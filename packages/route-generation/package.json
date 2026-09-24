@@ -1,0 +1,14 @@
+{
+  "name": "@path-finder/route-generation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "typescript": "~6.0.3"
+  }
+}
