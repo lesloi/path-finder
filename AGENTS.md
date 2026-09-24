@@ -46,6 +46,7 @@ Run from the repo root. Keep this table in sync with the root `package.json`.
 | Dev server          | `pnpm start`                                |
 | Android / iOS / web | `pnpm android` / `pnpm ios` / `pnpm web`    |
 | Unit tests          | `pnpm test`                                 |
+| Unit test coverage  | `pnpm test:coverage` (fails below 80 %)     |
 | Integration tests   | `pnpm test:integration` (placeholder, #13)  |
 | Single test file    | `pnpm jest path/to/file-test.tsx`           |
 | Single test by name | `pnpm jest -t "generates a loop route"`     |

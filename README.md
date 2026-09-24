@@ -1,5 +1,7 @@
 # Path finder
 
+![Coverage](https://raw.githubusercontent.com/lesloi/path-finder/badges/coverage.svg)
+
 Path finder is a privacy-first mobile app that generates running and trail routes from a
 few criteria: where you start, how far you want to go, and how much elevation gain you
 want.
@@ -40,6 +42,7 @@ pnpm install
 pnpm start        # Expo dev server for apps/mobile
 pnpm android      # open on an Android device or emulator
 pnpm test         # unit tests
+pnpm test:coverage  # unit tests with coverage (fails below 80 %)
 ```
 
 The repository is a pnpm workspace: `apps/mobile` (Expo app), `apps/api` (Hono API), and

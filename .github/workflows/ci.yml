@@ -26,5 +26,60 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test --ci
+
+      # Fails below the coverage threshold set in jest.config.js.
+      - run: pnpm test:coverage | tee "$RUNNER_TEMP/coverage.txt"
+        shell: bash
+
+      - name: Write coverage to the job summary
+        if: ${{ !cancelled() && hashFiles('coverage/coverage-summary.json') != '' }}
+        run: |
+          {
+            echo '### Coverage'
+            echo '```'
+            # Keep the coverage table only, without ANSI colors.
+            sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/coverage.txt" | grep -E '^(-|.*\|)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() && hashFiles('coverage/coverage-summary.json') != '' }}
+        with:
+          name: coverage
+          path: coverage/
+
       - run: pnpm test:integration
+
+  # Publishes the README badge on the orphan `badges` branch, from main only.
+  coverage-badge:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    concurrency: coverage-badge
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: coverage
+          path: coverage/
+
+      - run: node scripts/coverage-badge.mjs "$RUNNER_TEMP/coverage.svg"
+
+      - name: Push the badge to the badges branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git fetch --depth=1 origin badges; then
+            git switch -c badges FETCH_HEAD
+          else
+            git switch --orphan badges
+          fi
+          cp "$RUNNER_TEMP/coverage.svg" coverage.svg
+          git add coverage.svg
+          if ! git diff --cached --quiet; then
+            git commit -m 'chore: update coverage badge'
+            git push origin badges
+          fi
