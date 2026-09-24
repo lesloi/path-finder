@@ -6,12 +6,13 @@
 //
 // Run: node spike.mjs  -> results/summary.md
 
-import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fromFile } from "geotiff";
 import { gain, resample, smooth } from "./geo.mjs";
 
 const TILES = new URL("data/tiles/", import.meta.url).pathname;
-const tracks = JSON.parse(readFileSync(new URL("data/tracks.json", import.meta.url)));
+const tracks = JSON.parse(readFileSync(process.env.TRACKS ?? new URL("data/tracks.json", import.meta.url)));
+const OUT = process.env.OUT ?? new URL("results/summary.md", import.meta.url).pathname;
 
 const STEPS = [10, 20, 30, 50, 90];
 const SMOOTH_M = [0, 60, 120, 200]; // moving-average window length in metres
@@ -23,7 +24,7 @@ const referenceGain = (t) => gain(smooth(t.reference.map((p) => p[2]), 5), 0);
 // --- Copernicus lookup -------------------------------------------------------------------
 
 const tileFiles = Object.fromEntries(
-  readdirSync(TILES).map((f) => {
+  readdirSync(TILES).filter((f) => f.endsWith(".tif")).map((f) => {
     const m = f.match(/_N(\d+)_00_([EW])(\d+)_00_DEM/);
     return [`${m[1]}_${m[2] === "W" ? -m[3] : +m[3]}`, TILES + f];
   }),
@@ -95,7 +96,7 @@ for (const t of tracks) {
 }
 
 // Lyon centre tracks run between buildings: Copernicus is a surface model (DSM), not terrain.
-const URBAN = new Set(["lyon-road-10", "lyon-fourviere-10"]);
+const URBAN = new Set([...["lyon-road-10", "lyon-fourviere-10"], ...tracks.filter((t) => t.kind === "urban").map((t) => t.name)]);
 
 // Score: error relative to max(reference, 100 m) so flat routes don't blow up percentages.
 const methods = [];
@@ -160,6 +161,5 @@ const lines = [
     return `| ${s} m | ${med(ts.map((t) => t.points))} | ${med(ts.map((t) => t.cold)).toFixed(0)} | ${Math.max(...ts.map((t) => t.cold)).toFixed(0)} | ${med(ts.map((t) => t.warm)).toFixed(0)} |`;
   }),
 ];
-mkdirSync(new URL("results/", import.meta.url), { recursive: true });
-writeFileSync(new URL("results/summary.md", import.meta.url), lines.join("\n") + "\n");
+writeFileSync(OUT, lines.join("\n") + "\n");
 console.log(lines.join("\n"));
