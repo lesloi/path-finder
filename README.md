@@ -33,7 +33,7 @@ national mapping agency (IGN).
 
 ## Getting started
 
-Requires Node.js 24 or later (the API runs its TypeScript directly) and pnpm.
+Requires Node.js 26 (LTS) and pnpm. The API runs its TypeScript directly with Node.
 
 ```sh
 pnpm install
