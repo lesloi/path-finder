@@ -8,21 +8,27 @@ Walkers and hikers can use it too, and cycling/MTB support may come later.
 
 ## Privacy-first
 
-Your location, your routes, and your activity data stay on your device. Path finder is
-built with no accounts, no analytics, no tracking, and no third-party services in the
-loop.
+No accounts, no analytics, no tracking. Your routes and settings stay on your phone.
+Your criteria (start point, distance, elevation gain) are sent to our own server in
+France, which generates the routes and keeps nothing. Map tiles come from the French
+national mapping agency (IGN).
 
 ## Planned features
 
-- Generate a route from a starting point, a target distance, and a target elevation gain
-- Activity profiles: running/trail first, hiking next, cycling/MTB later
-- Route shapes (loops, out-and-back, point-to-point)
+- Generate three to five loops from a start point, a target distance or duration, an
+  optional target elevation gain, and a surface preference (paved or trails)
+- Browse the routes on a map, with elevation profile and estimated duration from your pace
+- Export a route as GPX for your watch (Garmin, Coros, Polar…)
+- Running (road and trail) and hiking first, cycling/MTB later
+- French and English, metric and imperial units
+- France only for now; Android first, iOS later
 
 ## Tech stack
 
-- [Expo](https://expo.dev) (React Native) for iOS and Android
-- [pnpm](https://pnpm.io) as the package manager
-- TypeScript
+- [Expo](https://expo.dev) (React Native) with [MapLibre](https://maplibre.org) and Plan IGN tiles
+- API in TypeScript with [Hono](https://hono.dev), routing by [BRouter](https://github.com/abrensch/brouter)
+  on OpenStreetMap data, elevation from Copernicus DEM
+- [pnpm](https://pnpm.io) workspace monorepo
 - [jest-expo](https://docs.expo.dev/develop/unit-testing/) for unit tests
 
 ## Getting started
