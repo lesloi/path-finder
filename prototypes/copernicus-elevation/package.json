@@ -1,0 +1,11 @@
+{
+  "name": "prototype-copernicus-elevation",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "spike": "node spike.mjs"
+  },
+  "dependencies": {
+    "geotiff": "^3.0.5"
+  }
+}
