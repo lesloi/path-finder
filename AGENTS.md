@@ -38,8 +38,7 @@ pnpm workspace monorepo:
 
 ## Commands
 
-Placeholders — confirm each one against `package.json` once the scaffold exists and fix
-this table if it drifts.
+Run from the repo root. Keep this table in sync with the root `package.json`.
 
 | Task                | Command                                     |
 | ------------------- | ------------------------------------------- |
@@ -47,7 +46,7 @@ this table if it drifts.
 | Dev server          | `pnpm start`                                |
 | Android / iOS / web | `pnpm android` / `pnpm ios` / `pnpm web`    |
 | Unit tests          | `pnpm test`                                 |
-| Integration tests   | `pnpm test:integration` (API + BRouter)     |
+| Integration tests   | `pnpm test:integration` (placeholder, #13)  |
 | Single test file    | `pnpm jest path/to/file-test.tsx`           |
 | Single test by name | `pnpm jest -t "generates a loop route"`     |
 | Non-watch test run  | `pnpm jest --ci --watchAll=false`           |

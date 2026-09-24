@@ -33,13 +33,17 @@ national mapping agency (IGN).
 
 ## Getting started
 
-The app has not been scaffolded yet, so there is nothing to run. Once the Expo project
-exists, the usual commands will be:
+Requires Node.js 26 (LTS) and pnpm. The API runs its TypeScript directly with Node.
 
 ```sh
 pnpm install
-pnpm start
+pnpm start        # Expo dev server for apps/mobile
+pnpm android      # open on an Android device or emulator
+pnpm test         # unit tests
 ```
+
+The repository is a pnpm workspace: `apps/mobile` (Expo app), `apps/api` (Hono API), and
+`packages/route-generation` (criteria → route set).
 
 ## License
 
