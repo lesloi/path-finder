@@ -81,16 +81,16 @@ If a feature seems to need an exception, ask the owner before implementing it.
 - Keep route generation (criteria → route set) in `packages/route-generation`, plain
   TypeScript free of React Native and Node-specific imports, so it can be unit tested
   without a simulator or a server. It runs in the API.
-- Elevation gain and profiles come from Copernicus DEM, never from BRouter
-  (`docs/adr/0003-elevation-from-copernicus-not-routing-engine.md`).
+- Elevation gain and profiles come from IGN BD ALTI 25 m, never from BRouter
+  (`docs/adr/0003-elevation-from-ign-terrain-model-not-routing-engine.md`).
 - Model activity type (run / hike / ride) as data, not as branches scattered through the UI.
 - Prefer small modules with focused tests over large screens.
 - Tests live in `__tests__/` directories or as `*-test.ts(x)` files next to the code.
 - Unit tests (`pnpm test`) are what runs locally: fast, no Docker, BRouter mocked.
   Integration tests (`pnpm test:integration`) run the API against a real BRouter container
   on one cached segment tile, mainly in CI.
-- Keep the in-app credits screen accurate: OpenStreetMap (ODbL), IGN (Licence Ouverte),
-  Copernicus DEM, and a link to the source code. Every GPX export carries the OSM
+- Keep the in-app credits screen accurate: OpenStreetMap (ODbL), IGN – Plan IGN and
+  BD ALTI (Licence Ouverte), and a link to the source code. Every GPX export carries the OSM
   attribution.
 - Do not commit generated artifacts: `node_modules/`, `.expo/`, `coverage/`, and the
   native `ios/` / `android/` directories if continuous native generation is used.
