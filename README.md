@@ -27,7 +27,7 @@ national mapping agency (IGN).
 
 - [Expo](https://expo.dev) (React Native) with [MapLibre](https://maplibre.org) and Plan IGN tiles
 - API in TypeScript with [Hono](https://hono.dev), routing by [BRouter](https://github.com/abrensch/brouter)
-  on OpenStreetMap data, elevation from Copernicus DEM
+  on OpenStreetMap data, elevation from IGN BD ALTI
 - [pnpm](https://pnpm.io) workspace monorepo
 - [jest-expo](https://docs.expo.dev/develop/unit-testing/) for unit tests
 
