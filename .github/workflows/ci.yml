@@ -26,5 +26,26 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      - run: pnpm test --ci
+
+      # Fails below the coverage threshold set in jest.config.js.
+      - run: pnpm test:coverage | tee "$RUNNER_TEMP/coverage.txt"
+        shell: bash
+
+      - name: Write coverage to the job summary
+        if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
+        run: |
+          {
+            echo '### Coverage'
+            echo '```'
+            # Keep the coverage table only, without ANSI colors.
+            sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/coverage.txt" | grep -E '^(-|.*\|)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
+        with:
+          name: coverage
+          path: coverage/
+
       - run: pnpm test:integration
