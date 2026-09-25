@@ -1,7 +1,5 @@
 # Path finder
 
-![Coverage](https://raw.githubusercontent.com/lesloi/path-finder/badges/coverage.svg)
-
 Path finder is a privacy-first mobile app that generates running and trail routes from a
 few criteria: where you start, how far you want to go, and how much elevation gain you
 want.

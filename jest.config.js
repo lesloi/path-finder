@@ -23,7 +23,7 @@ const nodeProject = (displayName, rootDir, coveragePathIgnorePatterns = ['/node_
 module.exports = {
   // Matched against paths relative to each project's rootDir.
   collectCoverageFrom: ['**/*.{ts,tsx}', '!**/__tests__/**', '!**/*-test.{ts,tsx}', '!**/*.d.ts'],
-  coverageReporters: ['text', 'lcov', 'json-summary'],
+  coverageReporters: ['text', 'lcov'],
   coverageThreshold: {
     global: { statements: 80, branches: 80, functions: 80, lines: 80 },
   },
