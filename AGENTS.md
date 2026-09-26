@@ -24,8 +24,8 @@ Walkers and hikers can use it too, and cycling/MTB support may come later.
 pnpm workspace monorepo:
 
 - `apps/web`: the web app.
-- `apps/api`: the Hono API.
-- `packages/route-generation`: criteria → route set, plain TypeScript, used by the API.
+- `apps/api`: the Hono API. Route generation (criteria → route set) lives in
+  `apps/api/src/route-generation`.
 
 ## Commands
 
@@ -72,9 +72,9 @@ If a feature seems to need an exception, ask the owner before implementing it.
 
 - Use the vocabulary in `CONTEXT.md` (route, route set, match, suggestion, effort
   distance…) in code, tests, and issues.
-- Keep route generation (criteria → route set) in `packages/route-generation`, plain
-  TypeScript free of browser and Node-specific imports, so it can be unit tested without
-  a browser or a server. It runs in the API.
+- Keep route generation (criteria → route set) in `apps/api/src/route-generation`, plain
+  TypeScript free of browser, Node, and Hono imports (enforced by ESLint), so it can be
+  unit tested without a browser or a server.
 - Elevation gain and profiles come from IGN BD ALTI 25 m, never from BRouter
   (`docs/adr/0003-elevation-from-ign-terrain-model-not-routing-engine.md`).
 - Model activity type (run / hike / ride) as data, not as branches scattered through the UI.

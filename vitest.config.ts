@@ -7,7 +7,6 @@ export default defineConfig({
     globals: true,
     projects: [
       { extends: true, test: { name: 'api', root: './apps/api' } },
-      { extends: true, test: { name: 'route-generation', root: './packages/route-generation' } },
       {
         extends: true,
         test: {
@@ -19,7 +18,7 @@ export default defineConfig({
       },
     ],
     coverage: {
-      include: ['apps/*/src/**/*.{ts,tsx}', 'packages/*/src/**/*.{ts,tsx}'],
+      include: ['apps/*/src/**/*.{ts,tsx}'],
       exclude: [
         '**/__tests__/**',
         '**/*-test.{ts,tsx}',

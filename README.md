@@ -45,8 +45,8 @@ pnpm test         # unit tests
 pnpm test:coverage  # unit tests with coverage (fails below 80 %)
 ```
 
-The repository is a pnpm workspace: `apps/web` (web app), `apps/api` (Hono API), and
-`packages/route-generation` (criteria → route set).
+The repository is a pnpm workspace: `apps/web` (web app) and `apps/api` (Hono API, with
+route generation in `apps/api/src/route-generation`).
 
 ## Contributing
 
