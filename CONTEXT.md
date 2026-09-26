@@ -90,10 +90,11 @@ not enough matches.
 _Avoid_: Alternative, fallback
 
 **GPX export**:
-A GPX file for one route, handed to the OS share sheet so the user can open it in their
-watch vendor's app.
+A GPX file for one route, sent to the device share sheet when the browser supports it,
+otherwise downloaded, so the user can open it in their watch vendor's app.
 _Avoid_: Sync, upload
 
 **Settings**:
-The user's preferences kept on the device: pace per activity, language, units.
+The user's preferences kept on the device: pace per activity, language, units. Lost if the
+user clears the site's data.
 _Avoid_: Profile, account

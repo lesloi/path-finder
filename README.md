@@ -1,6 +1,6 @@
 # Path finder
 
-Path finder is a privacy-first mobile app that generates running and trail routes from a
+Path finder is a privacy-first web app that generates running and trail routes from a
 few criteria: where you start, how far you want to go, and how much elevation gain you
 want.
 
@@ -8,7 +8,7 @@ Walkers and hikers can use it too, and cycling/MTB support may come later.
 
 ## Privacy-first
 
-No accounts, no analytics, no tracking. Your routes and settings stay on your phone.
+No accounts, no analytics, no tracking. Your routes and settings stay in your browser.
 Your criteria (start point, distance, elevation gain) are sent to our own server in
 France, which generates the routes and keeps nothing. Map tiles come from the French
 national mapping agency (IGN).
@@ -21,17 +21,21 @@ national mapping agency (IGN).
 - Export a route as GPX for your watch (Garmin, Coros, Polar…)
 - Running (road and trail) and hiking first, cycling/MTB later
 - French and English, metric and imperial units
-- France only for now; Android first, iOS later
+- France only for now; works in any current mobile or desktop browser, installable on the
+  home screen
 
 ## Tech stack
 
-- [Expo](https://expo.dev) (React Native) with [MapLibre](https://maplibre.org) and Plan IGN tiles
+- [Vite](https://vite.dev) + [React](https://react.dev) web app with [MapLibre](https://maplibre.org) and Plan IGN tiles
 - API in TypeScript with [Hono](https://hono.dev), routing by [BRouter](https://github.com/abrensch/brouter)
   on OpenStreetMap data, elevation from IGN BD ALTI
 - [pnpm](https://pnpm.io) workspace monorepo
-- [jest-expo](https://docs.expo.dev/develop/unit-testing/) for unit tests
+- [Vitest](https://vitest.dev) for unit tests
 
 ## Getting started
+
+The web app is being scaffolded (#20); until then `apps/mobile` holds the former Expo
+scaffold and the commands below are the Expo ones.
 
 Requires Node.js 26 (LTS) and pnpm. The API runs its TypeScript directly with Node.
 
@@ -43,8 +47,8 @@ pnpm test         # unit tests
 pnpm test:coverage  # unit tests with coverage (fails below 80 %)
 ```
 
-The repository is a pnpm workspace: `apps/mobile` (Expo app), `apps/api` (Hono API), and
-`packages/route-generation` (criteria → route set).
+The repository is a pnpm workspace: `apps/web` (web app; `apps/mobile` until #20),
+`apps/api` (Hono API), and `packages/route-generation` (criteria → route set).
 
 ## Contributing
 

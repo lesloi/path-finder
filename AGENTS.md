@@ -1,4 +1,4 @@
-**Path finder** is a privacy-first mobile app that generates running and trail routes from a
+**Path finder** is a privacy-first web app that generates running and trail routes from a
 few criteria: where you start, how far you want to go, and how much elevation gain you
 want.
 
@@ -7,23 +7,27 @@ Walkers and hikers can use it too, and cycling/MTB support may come later.
 ## Stack
 
 - Package manager: **pnpm** only — never npm or yarn. The lockfile is `pnpm-lock.yaml`.
-- Framework: **Expo** (React Native), current stable SDK. **Android first**; iOS comes
-  later, so don't block on iOS-only work.
-- Language: **TypeScript**, everywhere (app, API, route generation).
-- API: **Hono** on Node, stateless, calling a self-hosted **BRouter** engine. Shipped as
-  Docker images on GitHub Container Registry and run with `docker compose` on a Scaleway
-  Instance (`fr-par`). See `docs/adr/0001-self-hosted-routing-backend.md`.
-- Maps: MapLibre React Native with Plan IGN tiles. See `docs/adr/0002-ign-basemap-from-device.md`.
-- Tests: **jest-expo** with `@testing-library/react-native`.
-- Lint/format: whatever the Expo scaffold configures (ESLint via `eslint-config-expo`).
-- Android builds: GitHub Actions with `expo prebuild` + Gradle, published to Google Play
-  and GitHub Releases. No EAS dependency.
+- Front end: **Vite + React** single-page app, installable as a PWA (manifest, no service
+  worker). Mobile-first responsive, for current mobile and desktop browsers. See
+  `docs/adr/0004-web-app-instead-of-native-app.md`.
+- Language: **TypeScript**, everywhere (web app, API, route generation).
+- API: **Hono** on Node, stateless, calling a self-hosted **BRouter** engine. It also serves
+  the built web app on the same origin. Shipped as Docker images on GitHub Container
+  Registry and run with `docker compose` on a Scaleway Instance (`fr-par`). See
+  `docs/adr/0001-self-hosted-routing-backend.md`.
+- Maps: MapLibre GL JS with Plan IGN tiles. See `docs/adr/0002-ign-basemap-from-device.md`.
+- Tests: **Vitest**, with `@testing-library/react` for the web app.
+- Lint: ESLint with `typescript-eslint` and `eslint-plugin-react-hooks`.
+
+**Migration in progress:** `apps/mobile` still holds the Expo scaffold until #20 replaces it
+with `apps/web`. Until then, the commands, the pnpm notes, and the Jest setup below are the
+Expo ones.
 
 ### Repository layout
 
 pnpm workspace monorepo:
 
-- `apps/mobile`: the Expo app.
+- `apps/web`: the web app (`apps/mobile`, the Expo scaffold, until #20).
 - `apps/api`: the Hono API.
 - `packages/route-generation`: criteria → route set, plain TypeScript, used by the API.
 
@@ -66,10 +70,13 @@ These are product requirements, not preferences:
   (ADR 0002). Any other runtime network call needs the owner's explicit approval and, if
   approved, a French or EU provider.
 - No analytics, crash reporting, advertising, or tracking SDKs.
-- No new dependency on Google Play Services beyond what Expo already requires (F-Droid /
-  IzzyOnDroid is a later target).
-- Request the narrowest OS permission that works (foreground location only) and degrade
-  gracefully when permission is denied.
+- No third-party scripts, stylesheets, or fonts in the web app (no CDN, no Google Fonts):
+  self-host every asset.
+- Serve every page with `Referrer-Policy: no-referrer`.
+- Ask for browser geolocation only when the user asks for their location; fall back to
+  picking the start point on the map when it is denied.
+- The API may hold a salted, daily-rotated hash of the client IP in memory for rate
+  limiting, never written to disk or logs.
 - No accounts, no logins, no device identifiers.
 
 If a feature seems to need an exception, ask the owner before implementing it.
@@ -79,21 +86,21 @@ If a feature seems to need an exception, ask the owner before implementing it.
 - Use the vocabulary in `CONTEXT.md` (route, route set, match, suggestion, effort
   distance…) in code, tests, and issues.
 - Keep route generation (criteria → route set) in `packages/route-generation`, plain
-  TypeScript free of React Native and Node-specific imports, so it can be unit tested
-  without a simulator or a server. It runs in the API.
+  TypeScript free of browser and Node-specific imports, so it can be unit tested without
+  a browser or a server. It runs in the API.
 - Elevation gain and profiles come from IGN BD ALTI 25 m, never from BRouter
   (`docs/adr/0003-elevation-from-ign-terrain-model-not-routing-engine.md`).
 - Model activity type (run / hike / ride) as data, not as branches scattered through the UI.
-- Prefer small modules with focused tests over large screens.
+- Prefer small modules with focused tests over large views.
 - Tests live in `__tests__/` directories or as `*-test.ts(x)` files next to the code.
 - Unit tests (`pnpm test`) are what runs locally: fast, no Docker, BRouter mocked.
   Integration tests (`pnpm test:integration`) run the API against a real BRouter container
   on one cached segment tile, mainly in CI.
-- Keep the in-app credits screen accurate: OpenStreetMap (ODbL), IGN – Plan IGN and
+- Keep the in-app credits page accurate: OpenStreetMap (ODbL), IGN – Plan IGN and
   BD ALTI (Licence Ouverte), and a link to the source code. Every GPX export carries the OSM
   attribution.
-- Do not commit generated artifacts: `node_modules/`, `.expo/`, `coverage/`, and the
-  native `ios/` / `android/` directories if continuous native generation is used.
+- Do not commit generated artifacts: `node_modules/`, `dist/`, `coverage/` (and `.expo/`
+  until #20).
 
 ## Commits
 
