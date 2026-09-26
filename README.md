@@ -30,11 +30,11 @@ national mapping agency (IGN).
 
 ## Tech stack
 
-- [Vite](https://vite.dev) + [React](https://react.dev) web app with [MapLibre](https://maplibre.org) and Plan IGN tiles
-- API in TypeScript with [Hono](https://hono.dev), routing by [BRouter](https://github.com/abrensch/brouter)
-  on OpenStreetMap data, elevation from IGN BD ALTI
-- [pnpm](https://pnpm.io) workspace monorepo
-- [Vitest](https://vitest.dev) for unit tests
+- Vite + React web app with MapLibre and Plan IGN tiles
+- API in TypeScript with Hono, routing by BRouter on OpenStreetMap data, elevation from
+  IGN BD ALTI
+- pnpm workspace monorepo: `apps/web` and `apps/api`
+- Vitest for unit tests
 
 ## Getting started
 
@@ -47,10 +47,16 @@ pnpm build        # build the web app
 pnpm start        # serve the built web app and the API on port 3000
 pnpm test         # unit tests
 pnpm test:coverage  # unit tests with coverage (fails below 80 %)
+pnpm lint         # lint
+pnpm typecheck    # type check
 ```
 
-The repository is a pnpm workspace: `apps/web` (web app) and `apps/api` (Hono API, with
-route generation in `apps/api/src/route-generation`).
+## Data and credits
+
+- Routing data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors,
+  under the ODbL
+- Map tiles (Plan IGN) and elevation (BD ALTI) from [IGN](https://www.ign.fr), under the
+  Licence Ouverte
 
 ## Contributing
 
