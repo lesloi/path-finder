@@ -27,7 +27,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
 
-      # Fails below the coverage threshold set in jest.config.js.
+      # Fails below the coverage threshold set in vitest.config.ts.
       - run: pnpm test:coverage | tee "$RUNNER_TEMP/coverage.txt"
         shell: bash
 
@@ -49,3 +49,4 @@ jobs:
           path: coverage/
 
       - run: pnpm test:integration
+      - run: pnpm build

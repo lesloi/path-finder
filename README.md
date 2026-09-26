@@ -34,21 +34,19 @@ national mapping agency (IGN).
 
 ## Getting started
 
-The web app is being scaffolded (#20); until then `apps/mobile` holds the former Expo
-scaffold and the commands below are the Expo ones.
-
 Requires Node.js 26 (LTS) and pnpm. The API runs its TypeScript directly with Node.
 
 ```sh
 pnpm install
-pnpm start        # Expo dev server for apps/mobile
-pnpm android      # open on an Android device or emulator
+pnpm dev          # web app on http://localhost:5173, API on port 3000
+pnpm build        # build the web app
+pnpm start        # serve the built web app and the API on port 3000
 pnpm test         # unit tests
 pnpm test:coverage  # unit tests with coverage (fails below 80 %)
 ```
 
-The repository is a pnpm workspace: `apps/web` (web app; `apps/mobile` until #20),
-`apps/api` (Hono API), and `packages/route-generation` (criteria → route set).
+The repository is a pnpm workspace: `apps/web` (web app), `apps/api` (Hono API), and
+`packages/route-generation` (criteria → route set).
 
 ## Contributing
 

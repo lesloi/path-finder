@@ -4,25 +4,8 @@ node_modules/
 # tests
 coverage/
 
-# Expo
-.expo/
+# build
 dist/
-web-build/
-expo-env.d.ts
-
-# Native (continuous native generation)
-apps/mobile/android/
-apps/mobile/ios/
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
 
 # debug
 npm-debug.*

@@ -9,7 +9,7 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
-    "types": ["jest"]
+    "types": ["vitest/globals"]
   },
   "include": ["src"]
 }
