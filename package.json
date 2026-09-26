@@ -1,6 +1,7 @@
 {
   "name": "path-finder",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "scripts": {
     "start": "pnpm --filter @path-finder/mobile start",
     "android": "pnpm --filter @path-finder/mobile android",
