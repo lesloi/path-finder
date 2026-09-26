@@ -35,9 +35,9 @@ These are product requirements. If a feature seems to need an exception, ask the
 before implementing it.
 
 - Routes and settings stay on the device. The only backend is our own stateless API
-  (ADR 0001): it keeps no state and logs no locations or IP addresses. It may hold a
+  (#28): it keeps no state and logs no locations or IP addresses. It may hold a
   salted, daily-rotated hash of the client IP in memory for rate limiting.
-- The only runtime third party is the IGN Géoplateforme for map tiles (ADR 0002). Any other
+- The only runtime third party is the IGN Géoplateforme for map tiles (#29). Any other
   runtime network call needs the owner's approval and a French or EU provider.
 - Self-host every script, stylesheet, and font. No analytics, crash reporting, advertising,
   or tracking SDKs. No accounts, logins, or device identifiers.
@@ -51,7 +51,7 @@ before implementing it.
   distance…) in code, tests, and issues.
 - `apps/api/src/route-generation` (criteria → route set) stays plain TypeScript, free of
   browser, Node, and Hono imports, so it is unit tested without a server.
-- Elevation gain and profiles come from IGN BD ALTI 25 m, never from BRouter (ADR 0003).
+- Elevation gain and profiles come from IGN BD ALTI 25 m, never from BRouter (#30).
 - Model activity type (run / hike / ride) as data, not as branches through the UI.
 - Tests live in `__tests__/` or as `*-test.ts(x)` next to the code. Unit tests mock
   BRouter; integration tests run against a real BRouter container in CI.
@@ -68,7 +68,9 @@ before implementing it.
 
 ## Agent skills
 
-- Issue tracker: GitHub Issues on `lesloi/path-finder` via `gh`. See
-  `docs/agents/issue-tracker.md`.
-- Triage labels: `docs/agents/triage-labels.md`.
-- Domain docs: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+- Issue tracker: GitHub Issues on `lesloi/path-finder` via `gh`. External PRs are not a
+  triage surface.
+- Triage labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`,
+  `wontfix`.
+- Domain docs: `CONTEXT.md` at the repo root. Record architecture decisions as closed
+  GitHub issues labeled `decision`, never under `docs/`.
