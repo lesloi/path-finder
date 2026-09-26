@@ -46,6 +46,14 @@ pnpm test:coverage  # unit tests with coverage (fails below 80 %)
 The repository is a pnpm workspace: `apps/mobile` (Expo app), `apps/api` (Hono API), and
 `packages/route-generation` (criteria → route set).
 
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 ## License
 
-[GPL-3.0](./LICENSE)
+[AGPL-3.0-or-later](./LICENSE). The API is covered too: if you run a modified version as a
+network service, you must offer its source code to its users.
+
+The license covers the code, not the name. If you distribute a fork, give it a different
+name and icon so users can't mistake it for Path finder.
