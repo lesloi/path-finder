@@ -19,26 +19,13 @@ Walkers and hikers can use it too, and cycling/MTB support may come later.
 - Tests: **Vitest**, with `@testing-library/react` for the web app.
 - Lint: ESLint with `typescript-eslint` and `eslint-plugin-react-hooks`.
 
-**Migration in progress:** `apps/mobile` still holds the Expo scaffold until #20 replaces it
-with `apps/web`. Until then, the commands, the pnpm notes, and the Jest setup below are the
-Expo ones.
-
 ### Repository layout
 
 pnpm workspace monorepo:
 
-- `apps/web`: the web app (`apps/mobile`, the Expo scaffold, until #20).
+- `apps/web`: the web app.
 - `apps/api`: the Hono API.
 - `packages/route-generation`: criteria → route set, plain TypeScript, used by the API.
-
-### pnpm specifics
-
-- Expo supports pnpm's isolated `node_modules` from SDK 54 onward. If a native build or
-  Metro resolution fails, the documented fallback is `nodeLinker: hoisted` in
-  `pnpm-workspace.yaml` — try that before restructuring dependencies.
-- Under pnpm, Jest needs `transformIgnorePatterns` that includes `.pnpm`; see the
-  [Expo unit testing guide](https://docs.expo.dev/develop/unit-testing/) for the exact
-  pattern.
 
 ## Commands
 
@@ -47,17 +34,17 @@ Run from the repo root. Keep this table in sync with the root `package.json`.
 | Task                | Command                                     |
 | ------------------- | ------------------------------------------- |
 | Install             | `pnpm install`                              |
-| Dev server          | `pnpm start`                                |
-| Android / iOS / web | `pnpm android` / `pnpm ios` / `pnpm web`    |
+| Dev servers         | `pnpm dev` (web on 5173, API on 3000)       |
+| Build the web app   | `pnpm build`                                |
+| Serve the build     | `pnpm start` (API serves `apps/web/dist`)   |
 | Unit tests          | `pnpm test`                                 |
 | Unit test coverage  | `pnpm test:coverage` (fails below 80 %)     |
 | Integration tests   | `pnpm test:integration` (placeholder, #13)  |
-| Single test file    | `pnpm jest path/to/file-test.tsx`           |
-| Single test by name | `pnpm jest -t "generates a loop route"`     |
-| Non-watch test run  | `pnpm jest --ci --watchAll=false`           |
+| Single test file    | `pnpm test path/to/file-test.tsx`           |
+| Single test by name | `pnpm test -t "generates a loop route"`     |
+| Watch mode          | `pnpm vitest`                               |
 | Lint                | `pnpm lint`                                 |
 | Type check          | `pnpm typecheck` (`tsc --noEmit`)           |
-| Dependency health   | `pnpm expo-doctor`                          |
 
 ## Privacy-first rules (non-negotiable)
 
@@ -99,8 +86,7 @@ If a feature seems to need an exception, ask the owner before implementing it.
 - Keep the in-app credits page accurate: OpenStreetMap (ODbL), IGN – Plan IGN and
   BD ALTI (Licence Ouverte), and a link to the source code. Every GPX export carries the OSM
   attribution.
-- Do not commit generated artifacts: `node_modules/`, `dist/`, `coverage/` (and `.expo/`
-  until #20).
+- Do not commit generated artifacts: `node_modules/`, `dist/`, `coverage/`.
 
 ## Commits
 

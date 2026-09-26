@@ -9,7 +9,6 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.14",
     "typescript": "~6.0.3"
   }
 }

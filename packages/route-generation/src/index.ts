@@ -1,2 +1,2 @@
-// Criteria → route set. Plain TypeScript: no React Native or Node-specific imports.
+// Criteria → route set. Plain TypeScript: no browser or Node-specific imports.
 export {};
