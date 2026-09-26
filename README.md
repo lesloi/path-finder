@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="apps/web/public/favicon.svg" alt="Path finder logo" width="128" height="128">
+</p>
+
 # Path finder
 
 Path finder is a privacy-first web app that generates running and trail routes from a
