@@ -6,6 +6,15 @@ const STEP = 5;
 
 const EARTH_RADIUS = 6_371_000;
 
+/** Great-circle distance between two points, in metres. */
+export function distance(a: Position, b: Position): number {
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+  const h =
+    Math.sin(toRad(b[1] - a[1]) / 2) ** 2 +
+    Math.cos(toRad(a[1])) * Math.cos(toRad(b[1])) * Math.sin(toRad(b[0] - a[0]) / 2) ** 2;
+  return 2 * EARTH_RADIUS * Math.asin(Math.sqrt(h));
+}
+
 /** A grid cell a route enters, and how far along the route it does, in metres. */
 export type CellVisit = { cell: string; along: number };
 
