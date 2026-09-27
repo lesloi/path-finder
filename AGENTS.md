@@ -6,7 +6,6 @@ start point, a distance, and an elevation gain.
   web app on the same origin.
 - Use **pnpm**; scripts are in the root `package.json`.
 
-`pnpm dev` and `pnpm start` need `BROUTER_URL` unless BRouter runs on `localhost:17777`.
 Without `BDALTI_DIR`, routes have no elevation gain and the target elevation gain is ignored.
 
 ## Privacy-first rules (non-negotiable)
