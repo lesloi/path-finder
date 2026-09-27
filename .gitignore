@@ -23,3 +23,6 @@ pnpm-debug.log*
 
 # Claude Code
 .claude/worktrees/
+
+# Local data (see INSTALL.md)
+/data/
