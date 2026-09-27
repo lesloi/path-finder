@@ -14,8 +14,8 @@ Walkers and hikers can use it too, and cycling/MTB support may come later.
 
 No accounts, no analytics, no tracking. Your routes and settings stay in your browser.
 Your criteria (start point, distance, elevation gain) are sent to our own server in
-France, which generates the routes and keeps nothing. Map tiles come from the French
-national mapping agency (IGN).
+France, which generates the routes and keeps nothing. Map tiles, with their fonts and
+icons, come from the French national mapping agency (IGN).
 
 ## Planned features
 
