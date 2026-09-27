@@ -1,5 +1,6 @@
 # The API, serving the built web app on the same origin. Mount the converted BD ALTI tiles
-# at BDALTI_DIR and point BROUTER_URL at the BRouter server.
+# at BDALTI_DIR and point BROUTER_URL at the BRouter server. To name routes after their
+# commune, mount the file written by scripts/convert-admin-express.ts and set COMMUNES_FILE.
 
 FROM node:26-slim AS base
 RUN npm install --global pnpm@12.6.0

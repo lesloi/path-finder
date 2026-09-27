@@ -40,10 +40,13 @@ national mapping agency (IGN).
 
 Requires Node.js 26 (LTS) and pnpm. The API runs its TypeScript directly with Node.
 
-The API needs two environment variables:
+The API reads these environment variables:
 
-- `BDALTI_DIR`: BD ALTI 25 m tiles converted by `apps/api/scripts/convert-bdalti.ts`
+- `BDALTI_DIR` (required): BD ALTI 25 m tiles converted by `apps/api/scripts/convert-bdalti.ts`
 - `BROUTER_URL`: a BRouter server, `http://localhost:17777` by default
+- `COMMUNES_FILE`: communes converted by `apps/api/scripts/convert-admin-express.ts`, to
+  name routes after the commune of their start point. Without it, route names have no
+  commune.
 
 ```sh
 pnpm install
@@ -57,14 +60,15 @@ pnpm typecheck    # type check
 ```
 
 The `Dockerfile` builds the API with the web app. Mount the tiles at `/data/bdalti` and
-point `BROUTER_URL` at BRouter (`http://brouter:17777` by default).
+point `BROUTER_URL` at BRouter (`http://brouter:17777` by default). To name routes after
+their commune, mount the communes file too and point `COMMUNES_FILE` at it.
 
 ## Data and credits
 
 - Routing data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors,
   under the ODbL
-- Map tiles (Plan IGN) and elevation (BD ALTI) from [IGN](https://www.ign.fr), under the
-  Licence Ouverte
+- Map tiles (Plan IGN), elevation (BD ALTI), and communes (ADMIN EXPRESS) from
+  [IGN](https://www.ign.fr), under the Licence Ouverte
 
 ## Contributing
 

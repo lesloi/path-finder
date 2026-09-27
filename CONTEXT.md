@@ -70,7 +70,7 @@ _Avoid_: Trace, track, itinerary, path
 
 **Route name**:
 The label of a route in the app and in its GPX export: the commune of the start point, the
-distance, and the elevation gain, such as "Boucle Annecy · 12.3 km · +340 m".
+distance, and the elevation gain, such as "Annecy · 12.3 km · +340 m".
 _Avoid_: Title
 
 **Loop**:

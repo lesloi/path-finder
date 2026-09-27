@@ -16,6 +16,7 @@ describe.each(languages)('legal pages in %s', (language) => {
       'https://www.openstreetmap.org/copyright',
     );
     expect(screen.getByText(/Plan IGN/)).toBeInTheDocument();
+    expect(screen.getByText(/ADMIN EXPRESS/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Licence Ouverte' })).toHaveAttribute(
       'href',
       'https://www.etalab.gouv.fr/licence-ouverte-open-licence/',

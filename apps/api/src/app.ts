@@ -12,6 +12,7 @@ import {
   type HeightAt,
   type RoutingEngine,
 } from './route-generation/index.ts';
+import type { CommuneAt } from './commune/communes.ts';
 import { createConcurrencyLimiter, createRateLimiter } from './limits.ts';
 
 // Vite fingerprints the files it emits under /assets, so they never change.
@@ -44,7 +45,18 @@ function retryLater(c: Context, status: 429 | 503, seconds: number, error: strin
   return c.json({ error }, status);
 }
 
-export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engine: RoutingEngine; heightAt: HeightAt }) {
+export function createApp({
+  webRoot,
+  engine,
+  heightAt,
+  communeAt = () => null,
+}: {
+  webRoot: string;
+  engine: RoutingEngine;
+  heightAt: HeightAt;
+  /** Without it, routes are named without a commune. */
+  communeAt?: CommuneAt;
+}) {
   const app = new Hono();
   const buildId = readBuildId(webRoot);
   // Generous, since mobile carriers put many users behind one address (CGNAT).
@@ -98,7 +110,7 @@ export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engi
       if (!routes) {
         return retryLater(c, 503, BUSY_RETRY_AFTER, 'Too many route sets being generated: retry in a few seconds');
       }
-      return c.json({ routes: await routes });
+      return c.json({ commune: communeAt(...criteria.start), routes: await routes });
     } catch (error) {
       // Only the deadline itself: any other error is a bug, not a slow generation.
       if (error === deadline.signal.reason) return c.json({ error: 'The route set took too long to generate' }, 504);
