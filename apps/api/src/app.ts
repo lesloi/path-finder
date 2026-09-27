@@ -1,5 +1,6 @@
+import { getConnInfo } from '@hono/node-server/conninfo';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -11,9 +12,12 @@ import {
   type HeightAt,
   type RoutingEngine,
 } from './route-generation/index.ts';
+import { createConcurrencyLimiter, createRateLimiter } from './limits.ts';
 
 // Vite fingerprints the files it emits under /assets, so they never change.
 const IMMUTABLE = 'public, max-age=31536000, immutable';
+// Seconds: about one generation, given the < 5 s p95 target.
+const BUSY_RETRY_AFTER = 5;
 
 /** ID written by each web app build (see `apps/web/vite.config.ts`), or none when the web app is not built. */
 function readBuildId(webRoot: string): string | undefined {
@@ -24,9 +28,28 @@ function readBuildId(webRoot: string): string | undefined {
   }
 }
 
+/**
+ * The reverse proxy appends the address it sees to `X-Forwarded-For`: earlier entries come
+ * from the client and can be forged. Without a proxy, the connection's own address counts.
+ */
+function clientAddress(c: Context): string {
+  const forwarded = c.req.header('X-Forwarded-For')?.split(',').at(-1)?.trim();
+  return forwarded || (getConnInfo(c).remote.address ?? '');
+}
+
+function retryLater(c: Context, status: 429 | 503, seconds: number, error: string) {
+  c.header('Retry-After', String(seconds));
+  return c.json({ error }, status);
+}
+
 export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engine: RoutingEngine; heightAt: HeightAt }) {
   const app = new Hono();
   const buildId = readBuildId(webRoot);
+  // Generous, since mobile carriers put many users behind one address (CGNAT).
+  const admit = createRateLimiter({ limit: 60, windowMs: 10 * 60 * 1000 });
+  // A generation already keeps BRouter's few calls at once busy, and waiting for more than two
+  // would miss the < 5 s p95 target.
+  const generate = createConcurrencyLimiter({ limit: 1, queueSize: 2 });
 
   app.use(async (c, next) => {
     await next();
@@ -35,8 +58,12 @@ export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engi
 
   app.get('/health', (c) => c.text('ok'));
 
-  // No logs here: criteria hold the start point.
+  // No logs here: criteria hold the start point, and requests hold the client address.
   app.post('/api/v1/route-sets', async (c) => {
+    const admission = admit(clientAddress(c));
+    if (!admission.admitted) {
+      return retryLater(c, 429, admission.retryAfter, 'Too many route sets asked for: retry later');
+    }
     // A tab left open across a deploy sends the ID of the previous build: it must reload.
     const clientBuildId = c.req.header('X-Build-Id');
     if (buildId && clientBuildId && clientBuildId !== buildId) {
@@ -52,10 +79,16 @@ export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engi
       throw error;
     }
     const { criteria, activity } = parsed;
-    const candidates = await generateCandidates(criteria, activity, engine, (geometry) =>
-      elevationGain(geometry, heightAt),
-    );
-    return c.json({ routes: buildRouteSet(criteria, candidates) });
+    const routes = generate(async () => {
+      const candidates = await generateCandidates(criteria, activity, engine, (geometry) =>
+        elevationGain(geometry, heightAt),
+      );
+      return buildRouteSet(criteria, candidates);
+    });
+    if (!routes) {
+      return retryLater(c, 503, BUSY_RETRY_AFTER, 'Too many route sets being generated: retry in a few seconds');
+    }
+    return c.json({ routes: await routes });
   });
 
   app.use(async (c, next) => {

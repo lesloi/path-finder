@@ -25,7 +25,7 @@ const BUILD_ID = 'b1d-2026';
 function postRouteSet(app: ReturnType<typeof createApp>, body: unknown, headers: Record<string, string> = {}) {
   return app.request('/api/v1/route-sets', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.1', ...headers },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 }
@@ -143,4 +143,82 @@ describe('api', () => {
       expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
     },
   );
+
+  describe('rate limit', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval'] });
+      vi.setSystemTime(new Date('2026-09-27T10:00:00Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function postManyTimes(limited: ReturnType<typeof createApp>, times: number, forwardedFor: (i: number) => string) {
+      for (let i = 0; i < times; i++) await postRouteSet(limited, '{', { 'X-Forwarded-For': forwardedFor(i) });
+    }
+
+    it('answers 429 after 60 requests in 10 minutes from the address the proxy saw', async () => {
+      const limited = createApp({ webRoot, engine, heightAt: flat });
+      await postManyTimes(limited, 60, () => '203.0.113.9');
+
+      const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.9' });
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get('Retry-After')).toBe('600');
+      expect((await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.10' })).status).toBe(200);
+    });
+
+    it('ignores the addresses a client forges before the one the proxy appends', async () => {
+      const limited = createApp({ webRoot, engine, heightAt: flat });
+      await postManyTimes(limited, 60, (i) => `10.0.0.${i}, 203.0.113.9`);
+
+      const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '10.0.0.99, 203.0.113.9' });
+
+      expect(response.status).toBe(429);
+    });
+
+    it('lets an address in again after 10 minutes', async () => {
+      const limited = createApp({ webRoot, engine, heightAt: flat });
+      await postManyTimes(limited, 61, () => '203.0.113.9');
+
+      vi.advanceTimersByTime(10 * 60 * 1000);
+
+      expect((await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.9' })).status).toBe(200);
+    });
+
+    it('counts connections without a proxy by their own address', async () => {
+      const limited = createApp({ webRoot, engine, heightAt: flat });
+      const post = (remoteAddress: string) =>
+        limited.request(
+          '/api/v1/route-sets',
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(criteria) },
+          { incoming: { socket: { remoteAddress } } },
+        );
+      for (let i = 0; i < 60; i++) await post('198.51.100.1');
+
+      expect((await post('198.51.100.1')).status).toBe(429);
+      expect((await post('198.51.100.2')).status).toBe(200);
+    });
+  });
+
+  it('answers 503 with Retry-After beyond one generation and two waiting', async () => {
+    let release!: () => void;
+    const busy = new Promise<void>((resolve) => (release = resolve));
+    const blocked: RoutingEngine = async (request) => {
+      await busy;
+      return engine(request);
+    };
+    const saturated = createApp({ webRoot, engine: blocked, heightAt: flat });
+
+    const requests = Array.from({ length: 4 }, () => postRouteSet(saturated, criteria));
+    // Nothing else can answer before the engine is released.
+    const turnedAway = await Promise.race(requests);
+    release();
+    const statuses = (await Promise.all(requests)).map((response) => response.status);
+
+    expect(turnedAway.status).toBe(503);
+    expect(turnedAway.headers.get('Retry-After')).toBe('5');
+    expect(statuses.sort()).toEqual([200, 200, 200, 503]);
+  });
 });

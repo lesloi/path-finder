@@ -14,7 +14,7 @@ start point, a distance, and an elevation gain.
 If a feature seems to need an exception, ask the owner before implementing it.
 
 - Routes and settings stay on the device. The API keeps no state and logs no locations or
-  IP addresses; it may hold a salted, daily-rotated IP hash in memory for rate limiting.
+  IP addresses; it may hold a salted IP hash, rotated at least daily, in memory for rate limiting.
 - The only runtime third party is the IGN Géoplateforme for map tiles. Any other runtime
   network call needs the owner's approval and a French or EU provider.
 - Self-host every script, stylesheet, and font. No analytics, tracking, or accounts.
