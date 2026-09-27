@@ -1,5 +1,7 @@
 // Key settings of the route generation engine.
 
+import type { Activity } from './candidates.ts';
+
 /**
  * How far a route may be from the criteria. `distance` also applies to the estimated
  * duration when the user asks for a target duration. Elevation gain floors are in metres.
@@ -23,6 +25,12 @@ export const CLIMB_PER_EFFORT_KM = 100;
 
 /** Shortest distance to ask the routing engine for, in kilometres (#7 criteria bounds). */
 export const MIN_TARGET_DISTANCE = 2;
+/** Longest target distance per activity, in kilometres (#7 criteria bounds). */
+export const MAX_TARGET_DISTANCE: Record<Activity, number> = { run: 50, hike: 40 };
+/** Target duration bounds, in minutes (#7 criteria bounds). */
+export const TARGET_DURATION = { min: 15, max: 360 };
+/** Largest target elevation gain, in metres (#7 criteria bounds). */
+export const MAX_TARGET_ELEVATION_GAIN = 2_500;
 
 export const MAX_ROUTES = 5;
 /** Suggestions only fill the route set up to this size. */

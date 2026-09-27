@@ -3,6 +3,33 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createApp } from './app.ts';
+import { API_CONTRACT } from './contract.ts';
+import type { Position, RoutingEngine } from './route-generation/index.ts';
+
+const START: Position = [6.1294, 45.8992];
+
+// Loops 5 times as long as the radius asked for, each out to a point in its own heading.
+const engine: RoutingEngine = async ({ radius, heading }) => {
+  const angle = (heading * Math.PI) / 180;
+  const offset = radius / 111_000;
+  return {
+    geometry: [START, [START[0] + offset * Math.sin(angle), START[1] + offset * Math.cos(angle)], START],
+    distance: (5 * radius) / 1000,
+    ways: [{ length: 5 * radius, surface: 'gravel' }],
+  };
+};
+const flat = () => 450;
+
+const criteria = { start: START, activity: 'run', target: { distance: 10 }, surface: 'any', pace: 6 };
+const CONTRACT = { 'X-Api-Contract': String(API_CONTRACT) };
+
+function postRouteSet(app: ReturnType<typeof createApp>, body: unknown, headers: Record<string, string> = CONTRACT) {
+  return app.request('/api/v1/route-sets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
+}
 
 describe('api', () => {
   let webRoot: string;
@@ -13,7 +40,7 @@ describe('api', () => {
     await mkdir(join(webRoot, 'assets'));
     await writeFile(join(webRoot, 'index.html'), '<h1>Path finder</h1>');
     await writeFile(join(webRoot, 'assets', 'index-a1b2c3.js'), 'console.log(1);');
-    app = createApp({ webRoot });
+    app = createApp({ webRoot, engine, heightAt: flat });
   });
 
   afterAll(async () => {
@@ -47,7 +74,51 @@ describe('api', () => {
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
   });
 
-  it.each(['/health', '/', '/assets/index-a1b2c3.js', '/missing'])(
+  it('generates a loop route set', async () => {
+    const response = await postRouteSet(app, criteria);
+
+    expect(response.status).toBe(200);
+    const { routes } = await response.json();
+    expect(routes.length).toBeGreaterThanOrEqual(3);
+    expect(routes[0]).toMatchObject({ kind: 'match', distance: expect.closeTo(10), elevationGain: 0, unpavedShare: 1 });
+  });
+
+  it('asks the routing engine with the activity and measures elevation gain on BD ALTI', async () => {
+    const spy = vi.fn(engine);
+    let height = 0;
+    const climbing = createApp({ webRoot, engine: spy, heightAt: () => (height += 1) });
+
+    const response = await postRouteSet(climbing, { ...criteria, activity: 'hike', elevationGain: 'hilly' });
+
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ start: START, activity: 'hike', surface: 'any' }));
+    const { routes } = await response.json();
+    expect(routes[0].elevationGain).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ['invalid criteria', { ...criteria, target: { distance: 100 } }],
+    [
+      'a target duration too short for the target elevation gain',
+      { ...criteria, target: { duration: 30 }, elevationGain: 2_000 },
+    ],
+    ['a body that is not JSON', '{'],
+  ])('answers 400 on %s', async (_, body) => {
+    const response = await postRouteSet(app, body);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: expect.any(String) });
+  });
+
+  it.each([
+    ['another contract version', { 'X-Api-Contract': String(API_CONTRACT + 1) }],
+    ['no contract version', {}],
+  ])('answers 426 on %s', async (_, headers) => {
+    const response = await postRouteSet(app, criteria, headers);
+
+    expect(response.status).toBe(426);
+  });
+
+  it.each(['/health', '/', '/assets/index-a1b2c3.js', '/missing', '/api/v1/route-sets'])(
     'sends no referrer from %s',
     async (path) => {
       const response = await app.request(path);
