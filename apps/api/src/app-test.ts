@@ -143,4 +143,69 @@ describe('api', () => {
       expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
     },
   );
+
+  it('rate-limits requests per IP', async () => {
+    const slowEngine: RoutingEngine = async ({ radius, heading }) => {
+      const angle = (heading * Math.PI) / 180;
+      const offset = radius / 111_000;
+      return {
+        geometry: [START, [START[0] + offset * Math.sin(angle), START[1] + offset * Math.cos(angle)], START],
+        distance: (5 * radius) / 1000,
+        ways: [{ length: 5 * radius, surface: 'gravel' }],
+      };
+    };
+    const appWithRateLimit = createApp({ webRoot, engine: slowEngine, heightAt: flat });
+
+    // Make many requests from the same IP
+    const responses = [];
+    for (let i = 0; i < 65; i++) {
+      const response = await postRouteSet(appWithRateLimit, criteria, {
+        'X-Build-Id': BUILD_ID,
+        'x-forwarded-for': '192.168.1.100',
+      });
+      responses.push(response.status);
+    }
+
+    // First 60 should succeed (threshold: 60), rest should be 429
+    expect(responses.slice(0, 60).every((s) => s === 200)).toBe(true);
+    expect(responses.slice(60).every((s) => s === 429)).toBe(true);
+  });
+
+  it('rejects requests with 503 when concurrency limit is exceeded', async () => {
+    const slowEngine: RoutingEngine = async ({ radius, heading }) => {
+      const angle = (heading * Math.PI) / 180;
+      const offset = radius / 111_000;
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Slow engine
+      return {
+        geometry: [START, [START[0] + offset * Math.sin(angle), START[1] + offset * Math.cos(angle)], START],
+        distance: (5 * radius) / 1000,
+        ways: [{ length: 5 * radius, surface: 'gravel' }],
+      };
+    };
+    const appWithConcurrencyLimit = createApp({ webRoot, engine: slowEngine, heightAt: flat });
+
+    // Start multiple concurrent requests
+    const requests = [];
+    for (let i = 0; i < 15; i++) {
+      requests.push(
+        postRouteSet(appWithConcurrencyLimit, criteria, {
+          'X-Build-Id': BUILD_ID,
+          'x-forwarded-for': `192.168.1.${i}`,
+        }),
+      );
+    }
+
+    const responses = await Promise.all(requests);
+    const statuses = responses.map((r) => r.status);
+
+    // Some should succeed, some should get 503
+    expect(statuses.some((s) => s === 200)).toBe(true);
+    expect(statuses.some((s) => s === 503)).toBe(true);
+
+    // 503 responses should have Retry-After header
+    const error503 = responses.find((r) => r.status === 503);
+    if (error503) {
+      expect(error503.headers.get('Retry-After')).toBeTruthy();
+    }
+  });
 });
