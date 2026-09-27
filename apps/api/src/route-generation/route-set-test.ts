@@ -77,6 +77,51 @@ describe('buildRouteSet', () => {
     expect(routeSet).toMatchObject([{ kind: 'match', misses: [] }]);
   });
 
+  describe('with the hilly shortcut', () => {
+    const hilly: Criteria = { ...criteria, elevationGain: 'hilly' };
+
+    it('keeps a route with at least 10 m of elevation gain per km as a match', () => {
+      expect(buildRouteSet(hilly, [candidate({ elevationGain: 900 })])).toMatchObject([{ kind: 'match', misses: [] }]);
+    });
+
+    it('marks a route with at least 5 m per km as a suggestion, with the gap below hilly', () => {
+      const routeSet = buildRouteSet(hilly, [candidate({ elevationGain: 60 })]);
+
+      expect(routeSet).toMatchObject([{ kind: 'suggestion', misses: [{ criterion: 'elevationGain', gap: -40 }] }]);
+    });
+
+    it('drops a route with less than 5 m per km', () => {
+      expect(buildRouteSet(hilly, [candidate({ elevationGain: 40 })])).toEqual([]);
+    });
+
+    it('ranks routes within the bound on distance alone', () => {
+      const routeSet = buildRouteSet(hilly, [
+        candidate({ geometry: loop(0), distance: 10.2, elevationGain: 110 }),
+        candidate({ geometry: loop(120), distance: 10.1, elevationGain: 800 }),
+      ]);
+
+      expect(routeSet.map(({ distance }) => distance)).toEqual([10.1, 10.2]);
+    });
+  });
+
+  describe('with the flat shortcut', () => {
+    const flat: Criteria = { ...criteria, elevationGain: 'flat' };
+
+    it('keeps a route with at most 10 m of elevation gain per km as a match', () => {
+      expect(buildRouteSet(flat, [candidate({ elevationGain: 100 })])).toMatchObject([{ kind: 'match', misses: [] }]);
+    });
+
+    it('marks a route with up to 20 m per km as a suggestion, with the gap above flat', () => {
+      const routeSet = buildRouteSet(flat, [candidate({ elevationGain: 160 })]);
+
+      expect(routeSet).toMatchObject([{ kind: 'suggestion', misses: [{ criterion: 'elevationGain', gap: 60 }] }]);
+    });
+
+    it('drops a route with more than 20 m per km', () => {
+      expect(buildRouteSet(flat, [candidate({ elevationGain: 210 })])).toEqual([]);
+    });
+  });
+
   it('estimates the duration from the effort distance and the pace', () => {
     // 10 km + 300 m of elevation gain = 13 km of effort distance, at 6:00 min/km.
     const routeSet = buildRouteSet(criteria, [candidate({ distance: 10, elevationGain: 300 })]);
@@ -252,6 +297,15 @@ describe('targetDistance', () => {
 
   it('derives the distance from the target duration alone without a target elevation gain', () => {
     expect(targetDistance({ ...criteria, target: { duration: 78 }, elevationGain: undefined })).toBe(13);
+  });
+
+  it('derives the distance from the target duration alone with the flat shortcut', () => {
+    expect(targetDistance({ ...criteria, target: { duration: 78 }, elevationGain: 'flat' })).toBe(13);
+  });
+
+  it('leaves room for the least climb of the hilly shortcut', () => {
+    // 66 min at 6:00 min/km = 11 km of effort distance: 10 km, plus 100 m of climb at 10 m per km.
+    expect(targetDistance({ ...criteria, target: { duration: 66 }, elevationGain: 'hilly' })).toBeCloseTo(10);
   });
 
   it.each([

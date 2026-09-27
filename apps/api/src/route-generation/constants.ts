@@ -9,6 +9,15 @@ export const TOLERANCES = {
   suggestion: { distance: 0.25, elevationGain: 0.5, elevationGainFloor: 100 },
 };
 
+/**
+ * Bounds of the flat and hilly shortcuts, in metres of elevation gain per km of the route:
+ * flat is at most `match`, hilly at least `match`, and `suggestion` widens each bound.
+ */
+export const ELEVATION_LEVELS = {
+  flat: { match: 10, suggestion: 20 },
+  hilly: { match: 10, suggestion: 5 },
+};
+
 /** Metres of elevation gain that count as 1 km of effort distance. */
 export const CLIMB_PER_EFFORT_KM = 100;
 

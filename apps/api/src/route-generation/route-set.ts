@@ -1,5 +1,6 @@
 import {
   CLIMB_PER_EFFORT_KM,
+  ELEVATION_LEVELS,
   MAX_ROUTES,
   MAX_SHARED,
   MIN_ROUTES,
@@ -17,7 +18,8 @@ export type Position = [number, number];
 export type Criteria = {
   start: Position;
   target: { distance: number } | { duration: number };
-  elevationGain?: number;
+  /** A target in metres, or the flat or hilly shortcut. Without one, elevation gain does not count. */
+  elevationGain?: number | 'flat' | 'hilly';
   surface: 'paved' | 'unpaved' | 'any';
   /** Minutes per kilometre on flat ground. */
   pace: number;
@@ -53,48 +55,84 @@ function effortDistance(distance: number, elevationGain: number): number {
  */
 export function targetDistance(criteria: Criteria): number {
   if ('distance' in criteria.target) return criteria.target.distance;
-  const distance = criteria.target.duration / criteria.pace - (criteria.elevationGain ?? 0) / CLIMB_PER_EFFORT_KM;
+  const effort = criteria.target.duration / criteria.pace;
+  const { elevationGain } = criteria;
+  let distance: number;
+  if (elevationGain === 'hilly') {
+    // The distance plus its least climb, at `match` metres per km, makes the effort distance.
+    distance = effort / (1 + ELEVATION_LEVELS.hilly.match / CLIMB_PER_EFFORT_KM);
+  } else {
+    distance = effort - (typeof elevationGain === 'number' ? elevationGain : 0) / CLIMB_PER_EFFORT_KM;
+  }
   if (distance < MIN_TARGET_DISTANCE) {
     throw new RangeError(`Target duration leaves ${distance} km, under ${MIN_TARGET_DISTANCE} km`);
   }
   return distance;
 }
 
-/** `scale` turns a gap into a relative gap, for ranking. */
-type Check = { criterion: Miss['criterion']; gap: number; scale: number; match: number; suggestion: number };
+/** How a route fares against one criterion. `relative` is its gap relative to the criterion, for ranking. */
+type Check = { criterion: Miss['criterion']; gap: number; relative: number; match: boolean; suggestion: boolean };
+
+function againstTarget(
+  criterion: Miss['criterion'],
+  gap: number,
+  scale: number,
+  match: number,
+  suggestion: number,
+): Check {
+  const size = Math.abs(gap);
+  return { criterion, gap, relative: size / scale, match: size <= match, suggestion: size <= suggestion };
+}
+
+function againstLevel(route: Candidate, level: 'flat' | 'hilly'): Check {
+  const { match, suggestion } = ELEVATION_LEVELS[level];
+  const perKm = route.elevationGain / route.distance;
+  const bound = match * route.distance;
+  const gap = route.elevationGain - bound;
+  const flat = level === 'flat';
+  return {
+    criterion: 'elevationGain',
+    gap,
+    relative: Math.max(0, flat ? gap : -gap) / bound,
+    match: flat ? perKm <= match : perKm >= match,
+    suggestion: flat ? perKm <= suggestion : perKm >= suggestion,
+  };
+}
 
 function checks(criteria: Criteria, route: Candidate & { estimatedDuration: number }): Check[] {
   const { match, suggestion } = TOLERANCES;
   const result: Check[] = [];
   if ('distance' in criteria.target) {
     const target = criteria.target.distance;
-    result.push({
-      criterion: 'distance',
-      gap: route.distance - target,
-      scale: target,
-      match: match.distance * target,
-      suggestion: suggestion.distance * target,
-    });
+    result.push(
+      againstTarget('distance', route.distance - target, target, match.distance * target, suggestion.distance * target),
+    );
   } else {
     const target = criteria.target.duration;
-    result.push({
-      criterion: 'duration',
-      gap: route.estimatedDuration - target,
-      scale: target,
-      match: match.distance * target,
-      suggestion: suggestion.distance * target,
-    });
+    result.push(
+      againstTarget(
+        'duration',
+        route.estimatedDuration - target,
+        target,
+        match.distance * target,
+        suggestion.distance * target,
+      ),
+    );
   }
-  if (criteria.elevationGain !== undefined) {
-    const target = criteria.elevationGain;
-    result.push({
-      criterion: 'elevationGain',
-      gap: route.elevationGain - target,
-      // Below this target, the floor of the match tolerance applies.
-      scale: Math.max(target, match.elevationGainFloor / match.elevationGain),
-      match: Math.max(match.elevationGain * target, match.elevationGainFloor),
-      suggestion: Math.max(suggestion.elevationGain * target, suggestion.elevationGainFloor),
-    });
+  const elevationGain = criteria.elevationGain;
+  if (elevationGain === 'flat' || elevationGain === 'hilly') {
+    result.push(againstLevel(route, elevationGain));
+  } else if (elevationGain !== undefined) {
+    result.push(
+      againstTarget(
+        'elevationGain',
+        route.elevationGain - elevationGain,
+        // Below this target, the floor of the match tolerance applies.
+        Math.max(elevationGain, match.elevationGainFloor / match.elevationGain),
+        Math.max(match.elevationGain * elevationGain, match.elevationGainFloor),
+        Math.max(suggestion.elevationGain * elevationGain, suggestion.elevationGainFloor),
+      ),
+    );
   }
   return result;
 }
@@ -111,13 +149,11 @@ type Ranked = { route: Route; score: number; cells: Set<string> };
 function classify(criteria: Criteria, candidate: Candidate, startRadius: number): Ranked | undefined {
   const estimatedDuration = effortDistance(candidate.distance, candidate.elevationGain) * criteria.pace;
   const results = checks(criteria, { ...candidate, estimatedDuration });
-  if (results.some(({ gap, suggestion }) => Math.abs(gap) > suggestion)) return undefined;
-  const misses = results
-    .filter(({ gap, match }) => Math.abs(gap) > match)
-    .map(({ criterion, gap }) => ({ criterion, gap }));
+  if (results.some(({ suggestion }) => !suggestion)) return undefined;
+  const misses = results.filter(({ match }) => !match).map(({ criterion, gap }) => ({ criterion, gap }));
   const cells = cellsAlong(candidate.geometry, criteria.start, startRadius);
   const score =
-    results.reduce((sum, { gap, scale }) => sum + Math.abs(gap) / scale, 0) +
+    results.reduce((sum, { relative }) => sum + relative, 0) +
     surfaceMismatch(criteria.surface, candidate.unpavedShare) +
     retraceShare(cells);
   return {
