@@ -54,7 +54,8 @@ export function createApp({
 }: {
   webRoot: string;
   engine: RoutingEngine;
-  heightAt: HeightAt;
+  /** Without it, elevation gain does not count and routes have none. */
+  heightAt?: HeightAt;
   /** Without it, routes are named without a commune. */
   communeAt?: CommuneAt;
   /** Rate and concurrency limits, turned off in development. */
@@ -92,7 +93,7 @@ export function createApp({
     }
     let parsed: ReturnType<typeof parseCriteria>;
     try {
-      parsed = parseCriteria(await c.req.json());
+      parsed = parseCriteria(await c.req.json(), { countElevationGain: heightAt !== undefined });
     } catch (error) {
       // JSON syntax errors quote the body, so they get a message of their own.
       if (error instanceof SyntaxError) return c.json({ error: 'Criteria must be JSON' }, 400);
@@ -109,7 +110,7 @@ export function createApp({
           criteria,
           activity,
           engine,
-          (geometry) => elevationGain(geometry, heightAt),
+          heightAt && ((geometry) => elevationGain(geometry, heightAt)),
           deadline.signal,
         );
         return buildRouteSet(criteria, candidates);

@@ -29,7 +29,8 @@ _Avoid_: Time
 
 **Target elevation gain**:
 The cumulative climb (D+) the user asks for, met within a tolerance. Optional: without one,
-elevation gain does not count. The user can pick a shortcut instead of a target.
+elevation gain does not count. Ignored when the server has no BD ALTI tiles. The user can
+pick a shortcut instead of a target.
 _Avoid_: Elevation, denivelé, climb
 
 **Flat** / **Hilly**:
@@ -57,20 +58,20 @@ The user's flat-ground speed for an activity, stored in their settings.
 _Avoid_: Speed (except as the imperial/metric display of the same value)
 
 **Effort distance**:
-Distance plus climb converted to distance, at 100 m of elevation gain for 1 km. Estimated
-duration is effort distance times pace.
+Distance plus climb converted to distance, at 100 m of elevation gain for 1 km. Without
+an elevation gain, the distance alone. Estimated duration is effort distance times pace.
 _Avoid_: Kilomètre-effort, adjusted distance
 
 ### Results
 
 **Route**:
-One generated loop, with its geometry, distance, elevation gain, surface breakdown, and
-estimated duration.
+One generated loop, with its geometry, distance, elevation gain (unknown when the server
+has no BD ALTI tiles), surface breakdown, and estimated duration.
 _Avoid_: Trace, track, itinerary, path
 
 **Route name**:
 The label of a route in the app and in its GPX export: the commune of the start point, the
-distance, and the elevation gain, such as "Annecy · 12.3 km · +340 m".
+distance, and the elevation gain when known, such as "Annecy · 12.3 km · +340 m".
 _Avoid_: Title
 
 **Loop**:
@@ -85,8 +86,8 @@ _Avoid_: Results, search results
 
 **Match**:
 A route whose distance (or estimated duration, when the user asked for a target duration)
-and elevation gain are within the tolerances of the criteria. Surface preference only
-affects ranking, never whether a route is a match.
+and elevation gain (when known) are within the tolerances of the criteria. Surface
+preference only affects ranking, never whether a route is a match.
 _Avoid_: Good route, result
 
 **Suggestion**:

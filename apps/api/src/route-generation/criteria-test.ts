@@ -61,6 +61,21 @@ describe('parseCriteria', () => {
     expect(() => parseCriteria({ ...valid, target: { duration: 30 }, elevationGain: 2_000 })).toThrow(RangeError);
   });
 
+  describe('without counting elevation gain', () => {
+    it('drops the target elevation gain, so it cannot make a target duration too short', () => {
+      const { criteria } = parseCriteria(
+        { ...valid, target: { duration: 30 }, elevationGain: 2_000 },
+        { countElevationGain: false },
+      );
+
+      expect(criteria).not.toHaveProperty('elevationGain');
+    });
+
+    it('still rejects a target elevation gain out of bounds', () => {
+      expect(() => parseCriteria({ ...valid, elevationGain: 2_501 }, { countElevationGain: false })).toThrow(RangeError);
+    });
+  });
+
   it('rejects a target duration that makes too long a route for the activity', () => {
     expect(() => parseCriteria({ ...valid, target: { duration: 360 }, pace: 6 })).toThrow(RangeError);
     expect(() => parseCriteria({ ...valid, activity: 'hike', target: { duration: 360 }, pace: 9 })).not.toThrow();

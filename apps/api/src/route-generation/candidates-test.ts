@@ -73,6 +73,12 @@ describe('generateCandidates', () => {
     expect(candidate).toMatchObject({ distance: 10, elevationGain: 120, unpavedShare: 1 });
   });
 
+  it('leaves out the elevation gain without a way to measure it', async () => {
+    const [candidate] = await generateCandidates(criteria, 'run', fakeEngine(), undefined, signal);
+
+    expect(candidate).not.toHaveProperty('elevationGain');
+  });
+
   it('aims the correction at the target duration with the elevation gain of the first loop', async () => {
     const engine = vi.fn(fakeEngine());
     // 60 min at 6 min/km asks for 10 km; with +300 m that loop is estimated at 78 min.

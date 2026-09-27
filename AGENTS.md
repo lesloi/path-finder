@@ -6,8 +6,8 @@ start point, a distance, and an elevation gain.
   web app on the same origin.
 - Use **pnpm**; scripts are in the root `package.json`.
 
-`pnpm dev` and `pnpm start` need `BDALTI_DIR` (and `BROUTER_URL` unless BRouter runs on
-`localhost:17777`).
+`pnpm dev` and `pnpm start` need `BROUTER_URL` unless BRouter runs on `localhost:17777`.
+Without `BDALTI_DIR`, routes have no elevation gain and the target elevation gain is ignored.
 
 ## Privacy-first rules (non-negotiable)
 
@@ -29,7 +29,7 @@ If a feature seems to need an exception, ask the owner before implementing it.
   imports) so it is unit tested without a server.
 - Elevation comes from IGN BD ALTI 25 m, never from BRouter (#30). The tile reader takes
   a directory converted by `apps/api/scripts/convert-bdalti.ts`; the API reads it from
-  `BDALTI_DIR`.
+  `BDALTI_DIR`, which is optional.
 - The start point's commune comes from a local lookup in IGN ADMIN EXPRESS, never from a
   third party. The API reads the file converted by
   `apps/api/scripts/convert-admin-express.ts` from `COMMUNES_FILE`.
