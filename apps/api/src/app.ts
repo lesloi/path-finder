@@ -2,7 +2,6 @@ import { getConnInfo } from '@hono/node-server/conninfo';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono, type Context } from 'hono';
 import { readFileSync } from 'node:fs';
-import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
 
 import {
@@ -13,7 +12,7 @@ import {
   type HeightAt,
   type RoutingEngine,
 } from './route-generation/index.ts';
-import { createConcurrencyLimiter, createRateLimiter } from './rate-limit.ts';
+import { createConcurrencyLimiter, createRateLimiter } from './limits.ts';
 
 // Vite fingerprints the files it emits under /assets, so they never change.
 const IMMUTABLE = 'public, max-age=31536000, immutable';
@@ -38,14 +37,19 @@ function clientAddress(c: Context): string {
   return forwarded || (getConnInfo(c).remote.address ?? '');
 }
 
+function retryLater(c: Context, status: 429 | 503, seconds: number, error: string) {
+  c.header('Retry-After', String(seconds));
+  return c.json({ error }, status);
+}
+
 export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engine: RoutingEngine; heightAt: HeightAt }) {
   const app = new Hono();
   const buildId = readBuildId(webRoot);
   // Generous, since mobile carriers put many users behind one address (CGNAT).
-  const limitRate = createRateLimiter({ limit: 60, windowMs: 10 * 60 * 1000 });
-  // About one generation per core, so BRouter never falls over.
-  const cores = availableParallelism();
-  const limitGenerations = createConcurrencyLimiter({ limit: cores, queueSize: cores });
+  const admit = createRateLimiter({ limit: 60, windowMs: 10 * 60 * 1000 });
+  // A generation already keeps BRouter's few calls at once busy, and waiting for more than two
+  // would miss the < 5 s p95 target.
+  const generate = createConcurrencyLimiter({ limit: 1, queueSize: 2 });
 
   app.use(async (c, next) => {
     await next();
@@ -56,10 +60,9 @@ export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engi
 
   // No logs here: criteria hold the start point, and requests hold the client address.
   app.post('/api/v1/route-sets', async (c) => {
-    const rateLimit = limitRate(clientAddress(c));
-    if (!rateLimit.allowed) {
-      c.header('Retry-After', String(rateLimit.retryAfter));
-      return c.json({ error: 'Too many route sets asked for: retry later' }, 429);
+    const admission = admit(clientAddress(c));
+    if (!admission.admitted) {
+      return retryLater(c, 429, admission.retryAfter, 'Too many route sets asked for: retry later');
     }
     // A tab left open across a deploy sends the ID of the previous build: it must reload.
     const clientBuildId = c.req.header('X-Build-Id');
@@ -76,15 +79,14 @@ export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engi
       throw error;
     }
     const { criteria, activity } = parsed;
-    const routes = limitGenerations(async () => {
+    const routes = generate(async () => {
       const candidates = await generateCandidates(criteria, activity, engine, (geometry) =>
         elevationGain(geometry, heightAt),
       );
       return buildRouteSet(criteria, candidates);
     });
     if (!routes) {
-      c.header('Retry-After', String(BUSY_RETRY_AFTER));
-      return c.json({ error: 'Every route generator is busy: retry in a few seconds' }, 503);
+      return retryLater(c, 503, BUSY_RETRY_AFTER, 'Too many route sets being generated: retry in a few seconds');
     }
     return c.json({ routes: await routes });
   });

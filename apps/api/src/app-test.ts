@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { availableParallelism, tmpdir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createApp } from './app.ts';
@@ -146,7 +146,7 @@ describe('api', () => {
 
   describe('rate limit', () => {
     beforeEach(() => {
-      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.useFakeTimers({ toFake: ['Date', 'setInterval'] });
       vi.setSystemTime(new Date('2026-09-27T10:00:00Z'));
     });
 
@@ -154,13 +154,13 @@ describe('api', () => {
       vi.useRealTimers();
     });
 
-    async function postManyTimes(limited: ReturnType<typeof createApp>, times: number, forwardedFor: string) {
-      for (let i = 0; i < times; i++) await postRouteSet(limited, '{', { 'X-Forwarded-For': forwardedFor });
+    async function postManyTimes(limited: ReturnType<typeof createApp>, times: number, forwardedFor: (i: number) => string) {
+      for (let i = 0; i < times; i++) await postRouteSet(limited, '{', { 'X-Forwarded-For': forwardedFor(i) });
     }
 
     it('answers 429 after 60 requests in 10 minutes from the address the proxy saw', async () => {
       const limited = createApp({ webRoot, engine, heightAt: flat });
-      await postManyTimes(limited, 60, '203.0.113.9');
+      await postManyTimes(limited, 60, () => '203.0.113.9');
 
       const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.9' });
 
@@ -171,7 +171,7 @@ describe('api', () => {
 
     it('ignores the addresses a client forges before the one the proxy appends', async () => {
       const limited = createApp({ webRoot, engine, heightAt: flat });
-      for (let i = 0; i < 60; i++) await postRouteSet(limited, '{', { 'X-Forwarded-For': `10.0.0.${i}, 203.0.113.9` });
+      await postManyTimes(limited, 60, (i) => `10.0.0.${i}, 203.0.113.9`);
 
       const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '10.0.0.99, 203.0.113.9' });
 
@@ -180,7 +180,7 @@ describe('api', () => {
 
     it('lets an address in again after 10 minutes', async () => {
       const limited = createApp({ webRoot, engine, heightAt: flat });
-      await postManyTimes(limited, 61, '203.0.113.9');
+      await postManyTimes(limited, 61, () => '203.0.113.9');
 
       vi.advanceTimersByTime(10 * 60 * 1000);
 
@@ -202,7 +202,7 @@ describe('api', () => {
     });
   });
 
-  it('answers 503 with Retry-After once every core generates and the queue is full', async () => {
+  it('answers 503 with Retry-After beyond one generation and two waiting', async () => {
     let release!: () => void;
     const busy = new Promise<void>((resolve) => (release = resolve));
     const blocked: RoutingEngine = async (request) => {
@@ -210,18 +210,15 @@ describe('api', () => {
       return engine(request);
     };
     const saturated = createApp({ webRoot, engine: blocked, heightAt: flat });
-    // One generation per core, and as many waiting.
-    const admitted = 2 * availableParallelism();
 
-    const requests = Array.from({ length: admitted + 1 }, (_, i) =>
-      postRouteSet(saturated, criteria, { 'X-Forwarded-For': `203.0.113.${i}` }),
-    );
-    const turnedAway = await requests[admitted];
+    const requests = Array.from({ length: 4 }, () => postRouteSet(saturated, criteria));
+    // Nothing else can answer before the engine is released.
+    const turnedAway = await Promise.race(requests);
     release();
-    const served = await Promise.all(requests.slice(0, admitted));
+    const statuses = (await Promise.all(requests)).map((response) => response.status);
 
     expect(turnedAway.status).toBe(503);
     expect(turnedAway.headers.get('Retry-After')).toBe('5');
-    expect(served.map((response) => response.status)).toEqual(Array(admitted).fill(200));
+    expect(statuses.sort()).toEqual([200, 200, 200, 503]);
   });
 });
