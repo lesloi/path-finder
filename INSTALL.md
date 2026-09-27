@@ -9,7 +9,6 @@ Path finder needs these next to its code:
 | [BRouter](https://github.com/abrensch/brouter) server | Routing on OpenStreetMap data | Official Docker image or release zip |
 | BRouter segments (`.rd5`) | The OpenStreetMap routing graph | [brouter.de/brouter/segments4](https://brouter.de/brouter/segments4/) |
 | IGN BD ALTI 25 m (optional) | Elevation gain | [IGN Géoplateforme](https://data.geopf.fr/telechargement/resource/BDALTI) |
-| IGN ADMIN EXPRESS (optional) | Naming routes after their commune | [IGN Géoplateforme](https://data.geopf.fr/telechargement/resource/ADMIN-EXPRESS) |
 
 Map tiles (Plan IGN) are loaded by the browser from the IGN Géoplateforme: there is
 nothing to install for them.
@@ -78,26 +77,12 @@ the estimated duration comes from the distance alone.
 Tiles on a department border are merged, so run the conversion again after adding
 departments. Routes outside the converted departments get no elevation.
 
-## 4. Communes: ADMIN EXPRESS (optional)
-
-Without this file, routes are named without a commune.
-
-1. Download the latest ADMIN EXPRESS `GPKG_LAMB93_FXX` archive (~250 MB) from
-   [data.geopf.fr/telechargement/resource/ADMIN-EXPRESS](https://data.geopf.fr/telechargement/resource/ADMIN-EXPRESS).
-2. Extract the `.gpkg` file from it.
-3. Convert it:
-
-   ```sh
-   node apps/api/scripts/convert-admin-express.ts path/to/ADMIN-EXPRESS.gpkg data/communes.json
-   ```
-
-## 5. Run it locally
+## 4. Run it locally
 
 With BRouter running:
 
 ```sh
-export BDALTI_DIR=$PWD/data/bdalti            # optional
-export COMMUNES_FILE=$PWD/data/communes.json   # optional
+export BDALTI_DIR=$PWD/data/bdalti   # optional
 pnpm dev
 ```
 
@@ -117,11 +102,10 @@ pnpm start   # http://localhost:3000
 | --- | --- | --- |
 | `BDALTI_DIR` | none | Tiles written by `convert-bdalti.ts` |
 | `BROUTER_URL` | `http://localhost:17777` | The BRouter server |
-| `COMMUNES_FILE` | none | File written by `convert-admin-express.ts` |
 | `NODE_ENV` | none | `development` turns off the rate and concurrency limits |
 | `PORT` | `3000` | Port the API listens on |
 
-## 6. Host it
+## 5. Host it
 
 The `Dockerfile` builds one image with the API and the web app. Build it with
 `docker build -t path-finder .`, or use the one CI publishes as
@@ -139,11 +123,9 @@ services:
     image: ghcr.io/lesloi/path-finder:latest
     depends_on: [brouter]
     environment:
-      BDALTI_DIR: /data/bdalti             # optional
-      COMMUNES_FILE: /data/communes.json   # optional
+      BDALTI_DIR: /data/bdalti   # optional
     volumes:
       - ./data/bdalti:/data/bdalti:ro
-      - ./data/communes.json:/data/communes.json:ro
     ports:
       - "127.0.0.1:3000:3000"
     restart: unless-stopped

@@ -48,9 +48,6 @@ The API reads these environment variables:
 - `BDALTI_DIR`: BD ALTI 25 m tiles converted by `apps/api/scripts/convert-bdalti.ts`. Without
   it, routes have no elevation gain and the target elevation gain is ignored.
 - `BROUTER_URL`: a BRouter server, `http://localhost:17777` by default
-- `COMMUNES_FILE`: communes converted by `apps/api/scripts/convert-admin-express.ts`, to
-  name routes after the commune of their start point. Without it, route names have no
-  commune.
 
 ```sh
 pnpm install
@@ -65,14 +62,13 @@ pnpm typecheck    # type check
 
 The `Dockerfile` builds the API with the web app. Point `BROUTER_URL` at BRouter
 (`http://brouter:17777` by default). To count elevation gain, mount the tiles and point
-`BDALTI_DIR` at them. To name routes after their commune, mount the communes file too and
-point `COMMUNES_FILE` at it.
+`BDALTI_DIR` at them.
 
 ## Data and credits
 
 - Routing data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors,
   under the ODbL
-- Map tiles (Plan IGN), elevation (BD ALTI), and communes (ADMIN EXPRESS) from
+- Map tiles (Plan IGN) and elevation (BD ALTI) from
   [IGN](https://www.ign.fr), under the Licence Ouverte
 
 ## Contributing

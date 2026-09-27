@@ -12,7 +12,6 @@ import {
   type HeightAt,
   type RoutingEngine,
 } from './route-generation/index.ts';
-import type { CommuneAt } from './commune/communes.ts';
 import { createConcurrencyLimiter, createRateLimiter, type Admission } from './limits.ts';
 
 // Vite fingerprints the files it emits under /assets, so they never change.
@@ -49,15 +48,12 @@ export function createApp({
   webRoot,
   engine,
   heightAt,
-  communeAt = () => null,
   limits = true,
 }: {
   webRoot: string;
   engine: RoutingEngine;
   /** Without it, elevation gain does not count and routes have none. */
   heightAt?: HeightAt;
-  /** Without it, routes are named without a commune. */
-  communeAt?: CommuneAt;
   /** Rate and concurrency limits, turned off in development. */
   limits?: boolean;
 }) {
@@ -118,7 +114,7 @@ export function createApp({
       if (!routes) {
         return retryLater(c, 503, BUSY_RETRY_AFTER, 'Too many route sets being generated: retry in a few seconds');
       }
-      return c.json({ commune: communeAt(...criteria.start), routes: await routes });
+      return c.json({ routes: await routes });
     } catch (error) {
       // Only the deadline itself: any other error is a bug, not a slow generation.
       if (error === deadline.signal.reason) return c.json({ error: 'The route set took too long to generate' }, 504);

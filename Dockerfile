@@ -1,7 +1,5 @@
 # The API, serving the built web app on the same origin. Point BROUTER_URL at the BRouter
-# server. To count elevation gain, mount the converted BD ALTI tiles and set BDALTI_DIR. To
-# name routes after their commune, mount the file written by scripts/convert-admin-express.ts
-# and set COMMUNES_FILE.
+# server. To count elevation gain, mount the converted BD ALTI tiles and set BDALTI_DIR.
 
 FROM node:26-slim AS base
 RUN npm install --global pnpm@12.6.0

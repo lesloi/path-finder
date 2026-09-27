@@ -85,22 +85,6 @@ describe('api', () => {
     expect(routes[0]).toMatchObject({ kind: 'match', distance: expect.closeTo(10), elevationGain: 0, unpavedShare: 1 });
   });
 
-  it('names the commune of the start point', async () => {
-    const communeAt = vi.fn(() => 'Annecy');
-    const named = createApp({ webRoot, engine, heightAt: flat, communeAt });
-
-    const response = await postRouteSet(named, criteria);
-
-    expect(communeAt).toHaveBeenCalledWith(...START);
-    expect(await response.json()).toMatchObject({ commune: 'Annecy' });
-  });
-
-  it('names no commune without communes to look up', async () => {
-    const response = await postRouteSet(app, criteria);
-
-    expect(await response.json()).toMatchObject({ commune: null });
-  });
-
   it('asks the routing engine with the activity and measures elevation gain on BD ALTI', async () => {
     const spy = vi.fn(engine);
     let height = 0;

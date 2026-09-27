@@ -30,9 +30,6 @@ If a feature seems to need an exception, ask the owner before implementing it.
 - Elevation comes from IGN BD ALTI 25 m, never from BRouter (#30). The tile reader takes
   a directory converted by `apps/api/scripts/convert-bdalti.ts`; the API reads it from
   `BDALTI_DIR`, which is optional.
-- The start point's commune comes from a local lookup in IGN ADMIN EXPRESS, never from a
-  third party. The API reads the file converted by
-  `apps/api/scripts/convert-admin-express.ts` from `COMMUNES_FILE`.
 - The web app sends `import.meta.env.VITE_BUILD_ID` in the `X-Build-Id` header; the API
   answers `426` when it differs from `apps/web/dist/build-id`, so stale tabs reload.
 - Model activity type (run / hike / ride) as data, not as branches through the UI.

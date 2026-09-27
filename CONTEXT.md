@@ -77,8 +77,9 @@ has no BD ALTI tiles), surface breakdown, and estimated duration.
 _Avoid_: Trace, track, itinerary, path
 
 **Route name**:
-The label of a route in the app and in its GPX export: the commune of the start point, the
-distance, and the elevation gain when known, such as "Annecy · 12.3 km · +340 m".
+The label of a route in its GPX export: the activity, the day of the export, the distance,
+and the elevation gain when known, such as "Course · 28 sept. · 12,3 km · +340 m", in the
+user's language and units. It never names where the route starts.
 _Avoid_: Title
 
 **Loop**:
