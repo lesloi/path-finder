@@ -15,6 +15,8 @@ const app = createApp({
   engine: createBRouter(process.env.BROUTER_URL ?? 'http://localhost:17777'),
   heightAt: bdAltiHeights(bdAltiDir),
   communeAt: communesFile ? loadCommunes(communesFile) : undefined,
+  // On unless explicitly in development, so forgetting NODE_ENV keeps them on.
+  limits: process.env.NODE_ENV !== 'development',
 });
 
 serve({ fetch: app.fetch, port }, () => {

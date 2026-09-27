@@ -208,6 +208,13 @@ describe('api', () => {
       expect((await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.9' })).status).toBe(200);
     });
 
+    it('admits every request when limits are off', async () => {
+      const unlimited = createApp({ webRoot, engine, heightAt: flat, limits: false });
+      await postManyTimes(unlimited, 60, () => '203.0.113.9');
+
+      expect((await postRouteSet(unlimited, criteria, { 'X-Forwarded-For': '203.0.113.9' })).status).toBe(200);
+    });
+
     it('counts connections without a proxy by their own address', async () => {
       const limited = createApp({ webRoot, engine, heightAt: flat });
       const post = (remoteAddress: string) =>
@@ -241,6 +248,14 @@ describe('api', () => {
     expect(turnedAway.status).toBe(503);
     expect(turnedAway.headers.get('Retry-After')).toBe('5');
     expect(statuses.sort()).toEqual([200, 200, 200, 503]);
+  });
+
+  it('generates any number of route sets at once when limits are off', async () => {
+    const unlimited = createApp({ webRoot, engine, heightAt: flat, limits: false });
+
+    const responses = await Promise.all(Array.from({ length: 4 }, () => postRouteSet(unlimited, criteria)));
+
+    expect(responses.map((response) => response.status)).toEqual([200, 200, 200, 200]);
   });
 
   describe('deadline', () => {
