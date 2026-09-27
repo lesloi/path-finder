@@ -17,8 +17,7 @@ export function CreditsPage({ language }: { language: Language }) {
             licence <a href={osmCopyright}>ODbL</a>.
           </li>
           <li>
-            Fond de carte Plan IGN, altitudes BD ALTI 25 m et communes ADMIN EXPRESS © IGN,
-            sous{' '}
+            Fond de carte Plan IGN et altitudes BD ALTI 25 m © IGN, sous{' '}
             <a href={licenceOuverte}>Licence Ouverte</a>.
           </li>
         </ul>
@@ -41,7 +40,7 @@ export function CreditsPage({ language }: { language: Language }) {
           <a href={osmCopyright}>ODbL</a>.
         </li>
         <li>
-          Plan IGN map, BD ALTI 25 m elevation, and ADMIN EXPRESS communes © IGN, under the{' '}
+          Plan IGN map and BD ALTI 25 m elevation © IGN, under the{' '}
           <a href={licenceOuverte}>Licence Ouverte</a>.
         </li>
       </ul>
