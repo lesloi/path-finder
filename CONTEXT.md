@@ -14,8 +14,15 @@ _Avoid_: Origin, departure
 
 **Criteria**:
 Everything the user sets to ask for routes: start point, activity, a target distance or a
-target duration, an optional target elevation gain, and a surface preference.
+target duration, an optional target elevation gain, a surface preference, and up to three
+optional waypoints.
 _Avoid_: Filters, query, search parameters
+
+**Waypoint**:
+A point a route must pass through between its start and its end, in the order the user
+placed it. Up to three per set of criteria. Waypoints never replace the target distance or
+target duration: a route set whose waypoints alone exceed the target holds only suggestions.
+_Avoid_: Stage, via, étape
 
 **Target distance**:
 The route length the user asks for, met within a tolerance. Given directly or derived from
@@ -78,6 +85,10 @@ _Avoid_: Title
 A route that ends at its start point. The only route shape for now.
 _Avoid_: Round trip, circuit
 
+**Point-to-point route**:
+A route that ends at a finish point other than its start point. Not offered yet.
+_Avoid_: One-way, parcours, traversée
+
 **Route set**:
 The three to five routes generated for one set of criteria: matches first, then
 suggestions. Routes are never saved, so a route set is gone when the user asks again or
@@ -102,6 +113,22 @@ otherwise downloaded, so the user can open it in their watch vendor's app.
 _Avoid_: Sync, upload
 
 **Settings**:
-The user's preferences kept on the device: pace per activity, language, units, and the last
-activity used (run on first launch). Lost if the user clears the site's data.
+The user's preferences kept on the device: pace per activity, language, units, the last
+activity used (run on first launch), and which POI categories the map shows. Lost if the user clears the site's data.
 _Avoid_: Profile, account
+
+### On the map
+
+**Point of interest** (POI):
+A useful place shown on the map wherever the user looks, whether or not a route passes
+by it. Display only: POIs never change which routes are generated. Each belongs to one POI
+category, which the user can show or hide.
+_Avoid_: Marker, place, amenity
+
+**Water point**:
+A POI with drinking water. Seasonal ones are shown and marked as seasonal. Shown by default.
+_Avoid_: Fountain (not every fountain has drinking water)
+
+**Viewpoint**:
+A POI with a view worth stopping for. Hidden by default.
+_Avoid_: Panorama, summit
