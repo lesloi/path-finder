@@ -1,6 +1,12 @@
-// Converts BD ALTI 25 m ASCII tiles into the tiles src/elevation/bdalti.ts reads (see README).
+// Converts BD ALTI 25 m ASCII tiles into the tiles src/elevation/bdalti.ts reads.
 //
-// Usage: node scripts/convert-bdalti.ts <directory of extracted .asc files> <output directory>
+// 1. Download the BD ALTI 25 m ASC archive of each department you need (~30 MB each, ~3 GB
+//    for metropolitan France) from https://data.geopf.fr/telechargement/resource/BDALTI.
+// 2. Extract the archives (7z) into one directory.
+// 3. Run: node scripts/convert-bdalti.ts <directory of extracted .asc files> <output directory>
+//
+// Output is ~2 MB per 25 km tile. Tiles shared by two departments are merged, so run it again
+// after adding departments.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
