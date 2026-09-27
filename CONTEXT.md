@@ -28,8 +28,14 @@ together with it.
 _Avoid_: Time
 
 **Target elevation gain**:
-The cumulative climb (D+) the user asks for, met within a tolerance. Optional.
+The cumulative climb (D+) the user asks for, met within a tolerance. Optional: without one,
+elevation gain does not count. The user can pick a shortcut instead of a target.
 _Avoid_: Elevation, denivelé, climb
+
+**Flat** / **Hilly**:
+Elevation gain shortcuts: at most (flat) or at least (hilly) a set climb per kilometre of
+the route, rather than a target in metres.
+_Avoid_: Easy, mountainous
 
 **Surface preference**:
 A soft preference for paved roads, unpaved paths, or no preference. It weights the
@@ -95,6 +101,6 @@ otherwise downloaded, so the user can open it in their watch vendor's app.
 _Avoid_: Sync, upload
 
 **Settings**:
-The user's preferences kept on the device: pace per activity, language, units. Lost if the
-user clears the site's data.
+The user's preferences kept on the device: pace per activity, language, units, and the last
+activity used (run on first launch). Lost if the user clears the site's data.
 _Avoid_: Profile, account
