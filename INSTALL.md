@@ -59,6 +59,23 @@ Run a BRouter server with these segments by following the
 or release zip). Path finder uses the stock `hiking-mountain` profile, which ships with
 BRouter. The default port is 17777.
 
+To run it with Java 17 or later, without Docker, get the
+[latest release](https://github.com/abrensch/brouter/releases) zip, which holds the server
+jar and the profiles:
+
+```sh
+curl -LO https://github.com/abrensch/brouter/releases/download/v1.7.10/brouter-1.7.10.zip
+unzip brouter-1.7.10.zip -d data
+java -Xmx1g -DmaxRunningTime=300 -cp data/brouter-1.7.10/brouter-1.7.10-all.jar \
+  btools.server.RouteServer data/segments4 data/brouter-1.7.10/profiles2 \
+  data/brouter-1.7.10/customprofiles 17777 4 127.0.0.1
+```
+
+The arguments after the class are the segments, the profiles, a directory for custom
+profiles (unused), the port, the number of threads (the API makes up to 4 calls at once),
+and the address to listen on. BRouter prints each request, start point included: don't keep
+its output where you host it.
+
 ## 3. Elevation: BD ALTI 25 m (optional)
 
 Without these tiles, routes have no elevation gain: a target elevation gain is ignored, and
