@@ -57,7 +57,8 @@ before implementing it.
 - Elevation gain and profiles come from IGN BD ALTI 25 m, never from BRouter (#30). The
   tile reader takes a directory converted by `apps/api/scripts/convert-bdalti.ts`; the
   API reads it from `BDALTI_DIR`.
-- Bump `API_CONTRACT` (`apps/api/src/contract.ts`) only on a breaking API change.
+- The web app sends `import.meta.env.VITE_BUILD_ID` in the `X-Build-Id` header; the API
+  answers `426` when it differs from `apps/web/dist/build-id`, so stale tabs reload.
 - Model activity type (run / hike / ride) as data, not as branches through the UI.
 - Tests live in `__tests__/` or as `*-test.ts(x)` next to the code. Unit tests mock
   BRouter; integration tests run against a real BRouter container in CI.

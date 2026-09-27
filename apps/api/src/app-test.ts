@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createApp } from './app.ts';
-import { API_CONTRACT } from './contract.ts';
 import type { Position, RoutingEngine } from './route-generation/index.ts';
 
 const START: Position = [6.1294, 45.8992];
@@ -21,9 +20,9 @@ const engine: RoutingEngine = async ({ radius, heading }) => {
 const flat = () => 450;
 
 const criteria = { start: START, activity: 'run', target: { distance: 10 }, surface: 'any', pace: 6 };
-const CONTRACT = { 'X-Api-Contract': String(API_CONTRACT) };
+const BUILD_ID = 'b1d-2026';
 
-function postRouteSet(app: ReturnType<typeof createApp>, body: unknown, headers: Record<string, string> = CONTRACT) {
+function postRouteSet(app: ReturnType<typeof createApp>, body: unknown, headers: Record<string, string> = {}) {
   return app.request('/api/v1/route-sets', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
@@ -40,6 +39,7 @@ describe('api', () => {
     await mkdir(join(webRoot, 'assets'));
     await writeFile(join(webRoot, 'index.html'), '<h1>Path finder</h1>');
     await writeFile(join(webRoot, 'assets', 'index-a1b2c3.js'), 'console.log(1);');
+    await writeFile(join(webRoot, 'build-id'), `${BUILD_ID}\n`);
     app = createApp({ webRoot, engine, heightAt: flat });
   });
 
@@ -109,13 +109,30 @@ describe('api', () => {
     expect(await response.json()).toEqual({ error: expect.any(String) });
   });
 
-  it.each([
-    ['another contract version', { 'X-Api-Contract': String(API_CONTRACT + 1) }],
-    ['no contract version', {}],
-  ])('answers 426 on %s', async (_, headers) => {
-    const response = await postRouteSet(app, criteria, headers);
+  it('answers 426 to a web app from another build', async () => {
+    const response = await postRouteSet(app, criteria, { 'X-Build-Id': 'older' });
 
     expect(response.status).toBe(426);
+  });
+
+  it.each([
+    ['the same build', { 'X-Build-Id': BUILD_ID }],
+    ['no build ID', {}],
+  ])('generates a route set for a web app from %s', async (_, headers) => {
+    const response = await postRouteSet(app, criteria, headers);
+
+    expect(response.status).toBe(200);
+  });
+
+  it('checks no build ID when the web app is not built', async () => {
+    const unbuilt = await mkdtemp(join(tmpdir(), 'web-'));
+
+    const response = await postRouteSet(createApp({ webRoot: unbuilt, engine, heightAt: flat }), criteria, {
+      'X-Build-Id': 'older',
+    });
+
+    expect(response.status).toBe(200);
+    await rm(unbuilt, { recursive: true });
   });
 
   it.each(['/health', '/', '/assets/index-a1b2c3.js', '/missing', '/api/v1/route-sets'])(

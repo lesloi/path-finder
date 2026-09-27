@@ -1,7 +1,8 @@
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { API_CONTRACT } from './contract.ts';
 import {
   buildRouteSet,
   elevationGain,
@@ -14,8 +15,18 @@ import {
 // Vite fingerprints the files it emits under /assets, so they never change.
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 
+/** ID written by each web app build (see `apps/web/vite.config.ts`), or none when the web app is not built. */
+function readBuildId(webRoot: string): string | undefined {
+  try {
+    return readFileSync(join(webRoot, 'build-id'), 'utf8').trim();
+  } catch {
+    return undefined;
+  }
+}
+
 export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engine: RoutingEngine; heightAt: HeightAt }) {
   const app = new Hono();
+  const buildId = readBuildId(webRoot);
 
   app.use(async (c, next) => {
     await next();
@@ -26,8 +37,10 @@ export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engi
 
   // No logs here: criteria hold the start point.
   app.post('/api/v1/route-sets', async (c) => {
-    if (c.req.header('X-Api-Contract') !== String(API_CONTRACT)) {
-      return c.json({ error: `This API expects contract version ${API_CONTRACT}` }, 426);
+    // A tab left open across a deploy sends the ID of the previous build: it must reload.
+    const clientBuildId = c.req.header('X-Build-Id');
+    if (buildId && clientBuildId && clientBuildId !== buildId) {
+      return c.json({ error: 'The web app has a new version: reload it' }, 426);
     }
     let parsed: ReturnType<typeof parseCriteria>;
     try {
