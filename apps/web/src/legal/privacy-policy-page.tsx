@@ -8,9 +8,8 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
       <>
         <h1>Politique de confidentialité</h1>
         <p>
-          Pas de compte, pas de cookie, pas de mesure d’audience, pas de pistage. Vos itinéraires
-          et vos réglages restent dans votre navigateur. Notre serveur calcule les itinéraires et
-          n’en garde rien.
+          Pas de compte, pas de cookie, pas de mesure d’audience, pas de pistage. Vos réglages
+          restent dans votre navigateur. Notre serveur calcule les itinéraires et n’en garde rien.
         </p>
 
         <h2>Ce qui reste sur votre appareil</h2>
@@ -30,10 +29,10 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
         <h2>Ce que reçoit notre serveur</h2>
         <p>
           Quand vous demandez des itinéraires, notre serveur reçoit vos critères (coordonnées du
-          point de départ, activité, distance ou durée visée, dénivelé, préférence de revêtement)
-          et, comme pour toute connexion, votre adresse IP. Il s’en sert uniquement pour calculer
-          les itinéraires et les oublie dès la réponse envoyée. Il n’écrit aucun journal
-          contenant une position ou une adresse IP.
+          point de départ, activité, allure, distance ou durée visée, dénivelé, préférence de
+          revêtement) et, comme pour toute connexion, votre adresse IP. Il s’en sert uniquement
+          pour calculer les itinéraires et les oublie dès la réponse envoyée. Il n’écrit aucun
+          journal contenant une position ou une adresse IP.
         </p>
         <p>
           Pour limiter les abus, il garde en mémoire une empreinte (hash) de votre adresse IP,
@@ -79,8 +78,8 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
     <>
       <h1>Privacy policy</h1>
       <p>
-        No account, no cookie, no analytics, no tracking. Your routes and settings stay in your
-        browser. Our server generates routes and keeps nothing.
+        No account, no cookie, no analytics, no tracking. Your settings stay in your browser.
+        Our server generates routes and keeps nothing.
       </p>
 
       <h2>What stays on your device</h2>
@@ -99,9 +98,9 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
       <h2>What our server receives</h2>
       <p>
         When you ask for routes, our server receives your criteria (start point coordinates,
-        activity, target distance or duration, elevation gain, surface preference) and, as with
-        any connection, your IP address. It uses them only to generate the routes and forgets them
-        once the response is sent. It writes no log that contains a location or an IP address.
+        activity, pace, target distance or duration, elevation gain, surface preference) and, as
+        with any connection, your IP address. It uses them only to generate the routes and forgets
+        them once the response is sent. It writes no log that contains a location or an IP address.
       </p>
       <p>
         To limit abuse, it keeps in memory a hash of your IP address, salted with a secret that

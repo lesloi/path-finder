@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type ReactNode } from 'react';
+import { useSyncExternalStore, type ComponentType } from 'react';
 
 import { browserLanguage, type Language } from './language.ts';
 import { CreditsPage } from './legal/credits-page.tsx';
@@ -6,8 +6,18 @@ import { LegalNoticePage } from './legal/legal-notice-page.tsx';
 import { PrivacyPolicyPage } from './legal/privacy-policy-page.tsx';
 import { SettingsView } from './settings-view.tsx';
 
-const backLabel: Record<Language, string> = { en: 'Back', fr: 'Retour' };
-const settingsLabel: Record<Language, string> = { en: 'Settings', fr: 'Réglages' };
+const text = {
+  en: { back: 'Back', settings: 'Settings' },
+  fr: { back: 'Retour', settings: 'Réglages' },
+} satisfies Record<Language, unknown>;
+
+// Each page by its hash, with where its back link goes.
+const pages: Record<string, { Page: ComponentType<{ language: Language }>; back: string }> = {
+  '#/settings': { Page: SettingsView, back: '#/' },
+  '#/credits': { Page: CreditsPage, back: '#/settings' },
+  '#/privacy': { Page: PrivacyPolicyPage, back: '#/settings' },
+  '#/legal-notice': { Page: LegalNoticePage, back: '#/settings' },
+};
 
 function subscribeToHash(onChange: () => void) {
   window.addEventListener('hashchange', onChange);
@@ -22,55 +32,21 @@ function useHash() {
 export function App() {
   const hash = useHash();
   const language = browserLanguage(navigator.languages);
+  const t = text[language];
+  const page = pages[hash];
 
-  switch (hash) {
-    case '#/settings':
-      return (
-        <Page language={language} back="#/">
-          <SettingsView language={language} />
-        </Page>
-      );
-    case '#/credits':
-      return (
-        <Page language={language} back="#/settings">
-          <CreditsPage language={language} />
-        </Page>
-      );
-    case '#/privacy':
-      return (
-        <Page language={language} back="#/settings">
-          <PrivacyPolicyPage language={language} />
-        </Page>
-      );
-    case '#/legal-notice':
-      return (
-        <Page language={language} back="#/settings">
-          <LegalNoticePage language={language} />
-        </Page>
-      );
-    default:
-      return (
-        <main>
-          <h1>Path finder</h1>
-          <a href="#/settings">{settingsLabel[language]}</a>
-        </main>
-      );
+  if (!page) {
+    return (
+      <main>
+        <h1>Path finder</h1>
+        <a href="#/settings">{t.settings}</a>
+      </main>
+    );
   }
-}
-
-function Page({
-  language,
-  back,
-  children,
-}: {
-  language: Language;
-  back: string;
-  children: ReactNode;
-}) {
   return (
     <main>
-      <a href={back}>{backLabel[language]}</a>
-      {children}
+      <a href={page.back}>{t.back}</a>
+      <page.Page language={language} />
     </main>
   );
 }
