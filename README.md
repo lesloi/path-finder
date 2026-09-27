@@ -38,6 +38,8 @@ national mapping agency (IGN).
 
 ## Getting started
 
+See [INSTALL.md](./INSTALL.md) to install the app locally, or host it yourself.
+
 Requires Node.js 26 (LTS) and pnpm. The API runs its TypeScript directly with Node.
 
 The API reads these environment variables:
