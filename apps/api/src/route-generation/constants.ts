@@ -40,3 +40,29 @@ export const START_RADIUS = 500;
 export const START_RADIUS_SHARE = 0.1;
 /** Metres a route must go before coming back to a cell counts as walking it twice. */
 export const RETRACE_MIN_LOOP = 100;
+
+/** Loops asked for per criteria, one per heading, spread evenly around the start point. */
+export const HEADINGS = 20;
+/** A BRouter loop comes out about this many times as long as the radius it is asked for. */
+export const LOOP_PER_RADIUS = 5;
+
+/** OSM `surface` values counted as unpaved. */
+export const UNPAVED_SURFACES = new Set([
+  'gravel',
+  'fine_gravel',
+  'compacted',
+  'ground',
+  'dirt',
+  'earth',
+  'grass',
+  'unpaved',
+  'rock',
+  'pebblestone',
+  'sand',
+  'mud',
+  'woodchips',
+  'grass_paver',
+  'stone',
+]);
+/** OSM `highway` values counted as unpaved when a way has no `surface`. */
+export const UNPAVED_HIGHWAYS = new Set(['path', 'track', 'bridleway']);

@@ -45,7 +45,7 @@ export type Route = Candidate & {
   misses: Miss[];
 };
 
-function effortDistance(distance: number, elevationGain: number): number {
+export function effortDistance(distance: number, elevationGain: number): number {
   return distance + elevationGain / CLIMB_PER_EFFORT_KM;
 }
 
