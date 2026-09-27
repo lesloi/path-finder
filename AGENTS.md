@@ -51,7 +51,9 @@ before implementing it.
   distance…) in code, tests, and issues.
 - `apps/api/src/route-generation` (criteria → route set) stays plain TypeScript, free of
   browser, Node, and Hono imports, so it is unit tested without a server.
-- Elevation gain and profiles come from IGN BD ALTI 25 m, never from BRouter (#30).
+- Elevation gain and profiles come from IGN BD ALTI 25 m, never from BRouter (#30). The
+  tile reader takes a directory converted by `apps/api/scripts/convert-bdalti.ts`; the
+  API will read it from `BDALTI_DIR` once wired (#36).
 - Model activity type (run / hike / ride) as data, not as branches through the UI.
 - Tests live in `__tests__/` or as `*-test.ts(x)` next to the code. Unit tests mock
   BRouter; integration tests run against a real BRouter container in CI.

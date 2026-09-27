@@ -66,3 +66,8 @@ export const UNPAVED_SURFACES = new Set([
 ]);
 /** OSM `highway` values counted as unpaved when a way has no `surface`. */
 export const UNPAVED_HIGHWAYS = new Set(['path', 'track', 'bridleway']);
+
+/** Metres between the points where a route's elevation is sampled, as validated in the BD ALTI spike (#14). */
+export const ELEVATION_STEP = 30;
+/** Side of the BD ALTI grid cells, in metres. */
+export const BDALTI_CELL = 25;
