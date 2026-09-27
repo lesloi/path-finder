@@ -13,7 +13,7 @@ import {
   type RoutingEngine,
 } from './route-generation/index.ts';
 import type { CommuneAt } from './commune/communes.ts';
-import { createConcurrencyLimiter, createRateLimiter } from './limits.ts';
+import { createConcurrencyLimiter, createRateLimiter, type Admission } from './limits.ts';
 
 // Vite fingerprints the files it emits under /assets, so they never change.
 const IMMUTABLE = 'public, max-age=31536000, immutable';
@@ -50,20 +50,27 @@ export function createApp({
   engine,
   heightAt,
   communeAt = () => null,
+  limits = true,
 }: {
   webRoot: string;
   engine: RoutingEngine;
   heightAt: HeightAt;
   /** Without it, routes are named without a commune. */
   communeAt?: CommuneAt;
+  /** Rate and concurrency limits, turned off in development. */
+  limits?: boolean;
 }) {
   const app = new Hono();
   const buildId = readBuildId(webRoot);
   // Generous, since mobile carriers put many users behind one address (CGNAT).
-  const admit = createRateLimiter({ limit: 60, windowMs: 10 * 60 * 1000 });
+  const admit = limits
+    ? createRateLimiter({ limit: 60, windowMs: 10 * 60 * 1000 })
+    : (): Admission => ({ admitted: true });
   // A generation already keeps BRouter's few calls at once busy, and waiting for more than two
   // would miss the < 5 s p95 target.
-  const generate = createConcurrencyLimiter({ limit: 1, queueSize: 2 });
+  const generate = limits
+    ? createConcurrencyLimiter({ limit: 1, queueSize: 2 })
+    : <T>(task: () => Promise<T>) => task();
 
   app.use(async (c, next) => {
     await next();
