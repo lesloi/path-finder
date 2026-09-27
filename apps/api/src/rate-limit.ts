@@ -1,94 +1,49 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
-export interface RateLimitResult {
-  allowed: boolean;
-}
+export type RateLimit = { allowed: true } | { allowed: false; retryAfter: number };
 
-export interface ConcurrencyLimitResult {
-  status: 503;
-  retryAfter: number;
-}
-
-export function createRateLimiter({
-  threshold,
-  salt,
-}: {
-  threshold: number;
-  salt: string;
-}): (ip: string) => RateLimitResult {
+/**
+ * Counts requests per address in fixed windows. Addresses are kept only as hashes salted
+ * with a random salt that changes with each window, and all of them are forgotten when it ends.
+ */
+export function createRateLimiter({ limit, windowMs }: { limit: number; windowMs: number }) {
+  let windowStart = Date.now();
+  let salt = randomBytes(16);
   const counts = new Map<string, number>();
 
-  return (ip: string) => {
-    const hash = createHash('sha256').update(`${salt}:${ip}`).digest('hex');
-    const count = (counts.get(hash) ?? 0) + 1;
-    counts.set(hash, count);
-
-    return {
-      allowed: count <= threshold,
-    };
+  return (address: string): RateLimit => {
+    const now = Date.now();
+    if (now - windowStart >= windowMs) {
+      windowStart = now;
+      salt = randomBytes(16);
+      counts.clear();
+    }
+    const key = createHash('sha256').update(salt).update(address).digest('base64');
+    const count = (counts.get(key) ?? 0) + 1;
+    counts.set(key, count);
+    if (count <= limit) return { allowed: true };
+    return { allowed: false, retryAfter: Math.ceil((windowStart + windowMs - now) / 1000) };
   };
 }
 
-export function createConcurrencyLimiter({
-  limit,
-  queueSize = 10,
-}: {
-  limit: number;
-  queueSize?: number;
-}): <T>(task: () => Promise<T>) => Promise<T> | ConcurrencyLimitResult {
-  let active = 0;
-  let queued = 0;
-  const taskQueue: Array<{
-    task: () => Promise<unknown>;
-    resolve: (value: unknown) => void;
-    reject: (reason?: unknown) => void;
-  }> = [];
+/** Runs up to `limit` tasks at once and queues up to `queueSize` more; returns undefined when the queue is full. */
+export function createConcurrencyLimiter({ limit, queueSize }: { limit: number; queueSize: number }) {
+  let running = 0;
+  const waiting: Array<() => void> = [];
 
-  const processNext = () => {
-    if (active >= limit || taskQueue.length === 0) {
-      return;
+  async function run<T>(task: () => Promise<T>): Promise<T> {
+    // A finishing task hands its slot straight to the next one, so `running` stays the same.
+    if (running < limit) running++;
+    else await new Promise<void>((resolve) => waiting.push(resolve));
+    try {
+      return await task();
+    } finally {
+      const next = waiting.shift();
+      if (next) next();
+      else running--;
     }
+  }
 
-    const { task, resolve, reject } = taskQueue.shift()!;
-    active++;
-    queued--;
-
-    task()
-      .then(resolve)
-      .catch(reject)
-      .finally(() => {
-        active--;
-        processNext();
-      });
-  };
-
-  return <T>(
-    task: () => Promise<T>,
-  ): Promise<T> | ConcurrencyLimitResult => {
-    if (active >= limit) {
-      if (queued >= queueSize) {
-        return {
-          status: 503,
-          retryAfter: Math.ceil(Math.random() * 5) + 1,
-        };
-      }
-
-      queued++;
-      return new Promise<T>((resolve, reject) => {
-        taskQueue.push({ task, resolve, reject });
-      });
-    }
-
-    active++;
-    return task().finally(() => {
-      active--;
-      processNext();
-    });
-  };
-}
-
-export function createDailySalt(): string {
-  const now = new Date();
-  const day = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
-  return createHash('sha256').update(day).digest('hex').slice(0, 16);
+  return <T>(task: () => Promise<T>): Promise<T> | undefined =>
+    running >= limit && waiting.length >= queueSize ? undefined : run(task);
 }

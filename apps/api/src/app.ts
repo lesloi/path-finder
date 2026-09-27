@@ -1,8 +1,9 @@
+import { getConnInfo } from '@hono/node-server/conninfo';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { readFileSync } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
-import { cpus } from 'node:os';
 
 import {
   buildRouteSet,
@@ -12,10 +13,12 @@ import {
   type HeightAt,
   type RoutingEngine,
 } from './route-generation/index.ts';
-import { createRateLimiter, createConcurrencyLimiter, createDailySalt } from './rate-limit.ts';
+import { createConcurrencyLimiter, createRateLimiter } from './rate-limit.ts';
 
 // Vite fingerprints the files it emits under /assets, so they never change.
 const IMMUTABLE = 'public, max-age=31536000, immutable';
+// Seconds: about one generation, given the < 5 s p95 target.
+const BUSY_RETRY_AFTER = 5;
 
 /** ID written by each web app build (see `apps/web/vite.config.ts`), or none when the web app is not built. */
 function readBuildId(webRoot: string): string | undefined {
@@ -26,11 +29,23 @@ function readBuildId(webRoot: string): string | undefined {
   }
 }
 
+/**
+ * The reverse proxy appends the address it sees to `X-Forwarded-For`: earlier entries come
+ * from the client and can be forged. Without a proxy, the connection's own address counts.
+ */
+function clientAddress(c: Context): string {
+  const forwarded = c.req.header('X-Forwarded-For')?.split(',').at(-1)?.trim();
+  return forwarded || (getConnInfo(c).remote.address ?? '');
+}
+
 export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engine: RoutingEngine; heightAt: HeightAt }) {
   const app = new Hono();
   const buildId = readBuildId(webRoot);
-  const rateLimiter = createRateLimiter({ threshold: 60, salt: createDailySalt() });
-  const concurrencyLimiter = createConcurrencyLimiter({ limit: Math.max(1, Math.ceil(cpus().length / 2)), queueSize: 5 });
+  // Generous, since mobile carriers put many users behind one address (CGNAT).
+  const limitRate = createRateLimiter({ limit: 60, windowMs: 10 * 60 * 1000 });
+  // About one generation per core, so BRouter never falls over.
+  const cores = availableParallelism();
+  const limitGenerations = createConcurrencyLimiter({ limit: cores, queueSize: cores });
 
   app.use(async (c, next) => {
     await next();
@@ -39,54 +54,39 @@ export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engi
 
   app.get('/health', (c) => c.text('ok'));
 
-  // No logs here: criteria hold the start point.
+  // No logs here: criteria hold the start point, and requests hold the client address.
   app.post('/api/v1/route-sets', async (c) => {
-    // Rate limit by IP
-    const ip = c.req.header('x-forwarded-for') ?? c.req.header('cf-connecting-ip') ?? '127.0.0.1';
-    const rateLimit = rateLimiter(ip);
+    const rateLimit = limitRate(clientAddress(c));
     if (!rateLimit.allowed) {
-      return c.json({ error: 'Rate limit exceeded' }, 429);
+      c.header('Retry-After', String(rateLimit.retryAfter));
+      return c.json({ error: 'Too many route sets asked for: retry later' }, 429);
     }
-
-    // Check build ID
+    // A tab left open across a deploy sends the ID of the previous build: it must reload.
     const clientBuildId = c.req.header('X-Build-Id');
     if (buildId && clientBuildId && clientBuildId !== buildId) {
       return c.json({ error: 'The web app has a new version: reload it' }, 426);
     }
-
-    // Generate route set with concurrency limit
-    const result = concurrencyLimiter(async () => {
-      let parsed: ReturnType<typeof parseCriteria>;
-      try {
-        parsed = parseCriteria(await c.req.json());
-      } catch (error) {
-        // JSON syntax errors quote the body, so they get a message of their own.
-        if (error instanceof SyntaxError) throw new Error('Criteria must be JSON');
-        if (error instanceof RangeError) throw error;
-        throw error;
-      }
-      const { criteria, activity } = parsed;
+    let parsed: ReturnType<typeof parseCriteria>;
+    try {
+      parsed = parseCriteria(await c.req.json());
+    } catch (error) {
+      // JSON syntax errors quote the body, so they get a message of their own.
+      if (error instanceof SyntaxError) return c.json({ error: 'Criteria must be JSON' }, 400);
+      if (error instanceof RangeError) return c.json({ error: error.message }, 400);
+      throw error;
+    }
+    const { criteria, activity } = parsed;
+    const routes = limitGenerations(async () => {
       const candidates = await generateCandidates(criteria, activity, engine, (geometry) =>
         elevationGain(geometry, heightAt),
       );
       return buildRouteSet(criteria, candidates);
     });
-
-    if (typeof result === 'object' && 'status' in result) {
-      c.header('Retry-After', String(result.retryAfter));
-      return c.json({ error: 'Server is busy, please retry' }, result.status);
+    if (!routes) {
+      c.header('Retry-After', String(BUSY_RETRY_AFTER));
+      return c.json({ error: 'Every route generator is busy: retry in a few seconds' }, 503);
     }
-
-    try {
-      const routes = await result;
-      return c.json({ routes });
-    } catch (error) {
-      if (error instanceof RangeError) return c.json({ error: error.message }, 400);
-      if (error instanceof Error && error.message === 'Criteria must be JSON') {
-        return c.json({ error: 'Criteria must be JSON' }, 400);
-      }
-      throw error;
-    }
+    return c.json({ routes: await routes });
   });
 
   app.use(async (c, next) => {

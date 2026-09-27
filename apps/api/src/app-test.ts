@@ -1,5 +1,5 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { createApp } from './app.ts';
@@ -25,7 +25,7 @@ const BUILD_ID = 'b1d-2026';
 function postRouteSet(app: ReturnType<typeof createApp>, body: unknown, headers: Record<string, string> = {}) {
   return app.request('/api/v1/route-sets', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.1', ...headers },
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 }
@@ -144,68 +144,84 @@ describe('api', () => {
     },
   );
 
-  it('rate-limits requests per IP', async () => {
-    const slowEngine: RoutingEngine = async ({ radius, heading }) => {
-      const angle = (heading * Math.PI) / 180;
-      const offset = radius / 111_000;
-      return {
-        geometry: [START, [START[0] + offset * Math.sin(angle), START[1] + offset * Math.cos(angle)], START],
-        distance: (5 * radius) / 1000,
-        ways: [{ length: 5 * radius, surface: 'gravel' }],
-      };
-    };
-    const appWithRateLimit = createApp({ webRoot, engine: slowEngine, heightAt: flat });
+  describe('rate limit', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-09-27T10:00:00Z'));
+    });
 
-    // Make many requests from the same IP
-    const responses = [];
-    for (let i = 0; i < 65; i++) {
-      const response = await postRouteSet(appWithRateLimit, criteria, {
-        'X-Build-Id': BUILD_ID,
-        'x-forwarded-for': '192.168.1.100',
-      });
-      responses.push(response.status);
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function postManyTimes(limited: ReturnType<typeof createApp>, times: number, forwardedFor: string) {
+      for (let i = 0; i < times; i++) await postRouteSet(limited, '{', { 'X-Forwarded-For': forwardedFor });
     }
 
-    // First 60 should succeed (threshold: 60), rest should be 429
-    expect(responses.slice(0, 60).every((s) => s === 200)).toBe(true);
-    expect(responses.slice(60).every((s) => s === 429)).toBe(true);
+    it('answers 429 after 60 requests in 10 minutes from the address the proxy saw', async () => {
+      const limited = createApp({ webRoot, engine, heightAt: flat });
+      await postManyTimes(limited, 60, '203.0.113.9');
+
+      const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.9' });
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get('Retry-After')).toBe('600');
+      expect((await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.10' })).status).toBe(200);
+    });
+
+    it('ignores the addresses a client forges before the one the proxy appends', async () => {
+      const limited = createApp({ webRoot, engine, heightAt: flat });
+      for (let i = 0; i < 60; i++) await postRouteSet(limited, '{', { 'X-Forwarded-For': `10.0.0.${i}, 203.0.113.9` });
+
+      const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '10.0.0.99, 203.0.113.9' });
+
+      expect(response.status).toBe(429);
+    });
+
+    it('lets an address in again after 10 minutes', async () => {
+      const limited = createApp({ webRoot, engine, heightAt: flat });
+      await postManyTimes(limited, 61, '203.0.113.9');
+
+      vi.advanceTimersByTime(10 * 60 * 1000);
+
+      expect((await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.9' })).status).toBe(200);
+    });
+
+    it('counts connections without a proxy by their own address', async () => {
+      const limited = createApp({ webRoot, engine, heightAt: flat });
+      const post = (remoteAddress: string) =>
+        limited.request(
+          '/api/v1/route-sets',
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(criteria) },
+          { incoming: { socket: { remoteAddress } } },
+        );
+      for (let i = 0; i < 60; i++) await post('198.51.100.1');
+
+      expect((await post('198.51.100.1')).status).toBe(429);
+      expect((await post('198.51.100.2')).status).toBe(200);
+    });
   });
 
-  it('rejects requests with 503 when concurrency limit is exceeded', async () => {
-    const slowEngine: RoutingEngine = async ({ radius, heading }) => {
-      const angle = (heading * Math.PI) / 180;
-      const offset = radius / 111_000;
-      await new Promise((resolve) => setTimeout(resolve, 100)); // Slow engine
-      return {
-        geometry: [START, [START[0] + offset * Math.sin(angle), START[1] + offset * Math.cos(angle)], START],
-        distance: (5 * radius) / 1000,
-        ways: [{ length: 5 * radius, surface: 'gravel' }],
-      };
+  it('answers 503 with Retry-After once every core generates and the queue is full', async () => {
+    let release!: () => void;
+    const busy = new Promise<void>((resolve) => (release = resolve));
+    const blocked: RoutingEngine = async (request) => {
+      await busy;
+      return engine(request);
     };
-    const appWithConcurrencyLimit = createApp({ webRoot, engine: slowEngine, heightAt: flat });
+    const saturated = createApp({ webRoot, engine: blocked, heightAt: flat });
+    // One generation per core, and as many waiting.
+    const admitted = 2 * availableParallelism();
 
-    // Start multiple concurrent requests
-    const requests = [];
-    for (let i = 0; i < 15; i++) {
-      requests.push(
-        postRouteSet(appWithConcurrencyLimit, criteria, {
-          'X-Build-Id': BUILD_ID,
-          'x-forwarded-for': `192.168.1.${i}`,
-        }),
-      );
-    }
+    const requests = Array.from({ length: admitted + 1 }, (_, i) =>
+      postRouteSet(saturated, criteria, { 'X-Forwarded-For': `203.0.113.${i}` }),
+    );
+    const turnedAway = await requests[admitted];
+    release();
+    const served = await Promise.all(requests.slice(0, admitted));
 
-    const responses = await Promise.all(requests);
-    const statuses = responses.map((r) => r.status);
-
-    // Some should succeed, some should get 503
-    expect(statuses.some((s) => s === 200)).toBe(true);
-    expect(statuses.some((s) => s === 503)).toBe(true);
-
-    // 503 responses should have Retry-After header
-    const error503 = responses.find((r) => r.status === 503);
-    if (error503) {
-      expect(error503.headers.get('Retry-After')).toBeTruthy();
-    }
+    expect(turnedAway.status).toBe(503);
+    expect(turnedAway.headers.get('Retry-After')).toBe('5');
+    expect(served.map((response) => response.status)).toEqual(Array(admitted).fill(200));
   });
 });
