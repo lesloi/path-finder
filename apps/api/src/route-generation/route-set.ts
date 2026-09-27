@@ -30,8 +30,8 @@ export type Candidate = {
   geometry: Position[];
   /** Kilometres. */
   distance: number;
-  /** Metres. */
-  elevationGain: number;
+  /** Metres. Without BD ALTI, unknown and not counted. */
+  elevationGain?: number;
   unpavedShare: number;
 };
 
@@ -45,8 +45,9 @@ export type Route = Candidate & {
   misses: Miss[];
 };
 
-export function effortDistance(distance: number, elevationGain: number): number {
-  return distance + elevationGain / CLIMB_PER_EFFORT_KM;
+/** Without an elevation gain, the distance alone. */
+export function effortDistance(distance: number, elevationGain: number | undefined): number {
+  return distance + (elevationGain ?? 0) / CLIMB_PER_EFFORT_KM;
 }
 
 /**
@@ -84,7 +85,7 @@ function againstTarget(
   return { criterion, gap, relative: size / scale, match: size <= match, suggestion: size <= suggestion };
 }
 
-function againstLevel(route: Candidate, level: 'flat' | 'hilly'): Check {
+function againstLevel(route: Candidate & { elevationGain: number }, level: 'flat' | 'hilly'): Check {
   const { match, suggestion } = ELEVATION_LEVELS[level];
   const perKm = route.elevationGain / route.distance;
   const bound = match * route.distance;
@@ -120,8 +121,10 @@ function checks(criteria: Criteria, route: Candidate & { estimatedDuration: numb
     );
   }
   const elevationGain = criteria.elevationGain;
+  // Without BD ALTI, routes have no elevation gain to check.
+  if (route.elevationGain === undefined) return result;
   if (elevationGain === 'flat' || elevationGain === 'hilly') {
-    result.push(againstLevel(route, elevationGain));
+    result.push(againstLevel({ ...route, elevationGain: route.elevationGain }, elevationGain));
   } else if (elevationGain !== undefined) {
     result.push(
       againstTarget(

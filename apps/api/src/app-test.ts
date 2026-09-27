@@ -116,6 +116,31 @@ describe('api', () => {
     expect(routes[0].elevationGain).toBeGreaterThan(0);
   });
 
+  describe('without BD ALTI', () => {
+    const noElevation = () => createApp({ webRoot, engine });
+
+    it('gives routes no elevation gain and ignores the target elevation gain', async () => {
+      const response = await postRouteSet(noElevation(), { ...criteria, elevationGain: 'hilly' });
+
+      expect(response.status).toBe(200);
+      const { routes } = await response.json();
+      expect(routes[0]).toMatchObject({ kind: 'match', misses: [] });
+      expect(routes[0]).not.toHaveProperty('elevationGain');
+    });
+
+    it('turns a target duration into distance alone', async () => {
+      const response = await postRouteSet(noElevation(), {
+        ...criteria,
+        target: { duration: 30 },
+        elevationGain: 2_000,
+      });
+
+      expect(response.status).toBe(200);
+      const { routes } = await response.json();
+      expect(routes[0]).toMatchObject({ distance: expect.closeTo(5), estimatedDuration: expect.closeTo(30) });
+    });
+  });
+
   it.each([
     ['invalid criteria', { ...criteria, target: { distance: 100 } }],
     [

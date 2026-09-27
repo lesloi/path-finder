@@ -1,6 +1,7 @@
-# The API, serving the built web app on the same origin. Mount the converted BD ALTI tiles
-# at BDALTI_DIR and point BROUTER_URL at the BRouter server. To name routes after their
-# commune, mount the file written by scripts/convert-admin-express.ts and set COMMUNES_FILE.
+# The API, serving the built web app on the same origin. Point BROUTER_URL at the BRouter
+# server. To count elevation gain, mount the converted BD ALTI tiles and set BDALTI_DIR. To
+# name routes after their commune, mount the file written by scripts/convert-admin-express.ts
+# and set COMMUNES_FILE.
 
 FROM node:26-slim AS base
 RUN npm install --global pnpm@12.6.0
@@ -18,7 +19,7 @@ FROM base
 RUN pnpm install --frozen-lockfile --prod --filter @path-finder/api
 COPY apps/api/src apps/api/src
 COPY --from=build /app/apps/web/dist apps/web/dist
-ENV NODE_ENV=production BDALTI_DIR=/data/bdalti BROUTER_URL=http://brouter:17777
+ENV NODE_ENV=production BROUTER_URL=http://brouter:17777
 USER node
 EXPOSE 3000
 CMD ["node", "apps/api/src/index.ts"]

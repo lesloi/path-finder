@@ -17,9 +17,13 @@ const within = (value: unknown, min: number, max: number): value is number =>
 /**
  * Criteria and activity from a request body, within the #7 bounds. Throws a `RangeError`
  * on anything else, including a target duration too short for the target elevation gain
- * or too long for the activity at the user's pace.
+ * or too long for the activity at the user's pace. Without `countElevationGain`, the target
+ * elevation gain is checked but dropped.
  */
-export function parseCriteria(body: unknown): { criteria: Criteria; activity: Activity } {
+export function parseCriteria(
+  body: unknown,
+  { countElevationGain = true } = {},
+): { criteria: Criteria; activity: Activity } {
   check(isObject(body), 'Criteria must be an object');
   const { start, activity, target, elevationGain, surface, pace } = body;
 
@@ -53,7 +57,7 @@ export function parseCriteria(body: unknown): { criteria: Criteria; activity: Ac
   const criteria: Criteria = {
     start: [start[0], start[1]],
     target: parsedTarget,
-    ...(elevationGain !== undefined && { elevationGain: elevationGain as Criteria['elevationGain'] }),
+    ...(countElevationGain && elevationGain !== undefined && { elevationGain: elevationGain as Criteria['elevationGain'] }),
     surface: surface as Criteria['surface'],
     pace,
   };

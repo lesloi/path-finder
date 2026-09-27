@@ -8,7 +8,7 @@ Path finder needs these next to its code:
 | --- | --- | --- |
 | [BRouter](https://github.com/abrensch/brouter) server | Routing on OpenStreetMap data | Official Docker image or release zip |
 | BRouter segments (`.rd5`) | The OpenStreetMap routing graph | [brouter.de/brouter/segments4](https://brouter.de/brouter/segments4/) |
-| IGN BD ALTI 25 m | Elevation gain | [IGN Géoplateforme](https://data.geopf.fr/telechargement/resource/BDALTI) |
+| IGN BD ALTI 25 m (optional) | Elevation gain | [IGN Géoplateforme](https://data.geopf.fr/telechargement/resource/BDALTI) |
 | IGN ADMIN EXPRESS (optional) | Naming routes after their commune | [IGN Géoplateforme](https://data.geopf.fr/telechargement/resource/ADMIN-EXPRESS) |
 
 Map tiles (Plan IGN) are loaded by the browser from the IGN Géoplateforme: there is
@@ -19,7 +19,6 @@ nothing to install for them.
 - [Node.js 26](https://nodejs.org/)
 - [pnpm](https://pnpm.io/installation)
 - A BRouter server (see [BRouter](#2-brouter))
-- BD ALTI 25 m elevation tiles (see [Elevation: BD ALTI 25 m](#3-elevation-bd-alti-25-m))
 
 As a rough guide:
 
@@ -61,7 +60,10 @@ Run a BRouter server with these segments by following the
 or release zip). Path finder uses the stock `hiking-mountain` profile, which ships with
 BRouter. The default port is 17777.
 
-## 3. Elevation: BD ALTI 25 m
+## 3. Elevation: BD ALTI 25 m (optional)
+
+Without these tiles, routes have no elevation gain: a target elevation gain is ignored, and
+the estimated duration comes from the distance alone.
 
 1. Download the BD ALTI 25 m **ASC** archive of each department you need (~30 MB each,
    ~3 GB for metropolitan France) from
@@ -94,7 +96,7 @@ Without this file, routes are named without a commune.
 With BRouter running:
 
 ```sh
-export BDALTI_DIR=$PWD/data/bdalti
+export BDALTI_DIR=$PWD/data/bdalti            # optional
 export COMMUNES_FILE=$PWD/data/communes.json   # optional
 pnpm dev
 ```
@@ -113,7 +115,7 @@ pnpm start   # http://localhost:3000
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `BDALTI_DIR` | none (required) | Tiles written by `convert-bdalti.ts` |
+| `BDALTI_DIR` | none | Tiles written by `convert-bdalti.ts` |
 | `BROUTER_URL` | `http://localhost:17777` | The BRouter server |
 | `COMMUNES_FILE` | none | File written by `convert-admin-express.ts` |
 | `NODE_ENV` | none | `development` turns off the rate and concurrency limits |
@@ -137,6 +139,7 @@ services:
     image: ghcr.io/lesloi/path-finder:latest
     depends_on: [brouter]
     environment:
+      BDALTI_DIR: /data/bdalti             # optional
       COMMUNES_FILE: /data/communes.json   # optional
     volumes:
       - ./data/bdalti:/data/bdalti:ro
@@ -146,5 +149,5 @@ services:
     restart: unless-stopped
 ```
 
-The image already sets `BDALTI_DIR=/data/bdalti` and `BROUTER_URL=http://brouter:17777`.
+The image already sets `BROUTER_URL=http://brouter:17777`.
 `GET /health` answers `ok` when the API is up.

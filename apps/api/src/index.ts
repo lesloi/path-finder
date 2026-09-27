@@ -8,12 +8,12 @@ import { bdAltiHeights } from './elevation/bdalti.ts';
 
 const port = Number(process.env.PORT ?? 3000);
 const bdAltiDir = process.env.BDALTI_DIR;
-if (!bdAltiDir) throw new Error('Set BDALTI_DIR to the tiles written by scripts/convert-bdalti.ts');
+if (!bdAltiDir) console.log('BDALTI_DIR is not set: routes have no elevation gain');
 const communesFile = process.env.COMMUNES_FILE;
 const app = createApp({
   webRoot: join(import.meta.dirname, '../../web/dist'),
   engine: createBRouter(process.env.BROUTER_URL ?? 'http://localhost:17777'),
-  heightAt: bdAltiHeights(bdAltiDir),
+  heightAt: bdAltiDir ? bdAltiHeights(bdAltiDir) : undefined,
   communeAt: communesFile ? loadCommunes(communesFile) : undefined,
   // On unless explicitly in development, so forgetting NODE_ENV keeps them on.
   limits: process.env.NODE_ENV !== 'development',

@@ -22,6 +22,7 @@ national mapping agency (IGN).
 - Generate three to five loops from a start point, a target distance or duration, an
   optional target elevation gain, and a surface preference (paved or trails)
 - Browse the routes on a map, with elevation profile and estimated duration from your pace
+  (elevation gain, its target, and the profile need the server's BD ALTI tiles)
 - Export a route as GPX for your watch (Garmin, Coros, Polar…)
 - Running (road and trail) and hiking first, cycling/MTB later
 - French and English, metric and imperial units
@@ -44,7 +45,8 @@ Requires Node.js 26 (LTS) and pnpm. The API runs its TypeScript directly with No
 
 The API reads these environment variables:
 
-- `BDALTI_DIR` (required): BD ALTI 25 m tiles converted by `apps/api/scripts/convert-bdalti.ts`
+- `BDALTI_DIR`: BD ALTI 25 m tiles converted by `apps/api/scripts/convert-bdalti.ts`. Without
+  it, routes have no elevation gain and the target elevation gain is ignored.
 - `BROUTER_URL`: a BRouter server, `http://localhost:17777` by default
 - `COMMUNES_FILE`: communes converted by `apps/api/scripts/convert-admin-express.ts`, to
   name routes after the commune of their start point. Without it, route names have no
@@ -61,9 +63,10 @@ pnpm lint         # lint
 pnpm typecheck    # type check
 ```
 
-The `Dockerfile` builds the API with the web app. Mount the tiles at `/data/bdalti` and
-point `BROUTER_URL` at BRouter (`http://brouter:17777` by default). To name routes after
-their commune, mount the communes file too and point `COMMUNES_FILE` at it.
+The `Dockerfile` builds the API with the web app. Point `BROUTER_URL` at BRouter
+(`http://brouter:17777` by default). To count elevation gain, mount the tiles and point
+`BDALTI_DIR` at them. To name routes after their commune, mount the communes file too and
+point `COMMUNES_FILE` at it.
 
 ## Data and credits
 

@@ -77,6 +77,12 @@ describe('buildRouteSet', () => {
     expect(routeSet).toMatchObject([{ kind: 'match', misses: [] }]);
   });
 
+  it('only checks the distance on a route without elevation gain', () => {
+    const routeSet = buildRouteSet({ ...criteria, elevationGain: 'hilly' }, [candidate({ elevationGain: undefined })]);
+
+    expect(routeSet).toMatchObject([{ kind: 'match', misses: [] }]);
+  });
+
   describe('with the hilly shortcut', () => {
     const hilly: Criteria = { ...criteria, elevationGain: 'hilly' };
 
@@ -127,6 +133,12 @@ describe('buildRouteSet', () => {
     const routeSet = buildRouteSet(criteria, [candidate({ distance: 10, elevationGain: 300 })]);
 
     expect(routeSet).toMatchObject([{ estimatedDuration: 78 }]);
+  });
+
+  it('estimates the duration from the distance alone on a route without elevation gain', () => {
+    const routeSet = buildRouteSet(criteria, [candidate({ distance: 10, elevationGain: undefined })]);
+
+    expect(routeSet).toMatchObject([{ estimatedDuration: 60 }]);
   });
 
   describe('with a target duration', () => {

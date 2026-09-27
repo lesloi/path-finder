@@ -47,7 +47,8 @@ export async function generateCandidates(
   criteria: Criteria,
   activity: Activity,
   engine: RoutingEngine,
-  elevationGain: ElevationGain,
+  /** Without it, routes have no elevation gain. */
+  elevationGain: ElevationGain | undefined,
   signal: AbortSignal,
 ): Promise<Candidate[]> {
   const radius = (targetDistance(criteria) * 1000) / LOOP_PER_RADIUS;
@@ -66,7 +67,12 @@ export async function generateCandidates(
     try {
       const { start, surface } = criteria;
       const { geometry, distance, ways } = await engine({ start, radius, heading, activity, surface }, signal);
-      return { geometry, distance, elevationGain: elevationGain(geometry), unpavedShare: unpavedShare(ways) };
+      return {
+        geometry,
+        distance,
+        ...(elevationGain && { elevationGain: elevationGain(geometry) }),
+        unpavedShare: unpavedShare(ways),
+      };
     } catch {
       return undefined;
     }
