@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore, type ComponentType } from 'react';
 
+import { CriteriaView } from './criteria-view.tsx';
 import { browserLanguage, type Language } from './language.ts';
 import { CreditsPage } from './legal/credits-page.tsx';
 import { LegalNoticePage } from './legal/legal-notice-page.tsx';
@@ -44,6 +45,7 @@ export function App() {
       <main>
         <h1>Path finder</h1>
         <a href="#/settings">{t.settings}</a>
+        <CriteriaView language={language} />
       </main>
     );
   }

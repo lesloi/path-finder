@@ -2,6 +2,9 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { App } from './App.tsx';
 
+// jsdom has no WebGL.
+vi.mock('maplibre-gl');
+
 afterEach(() => {
   window.location.hash = '';
   vi.restoreAllMocks();
