@@ -40,6 +40,11 @@ national mapping agency (IGN).
 
 Requires Node.js 26 (LTS) and pnpm. The API runs its TypeScript directly with Node.
 
+The API needs two environment variables:
+
+- `BDALTI_DIR`: BD ALTI 25 m tiles converted by `apps/api/scripts/convert-bdalti.ts`
+- `BROUTER_URL`: a BRouter server, `http://localhost:17777` by default
+
 ```sh
 pnpm install
 pnpm dev          # web app on http://localhost:5173, API on port 3000
@@ -50,6 +55,9 @@ pnpm test:coverage  # unit tests with coverage (fails below 80 %)
 pnpm lint         # lint
 pnpm typecheck    # type check
 ```
+
+The `Dockerfile` builds the API with the web app. Mount the tiles at `/data/bdalti` and
+point `BROUTER_URL` at BRouter (`http://brouter:17777` by default).
 
 ## Data and credits
 

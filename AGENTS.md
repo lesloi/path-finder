@@ -29,6 +29,9 @@ Run from the repo root. Keep this table in sync with the root `package.json`.
 | Lint                | `pnpm lint`                                 |
 | Type check          | `pnpm typecheck`                            |
 
+`pnpm dev` and `pnpm start` need `BDALTI_DIR` (and `BROUTER_URL` unless BRouter runs on
+`localhost:17777`).
+
 ## Privacy-first rules (non-negotiable)
 
 These are product requirements. If a feature seems to need an exception, ask the owner
@@ -53,7 +56,9 @@ before implementing it.
   browser, Node, and Hono imports, so it is unit tested without a server.
 - Elevation gain and profiles come from IGN BD ALTI 25 m, never from BRouter (#30). The
   tile reader takes a directory converted by `apps/api/scripts/convert-bdalti.ts`; the
-  API will read it from `BDALTI_DIR` once wired (#36).
+  API reads it from `BDALTI_DIR`.
+- The web app sends `import.meta.env.VITE_BUILD_ID` in the `X-Build-Id` header; the API
+  answers `426` when it differs from `apps/web/dist/build-id`, so stale tabs reload.
 - Model activity type (run / hike / ride) as data, not as branches through the UI.
 - Tests live in `__tests__/` or as `*-test.ts(x)` next to the code. Unit tests mock
   BRouter; integration tests run against a real BRouter container in CI.
