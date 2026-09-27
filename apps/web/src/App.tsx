@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type ComponentType } from 'react';
+import { useEffect, useSyncExternalStore, type ComponentType } from 'react';
 
 import { browserLanguage, type Language } from './language.ts';
 import { CreditsPage } from './legal/credits-page.tsx';
@@ -34,6 +34,10 @@ export function App() {
   const language = browserLanguage(navigator.languages);
   const t = text[language];
   const page = pages[hash];
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   if (!page) {
     return (
