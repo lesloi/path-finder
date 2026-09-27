@@ -6,6 +6,9 @@ start point, a distance, and an elevation gain.
   web app on the same origin.
 - Use **pnpm**; scripts are in the root `package.json`.
 
+`pnpm dev` and `pnpm start` need `BDALTI_DIR` (and `BROUTER_URL` unless BRouter runs on
+`localhost:17777`).
+
 ## Privacy-first rules (non-negotiable)
 
 If a feature seems to need an exception, ask the owner before implementing it.
@@ -25,7 +28,10 @@ If a feature seems to need an exception, ask the owner before implementing it.
 - `apps/api/src/route-generation` stays plain TypeScript (no browser, Node, or Hono
   imports) so it is unit tested without a server.
 - Elevation comes from IGN BD ALTI 25 m, never from BRouter (#30). The tile reader takes
-  a directory converted by `apps/api/scripts/convert-bdalti.ts`.
+  a directory converted by `apps/api/scripts/convert-bdalti.ts`; the API reads it from
+  `BDALTI_DIR`.
+- The web app sends `import.meta.env.VITE_BUILD_ID` in the `X-Build-Id` header; the API
+  answers `426` when it differs from `apps/web/dist/build-id`, so stale tabs reload.
 - Model activity type (run / hike / ride) as data, not as branches through the UI.
 - Unit tests mock BRouter.
 - Keep the in-app credits page accurate (OSM, Plan IGN, BD ALTI, source code link).

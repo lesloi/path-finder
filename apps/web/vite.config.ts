@@ -1,8 +1,23 @@
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { randomUUID } from 'node:crypto';
+import { defineConfig, type Plugin } from 'vite';
+
+// Each build gets its own ID, as `import.meta.env.VITE_BUILD_ID` and in `dist/build-id`.
+// The API reads the file and answers 426 to a tab left open across a deploy.
+function buildId(): Plugin {
+  const id = randomUUID();
+  return {
+    name: 'build-id',
+    apply: 'build',
+    config: () => ({ define: { 'import.meta.env.VITE_BUILD_ID': JSON.stringify(id) } }),
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'build-id', source: id });
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), buildId()],
   // The API (`apps/api`, port 3000) serves the built app on the same origin in production.
   server: { proxy: { '/api': 'http://localhost:3000' } },
 });
