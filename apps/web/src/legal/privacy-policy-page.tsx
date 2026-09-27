@@ -52,14 +52,16 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
           </li>
           <li>
             L’IGN (Institut national de l’information géographique et forestière), organisme
-            public français : votre navigateur charge la carte directement depuis la Géoplateforme
-            de l’IGN, qui reçoit donc votre adresse IP et la zone de carte affichée. Nos pages
+            public français : votre navigateur charge la carte, avec ses polices et ses icônes,
+            directement depuis la Géoplateforme de l’IGN, qui reçoit donc votre adresse IP et la
+            zone de carte affichée. Nos pages
             n’envoient pas leur adresse (aucun « referrer ») à l’IGN.
           </li>
         </ul>
         <p>
           Aucun autre tiers : pas de mesure d’audience, de publicité, de rapport de plantage, ni
-          de police ou de script externe. Vos données ne quittent pas l’Union européenne.
+          de police ou de script chargé d’ailleurs. Vos données ne quittent pas l’Union
+          européenne.
         </p>
 
         <h2>Vos droits</h2>
@@ -70,7 +72,7 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
           (voir les mentions légales). Vous pouvez aussi <a href={cnil}>saisir la CNIL</a>.
         </p>
 
-        <p>Dernière mise à jour : 27 septembre 2026.</p>
+        <p>Dernière mise à jour : 28 septembre 2026.</p>
       </>
     );
   }
@@ -120,14 +122,15 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
         </li>
         <li>
           IGN (the French national institute of geographic and forest information), a French
-          public body: your browser loads the map straight from the IGN Géoplateforme, which
-          therefore receives your IP address and the map area you view. Our pages do not send
+          public body: your browser loads the map, with its fonts and icons, straight from the
+          IGN Géoplateforme, which therefore receives your IP address and the map area you view.
+          Our pages do not send
           their address (no referrer) to IGN.
         </li>
       </ul>
       <p>
-        No other third party: no analytics, advertising, crash reporting, or external fonts or
-        scripts. Your data does not leave the European Union.
+        No other third party: no analytics, advertising, crash reporting, or fonts or scripts
+        loaded from anywhere else. Your data does not leave the European Union.
       </p>
 
       <h2>Your rights</h2>
@@ -138,7 +141,7 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
         <a href={cnil}>complain to the CNIL</a>, the French data protection authority.
       </p>
 
-      <p>Last updated: 27 September 2026.</p>
+      <p>Last updated: 28 September 2026.</p>
     </>
   );
 }

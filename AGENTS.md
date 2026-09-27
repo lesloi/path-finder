@@ -16,7 +16,8 @@ If a feature seems to need an exception, ask the owner before implementing it.
   IP addresses; it may hold a salted IP hash, rotated at least daily, in memory for rate limiting.
 - The only runtime third party is the IGN Géoplateforme for map tiles. Any other runtime
   network call needs the owner's approval and a French or EU provider.
-- Self-host every script, stylesheet, and font. No analytics, tracking, or accounts.
+- Self-host every script, stylesheet, and font; only the map style and its fonts and icons
+  come from the IGN Géoplateforme. No analytics, tracking, or accounts.
 - Serve every page with `Referrer-Policy: no-referrer`.
 - Ask for geolocation only when the user asks for their location; otherwise the start
   point is picked on the map.
