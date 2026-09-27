@@ -8,6 +8,7 @@ const request: LoopRequest = {
   activity: 'run',
   surface: 'unpaved',
 };
+const signal = new AbortController().signal;
 
 // A trimmed BRouter GeoJSON answer.
 const answer = {
@@ -45,12 +46,13 @@ describe('createBRouter', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('asks for a loop in round-trip mode with the profile overrides', async () => {
     fetch.mockResolvedValue(Response.json(answer));
 
-    await createBRouter('http://brouter:17777')(request);
+    await createBRouter('http://brouter:17777')(request, signal);
 
     const url = new URL(String(fetch.mock.calls[0][0]));
     expect(url.origin + url.pathname).toBe('http://brouter:17777/brouter');
@@ -72,7 +74,7 @@ describe('createBRouter', () => {
   ] as const)('limits the SAC scale for a %s to %i', async (activity, limit) => {
     fetch.mockResolvedValue(Response.json(answer));
 
-    await createBRouter('http://brouter:17777')({ ...request, activity });
+    await createBRouter('http://brouter:17777')({ ...request, activity }, signal);
 
     expect(new URL(String(fetch.mock.calls[0][0])).searchParams.get('profile:SAC_scale_limit')).toBe(String(limit));
   });
@@ -84,7 +86,7 @@ describe('createBRouter', () => {
   ] as const)('sets the path preference for the %s surface preference to %i', async (surface, preference) => {
     fetch.mockResolvedValue(Response.json(answer));
 
-    await createBRouter('http://brouter:17777')({ ...request, surface });
+    await createBRouter('http://brouter:17777')({ ...request, surface }, signal);
 
     expect(new URL(String(fetch.mock.calls[0][0])).searchParams.get('profile:path_preference')).toBe(
       String(preference),
@@ -96,7 +98,7 @@ describe('createBRouter', () => {
     fetch.mockImplementation(() => new Promise((resolve) => answers.push(resolve)));
     const brouter = createBRouter('http://brouter:17777');
 
-    const settled = Promise.allSettled(Array.from({ length: 6 }, () => brouter(request)));
+    const settled = Promise.allSettled(Array.from({ length: 6 }, () => brouter(request, signal)));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(fetch).toHaveBeenCalledTimes(4);
 
@@ -111,7 +113,7 @@ describe('createBRouter', () => {
   it('reads the geometry, the distance in kilometres, and the tags of each way', async () => {
     fetch.mockResolvedValue(Response.json(answer));
 
-    const loop = await createBRouter('http://brouter:17777')(request);
+    const loop = await createBRouter('http://brouter:17777')(request, signal);
 
     expect(loop).toEqual({
       geometry: [
@@ -128,18 +130,34 @@ describe('createBRouter', () => {
   });
 
   it('gives up after 5 s', async () => {
-    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    const elapsed = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(elapsed.signal);
     fetch.mockResolvedValue(Response.json(answer));
 
-    await createBRouter('http://brouter:17777')(request);
+    await createBRouter('http://brouter:17777')(request, signal);
+    const fetchSignal = fetch.mock.calls[0][1]?.signal;
+    expect(fetchSignal?.aborted).toBe(false);
+    elapsed.abort();
 
     expect(timeout).toHaveBeenCalledWith(5_000);
-    expect(fetch.mock.calls[0][1]?.signal).toBe(timeout.mock.results[0].value);
+    expect(fetchSignal?.aborted).toBe(true);
+  });
+
+  it('gives up when the generation is aborted', async () => {
+    const generation = new AbortController();
+    fetch.mockResolvedValue(Response.json(answer));
+
+    await createBRouter('http://brouter:17777')(request, generation.signal);
+    const fetchSignal = fetch.mock.calls[0][1]?.signal;
+    expect(fetchSignal?.aborted).toBe(false);
+    generation.abort();
+
+    expect(fetchSignal?.aborted).toBe(true);
   });
 
   it('rejects when BRouter answers with an error', async () => {
     fetch.mockResolvedValue(new Response('target island detected', { status: 500 }));
 
-    await expect(createBRouter('http://brouter:17777')(request)).rejects.toThrow('500');
+    await expect(createBRouter('http://brouter:17777')(request, signal)).rejects.toThrow('500');
   });
 });

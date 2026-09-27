@@ -22,13 +22,13 @@ type Answer = {
 /**
  * Asks the BRouter server at `baseUrl` (such as `http://localhost:17777`) for loops in
  * round-trip mode, with the `hiking-mountain` profile, `CONCURRENCY` calls at a time. Each
- * call rejects after `TIMEOUT`.
+ * call rejects after `TIMEOUT`, or once `signal` aborts.
  */
 export function createBRouter(baseUrl: string): RoutingEngine {
   let running = 0;
   const waiting: (() => void)[] = [];
 
-  return async ({ start, radius, heading, activity, surface }) => {
+  return async ({ start, radius, heading, activity, surface }, signal) => {
     if (running < CONCURRENCY) running++;
     else await new Promise<void>((resolve) => waiting.push(resolve));
     try {
@@ -42,7 +42,9 @@ export function createBRouter(baseUrl: string): RoutingEngine {
         'profile:SAC_scale_limit': String(SAC_SCALE_LIMIT[activity]),
         'profile:path_preference': String(PATH_PREFERENCE[surface]),
       });
-      const response = await fetch(`${baseUrl}/brouter?${params}`, { signal: AbortSignal.timeout(TIMEOUT) });
+      const response = await fetch(`${baseUrl}/brouter?${params}`, {
+        signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT)]),
+      });
       if (!response.ok) throw new Error(`BRouter answered ${response.status}`);
       const [{ geometry, properties }] = ((await response.json()) as Answer).features;
       const [columns, ...rows] = properties.messages;

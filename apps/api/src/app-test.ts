@@ -2,6 +2,8 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import type { Mock } from 'vitest';
+
 import { createApp } from './app.ts';
 import type { Position, RoutingEngine } from './route-generation/index.ts';
 
@@ -90,7 +92,10 @@ describe('api', () => {
 
     const response = await postRouteSet(climbing, { ...criteria, activity: 'hike', elevationGain: 'hilly' });
 
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ start: START, activity: 'hike', surface: 'any' }));
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ start: START, activity: 'hike', surface: 'any' }),
+      expect.any(AbortSignal),
+    );
     const { routes } = await response.json();
     expect(routes[0].elevationGain).toBeGreaterThan(0);
   });
@@ -205,9 +210,9 @@ describe('api', () => {
   it('answers 503 with Retry-After beyond one generation and two waiting', async () => {
     let release!: () => void;
     const busy = new Promise<void>((resolve) => (release = resolve));
-    const blocked: RoutingEngine = async (request) => {
+    const blocked: RoutingEngine = async (request, signal) => {
       await busy;
-      return engine(request);
+      return engine(request, signal);
     };
     const saturated = createApp({ webRoot, engine: blocked, heightAt: flat });
 
@@ -220,5 +225,55 @@ describe('api', () => {
     expect(turnedAway.status).toBe(503);
     expect(turnedAway.headers.get('Retry-After')).toBe('5');
     expect(statuses.sort()).toEqual([200, 200, 200, 503]);
+  });
+
+  describe('deadline', () => {
+    let stuck: Mock<RoutingEngine>;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      // Like BRouter behind `fetch`: never answers, but rejects once its call is aborted.
+      stuck = vi.fn<RoutingEngine>(
+        (_, signal) =>
+          new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })),
+      );
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('answers 504 when a generation is not done within 15 s', async () => {
+      const slow = createApp({ webRoot, engine: stuck, heightAt: flat });
+
+      const response = postRouteSet(slow, criteria);
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      expect((await response).status).toBe(504);
+      expect(await (await response).json()).toEqual({ error: expect.any(String) });
+    });
+
+    it('aborts the pending routing engine calls at the deadline', async () => {
+      const slow = createApp({ webRoot, engine: stuck, heightAt: flat });
+
+      const response = postRouteSet(slow, criteria);
+      await vi.advanceTimersByTimeAsync(14_999);
+      const signals = stuck.mock.calls.map(([, signal]) => signal);
+      expect(signals).toHaveLength(20);
+      expect(signals.some((signal) => signal.aborted)).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      await response;
+
+      expect(signals.every((signal) => signal.aborted)).toBe(true);
+      // No correction call follows an aborted first call.
+      expect(stuck).toHaveBeenCalledTimes(20);
+    });
+
+    it('answers as usual when a generation is done in time', async () => {
+      const response = await postRouteSet(createApp({ webRoot, engine, heightAt: flat }), criteria);
+
+      expect(response.status).toBe(200);
+    });
   });
 });

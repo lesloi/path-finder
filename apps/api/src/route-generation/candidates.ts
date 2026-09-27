@@ -18,8 +18,11 @@ export type Way = { length: number; surface?: string; highway?: string };
 /** A loop from the routing engine. `distance` is in kilometres. */
 export type EngineLoop = { geometry: Position[]; distance: number; ways: Way[] };
 
-/** Asks the routing engine for a loop. A rejected call is dropped, not retried. */
-export type RoutingEngine = (request: LoopRequest) => Promise<EngineLoop>;
+/**
+ * Asks the routing engine for a loop. A rejected call is dropped, not retried. The call must
+ * reject once `signal` aborts.
+ */
+export type RoutingEngine = (request: LoopRequest, signal: AbortSignal) => Promise<EngineLoop>;
 
 /** Elevation gain along a geometry, in metres. */
 export type ElevationGain = (geometry: Position[]) => number;
@@ -38,13 +41,14 @@ export function unpavedShare(ways: Way[]): number {
 /**
  * Asks for one loop per heading, then once more per loop with the radius scaled to meet the
  * target, and keeps whichever of the two is closer to it. Throws a `RangeError` as
- * `targetDistance` does.
+ * `targetDistance` does, and the abort reason once `signal` aborts.
  */
 export async function generateCandidates(
   criteria: Criteria,
   activity: Activity,
   engine: RoutingEngine,
   elevationGain: ElevationGain,
+  signal: AbortSignal,
 ): Promise<Candidate[]> {
   const radius = (targetDistance(criteria) * 1000) / LOOP_PER_RADIUS;
   // Loops are judged as the route set judges them: on distance, or on estimated duration.
@@ -61,7 +65,7 @@ export async function generateCandidates(
   const requestCandidate = async (radius: number, heading: number): Promise<Candidate | undefined> => {
     try {
       const { start, surface } = criteria;
-      const { geometry, distance, ways } = await engine({ start, radius, heading, activity, surface });
+      const { geometry, distance, ways } = await engine({ start, radius, heading, activity, surface }, signal);
       return { geometry, distance, elevationGain: elevationGain(geometry), unpavedShare: unpavedShare(ways) };
     } catch {
       return undefined;
@@ -77,5 +81,6 @@ export async function generateCandidates(
       return [second && offTarget(second) < offTarget(first) ? second : first];
     }),
   );
+  signal.throwIfAborted();
   return candidates.flat();
 }

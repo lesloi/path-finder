@@ -18,6 +18,8 @@ import { createConcurrencyLimiter, createRateLimiter } from './limits.ts';
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 // Seconds: about one generation, given the < 5 s p95 target.
 const BUSY_RETRY_AFTER = 5;
+// Milliseconds a route set may take, waiting in the queue included.
+const GENERATION_TIMEOUT = 15_000;
 
 /** ID written by each web app build (see `apps/web/vite.config.ts`), or none when the web app is not built. */
 function readBuildId(webRoot: string): string | undefined {
@@ -79,16 +81,31 @@ export function createApp({ webRoot, engine, heightAt }: { webRoot: string; engi
       throw error;
     }
     const { criteria, activity } = parsed;
-    const routes = generate(async () => {
-      const candidates = await generateCandidates(criteria, activity, engine, (geometry) =>
-        elevationGain(geometry, heightAt),
-      );
-      return buildRouteSet(criteria, candidates);
-    });
-    if (!routes) {
-      return retryLater(c, 503, BUSY_RETRY_AFTER, 'Too many route sets being generated: retry in a few seconds');
+    // A timer rather than `AbortSignal.timeout`, which cannot be cancelled once the route set is done.
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(), GENERATION_TIMEOUT);
+    try {
+      const routes = generate(async () => {
+        const candidates = await generateCandidates(
+          criteria,
+          activity,
+          engine,
+          (geometry) => elevationGain(geometry, heightAt),
+          deadline.signal,
+        );
+        return buildRouteSet(criteria, candidates);
+      });
+      if (!routes) {
+        return retryLater(c, 503, BUSY_RETRY_AFTER, 'Too many route sets being generated: retry in a few seconds');
+      }
+      return c.json({ routes: await routes });
+    } catch (error) {
+      // Only the deadline itself: any other error is a bug, not a slow generation.
+      if (error === deadline.signal.reason) return c.json({ error: 'The route set took too long to generate' }, 504);
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
-    return c.json({ routes: await routes });
   });
 
   app.use(async (c, next) => {
