@@ -43,4 +43,18 @@ describe('App', () => {
       await screen.findByRole('heading', { level: 1, name: 'Politique de confidentialité' }),
     ).toBeInTheDocument();
   });
+
+  it('sets the document language to fr when the browser prefers French', () => {
+    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['fr-FR']);
+    render(<App />);
+
+    expect(document.documentElement.lang).toBe('fr');
+  });
+
+  it('sets the document language to en otherwise', () => {
+    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['de-DE']);
+    render(<App />);
+
+    expect(document.documentElement.lang).toBe('en');
+  });
 });
