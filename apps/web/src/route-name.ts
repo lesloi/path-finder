@@ -3,8 +3,8 @@ import type { Language } from './language.ts';
 
 export type Units = 'metric' | 'imperial';
 
-const KM_PER_MILE = 1.609344;
-const METRES_PER_FOOT = 0.3048;
+export const KM_PER_MILE = 1.609344;
+export const METRES_PER_FOOT = 0.3048;
 
 /**
  * The route name: the activity, the day of the export, the distance, and the elevation gain

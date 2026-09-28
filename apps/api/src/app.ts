@@ -109,7 +109,18 @@ export function createApp({
           heightAt && ((geometry) => elevationGain(geometry, heightAt)),
           deadline.signal,
         );
-        return buildRouteSet(criteria, candidates);
+        const routeSet = buildRouteSet(criteria, candidates);
+        if (!heightAt) return routeSet;
+        // Heights on every point, to the decimetre, so the web app builds the GPX export offline.
+        // Elevation gain only samples along a loop: a point with no height drops its route.
+        return routeSet.flatMap((route) => {
+          try {
+            const geometry = route.geometry.map(([lon, lat]) => [lon, lat, Math.round(heightAt(lon, lat) * 10) / 10]);
+            return [{ ...route, geometry }];
+          } catch {
+            return [];
+          }
+        });
       });
       if (!routes) {
         return retryLater(c, 503, BUSY_RETRY_AFTER, 'Too many route sets being generated: retry in a few seconds');
