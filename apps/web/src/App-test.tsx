@@ -54,6 +54,17 @@ describe('App', () => {
     expect(document.documentElement.lang).toBe('fr');
   });
 
+  it('speaks the language picked in the settings over the browser one', async () => {
+    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['en-US']);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.change(await screen.findByLabelText('Language'), { target: { value: 'fr' } });
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Réglages' })).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe('fr');
+  });
+
   it('sets the document language to en otherwise', () => {
     vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['de-DE']);
     render(<App />);

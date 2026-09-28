@@ -5,6 +5,7 @@ import { browserLanguage, type Language } from './language.ts';
 import { CreditsPage } from './legal/credits-page.tsx';
 import { LegalNoticePage } from './legal/legal-notice-page.tsx';
 import { PrivacyPolicyPage } from './legal/privacy-policy-page.tsx';
+import { useSettings } from './settings.ts';
 import { SettingsView } from './settings-view.tsx';
 
 const text = {
@@ -32,7 +33,8 @@ function useHash() {
 
 export function App() {
   const hash = useHash();
-  const language = browserLanguage(navigator.languages);
+  const [settings] = useSettings();
+  const language = settings.language ?? browserLanguage(navigator.languages);
   const t = text[language];
   const page = pages[hash];
 
