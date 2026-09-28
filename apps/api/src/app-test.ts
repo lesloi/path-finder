@@ -100,6 +100,38 @@ describe('api', () => {
     expect(routes[0].elevationGain).toBeGreaterThan(0);
   });
 
+  it('gives every point of a route its BD ALTI height, for the GPX export', async () => {
+    const response = await postRouteSet(app, criteria);
+
+    const { routes } = await response.json();
+    expect(routes[0].geometry[0]).toEqual([...START, 450]);
+    expect(routes[0].geometry.every((point: number[]) => point[2] === 450)).toBe(true);
+  });
+
+  it('drops a route with a point it finds no height for', async () => {
+    // Elevation gain samples along the loops, never on the far point of the loops heading east.
+    const unknown = new Set<string>();
+    const eastward: RoutingEngine = async (request, signal) => {
+      const loop = await engine(request, signal);
+      if (request.heading < 180) unknown.add(String(loop.geometry[1]));
+      return loop;
+    };
+    const heightAt = (lon: number, lat: number) => {
+      if (unknown.has(String([lon, lat]))) throw new RangeError('No BD ALTI tile here');
+      return 450;
+    };
+    const partial = createApp({ webRoot, engine: eastward, heightAt });
+
+    const response = await postRouteSet(partial, criteria);
+
+    expect(response.status).toBe(200);
+    const { routes } = await response.json();
+    expect(routes.length).toBeGreaterThan(0);
+    expect(routes.some((route: { geometry: number[][] }) => unknown.has(String(route.geometry[1].slice(0, 2))))).toBe(
+      false,
+    );
+  });
+
   describe('without BD ALTI', () => {
     const noElevation = () => createApp({ webRoot, engine });
 
@@ -110,6 +142,13 @@ describe('api', () => {
       const { routes } = await response.json();
       expect(routes[0]).toMatchObject({ kind: 'match', misses: [] });
       expect(routes[0]).not.toHaveProperty('elevationGain');
+    });
+
+    it('gives the points of a route no height', async () => {
+      const response = await postRouteSet(noElevation(), criteria);
+
+      const { routes } = await response.json();
+      expect(routes[0].geometry[0]).toEqual(START);
     });
 
     it('turns a target duration into distance alone', async () => {
