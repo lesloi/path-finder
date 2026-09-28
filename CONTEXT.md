@@ -21,7 +21,8 @@ _Avoid_: Filters, query, search parameters
 **Waypoint**:
 A point a route must pass through between its start and its end, in the order the user
 placed it. Up to three per set of criteria. Waypoints never replace the target distance or
-target duration: a route set whose waypoints alone exceed the target holds only suggestions.
+target duration: criteria whose waypoints alone exceed the target are refused. A waypoint
+off the ways the activity allows is moved to the nearest one, unless it is too far from any.
 _Avoid_: Stage, via, étape
 
 **Target distance**:
