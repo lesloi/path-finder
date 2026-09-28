@@ -3,8 +3,8 @@
   "short_name": "Path finder",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1b5e3f",
-  "theme_color": "#1b5e3f",
+  "background_color": "#4a90c2",
+  "theme_color": "#4a90c2",
   "icons": [
     {
       "src": "/icon-192.png",
