@@ -1,10 +1,6 @@
 import { ACTIVITY_NAMES, type Activity } from './activity.ts';
 import type { Language } from './language.ts';
-
-export type Units = 'metric' | 'imperial';
-
-export const KM_PER_MILE = 1.609344;
-export const METRES_PER_FOOT = 0.3048;
+import { KM_PER_MILE, METRES_PER_FOOT, type Units } from './units.ts';
 
 /**
  * The route name: the activity, the day of the export, the distance, and the elevation gain
