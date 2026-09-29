@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import { Map } from 'maplibre-gl';
+
 import { App } from './App.tsx';
 
 // jsdom has no WebGL.
@@ -35,6 +37,17 @@ describe('App', () => {
     },
   );
 
+  it('keeps the map across a visit to the settings', async () => {
+    render(<App />);
+    const created = vi.mocked(Map).mock.instances.length;
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Back' }));
+    await screen.findByRole('button', { name: 'Criteria' });
+
+    expect(vi.mocked(Map).mock.instances).toHaveLength(created);
+  });
+
   it('speaks French when the browser prefers French', async () => {
     vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['fr-FR']);
     render(<App />);
@@ -59,7 +72,8 @@ describe('App', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
-    fireEvent.change(await screen.findByLabelText('Language'), { target: { value: 'fr' } });
+    fireEvent.click(await screen.findByRole('button', { name: /^Language/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'Français' }));
 
     expect(screen.getByRole('heading', { level: 1, name: 'Réglages' })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('fr');

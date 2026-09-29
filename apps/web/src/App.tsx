@@ -7,18 +7,25 @@ import { LegalNoticePage } from './legal/legal-notice-page.tsx';
 import { PrivacyPolicyPage } from './legal/privacy-policy-page.tsx';
 import { useSettings } from './settings.ts';
 import { SettingsView } from './settings-view.tsx';
+import { SubPage } from './ui/index.ts';
 
-const text = {
-  en: { back: 'Back', settings: 'Settings' },
-  fr: { back: 'Retour', settings: 'Réglages' },
-} satisfies Record<Language, unknown>;
-
-// Each page by its hash, with where its back link goes.
-const pages: Record<string, { Page: ComponentType<{ language: Language }>; back: string }> = {
-  '#/settings': { Page: SettingsView, back: '#/' },
-  '#/credits': { Page: CreditsPage, back: '#/settings' },
-  '#/privacy': { Page: PrivacyPolicyPage, back: '#/settings' },
-  '#/legal-notice': { Page: LegalNoticePage, back: '#/settings' },
+// Each page by its hash, with its title and where its back arrow goes.
+const pages: Record<
+  string,
+  { Page: ComponentType<{ language: Language }>; title: Record<Language, string>; back: string }
+> = {
+  '#/settings': { Page: SettingsView, title: { en: 'Settings', fr: 'Réglages' }, back: '#/' },
+  '#/credits': { Page: CreditsPage, title: { en: 'Credits', fr: 'Crédits' }, back: '#/settings' },
+  '#/privacy': {
+    Page: PrivacyPolicyPage,
+    title: { en: 'Privacy policy', fr: 'Politique de confidentialité' },
+    back: '#/settings',
+  },
+  '#/legal-notice': {
+    Page: LegalNoticePage,
+    title: { en: 'Legal notice', fr: 'Mentions légales' },
+    back: '#/settings',
+  },
 };
 
 function subscribeToHash(onChange: () => void) {
@@ -35,26 +42,25 @@ export function App() {
   const hash = useHash();
   const [settings] = useSettings();
   const language = settings.language ?? browserLanguage(navigator.languages);
-  const t = text[language];
   const page = pages[hash];
 
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
 
-  if (!page) {
-    return (
-      <main>
-        <h1>Path finder</h1>
-        <a href="#/settings">{t.settings}</a>
-        <CriteriaView language={language} />
-      </main>
-    );
-  }
   return (
     <main>
-      <a href={page.back}>{t.back}</a>
-      <page.Page language={language} />
+      {/* Pages open over the map, which stays mounted so it keeps its view and start point. */}
+      <div inert={Boolean(page)}>
+        {/* The map says what the app is: the name is for screen readers. */}
+        <h1 className="sr-only">Path finder</h1>
+        <CriteriaView language={language} />
+      </div>
+      {page && (
+        <SubPage title={page.title[language]} back={page.back} language={language}>
+          <page.Page language={language} />
+        </SubPage>
+      )}
     </main>
   );
 }

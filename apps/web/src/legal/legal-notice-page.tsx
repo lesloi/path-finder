@@ -8,7 +8,6 @@ export function LegalNoticePage({ language }: { language: Language }) {
   if (language === 'fr') {
     return (
       <>
-        <h1>Mentions légales</h1>
         <h2>Éditeur</h2>
         <p>
           Path finder est édité à titre non professionnel par un particulier, connu sur GitHub
@@ -29,7 +28,6 @@ export function LegalNoticePage({ language }: { language: Language }) {
   }
   return (
     <>
-      <h1>Legal notice</h1>
       <h2>Publisher</h2>
       <p>
         Path finder is published on a non-professional basis by a private individual, known on

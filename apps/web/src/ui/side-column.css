@@ -1,0 +1,37 @@
+/* The desktop panel floating over the left of the map. */
+.side-column {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + var(--space-3));
+  bottom: calc(env(safe-area-inset-bottom) + var(--space-3));
+  left: calc(env(safe-area-inset-left) + var(--space-3));
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  width: var(--column-width);
+  overflow: hidden;
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.side-column-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) 0;
+  font-size: var(--text-l);
+  font-weight: 700;
+}
+
+.side-column-brand img {
+  border-radius: var(--radius-s);
+}
+
+.side-column-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  overflow-y: auto;
+}

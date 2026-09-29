@@ -1,41 +1,36 @@
-import { Map, Marker, type MapMouseEvent, type MapTouchEvent } from 'maplibre-gl';
+import { AttributionControl, Map, Marker, type MapMouseEvent, type MapTouchEvent } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 
-import type { Language } from './language.ts';
+import './start-point-map.css';
 
 /** A longitude and a latitude, the shape the API's criteria take. */
 export type Position = [number, number];
 
+/** How the map sets the start point: a long press (phones), or a click once picking is armed (desktops). */
+export type PickBy = 'long-press' | 'click';
+
 const LONG_PRESS_MS = 500;
 
-const text = {
-  en: {
-    myLocation: 'My location',
-    unavailable: 'Your location is unavailable. Long-press the map to pick your start point.',
-  },
-  fr: {
-    myLocation: 'Ma position',
-    unavailable:
-      'Votre position n’est pas disponible. Appuyez longuement sur la carte pour choisir votre point de départ.',
-  },
-} satisfies Record<Language, unknown>;
-
+/** The full-screen map, which shows the start point and sets it the way `pickBy` says. */
 export function StartPointMap({
-  language,
   start,
+  located,
+  pickBy,
   onStartChange,
 }: {
-  language: Language;
   start?: Position;
+  /** The device location, which the map moves to. */
+  located?: Position;
+  /** Absent: the map never sets the start point. */
+  pickBy?: PickBy;
   onStartChange: (start: Position) => void;
 }) {
-  const t = text[language];
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map>(null);
-  // The start point when the location was unavailable: setting a new one drops the message.
-  const [unavailableAt, setUnavailableAt] = useState<{ start?: Position }>();
-  const pickStart = useEffectEvent(onStartChange);
+  const pick = useEffectEvent((how: PickBy, { lng, lat }: { lng: number; lat: number }) => {
+    if (how === pickBy) onStartChange([lng, lat]);
+  });
 
   useEffect(() => {
     const map = new Map({
@@ -43,14 +38,20 @@ export function StartPointMap({
       style: 'https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/standard.json',
       center: [2.5, 46.6],
       zoom: 5,
-      // Routes come from OpenStreetMap: credit it from this map on, before any route is drawn.
-      attributionControl: {
+      attributionControl: false,
+    });
+    // Routes come from OpenStreetMap: credit it from this map on, before any route is drawn.
+    // The stylesheet moves it above the sheet on phones and to the centre of the map on desktops.
+    map.addControl(
+      new AttributionControl({
+        compact: true,
         customAttribution: [
           '<a href="https://www.ign.fr">© IGN</a>',
           '<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap</a>',
         ],
-      },
-    });
+      }),
+      'bottom-left',
+    );
     mapRef.current = map;
     // The IGN style paints its background from the tiles, so tiles still loading would show
     // whatever is behind the canvas (black in dark mode).
@@ -61,10 +62,12 @@ export function StartPointMap({
       );
     });
 
+    map.on('click', ({ lngLat }) => pick('click', lngLat));
+
     let timer: ReturnType<typeof setTimeout> | undefined;
     const press = ({ lngLat }: MapMouseEvent | MapTouchEvent) => {
       clearTimeout(timer);
-      timer = setTimeout(() => pickStart([lngLat.lng, lngLat.lat]), LONG_PRESS_MS);
+      timer = setTimeout(() => pick('long-press', lngLat), LONG_PRESS_MS);
     };
     const cancel = () => clearTimeout(timer);
     map.on('mousedown', (event) => {
@@ -85,35 +88,17 @@ export function StartPointMap({
 
   useEffect(() => {
     if (!start) return;
-    const marker = new Marker().setLngLat(start).addTo(mapRef.current!);
+    const element = document.createElement('div');
+    element.className = 'start-marker';
+    const marker = new Marker({ element }).setLngLat(start).addTo(mapRef.current!);
     return () => {
       marker.remove();
     };
   }, [start]);
 
-  // Geolocation is asked for only here, when the user taps the button.
-  function locate() {
-    setUnavailableAt(undefined);
-    if (!navigator.geolocation) return setUnavailableAt({ start });
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        const location: Position = [coords.longitude, coords.latitude];
-        mapRef.current?.easeTo({ center: location, zoom: 14 });
-        onStartChange(location);
-      },
-      () => setUnavailableAt({ start }),
-      // Without a timeout, a position that never comes would never show the message.
-      { timeout: 10_000 },
-    );
-  }
+  useEffect(() => {
+    if (located) mapRef.current!.easeTo({ center: located, zoom: 14 });
+  }, [located]);
 
-  return (
-    <>
-      <div ref={container} style={{ height: '60vh' }} />
-      <button type="button" onClick={locate}>
-        {t.myLocation}
-      </button>
-      {unavailableAt && unavailableAt.start === start && <p role="alert">{t.unavailable}</p>}
-    </>
-  );
+  return <div ref={container} className={pickBy === 'click' ? 'map picking' : 'map'} />;
 }

@@ -5,6 +5,10 @@ import { SettingsView } from './settings-view.tsx';
 
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);
 const saved = () => renderHook(() => useSettings()).result.current[0];
+const pick = (dropdown: RegExp, option: string) => {
+  fireEvent.click(screen.getByRole('button', { name: dropdown }));
+  fireEvent.click(screen.getByRole('option', { name: option }));
+};
 
 describe('SettingsView', () => {
   it('shows the default paces in metric units', () => {
@@ -12,7 +16,27 @@ describe('SettingsView', () => {
 
     expect(screen.getByLabelText('Run (min/km)')).toHaveValue('6:00');
     expect(screen.getByLabelText('Hike (km/h)')).toHaveValue('4.5');
-    expect(screen.getByLabelText('Units')).toHaveValue('metric');
+    expect(screen.getByRole('button', { name: 'Units Metric (km, m)' })).toBeInTheDocument();
+  });
+
+  it('shows the display, pace, and about groups in this order', () => {
+    renderView();
+
+    expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      'Display',
+      'Pace',
+      'About',
+    ]);
+  });
+
+  it.each([
+    ['Credits', '#/credits'],
+    ['Privacy policy', '#/privacy'],
+    ['Legal notice', '#/legal-notice'],
+  ])('links to the %s page', (page, href) => {
+    renderView();
+
+    expect(screen.getByRole('link', { name: page })).toHaveAttribute('href', href);
   });
 
   it('saves a run pace in minutes per km', () => {
@@ -45,7 +69,7 @@ describe('SettingsView', () => {
   it('shows and takes paces in min/mi and mph with imperial units', () => {
     renderView();
 
-    fireEvent.change(screen.getByLabelText('Units'), { target: { value: 'imperial' } });
+    pick(/^Units/, 'Imperial (mi, ft)');
 
     expect(saved().units).toBe('imperial');
     expect(screen.getByLabelText('Run (min/mi)')).toHaveValue('9:39');
@@ -67,7 +91,7 @@ describe('SettingsView', () => {
   it('saves the language the user picks', () => {
     renderView();
 
-    fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'fr' } });
+    pick(/^Language/, 'Français');
 
     expect(saved().language).toBe('fr');
   });
@@ -78,7 +102,7 @@ describe('SettingsView', () => {
     expect(screen.getByRole('heading', { name: 'Allure' })).toBeInTheDocument();
     expect(screen.getByLabelText('Course (min/km)')).toHaveValue('6:00');
     expect(screen.getByLabelText('Randonnée (km/h)')).toHaveValue('4,5');
-    expect(screen.getByLabelText('Langue')).toHaveValue('fr');
-    expect(screen.getByLabelText('Unités')).toHaveValue('metric');
+    expect(screen.getByRole('button', { name: 'Langue Français' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unités Métriques (km, m)' })).toBeInTheDocument();
   });
 });

@@ -1,0 +1,35 @@
+/* A full-screen page over the map, with a sticky header and a back arrow. */
+.sub-page {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface);
+}
+
+.sub-page-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: calc(56px + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) calc(env(safe-area-inset-right) + var(--space-2)) 0
+    calc(env(safe-area-inset-left) + var(--space-2));
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.sub-page-header h1 {
+  margin: 0;
+  font-size: var(--text-l);
+}
+
+.sub-page-body {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: var(--space-4) calc(env(safe-area-inset-right) + var(--space-4)) var(--space-5)
+    calc(env(safe-area-inset-left) + var(--space-4));
+}

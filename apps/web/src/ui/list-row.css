@@ -1,0 +1,61 @@
+/* Rows grouped under a title: a label on the left, a value, a field, or a chevron on the right. */
+.group-title {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: var(--text-s);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.group-title:first-child {
+  margin-top: var(--space-2);
+}
+
+.list {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+}
+
+/* Rows round their own corners, so a dropdown list can overflow the group. */
+.list-row:first-child {
+  border-radius: var(--radius-m) var(--radius-m) 0 0;
+}
+
+.list-row:last-child {
+  border-bottom: 0;
+  border-radius: 0 0 var(--radius-m) var(--radius-m);
+}
+
+.list-row:only-child {
+  border-radius: var(--radius-m);
+}
+
+a.list-row:hover {
+  background: var(--surface-2);
+}
+
+.list-row-chevron {
+  flex: none;
+  color: var(--text-2);
+}
+
+.list-row input {
+  width: 88px;
+  min-height: var(--touch);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: var(--surface-2);
+  text-align: right;
+}

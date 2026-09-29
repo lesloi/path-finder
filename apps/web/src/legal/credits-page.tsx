@@ -9,7 +9,6 @@ export function CreditsPage({ language }: { language: Language }) {
   if (language === 'fr') {
     return (
       <>
-        <h1>Crédits</h1>
         <h2>Données</h2>
         <ul>
           <li>
@@ -32,7 +31,6 @@ export function CreditsPage({ language }: { language: Language }) {
   }
   return (
     <>
-      <h1>Credits</h1>
       <h2>Data</h2>
       <ul>
         <li>

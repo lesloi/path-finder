@@ -1,0 +1,63 @@
+/* The design tokens: every colour, size, and shadow the stylesheets use (DESIGN.md). */
+:root {
+  --accent: #2b6f9e;
+  --accent-hover: #235b82;
+  --on-accent: #ffffff;
+  --accent-soft: #e4eef6;
+  --surface: #ffffff;
+  --surface-2: #f3f4f2;
+  --text: #1c1d1b;
+  --text-2: #5d615c;
+  --border: #e1e3df;
+  --scrim: rgb(0 0 0 / 0.35);
+
+  /* On the map, which stays light: the same in dark mode. */
+  --route-1: #e0115f;
+  --route-2: #1d2433;
+  --route-3: #7a3fc4;
+  --start: #6b4f33;
+
+  /* Uphill grade classes and road surfaces of a route (#9). */
+  --slope-1: #7cb342; /* < 3 % */
+  --slope-2: #f9a825; /* 3–6 % */
+  --slope-3: #ef6c00; /* 6–10 % */
+  --slope-4: #d32f2f; /* > 10 % */
+  --paved: #8d8f8a;
+  --unpaved: #a47148;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --radius-s: 8px;
+  --radius-m: 14px;
+  --radius-l: 22px;
+  --radius-full: 999px;
+  --shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 4px 14px rgb(0 0 0 / 0.14);
+  --touch: 44px;
+  --column-width: 380px;
+
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --text-s: 13px;
+  --text-m: 15px;
+  --text-l: 18px;
+  --text-xl: 24px;
+
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #6fb0dd;
+    --accent-hover: #8ac0e4;
+    --on-accent: #0b1a26;
+    --accent-soft: #1b3246;
+    --surface: #1c1e1d;
+    --surface-2: #272a28;
+    --text: #eeefec;
+    --text-2: #a3a7a2;
+    --border: #363937;
+    --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.45);
+  }
+}
