@@ -34,23 +34,23 @@ margins use the steps below, and other multiples (`min-h-13`) only give a compon
 dimensions (a 52 px row). Only the map's own colours (white under the start point) are
 written raw.
 
-| Utilities                                                | Values                                           |
-| -------------------------------------------------------- | ------------------------------------------------ |
-| `accent`, `accent-hover`, `accent-soft`                  | `#2b6f9e`; dark mode `#6fb0dd`                   |
-| `on-accent`                                              | Text on the accent: white; dark text in dark mode |
-| `surface`, `surface-2`, `ink`, `ink-2`, `border`, `scrim` | UI surfaces, text, and borders, light and dark  |
-| `route-1`, `route-2`, `route-3`                          | `#e0115f`, `#1d2433`, `#7a3fc4`                  |
-| `slope-1` … `slope-4`                                    | Uphill grade < 3 %, 3–6 %, 6–10 %, > 10 %        |
-| `paved`, `unpaved`                                       | Road surfaces                                    |
-| `start`                                                  | The start point's brown ring, as in the logo     |
-| spacing `1`, `2`, `3`, `4`, `6`                          | 4, 8, 12, 16, 24 px (Tailwind's 4 px steps)      |
-| `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full` | 8, 14, 22 px, and a full pill                    |
-| `shadow-float`                                           | The one shadow, for everything that floats       |
-| `text-sm`, `text-base`, `text-lg`, `text-xl`             | 13, 15, 18, 24 px, in `rem` like the spacing     |
-| `font-sans`                                              | The system font stack                            |
-| `touch` (`size-touch`, `min-h-touch`)                    | 44 px, the smallest touch target                 |
-| `column` (`w-column`)                                    | 380 px, the desktop left column                  |
-| `top-safe-*`, `pb-safe-*`, and the other sides          | An offset or a padding from a screen edge, plus its safe area |
+| Utilities                                                 | Values                                                        |
+| --------------------------------------------------------- | ------------------------------------------------------------- |
+| `accent`, `accent-hover`, `accent-soft`                   | `#2b6f9e`; dark mode `#6fb0dd`                                |
+| `on-accent`                                               | Text on the accent: white; dark text in dark mode             |
+| `surface`, `surface-2`, `ink`, `ink-2`, `border`, `scrim` | UI surfaces, text, and borders, light and dark                |
+| `route-1`, `route-2`, `route-3`                           | `#e0115f`, `#1d2433`, `#7a3fc4`                               |
+| `slope-1` … `slope-4`                                     | Uphill grade < 3 %, 3–6 %, 6–10 %, > 10 %                     |
+| `paved`, `unpaved`                                        | Road surfaces                                                 |
+| `start`                                                   | The start point's brown ring, as in the logo                  |
+| spacing `1`, `2`, `3`, `4`, `6`                           | 4, 8, 12, 16, 24 px (Tailwind's 4 px steps)                   |
+| `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`  | 8, 14, 22 px, and a full pill                                 |
+| `shadow-float`                                            | The one shadow, for everything that floats                    |
+| `text-sm`, `text-base`, `text-lg`, `text-xl`              | 13, 15, 18, 24 px, in `rem` like the spacing                  |
+| `font-sans`                                               | The system font stack                                         |
+| `touch` (`size-touch`, `min-h-touch`)                     | 44 px, the smallest touch target                              |
+| `column` (`w-column`)                                     | 380 px, the desktop left column                               |
+| `top-safe-*`, `pb-safe-*`, and the other sides            | An offset or a padding from a screen edge, plus its safe area |
 
 **Stacking** (`z-*`): 4 for the sheet and the column, 5 for the floating buttons, 9 for a
 toast, 11 and 12 for an open dropdown and its scrim. Sub-pages are in the top
@@ -69,17 +69,17 @@ React components exist where markup alone is not enough. The others are Tailwind
 strings in [`ui/styles.ts`](./apps/web/src/ui/styles.ts), one per element, so every screen
 draws them the same way.
 
-| Component             | Where                                                                   |
-| --------------------- | ----------------------------------------------------------------------- |
-| Round floating button | `FLOATING_BUTTON`, `aria-pressed` when it toggles                       |
-| Bottom sheet          | `<BottomSheet label expanded onExpandedChange>`: collapsed or expanded; its handle is a button with `aria-expanded`, tapped or swiped |
-| Left column           | `SIDE_COLUMN`                                                           |
-| Buttons               | `SECONDARY_BUTTON`; `ICON_BUTTON` for an icon alone                     |
-| List row              | `GROUP_TITLE`, then `LIST` of `LIST_ROW`; `LIST_ROW_CHEVRON` for a link |
-| Dropdown              | `<Dropdown label value options onChange>`: a listbox whose options may have icons |
-| Sub-page              | `<SubPage title back wide language navigate>`: a `<dialog>` with its title, a back arrow, and a cross on desktops |
+| Component             | Where                                                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Round floating button | `FLOATING_BUTTON`, `aria-pressed` when it toggles                                                                                                                     |
+| Bottom sheet          | `<BottomSheet label expanded onExpandedChange>`: collapsed or expanded; its handle is a button with `aria-expanded`, tapped or swiped                                 |
+| Left column           | `SIDE_COLUMN`                                                                                                                                                         |
+| Buttons               | `SECONDARY_BUTTON`; `ICON_BUTTON` for an icon alone                                                                                                                   |
+| List row              | `GROUP_TITLE`, then `LIST` of `LIST_ROW`; `LIST_ROW_CHEVRON` for a link                                                                                               |
+| Dropdown              | `<Dropdown label value options onChange>`: a listbox whose options may have icons                                                                                     |
+| Sub-page              | `<SubPage title back wide language navigate>`: a `<dialog>` with its title, a back arrow, and a cross on desktops                                                     |
 | Toast                 | `TOAST` with `role="alert"`, in the floating buttons' colours: what went wrong, then on a second line what to do; the view hides it after a few seconds or on a click |
-| Long text             | `PROSE`, for the legal pages                                            |
+| Long text             | `PROSE`, for the legal pages                                                                                                                                          |
 
 A component comes with the first screen that uses it, as the prototype on the
 `prototype/ui-redesign` branch draws it:

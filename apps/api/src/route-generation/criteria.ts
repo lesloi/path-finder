@@ -57,7 +57,8 @@ export function parseCriteria(
   const criteria: Criteria = {
     start: [start[0], start[1]],
     target: parsedTarget,
-    ...(countElevationGain && elevationGain !== undefined && { elevationGain: elevationGain as Criteria['elevationGain'] }),
+    ...(countElevationGain &&
+      elevationGain !== undefined && { elevationGain: elevationGain as Criteria['elevationGain'] }),
     surface: surface as Criteria['surface'],
     pace,
   };

@@ -17,13 +17,28 @@ const CELL = 25;
 /** One ASCII tile as heights in decimetres + 1000 (0 = no data), named after its north-west cell centre in km. */
 export function convertTile(text: string): { name: string; cells: Uint16Array } {
   const lines = text.split('\n');
-  const header = new Map(lines.slice(0, 6).map((line) => {
-    const [key, value] = line.trim().split(/\s+/);
-    return [key.toLowerCase(), Number(value)];
-  }));
-  const [ncols, nrows, xll, yll, cellsize, nodata] = ['ncols', 'nrows', 'xllcorner', 'yllcorner', 'cellsize', 'nodata_value']
-    .map((key) => header.get(key));
-  if (ncols !== CELLS || nrows !== CELLS || cellsize !== CELL || xll === undefined || yll === undefined || nodata === undefined) {
+  const header = new Map(
+    lines.slice(0, 6).map((line) => {
+      const [key, value] = line.trim().split(/\s+/);
+      return [key.toLowerCase(), Number(value)];
+    }),
+  );
+  const [ncols, nrows, xll, yll, cellsize, nodata] = [
+    'ncols',
+    'nrows',
+    'xllcorner',
+    'yllcorner',
+    'cellsize',
+    'nodata_value',
+  ].map((key) => header.get(key));
+  if (
+    ncols !== CELLS ||
+    nrows !== CELLS ||
+    cellsize !== CELL ||
+    xll === undefined ||
+    yll === undefined ||
+    nodata === undefined
+  ) {
     throw new Error(`Not a BD ALTI 25 m tile of ${CELLS} x ${CELLS} cells`);
   }
   const cells = new Uint16Array(CELLS * CELLS);

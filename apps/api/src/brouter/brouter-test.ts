@@ -107,7 +107,11 @@ describe('createBRouter', () => {
     answers[1](new Response('busy', { status: 503 }));
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(6));
     answers.slice(2).forEach((resolve) => resolve(Response.json(answer)));
-    expect((await settled).map(({ status }) => status)).toEqual(['fulfilled', 'rejected', ...Array(4).fill('fulfilled')]);
+    expect((await settled).map(({ status }) => status)).toEqual([
+      'fulfilled',
+      'rejected',
+      ...Array(4).fill('fulfilled'),
+    ]);
   });
 
   it('reads the geometry, the distance in kilometres, and the tags of each way', async () => {

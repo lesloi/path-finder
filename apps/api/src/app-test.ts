@@ -223,7 +223,11 @@ describe('api', () => {
       vi.useRealTimers();
     });
 
-    async function postManyTimes(limited: ReturnType<typeof createApp>, times: number, forwardedFor: (i: number) => string) {
+    async function postManyTimes(
+      limited: ReturnType<typeof createApp>,
+      times: number,
+      forwardedFor: (i: number) => string,
+    ) {
       for (let i = 0; i < times; i++) await postRouteSet(limited, '{', { 'X-Forwarded-For': forwardedFor(i) });
     }
 

@@ -108,9 +108,7 @@ describe('StartPointMap', () => {
     rerender(<StartPointMap start={[6.2, 45.8]} onStartChange={vi.fn()} />);
     rerender(<StartPointMap start={[6.3, 45.9]} onStartChange={vi.fn()} />);
 
-    expect(markers.filter((marker) => marker.shown)).toEqual([
-      expect.objectContaining({ position: [6.3, 45.9] }),
-    ]);
+    expect(markers.filter((marker) => marker.shown)).toEqual([expect.objectContaining({ position: [6.3, 45.9] })]);
   });
 
   it('moves the map to its focus', () => {

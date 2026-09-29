@@ -24,6 +24,7 @@ jobs:
           node-version: 26
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
 

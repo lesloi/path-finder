@@ -47,4 +47,5 @@ export function bdAltiHeights(dir: string, cacheSize = 64): HeightAt {
 }
 
 // No coordinates in the message: the API logs no locations.
-const noData = () => new Error('No BD ALTI elevation data here: outside metropolitan France, or a tile missing from BDALTI_DIR');
+const noData = () =>
+  new Error('No BD ALTI elevation data here: outside metropolitan France, or a tile missing from BDALTI_DIR');
