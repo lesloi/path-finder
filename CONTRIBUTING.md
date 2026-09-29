@@ -14,7 +14,7 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 | `pnpm lint`             | ESLint                                                         |
 | `pnpm typecheck`        | Type check the apps and the end-to-end tests                   |
 | `pnpm test`             | Unit tests                                                     |
-| `pnpm test:coverage`    | Unit tests with coverage, failing below 80%                    |
+| `pnpm test:coverage`    | Unit tests with coverage, failing below 90%                    |
 | `pnpm test:integration` | API integration tests, through HTTP                            |
 | `pnpm test:e2e`         | End-to-end tests in Chromium, on the built app                 |
 | `pnpm dev`              | Web app on port 5173 and API on port 3000; needs `BROUTER_URL` |
@@ -140,7 +140,7 @@ A pull request is ready when:
 - new behavior is tested at each level the [Tests](#tests) conventions ask for;
 - `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:integration`,
   and `pnpm test:e2e` pass;
-- coverage stays at or above 80% (`pnpm test:coverage`) and `pnpm build` succeeds, as in CI;
+- coverage stays at or above 90% (`pnpm test:coverage`) and `pnpm build` succeeds, as in CI;
 - `README.md` and `AGENTS.md` match reality;
 - it follows the [project rules](./AGENTS.md#project-rules) and the coding conventions above.
 
