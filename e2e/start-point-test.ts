@@ -46,6 +46,15 @@ test.describe('the start point', () => {
     await expect(page.getByLabel('Start point')).toHaveValue('45.8326° N · 6.8652° E');
   });
 
+  test('is set by typed coordinates', async ({ page }) => {
+    await page.goto('/');
+
+    await page.getByLabel('Start point').fill('45.8326, 6.8652');
+    await page.getByLabel('Start point').press('Enter');
+
+    await expect(page.getByLabel('Start point')).toHaveValue('45.8326° N · 6.8652° E');
+  });
+
   test('falls back to the map when the location is denied', async ({ page }) => {
     // Without a granted permission, headless Chromium dismisses the prompt: the location is denied.
     await page.goto('/');
