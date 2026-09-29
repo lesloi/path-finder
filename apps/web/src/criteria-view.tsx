@@ -1,10 +1,17 @@
 import { LocateFixed, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import './criteria-view.css';
 import type { Language } from './language.ts';
 import { StartPointMap, type Position } from './start-point-map.tsx';
-import { BottomSheet, useDesktop } from './ui/index.ts';
+import {
+  BottomSheet,
+  FLOATING_BUTTON,
+  ICON_BUTTON,
+  SECONDARY_BUTTON,
+  SIDE_COLUMN,
+  TOAST,
+  useDesktop,
+} from './ui/index.ts';
 
 const TOAST_MS = 6_000;
 
@@ -81,7 +88,7 @@ export function CriteriaView({ language }: { language: Language }) {
   }
 
   const locateButton = (
-    <button type="button" className="floating-button" aria-label={t.myLocation} onClick={locate}>
+    <button type="button" className={FLOATING_BUTTON} aria-label={t.myLocation} onClick={locate}>
       <LocateFixed size={20} aria-hidden />
     </button>
   );
@@ -95,32 +102,49 @@ export function CriteriaView({ language }: { language: Language }) {
         pickBy={!desktop ? 'long-press' : picking ? 'click' : undefined}
         onStartChange={changeStart}
       />
-      <a className="floating-button map-settings" href="#/settings" aria-label={t.settings}>
+      <a
+        className={`${FLOATING_BUTTON} fixed top-safe-3 right-safe-3 z-5`}
+        href="#/settings"
+        aria-label={t.settings}
+      >
         <Settings size={20} aria-hidden />
       </a>
-      <div className="map-locate">{locateButton}</div>
+      {/* Above the sheet on phones, whatever its height. */}
+      <div
+        className={
+          'fixed right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3))] z-5 transition-[bottom] ' +
+          'duration-250 ease-[ease] desktop:bottom-safe-6'
+        }
+      >
+        {locateButton}
+      </div>
       {desktop ? (
-        <aside className="side-column">
-          <div className="side-column-brand">
-            <img src="/favicon.svg" alt="" width="32" height="32" />
+        <aside className={SIDE_COLUMN}>
+          <div className="flex items-center gap-2 px-4 pt-4 text-lg font-bold">
+            <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
             Path finder
           </div>
-          <div className="side-column-body">
-            <div className={picking ? 'start-block picking' : 'start-block'}>
+          <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+            <div
+              className={
+                'flex items-center gap-1 rounded-md bg-surface-2 pr-1 ' +
+                (picking ? 'ring-2 ring-accent ring-inset' : '')
+              }
+            >
               <button
                 type="button"
-                className="start-block-pick"
+                className="flex min-h-14 flex-1 items-center gap-3 rounded-md px-3 py-2 text-left"
                 aria-pressed={picking}
                 onClick={() => setPicking(!picking)}
               >
-                <span className="start-block-dot" />
-                <span>
-                  <span className="start-block-label">{t.startPoint}</span>{' '}
+                <span className="size-4 flex-none rounded-full border-4 border-start bg-white" />
+                <span className="flex flex-col">
+                  <span className="text-sm text-ink-2">{t.startPoint}</span>{' '}
                   {/* Coordinates only: naming the place would send it to a geocoding service. */}
                   <span>{picking ? t.clickMap : start ? formatPosition(start, language) : t.chooseOnMap}</span>
                 </span>
               </button>
-              <button type="button" className="icon-button" aria-label={t.myLocation} onClick={locate}>
+              <button type="button" className={ICON_BUTTON} aria-label={t.myLocation} onClick={locate}>
                 <LocateFixed size={20} aria-hidden />
               </button>
             </div>
@@ -130,8 +154,8 @@ export function CriteriaView({ language }: { language: Language }) {
         <BottomSheet label={t.criteria}>
           {!start && (
             <>
-              <p className="hint">{t.longPress}</p>
-              <button type="button" className="button button-secondary" onClick={locate}>
+              <p className="text-sm text-ink-2">{t.longPress}</p>
+              <button type="button" className={SECONDARY_BUTTON} onClick={locate}>
                 <LocateFixed size={18} aria-hidden />
                 {t.myLocation}
               </button>
@@ -140,7 +164,7 @@ export function CriteriaView({ language }: { language: Language }) {
         </BottomSheet>
       )}
       {unavailableAt && unavailableAt.start === start && (
-        <p className="toast" role="alert">
+        <p className={TOAST} role="alert">
           {desktop ? t.unavailableDesktop : t.unavailable}
         </p>
       )}

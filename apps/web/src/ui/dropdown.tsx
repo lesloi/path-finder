@@ -61,7 +61,7 @@ export function Dropdown<Value extends string>({
     <>
       <span id={labelId}>{label}</span>
       <span
-        className="dropdown"
+        className="relative"
         // Tab leaves from the button, so the focus moves on to what follows the dropdown.
         onKeyDown={(event) => open && (event.key === 'Escape' || event.key === 'Tab') && close()}
       >
@@ -69,7 +69,7 @@ export function Dropdown<Value extends string>({
           ref={button}
           id={buttonId}
           type="button"
-          className="dropdown-button"
+          className="inline-flex min-h-touch items-center gap-2 rounded-sm bg-surface-2 px-3"
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-labelledby={`${labelId} ${buttonId}`}
@@ -81,11 +81,25 @@ export function Dropdown<Value extends string>({
         </button>
         {open && (
           <>
-            <div className="dropdown-scrim" onClick={close} />
-            <ul ref={list} className="dropdown-list" role="listbox" aria-labelledby={labelId} onKeyDown={move}>
+            <div className="fixed inset-0 z-11" onClick={close} />
+            <ul
+              ref={list}
+              className={
+                'absolute top-[calc(100%+--spacing(1))] right-0 z-12 min-w-50 rounded-md bg-surface p-1 ' +
+                'shadow-float'
+              }
+              role="listbox"
+              aria-labelledby={labelId}
+              onKeyDown={move}
+            >
               {options.map((option) => (
                 <li
                   key={option.value}
+                  className={
+                    'flex min-h-touch items-center gap-2 rounded-sm px-3 outline-none hover:bg-surface-2 ' +
+                    'focus:bg-surface-2 aria-selected:bg-accent-soft aria-selected:font-semibold ' +
+                    'aria-selected:text-accent'
+                  }
                   role="option"
                   aria-selected={option.value === value}
                   tabIndex={-1}
@@ -98,7 +112,7 @@ export function Dropdown<Value extends string>({
                 >
                   {option.icon}
                   {option.label}
-                  {option.value === value && <Check size={16} aria-hidden className="dropdown-check" />}
+                  {option.value === value && <Check size={16} aria-hidden className="ml-auto" />}
                 </li>
               ))}
             </ul>

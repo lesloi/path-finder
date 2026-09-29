@@ -24,10 +24,20 @@ export function BottomSheet({ label, children }: { label: string; children?: Rea
   }, []);
 
   return (
-    <div ref={sheet} className={expanded ? 'bottom-sheet expanded' : 'bottom-sheet'}>
+    <div
+      ref={sheet}
+      className={
+        'fixed inset-x-0 bottom-0 z-4 flex flex-col rounded-t-lg bg-surface shadow-float ' +
+        'pr-safe-4 pb-safe-4 pl-safe-4 transition-[max-height] duration-250 ease-[ease] desktop:hidden ' +
+        (expanded ? 'h-[88dvh] max-h-[88dvh]' : 'max-h-[40dvh]')
+      }
+    >
       <button
         type="button"
-        className="bottom-sheet-handle"
+        className={
+          'h-7 w-full flex-none cursor-grab touch-none before:mx-auto before:block before:h-1 before:w-10 ' +
+          'before:rounded-full before:bg-border'
+        }
         aria-label={label}
         aria-expanded={expanded}
         onPointerDown={(event) => {
@@ -46,7 +56,7 @@ export function BottomSheet({ label, children }: { label: string; children?: Rea
           swiped.current = false;
         }}
       />
-      <div className="bottom-sheet-body">{children}</div>
+      <div className="flex flex-col gap-3 overflow-y-auto">{children}</div>
     </div>
   );
 }

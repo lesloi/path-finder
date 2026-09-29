@@ -2,6 +2,7 @@ import { ArrowLeft } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import type { Language } from '../language.ts';
+import { ICON_BUTTON } from './styles.ts';
 
 const text = {
   en: { back: 'Back' },
@@ -22,14 +23,23 @@ export function SubPage({
 }) {
   const t = text[language];
   return (
-    <div className="sub-page">
-      <header className="sub-page-header">
-        <a className="icon-button" href={back} aria-label={t.back}>
+    <div className="fixed inset-0 z-10 overflow-y-auto bg-surface pb-safe-0">
+      <header
+        className={
+          'sticky top-0 z-1 flex min-h-[calc(56px+env(safe-area-inset-top))] items-center gap-1 border-b ' +
+          'border-border bg-surface pt-safe-0 pr-safe-2 pl-safe-2'
+        }
+      >
+        <a className={ICON_BUTTON} href={back} aria-label={t.back}>
           <ArrowLeft aria-hidden />
         </a>
-        <h1>{title}</h1>
+        <h1 className="text-lg font-bold">{title}</h1>
       </header>
-      <div className="sub-page-body">{children}</div>
+      <div
+        className="mx-auto max-w-140 pt-4 pr-safe-4 pb-6 pl-safe-4"
+      >
+        {children}
+      </div>
     </div>
   );
 }

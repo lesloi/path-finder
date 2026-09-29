@@ -2,8 +2,6 @@ import { AttributionControl, Map, Marker, type MapMouseEvent, type MapTouchEvent
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useEffectEvent, useRef } from 'react';
 
-import './start-point-map.css';
-
 /** A longitude and a latitude, the shape the API's criteria take. */
 export type Position = [number, number];
 
@@ -89,7 +87,8 @@ export function StartPointMap({
   useEffect(() => {
     if (!start) return;
     const element = document.createElement('div');
-    element.className = 'start-marker';
+    // A white dot with a brown ring, like the start of the logo's trail.
+    element.className = 'size-6 rounded-full border-6 border-start bg-white shadow-float';
     const marker = new Marker({ element }).setLngLat(start).addTo(mapRef.current!);
     return () => {
       marker.remove();
@@ -100,5 +99,11 @@ export function StartPointMap({
     if (located) mapRef.current!.easeTo({ center: located, zoom: 14 });
   }, [located]);
 
-  return <div ref={container} className={pickBy === 'click' ? 'map picking' : 'map'} />;
+  // The Plan IGN map stays light in dark mode. MapLibre makes its container `position: relative`
+  // from outside Tailwind's layers, so a wrapper pins it to the screen.
+  return (
+    <div className={`fixed inset-0 bg-white [color-scheme:light] ${pickBy === 'click' ? 'map-picking' : ''}`}>
+      <div ref={container} className="size-full" />
+    </div>
+  );
 }

@@ -1,3 +1,4 @@
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { randomUUID } from 'node:crypto';
 import { defineConfig, type Plugin } from 'vite';
@@ -17,7 +18,7 @@ function buildId(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), buildId()],
+  plugins: [react(), tailwindcss(), buildId()],
   // In dev, keep one copy of maplibre-gl-shared for the page and its worker.
   optimizeDeps: { exclude: ['maplibre-gl'] },
   worker: { format: 'es' },

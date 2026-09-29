@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { ACTIVITY_NAMES, ACTIVITY_PACES, type Activity } from './activity.ts';
 import type { Language } from './language.ts';
 import { paceFor, useSettings } from './settings.ts';
-import { Dropdown } from './ui/index.ts';
+import { Dropdown, GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON } from './ui/index.ts';
 import { formatPace, paceUnit, parsePace, type Units } from './units.ts';
+
+const FLAG_CLASSES = 'flex-none ring-1 ring-border';
 
 const text = {
   en: {
@@ -39,9 +41,9 @@ export function SettingsView({ language }: { language: Language }) {
   const [settings, update] = useSettings();
   return (
     <>
-      <h2 className="group-title">{t.display}</h2>
-      <div className="list">
-        <div className="list-row">
+      <h2 className={GROUP_TITLE}>{t.display}</h2>
+      <div className={LIST}>
+        <div className={LIST_ROW}>
           <Dropdown
             label={t.language}
             value={language}
@@ -52,7 +54,7 @@ export function SettingsView({ language }: { language: Language }) {
             onChange={(picked) => update({ language: picked })}
           />
         </div>
-        <div className="list-row">
+        <div className={LIST_ROW}>
           <Dropdown
             label={t.units}
             value={settings.units}
@@ -64,8 +66,8 @@ export function SettingsView({ language }: { language: Language }) {
           />
         </div>
       </div>
-      <h2 className="group-title">{t.pace}</h2>
-      <div className="list">
+      <h2 className={GROUP_TITLE}>{t.pace}</h2>
+      <div className={LIST}>
         {(Object.keys(ACTIVITY_PACES) as Activity[]).map((activity) => (
           // A new key on a units change shows the pace again in the new units.
           <PaceInput
@@ -76,16 +78,16 @@ export function SettingsView({ language }: { language: Language }) {
           />
         ))}
       </div>
-      <h2 className="group-title">{t.about}</h2>
-      <nav className="list">
+      <h2 className={GROUP_TITLE}>{t.about}</h2>
+      <nav className={LIST}>
         {[
           [t.credits, '#/credits'],
           [t.privacy, '#/privacy'],
           [t.legalNotice, '#/legal-notice'],
         ].map(([name, href]) => (
-          <a key={href} className="list-row" href={href}>
+          <a key={href} className={LIST_ROW} href={href}>
             {name}
-            <ChevronRight size={18} aria-hidden className="list-row-chevron" />
+            <ChevronRight size={18} aria-hidden className={LIST_ROW_CHEVRON} />
           </a>
         ))}
       </nav>
@@ -100,9 +102,10 @@ function PaceInput({ activity, language, units }: { activity: Activity; language
   const shown = formatPace(paceFor(settings, activity), display, units, language);
   const [draft, setDraft] = useState(shown);
   return (
-    <label className="list-row">
+    <label className={LIST_ROW}>
       {`${ACTIVITY_NAMES[activity][language]} (${paceUnit(display, units)})`}
       <input
+        className="min-h-touch w-22 rounded-sm bg-surface-2 px-3 text-right"
         inputMode="decimal"
         value={draft}
         onChange={(event) => {
@@ -118,7 +121,7 @@ function PaceInput({ activity, language, units }: { activity: Activity; language
 
 function FrenchFlag() {
   return (
-    <svg className="flag" viewBox="0 0 3 2" width="24" height="16" aria-hidden>
+    <svg className={FLAG_CLASSES} viewBox="0 0 3 2" width="24" height="16" aria-hidden>
       <path fill="#002395" d="M0 0h1v2H0z" />
       <path fill="#ffffff" d="M1 0h1v2H1z" />
       <path fill="#ed2939" d="M2 0h1v2H2z" />
@@ -128,7 +131,7 @@ function FrenchFlag() {
 
 function BritishFlag() {
   return (
-    <svg className="flag" viewBox="0 0 60 30" width="24" height="16" aria-hidden>
+    <svg className={FLAG_CLASSES} viewBox="0 0 60 30" width="24" height="16" aria-hidden>
       <path fill="#012169" d="M0 0h60v30H0z" />
       <path stroke="#ffffff" strokeWidth="6" d="M0 0l60 30M60 0L0 30" />
       <path stroke="#c8102e" strokeWidth="2" d="M0 0l60 30M60 0L0 30" />
