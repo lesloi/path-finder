@@ -32,6 +32,24 @@ export function BottomSheet({
     };
   }, []);
 
+  // The on-screen keyboard covers the bottom of the layout viewport, where the sheet is pinned:
+  // while a field of the sheet has the focus, the sheet rises above the keyboard.
+  useLayoutEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const rise = () => {
+      const element = sheet.current!;
+      const covered = window.innerHeight - viewport.height - viewport.offsetTop;
+      element.style.bottom = element.contains(document.activeElement) && covered > 0 ? `${covered}px` : '';
+    };
+    viewport.addEventListener('resize', rise);
+    viewport.addEventListener('scroll', rise);
+    return () => {
+      viewport.removeEventListener('resize', rise);
+      viewport.removeEventListener('scroll', rise);
+    };
+  }, []);
+
   return (
     <div
       ref={sheet}
