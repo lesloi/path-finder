@@ -6,8 +6,17 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 ## Getting started
 
 - [INSTALL.md](./INSTALL.md) sets up BRouter and the elevation data.
-- The [README](./README.md#getting-started) lists the scripts to run the app and its checks.
 - [CONTEXT.md](./CONTEXT.md) holds the domain vocabulary to use in code, tests, and issues.
+
+| Command              | What it does                                                                    |
+| -------------------- | ------------------------------------------------------------------------------- |
+| `pnpm lint`          | ESLint                                                                          |
+| `pnpm typecheck`     | Type check both apps                                                            |
+| `pnpm test`          | Unit tests                                                                      |
+| `pnpm test:coverage` | Unit tests with coverage, failing below 80%                                     |
+| `pnpm dev`           | Web app on port 5173 and API on port 3000; needs `BROUTER_URL` |
+| `pnpm build`         | Build the web app                                                               |
+| `pnpm start`         | Serve the built web app and the API on port 3000                                |
 
 ## Privacy-first rules (non-negotiable)
 
@@ -17,7 +26,7 @@ exception, open an issue before implementing it.
 - Routes and settings stay on the device. The API keeps no state and logs no locations or
   IP addresses; it may hold a salted IP hash, rotated at least daily, in memory for rate limiting.
 - The only runtime third party is the IGN Géoplateforme for map tiles. Any other runtime
-  network call needs the maintainer's approval and a French or EU provider.
+  network call needs the maintainer's approval.
 - Self-host every script, stylesheet, and font; only the map style and its fonts and icons
   come from the IGN Géoplateforme. No analytics, tracking, or accounts.
 - Serve every page with `Referrer-Policy: no-referrer`.
