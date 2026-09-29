@@ -1,0 +1,73 @@
+{
+  "version": 8,
+  "name": "PLAN IGN (e2e fixture)",
+  "glyphs": "https://data.geopf.fr/annexes/ressources/vectorTiles/fonts/{fontstack}/{range}.pbf",
+  "sources": {
+    "plan_ign": {
+      "type": "vector",
+      "tiles": ["https://data.geopf.fr/tms/1.0.0/PLAN.IGN/{z}/{x}/{y}.pbf"],
+      "scheme": "xyz"
+    }
+  },
+  "layers": [
+    {
+      "id": "bckgrd",
+      "type": "fill",
+      "source": "plan_ign",
+      "source-layer": "fond_opaque",
+      "minzoom": 0,
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "fill-color": "#FFFFFF",
+        "fill-opacity": 1
+      }
+    },
+    {
+      "id": "hydro surfacique",
+      "type": "fill",
+      "source": "plan_ign",
+      "source-layer": "hydro_surf",
+      "layout": {
+        "visibility": "visible"
+      },
+      "filter": ["in", "symbo", "SURFACE_D_EAU", "BASSIN", "ZONE_MARINE"],
+      "paint": {
+        "fill-color": "#AAD5E9",
+        "fill-outline-color": "#AAD5E9"
+      }
+    },
+    {
+      "id": "toponyme localite importance 1",
+      "type": "symbol",
+      "source": "plan_ign",
+      "source-layer": "toponyme_localite_ponc",
+      "minzoom": 3,
+      "maxzoom": 13,
+      "filter": ["in", "txt_typo", "commune 1", "TYPO_A_1", "BAT_COMMUNE_1", "BAT_COMMUNE_1_T"],
+      "layout": {
+        "visibility": "visible",
+        "symbol-placement": "point",
+        "text-field": "{texte}",
+        "text-size": {
+          "stops": [
+            [3, 10],
+            [6, 20]
+          ]
+        },
+        "text-allow-overlap": false,
+        "text-anchor": "bottom-left",
+        "text-offset": [0.25, -0.1],
+        "text-padding": 1,
+        "text-transform": "uppercase",
+        "text-font": ["Source Sans Pro Regular"]
+      },
+      "paint": {
+        "text-color": "#000000",
+        "text-halo-color": "rgba(255, 255, 255, 0.5)",
+        "text-halo-width": 4
+      }
+    }
+  ]
+}

@@ -18,6 +18,8 @@ node_modules/
 
 # tests
 coverage/
+test-results/
+playwright-report/
 
 # debug logs
 pnpm-debug.log*

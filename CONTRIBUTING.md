@@ -12,9 +12,10 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 | -------------------- | -------------------------------------------------------------- |
 | `pnpm format`        | Format the code with Prettier                                  |
 | `pnpm lint`          | ESLint                                                         |
-| `pnpm typecheck`     | Type check both apps                                           |
+| `pnpm typecheck`     | Type check the apps and the end-to-end tests                   |
 | `pnpm test`          | Unit tests                                                     |
 | `pnpm test:coverage` | Unit tests with coverage, failing below 80%                    |
+| `pnpm test:e2e`      | End-to-end tests in Chromium, on the built app                 |
 | `pnpm dev`           | Web app on port 5173 and API on port 3000; needs `BROUTER_URL` |
 | `pnpm build`         | Build the web app                                              |
 | `pnpm start`         | Serve the built web app and the API on port 3000               |
@@ -112,6 +113,9 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
 
 ### Tests
 
+- Every change comes with unit tests, which call functions and components directly. An API
+  route is tested through HTTP in an integration test, and a UI feature gets an end-to-end
+  scenario in `e2e/` for its main path, while its edge cases stay in unit tests.
 - Vitest with globals (`describe`, `it`, `expect`, `vi`), no imports needed.
 - One `describe` per exported function or component. Each `it` is a present-tense
   sentence about behavior: `it('rejects a target duration too short for …')`.
@@ -121,13 +125,17 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
 - Components are tested through what the user sees, with Testing Library queries by
   label or role.
 - Mock `fetch` and BRouter with `vi.fn`; unit tests never call the network.
+- End-to-end tests live in `e2e/`: Playwright drives the built app served by `pnpm start`.
+  Import `test` and `expect` from `e2e/test.ts`, which answers the IGN Géoplateforme from
+  `e2e/fixtures/` and fails a test whose browser calls any other host. Run
+  `pnpm exec playwright install chromium` in `e2e/` once.
 
 ## Before opening a pull request
 
 A pull request is ready when:
 
-- new behavior is tested;
-- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass;
+- new behavior is tested at each level the [Tests](#tests) conventions ask for;
+- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm test:e2e` pass;
 - coverage stays at or above 80% (`pnpm test:coverage`) and `pnpm build` succeeds, as in CI;
 - `README.md` and `AGENTS.md` match reality;
 - it follows the [project rules](./AGENTS.md#project-rules) and the coding conventions above.
