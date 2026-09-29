@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -36,5 +36,11 @@ export const test = base.extend<{ privacyGuard: void }>({
     { auto: true },
   ],
 });
+
+/** Opens the map view once the map has loaded its style, tiles and glyphs. */
+export async function openMap(page: Page) {
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+}
 
 export { expect };

@@ -1,4 +1,4 @@
-import { expect, test } from './test.ts';
+import { expect, openMap, test } from './test.ts';
 
 test.describe('the app', () => {
   test('loads with no console error and serves every file with no referrer', async ({ page, baseURL }) => {
@@ -12,9 +12,7 @@ test.describe('the app', () => {
       if (response.url().startsWith(baseURL!)) policies.set(response.url(), response.headers()['referrer-policy']);
     });
 
-    await page.goto('/');
-    // The map has loaded its style, tiles and glyphs.
-    await page.waitForLoadState('networkidle');
+    await openMap(page);
 
     expect(errors).toEqual([]);
     expect(policies.size).toBeGreaterThan(1);
@@ -23,21 +21,16 @@ test.describe('the app', () => {
 
   test('does not ask for the location on load', async ({ page }) => {
     await page.addInitScript(() => {
-      const calls: string[] = [];
-      Object.assign(window, { geolocationCalls: calls });
       for (const method of ['getCurrentPosition', 'watchPosition'] as const) {
         navigator.geolocation[method] = () => {
-          calls.push(method);
+          document.documentElement.dataset.geolocation = method;
           return 0;
         };
       }
     });
 
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await openMap(page);
 
-    expect(await page.evaluate(() => (window as unknown as { geolocationCalls: string[] }).geolocationCalls)).toEqual(
-      [],
-    );
+    await expect(page.locator('html')).not.toHaveAttribute('data-geolocation');
   });
 });
