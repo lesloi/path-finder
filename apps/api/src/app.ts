@@ -1,8 +1,6 @@
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono, type Context } from 'hono';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import {
   buildRouteSet,
@@ -12,7 +10,8 @@ import {
   type HeightAt,
   type RoutingEngine,
 } from './route-generation/index.ts';
-import { parseAddressRanges, type AddressMatcher } from './addresses.ts';
+import { clientAddress, parseAddressRanges, type AddressMatcher } from './addresses.ts';
+import { readBuildId } from './build-id.ts';
 import { createConcurrencyLimiter, createRateLimiter, type Admission } from './limits.ts';
 
 // Vite fingerprints the files it emits under /assets, so they never change.
@@ -26,24 +25,9 @@ const IS_LOOPBACK = parseAddressRanges('127.0.0.0/8, ::1', 'LOOPBACK');
 // reach the API without a proxy can then forge `X-Forwarded-For`.
 const EVERY_ADDRESS = parseAddressRanges('0.0.0.0/0, ::/0', 'EVERY_ADDRESS');
 
-/** ID written by each web app build (see `apps/web/vite.config.ts`), or none when the web app is not built. */
-function readBuildId(webRoot: string): string | undefined {
-  try {
-    return readFileSync(join(webRoot, 'build-id'), 'utf8').trim();
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * A trusted reverse proxy appends the address it sees to `X-Forwarded-For`: earlier entries come
- * from the client and can be forged. From any other connection, the whole header can be forged
- * (#91), so the connection's own address counts.
- */
-function clientAddress(c: Context, trustedProxies: AddressMatcher): string {
-  const connection = getConnInfo(c).remote.address ?? '';
-  if (!trustedProxies(connection)) return connection;
-  return c.req.header('X-Forwarded-For')?.split(',').at(-1)?.trim() || connection;
+/** The client's address, from the connection and the `X-Forwarded-For` of a trusted proxy. */
+function requestClientAddress(c: Context, trustedProxies: AddressMatcher): string {
+  return clientAddress(getConnInfo(c).remote.address ?? '', c.req.header('X-Forwarded-For'), trustedProxies);
 }
 
 function retryLater(c: Context, status: 429 | 503, seconds: number, error: string) {
@@ -94,13 +78,13 @@ export function createApp({
   // the route did not exist, and are not logged.
   app.get('/health', (c) => {
     if (!healthAllowlist) return c.text('ok');
-    const address = clientAddress(c, trustedProxies);
+    const address = requestClientAddress(c, trustedProxies);
     return IS_LOOPBACK(address) || healthAllowlist(address) ? c.text('ok') : c.notFound();
   });
 
   // No logs here: criteria hold the start point, and requests hold the client address.
   app.post('/api/v1/route-sets', async (c) => {
-    const admission = admit(clientAddress(c, trustedProxies));
+    const admission = admit(requestClientAddress(c, trustedProxies));
     if (!admission.admitted) {
       return retryLater(c, 429, admission.retryAfter, 'Too many route sets asked for: retry later');
     }

@@ -38,3 +38,17 @@ export function parseAddressRanges(list: string, variable: string): AddressMatch
     return addressFamily !== undefined && ranges.check(address, addressFamily.name);
   };
 }
+
+/**
+ * Returns the client's address. A trusted reverse proxy appends the address it sees to
+ * `X-Forwarded-For`: earlier entries come from the client and can be forged. From any other
+ * connection, the whole header can be forged (#91), so the connection's own address counts.
+ */
+export function clientAddress(
+  connection: string,
+  forwardedFor: string | undefined,
+  trustedProxies: AddressMatcher,
+): string {
+  if (!trustedProxies(connection)) return connection;
+  return forwardedFor?.split(',').at(-1)?.trim() || connection;
+}

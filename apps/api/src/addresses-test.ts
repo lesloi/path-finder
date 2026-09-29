@@ -1,4 +1,4 @@
-import { parseAddressRanges } from './addresses.ts';
+import { clientAddress, parseAddressRanges } from './addresses.ts';
 
 describe('parseAddressRanges', () => {
   it.each([
@@ -55,5 +55,24 @@ describe('parseAddressRanges', () => {
     expect(() => parseAddressRanges(`10.0.0.1, ${list}`, 'TRUSTED_PROXIES')).toThrow(
       new RangeError('TRUSTED_PROXIES must list IP addresses or CIDR ranges, separated by commas'),
     );
+  });
+});
+
+describe('clientAddress', () => {
+  const PROXY = '172.18.0.3';
+  const trustedProxies = parseAddressRanges(PROXY, 'TRUSTED_PROXIES');
+
+  it.each([
+    ['the address a trusted proxy appends', PROXY, '203.0.113.9', '203.0.113.9'],
+    ['the last address, ignoring those a client forges before it', PROXY, '10.0.0.1, 203.0.113.9', '203.0.113.9'],
+    ['a trusted proxy seen as an IPv4 address mapped to IPv6', `::ffff:${PROXY}`, '203.0.113.9', '203.0.113.9'],
+    ['the connection of a trusted proxy that forwards nothing', PROXY, undefined, PROXY],
+    ['the connection of a trusted proxy that forwards an empty entry', PROXY, '203.0.113.9, ', PROXY],
+    ['the connection of a client that is not a trusted proxy', '198.51.100.1', '203.0.113.9', '198.51.100.1'],
+    ['no address for a connection that has none', '', '203.0.113.9', ''],
+  ])('returns %s', (_, connection, forwardedFor, expected) => {
+    const address = clientAddress(connection, forwardedFor, trustedProxies);
+
+    expect(address).toBe(expected);
   });
 });
