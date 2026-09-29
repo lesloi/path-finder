@@ -30,6 +30,15 @@ describe('CriteriaView', () => {
   });
 
   describe('on phones', () => {
+    it('hides the floating My location button while the sheet is expanded', () => {
+      render(<CriteriaView language="en" />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Criteria' }));
+
+      // Only the sheet's own button is left: the floating one would cover the settings button.
+      expect(screen.getAllByRole('button', { name: 'My location' })).toHaveLength(1);
+    });
+
     it('invites a long press in the sheet until the start point is set', () => {
       vi.useFakeTimers();
       render(<CriteriaView language="en" />);
@@ -49,6 +58,17 @@ describe('CriteriaView', () => {
   });
 
   describe('on desktops', () => {
+    it('stops picking the start point when the settings open', () => {
+      onDesktop();
+      render(<CriteriaView language="en" />);
+      const block = screen.getByRole('button', { name: /^Start point/ });
+      fireEvent.click(block);
+
+      fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+
+      expect(block).toHaveAttribute('aria-pressed', 'false');
+    });
+
     it('picks the start point with a click on the map once its block is pressed', () => {
       onDesktop();
       render(<CriteriaView language="en" />);

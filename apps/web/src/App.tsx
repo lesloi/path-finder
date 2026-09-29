@@ -12,19 +12,21 @@ import { SubPage } from './ui/index.ts';
 // Each page by its hash, with its title and where its back arrow goes.
 const pages: Record<
   string,
-  { Page: ComponentType<{ language: Language }>; title: Record<Language, string>; back: string }
+  { Page: ComponentType<{ language: Language }>; title: Record<Language, string>; back: string; wide?: boolean }
 > = {
   '#/settings': { Page: SettingsView, title: { en: 'Settings', fr: 'Réglages' }, back: '#/' },
-  '#/credits': { Page: CreditsPage, title: { en: 'Credits', fr: 'Crédits' }, back: '#/settings' },
+  '#/credits': { Page: CreditsPage, title: { en: 'Credits', fr: 'Crédits' }, back: '#/settings', wide: true },
   '#/privacy': {
     Page: PrivacyPolicyPage,
     title: { en: 'Privacy policy', fr: 'Politique de confidentialité' },
     back: '#/settings',
+    wide: true,
   },
   '#/legal-notice': {
     Page: LegalNoticePage,
     title: { en: 'Legal notice', fr: 'Mentions légales' },
     back: '#/settings',
+    wide: true,
   },
 };
 
@@ -50,14 +52,17 @@ export function App() {
 
   return (
     <main>
+      {/* The map says what the app is: the name is for screen readers. */}
+      <h1 className="sr-only">Path finder</h1>
       {/* Pages open over the map, which stays mounted so it keeps its view and start point. */}
-      <div inert={Boolean(page)}>
-        {/* The map says what the app is: the name is for screen readers. */}
-        <h1 className="sr-only">Path finder</h1>
-        <CriteriaView language={language} />
-      </div>
+      <CriteriaView language={language} pageOpen={Boolean(page)} />
       {page && (
-        <SubPage title={page.title[language]} back={page.back} language={language}>
+        <SubPage
+          title={page.title[language]}
+          back={page.back}
+          {...(page.wide && { wide: true })}
+          language={language}
+        >
           <page.Page language={language} />
         </SubPage>
       )}

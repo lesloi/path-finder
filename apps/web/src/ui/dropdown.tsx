@@ -63,7 +63,12 @@ export function Dropdown<Value extends string>({
       <span
         className="relative"
         // Tab leaves from the button, so the focus moves on to what follows the dropdown.
-        onKeyDown={(event) => open && (event.key === 'Escape' || event.key === 'Tab') && close()}
+        onKeyDown={(event) => {
+          if (!open || (event.key !== 'Escape' && event.key !== 'Tab')) return;
+          // Escape closes the list only, not the dialog around it.
+          if (event.key === 'Escape') event.preventDefault();
+          close();
+        }}
       >
         <button
           ref={button}

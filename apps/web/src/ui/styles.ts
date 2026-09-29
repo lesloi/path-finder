@@ -21,8 +21,9 @@ export const GHOST_BUTTON = 'inline-flex min-h-touch items-center gap-2 px-2 fon
 
 /** The desktop panel floating over the left of the map. */
 export const SIDE_COLUMN =
-  'fixed top-safe-3 bottom-safe-3 left-safe-3 z-4 flex w-column flex-col overflow-hidden rounded-md bg-surface ' +
-  'shadow-float';
+  // As tall as its content, within the screen.
+  'fixed top-safe-3 left-safe-3 z-4 flex max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-' +
+  'var(--spacing)*6)] w-column flex-col overflow-hidden rounded-md bg-surface shadow-float';
 
 /** A row of chips that scrolls sideways. */
 export const CHIPS = 'flex gap-2 overflow-x-auto [scrollbar-width:none]';
@@ -71,4 +72,6 @@ export const POPOVER =
 /** Long text: headings, paragraphs, lists, and links, as on the legal pages. */
 export const PROSE =
   '[&_a]:text-accent [&_a]:underline [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_li]:my-1 ' +
-  '[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6';
+  '[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 ' +
+  // The same room above and below as a page of list rows.
+  '[&>:first-child]:mt-2 [&>:last-child]:mb-0';

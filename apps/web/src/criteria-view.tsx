@@ -1,5 +1,5 @@
 import { LocateFixed, Settings } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { Language } from './language.ts';
 import { StartPointMap, type Position } from './start-point-map.tsx';
@@ -51,14 +51,30 @@ const text = {
 } satisfies Record<Language, unknown>;
 
 /** The first view: where the user sets the criteria of a route set, over a full-screen map. */
-export function CriteriaView({ language }: { language: Language }) {
+export function CriteriaView({
+  language,
+  pageOpen = false,
+}: {
+  language: Language;
+  /** A sub-page is open over the view. */
+  pageOpen?: boolean;
+}) {
   const t = text[language];
   const desktop = useDesktop();
   const [start, setStart] = useState<Position>();
   const [located, setLocated] = useState<Position>();
   const [picking, setPicking] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
   // The start point when the location was unavailable: setting a new one drops the toast.
   const [unavailableAt, setUnavailableAt] = useState<{ start?: Position }>();
+  const settingsLink = useRef<HTMLAnchorElement>(null);
+  const pageWasOpen = useRef(pageOpen);
+
+  // Keyboard users go on from the button that opened the page.
+  useEffect(() => {
+    if (pageWasOpen.current && !pageOpen) settingsLink.current?.focus();
+    pageWasOpen.current = pageOpen;
+  }, [pageOpen]);
 
   useEffect(() => {
     if (!unavailableAt) return;
@@ -96,32 +112,40 @@ export function CriteriaView({ language }: { language: Language }) {
         pickBy={!desktop ? 'long-press' : picking ? 'click' : undefined}
         onStartChange={changeStart}
       />
-      <a
-        className={`${FLOATING_BUTTON} fixed top-safe-3 right-safe-3 z-5`}
-        href="#/settings"
-        aria-label={t.settings}
-      >
-        <Settings size={20} aria-hidden />
-      </a>
-      {/* Above the sheet on phones, whatever its height. */}
-      <button
-        type="button"
-        className={
-          `${FLOATING_BUTTON} fixed right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3))] z-5 ` +
-          'transition-[bottom] duration-250 ease-[ease] desktop:bottom-safe-6'
-        }
-        aria-label={t.myLocation}
-        onClick={locate}
-      >
-        <LocateFixed size={20} aria-hidden />
-      </button>
+      {/* The settings are open, or another page with a way back to them. */}
+      {!pageOpen && (
+        <a
+          ref={settingsLink}
+          className={`${FLOATING_BUTTON} fixed top-safe-3 right-safe-3 z-5`}
+          href="#/settings"
+          aria-label={t.settings}
+          // Back from the settings, a crosshair armed before them would come as a surprise.
+          onClick={() => setPicking(false)}
+        >
+          <Settings size={20} aria-hidden />
+        </a>
+      )}
+      {/* Above the sheet on phones, whatever its height; an expanded sheet leaves it no room. */}
+      {(desktop || !sheetExpanded) && (
+        <button
+          type="button"
+          className={
+            `${FLOATING_BUTTON} fixed right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3))] z-5 ` +
+            'transition-[bottom] duration-250 ease-[ease] desktop:bottom-safe-6'
+          }
+          aria-label={t.myLocation}
+          onClick={locate}
+        >
+          <LocateFixed size={20} aria-hidden />
+        </button>
+      )}
       {desktop ? (
         <aside className={SIDE_COLUMN}>
           <div className="flex items-center gap-2 px-4 pt-4 text-lg font-bold">
             <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
             Path finder
           </div>
-          <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             <div
               className={
                 'flex items-center gap-1 rounded-md bg-surface-2 pr-1 ' +
@@ -148,7 +172,7 @@ export function CriteriaView({ language }: { language: Language }) {
           </div>
         </aside>
       ) : (
-        <BottomSheet label={t.criteria}>
+        <BottomSheet label={t.criteria} expanded={sheetExpanded} onExpandedChange={setSheetExpanded}>
           {!start && (
             <>
               <p className="text-sm text-ink-2">{t.longPress}</p>

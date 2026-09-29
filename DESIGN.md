@@ -9,10 +9,19 @@ only, bundled with the app.
 
 - The Plan IGN map fills the screen. The controls float over it.
 - **Phones** (below 768 px): a bottom sheet holds the view's content. The floating buttons
-  and the map attribution stay above it, whatever its height (`--sheet-height`).
-- **Desktops** (768 px and up, the `desktop:` variant): a left column, 380 px wide, holds it
-  instead.
-- Settings and legal pages are full-screen sub-pages, at most 560 px wide on desktops.
+  and the map attribution stay above it, whatever its height (`--sheet-height`); a floating
+  button near the sheet hides while it is expanded, so it never covers the ones at the top.
+- **Desktops** (768 px and up, the `desktop:` variant): a left column, 380 px wide and as tall
+  as its content, holds it instead.
+- Settings and legal pages are sub-pages, modal dialogs over the map:
+  - on phones, full screen, with a back arrow at the leading edge (Android's top app bar;
+    close to iOS's back button), so the page reads as a step in the app;
+  - on desktops, centred on a scrim, as tall as their content: 480 px wide, 640 px for the
+    legal pages. A cross at the right closes every page; the back arrow shows only for a page
+    within a page.
+  - Escape goes back a level, and a click on the scrim closes every page. Only the content
+    scrolls, under the header. Opening a page moves the focus to its title; closing it gives
+    the focus back to the settings button, which the page hides.
 
 The 768 px breakpoint is `--breakpoint-desktop` in [`ui/index.css`](./apps/web/src/ui/index.css)
 and the query in `useDesktop` (`ui/use-desktop.ts`): change both together.
@@ -23,9 +32,9 @@ All in [`ui/index.css`](./apps/web/src/ui/index.css), as Tailwind theme variable
 drops Tailwind's default colours, radii, shadows, fonts, type sizes, and breakpoints, so a
 colour or a radius outside the tokens does not exist. Spacing is Tailwind's own scale, in
 `rem` so it follows the user's font size, and any multiple compiles: gaps, paddings, and
-margins use the steps below, and other multiples (`min-h-13`, `max-w-140`) only give a
-component its own dimensions (a 52 px row, a 560 px page). Only the map's own colours (white
-under the start point) are written raw.
+margins use the steps below, and other multiples (`min-h-13`) only give a component its own
+dimensions (a 52 px row). Only the map's own colours (white under the start point) are
+written raw.
 
 | Utilities                                                | Values                                           |
 | -------------------------------------------------------- | ------------------------------------------------ |
@@ -46,7 +55,8 @@ under the start point) are written raw.
 | `top-safe-*`, `pb-safe-*`, and the other sides          | An offset or a padding from a screen edge, plus its safe area |
 
 **Stacking** (`z-*`): 4 for the sheet and the column, 5 for the floating buttons, 6 for a
-popover, 9 for a toast, 10 for a sub-page, 11 and 12 for an open dropdown and its scrim.
+popover, 9 for a toast, 11 and 12 for an open dropdown and its scrim. Sub-pages are in the top
+layer, above them all.
 
 **Dark mode** follows `prefers-color-scheme` for the UI only: UI colours are variables that
 switch with it, so markup names a role (`bg-surface`) and never uses `dark:`. The Plan IGN
@@ -64,7 +74,7 @@ draws them the same way.
 | Component             | Where                                                                   |
 | --------------------- | ----------------------------------------------------------------------- |
 | Round floating button | `FLOATING_BUTTON`, `aria-pressed` when it toggles                       |
-| Bottom sheet          | `<BottomSheet label>`: collapsed or expanded; its handle is a button with `aria-expanded`, tapped or swiped |
+| Bottom sheet          | `<BottomSheet label expanded onExpandedChange>`: collapsed or expanded; its handle is a button with `aria-expanded`, tapped or swiped |
 | Left column           | `SIDE_COLUMN`                                                           |
 | Chip                  | `CHIP` in `CHIPS`; `data-set` when it is not the default                |
 | Buttons               | `PRIMARY_BUTTON`, `SECONDARY_BUTTON`, `GHOST_BUTTON`; `ICON_BUTTON` for an icon alone |
@@ -72,7 +82,7 @@ draws them the same way.
 | Slider                | `SLIDER_VALUE` (an `<output>` in large type), `SLIDER_INPUT`, `SLIDER_SCALE` |
 | List row              | `GROUP_TITLE`, then `LIST` of `LIST_ROW`; `LIST_ROW_CHEVRON` for a link |
 | Dropdown              | `<Dropdown label value options onChange>`: a listbox whose options may have icons |
-| Sub-page header       | `<SubPage title back language>`: a back arrow and the title             |
+| Sub-page              | `<SubPage title back wide language>`: a `<dialog>` with its title, a back arrow, and a cross on desktops |
 | Toast                 | `TOAST` with `role="alert"`; the view that shows it hides it after a few seconds |
 | Popover               | `POPOVER`, next to the floating button that opened it                   |
 | Long text             | `PROSE`, for the legal pages                                            |

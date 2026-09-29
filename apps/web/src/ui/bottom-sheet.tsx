@@ -1,11 +1,20 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 
 // A drag of the handle longer than this, in px, moves the sheet instead of toggling it.
 const SWIPE_PX = 30;
 
 /** The phone panel over the bottom of the map, collapsed or expanded from its handle. */
-export function BottomSheet({ label, children }: { label: string; children?: ReactNode }) {
-  const [expanded, setExpanded] = useState(false);
+export function BottomSheet({
+  label,
+  expanded,
+  onExpandedChange,
+  children,
+}: {
+  label: string;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
+  children?: ReactNode;
+}) {
   const sheet = useRef<HTMLDivElement>(null);
   const dragFrom = useRef<number>(undefined);
   const swiped = useRef(false);
@@ -48,11 +57,11 @@ export function BottomSheet({ label, children }: { label: string; children?: Rea
           const distance = event.clientY - (dragFrom.current ?? event.clientY);
           dragFrom.current = undefined;
           swiped.current = Math.abs(distance) > SWIPE_PX;
-          if (swiped.current) setExpanded(distance < 0);
+          if (swiped.current) onExpandedChange(distance < 0);
         }}
         // A swipe ends with a click too: only a tap or a key toggles the sheet.
         onClick={() => {
-          if (!swiped.current) setExpanded(!expanded);
+          if (!swiped.current) onExpandedChange(!expanded);
           swiped.current = false;
         }}
       />

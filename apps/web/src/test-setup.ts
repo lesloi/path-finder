@@ -9,5 +9,12 @@ window.ResizeObserver = class {
   disconnect() {}
 };
 Element.prototype.setPointerCapture = () => {};
+// jsdom has no modal dialogs.
+HTMLDialogElement.prototype.showModal = function () {
+  this.open = true;
+};
+HTMLDialogElement.prototype.close = function () {
+  this.open = false;
+};
 
 afterEach(() => localStorage.clear());
