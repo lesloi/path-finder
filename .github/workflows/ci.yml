@@ -55,6 +55,8 @@ jobs:
   # The built web app in Chromium, served by the API; the IGN is answered from fixtures (e2e/test.ts).
   e2e:
     runs-on: ubuntu-latest
+    # A hang fails fast instead of running for hours; the tests take seconds.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 

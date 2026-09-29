@@ -18,8 +18,10 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    // `pnpm start` rather than the Vite dev server, so headers, static serving and `build-id` are the real ones.
-    command: 'pnpm build && pnpm start',
+    // What `pnpm start` runs, rather than the Vite dev server, so headers, static serving and `build-id` are
+    // the real ones. Not `pnpm start` itself: pnpm puts the server in its own process group, which outlives
+    // Playwright's stop and holds CI open.
+    command: 'pnpm build && exec node apps/api/src/index.ts',
     cwd: '..',
     url: `http://localhost:${PORT}/health`,
     reuseExistingServer: !CI,
