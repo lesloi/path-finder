@@ -1,28 +1,26 @@
+# macOS
+.DS_Store
+
+# agent
+.claude/worktrees/
+prototypes/
+
+# secrets
+.env*.local
+*.pem
+
+# build
+dist/
+*.tsbuildinfo
+
 # dependencies
 node_modules/
 
 # tests
 coverage/
 
-# build
-dist/
-
-# debug
-npm-debug.*
+# debug logs
 pnpm-debug.log*
 
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-# Claude Code
-.claude/worktrees/
-
-# Local data (see INSTALL.md)
+# local data
 /data/
