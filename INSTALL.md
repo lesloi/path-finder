@@ -118,14 +118,14 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable           | Default        | Description                                                                |
-| ------------------ | -------------- | -------------------------------------------------------------------------- |
-| `NODE_ENV`         | none           | `development` turns off the rate and concurrency limits                    |
-| `BDALTI_DIR`       | none           | Tiles written by `convert-bdalti.ts`                                       |
-| `BROUTER_URL`      | none, required | The BRouter server, such as `http://localhost:17777`                       |
-| `HEALTH_ALLOWLIST` | every caller   | Callers allowed on the healthcheck ([details](#health))                    |
-| `PORT`             | `3000`         | Port the API listens on                                                    |
-| `TRUSTED_PROXIES`  | loopback       | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy)) |
+| Variable           | Required | Default           | Description                                                                |
+| ------------------ | -------- | ----------------- | -------------------------------------------------------------------------- |
+| `BROUTER_URL`      | yes      |                   | The BRouter server, such as `http://localhost:17777`                       |
+| `BDALTI_DIR`       | no       |                   | Tiles written by `convert-bdalti.ts`                                       |
+| `HEALTH_ALLOWLIST` | no       | `0.0.0.0/0, ::/0` | Callers allowed on the healthcheck ([details](#health))                    |
+| `NODE_ENV`         | no       |                   | `development` turns off the rate and concurrency limits                    |
+| `PORT`             | no       | `3000`            | Port the API listens on                                                    |
+| `TRUSTED_PROXIES`  | no       | `0.0.0.0/0, ::/0` | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy)) |
 
 ## 5. Host it
 
@@ -168,15 +168,14 @@ services:
 ### Behind a reverse proxy
 
 The rate limit counts each client by the address the proxy appends to `X-Forwarded-For`.
-Clients can forge that header, so the API reads it only from the addresses listed in
-`TRUSTED_PROXIES`, and otherwise counts the connection's address.
+Clients can forge that header, so list your proxies in `TRUSTED_PROXIES`: the API then reads
+it only from them, and otherwise counts the connection's address. Unset or empty, it takes the
+default.
 
-| `TRUSTED_PROXIES`        | Trusted proxies                                             |
-| ------------------------ | ----------------------------------------------------------- |
-| unset                    | Loopback only (`127.0.0.0/8`, `::1`): a proxy on the host   |
-| `172.18.0.3, 10.0.0.0/8` | These IP addresses and CIDR ranges, such as a Docker subnet |
-| empty                    | None                                                        |
-| `0.0.0.0/0, ::/0`        | Every connection: for development only                      |
+| `TRUSTED_PROXIES`        | Trusted proxies                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| `0.0.0.0/0, ::/0`        | Every connection, the default: clients reaching the API directly can forge the header |
+| `172.18.0.3, 10.0.0.0/8` | These IP addresses and CIDR ranges, such as a Docker subnet                           |
 
 ### Health
 
