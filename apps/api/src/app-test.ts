@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import type { Mock } from 'vitest';
 
+import { parseAddressRanges } from './addresses.ts';
 import { createApp } from './app.ts';
 import type { Position, RoutingEngine } from './route-generation/index.ts';
 
@@ -23,13 +24,25 @@ const flat = () => 450;
 
 const criteria = { start: START, activity: 'run', target: { distance: 10 }, surface: 'any', pace: 6 };
 const BUILD_ID = 'b1d-2026';
+// The reverse proxy, such as Caddy on the Docker network.
+const PROXY = '172.18.0.3';
+const trustedProxies = parseAddressRanges(PROXY, 'TRUSTED_PROXIES');
 
-function postRouteSet(app: ReturnType<typeof createApp>, body: unknown, headers: Record<string, string> = {}) {
-  return app.request('/api/v1/route-sets', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.1', ...headers },
-    body: typeof body === 'string' ? body : JSON.stringify(body),
-  });
+function postRouteSet(
+  app: ReturnType<typeof createApp>,
+  body: unknown,
+  headers: Record<string, string> = {},
+  remoteAddress = PROXY,
+) {
+  return app.request(
+    '/api/v1/route-sets',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': '203.0.113.1', ...headers },
+      body: typeof body === 'string' ? body : JSON.stringify(body),
+    },
+    { incoming: { socket: { remoteAddress } } },
+  );
 }
 
 describe('api', () => {
@@ -42,7 +55,7 @@ describe('api', () => {
     await writeFile(join(webRoot, 'index.html'), '<h1>Path finder</h1>');
     await writeFile(join(webRoot, 'assets', 'index-a1b2c3.js'), 'console.log(1);');
     await writeFile(join(webRoot, 'build-id'), `${BUILD_ID}\n`);
-    app = createApp({ webRoot, engine, heightAt: flat });
+    app = createApp({ webRoot, engine, heightAt: flat, trustedProxies });
   });
 
   afterAll(async () => {
@@ -227,12 +240,15 @@ describe('api', () => {
       limited: ReturnType<typeof createApp>,
       times: number,
       forwardedFor: (i: number) => string,
+      remoteAddress = PROXY,
     ) {
-      for (let i = 0; i < times; i++) await postRouteSet(limited, '{', { 'X-Forwarded-For': forwardedFor(i) });
+      for (let i = 0; i < times; i++) {
+        await postRouteSet(limited, '{', { 'X-Forwarded-For': forwardedFor(i) }, remoteAddress);
+      }
     }
 
     it('answers 429 after 60 requests in 10 minutes from the address the proxy saw', async () => {
-      const limited = createApp({ webRoot, engine, heightAt: flat });
+      const limited = createApp({ webRoot, engine, heightAt: flat, trustedProxies });
       await postManyTimes(limited, 60, () => '203.0.113.9');
 
       const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.9' });
@@ -243,7 +259,7 @@ describe('api', () => {
     });
 
     it('ignores the addresses a client forges before the one the proxy appends', async () => {
-      const limited = createApp({ webRoot, engine, heightAt: flat });
+      const limited = createApp({ webRoot, engine, heightAt: flat, trustedProxies });
       await postManyTimes(limited, 60, (i) => `10.0.0.${i}, 203.0.113.9`);
 
       const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '10.0.0.99, 203.0.113.9' });
@@ -252,7 +268,7 @@ describe('api', () => {
     });
 
     it('lets an address in again after 10 minutes', async () => {
-      const limited = createApp({ webRoot, engine, heightAt: flat });
+      const limited = createApp({ webRoot, engine, heightAt: flat, trustedProxies });
       await postManyTimes(limited, 61, () => '203.0.113.9');
 
       vi.advanceTimersByTime(10 * 60 * 1000);
@@ -261,7 +277,7 @@ describe('api', () => {
     });
 
     it('admits every request when limits are off', async () => {
-      const unlimited = createApp({ webRoot, engine, heightAt: flat, limits: false });
+      const unlimited = createApp({ webRoot, engine, heightAt: flat, limits: false, trustedProxies });
       await postManyTimes(unlimited, 60, () => '203.0.113.9');
 
       expect((await postRouteSet(unlimited, criteria, { 'X-Forwarded-For': '203.0.113.9' })).status).toBe(200);
@@ -279,6 +295,57 @@ describe('api', () => {
 
       expect((await post('198.51.100.1')).status).toBe(429);
       expect((await post('198.51.100.2')).status).toBe(200);
+    });
+
+    it.each([
+      ['from a public address by default', undefined, '198.51.100.1'],
+      ['from a private network by default', undefined, '172.18.0.3'],
+      ['from a unique local IPv6 address by default', undefined, 'fd12::3'],
+      ['from a connection that is not a trusted proxy', trustedProxies, '198.51.100.1'],
+      ['from a private network left out of the trusted proxies', trustedProxies, '10.0.0.1'],
+      ['from any connection when no proxy is trusted', parseAddressRanges('', 'TRUSTED_PROXIES'), PROXY],
+    ])('ignores X-Forwarded-For %s, so a client cannot rotate it', async (_, proxies, remoteAddress) => {
+      const limited = createApp({ webRoot, engine, heightAt: flat, ...(proxies && { trustedProxies: proxies }) });
+      await postManyTimes(limited, 60, (i) => `203.0.113.${i}`, remoteAddress);
+
+      const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.99' }, remoteAddress);
+
+      expect(response.status).toBe(429);
+    });
+
+    it.each(['127.0.0.1', '127.0.1.1', '::1', '::ffff:127.0.0.1'])(
+      'trusts X-Forwarded-For by default from %s, on the loopback',
+      async (remoteAddress) => {
+        const limited = createApp({ webRoot, engine, heightAt: flat });
+        await postManyTimes(limited, 60, () => '203.0.113.9', remoteAddress);
+
+        const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.10' }, remoteAddress);
+
+        expect(response.status).toBe(200);
+      },
+    );
+
+    it('trusts X-Forwarded-For from any connection when every proxy is trusted', async () => {
+      const limited = createApp({
+        webRoot,
+        engine,
+        heightAt: flat,
+        trustedProxies: parseAddressRanges('0.0.0.0/0, ::/0', 'TRUSTED_PROXIES'),
+      });
+      await postManyTimes(limited, 60, () => '203.0.113.9', '198.51.100.1');
+
+      const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.10' }, '198.51.100.1');
+
+      expect(response.status).toBe(200);
+    });
+
+    it('trusts X-Forwarded-For from a trusted proxy seen as an IPv4 address mapped to IPv6', async () => {
+      const limited = createApp({ webRoot, engine, heightAt: flat, trustedProxies });
+      await postManyTimes(limited, 60, () => '203.0.113.9', `::ffff:${PROXY}`);
+
+      const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.10' }, `::ffff:${PROXY}`);
+
+      expect(response.status).toBe(200);
     });
   });
 

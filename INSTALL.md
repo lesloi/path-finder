@@ -118,12 +118,13 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable      | Default        | Description                                             |
-| ------------- | -------------- | ------------------------------------------------------- |
-| `BDALTI_DIR`  | none           | Tiles written by `convert-bdalti.ts`                    |
-| `BROUTER_URL` | none, required | The BRouter server, such as `http://localhost:17777`    |
-| `NODE_ENV`    | none           | `development` turns off the rate and concurrency limits |
-| `PORT`        | `3000`         | Port the API listens on                                 |
+| Variable          | Default        | Description                                                                |
+| ----------------- | -------------- | -------------------------------------------------------------------------- |
+| `NODE_ENV`        | none           | `development` turns off the rate and concurrency limits                    |
+| `BDALTI_DIR`      | none           | Tiles written by `convert-bdalti.ts`                                       |
+| `BROUTER_URL`     | none, required | The BRouter server, such as `http://localhost:17777`                       |
+| `PORT`            | `3000`         | Port the API listens on                                                    |
+| `TRUSTED_PROXIES` | loopback       | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy)) |
 
 ## 5. Host it
 
@@ -162,5 +163,18 @@ services:
       - '127.0.0.1:3000:3000'
     restart: unless-stopped
 ```
+
+### Behind a reverse proxy
+
+The rate limit counts each client by the address the proxy appends to `X-Forwarded-For`.
+Clients can forge that header, so the API reads it only from the addresses listed in
+`TRUSTED_PROXIES`, and otherwise counts the connection's address.
+
+| `TRUSTED_PROXIES`        | Trusted proxies                                             |
+| ------------------------ | ----------------------------------------------------------- |
+| unset                    | Loopback only (`127.0.0.0/8`, `::1`): a proxy on the host   |
+| `172.18.0.3, 10.0.0.0/8` | These IP addresses and CIDR ranges, such as a Docker subnet |
+| empty                    | None                                                        |
+| `0.0.0.0/0, ::/0`        | Every connection: for development only                      |
 
 `GET /health` answers `ok` when the API is up.

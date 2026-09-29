@@ -12,6 +12,7 @@ import {
   type HeightAt,
   type RoutingEngine,
 } from './route-generation/index.ts';
+import { parseAddressRanges, type AddressMatcher } from './addresses.ts';
 import { createConcurrencyLimiter, createRateLimiter, type Admission } from './limits.ts';
 
 // Vite fingerprints the files it emits under /assets, so they never change.
@@ -20,6 +21,9 @@ const IMMUTABLE = 'public, max-age=31536000, immutable';
 const BUSY_RETRY_AFTER = 5;
 // Milliseconds a route set may take, waiting in the queue included.
 const GENERATION_TIMEOUT = 15_000;
+// Only a proxy on the same host connects from the loopback. Private networks are left out, as
+// clients on them could reach the API without a proxy and forge `X-Forwarded-For`.
+const LOOPBACK = '127.0.0.0/8, ::1';
 
 /** ID written by each web app build (see `apps/web/vite.config.ts`), or none when the web app is not built. */
 function readBuildId(webRoot: string): string | undefined {
@@ -31,12 +35,14 @@ function readBuildId(webRoot: string): string | undefined {
 }
 
 /**
- * The reverse proxy appends the address it sees to `X-Forwarded-For`: earlier entries come
- * from the client and can be forged. Without a proxy, the connection's own address counts.
+ * A trusted reverse proxy appends the address it sees to `X-Forwarded-For`: earlier entries come
+ * from the client and can be forged. From any other connection, the whole header can be forged
+ * (#91), so the connection's own address counts.
  */
-function clientAddress(c: Context): string {
-  const forwarded = c.req.header('X-Forwarded-For')?.split(',').at(-1)?.trim();
-  return forwarded || (getConnInfo(c).remote.address ?? '');
+function clientAddress(c: Context, trustedProxies: AddressMatcher): string {
+  const connection = getConnInfo(c).remote.address ?? '';
+  if (!trustedProxies(connection)) return connection;
+  return c.req.header('X-Forwarded-For')?.split(',').at(-1)?.trim() || connection;
 }
 
 function retryLater(c: Context, status: 429 | 503, seconds: number, error: string) {
@@ -49,6 +55,7 @@ export function createApp({
   engine,
   heightAt,
   limits = true,
+  trustedProxies = parseAddressRanges(LOOPBACK, 'LOOPBACK'),
 }: {
   webRoot: string;
   engine: RoutingEngine;
@@ -56,6 +63,8 @@ export function createApp({
   heightAt?: HeightAt;
   /** Rate and concurrency limits, turned off in development. */
   limits?: boolean;
+  /** Reverse proxies whose `X-Forwarded-For` counts, by default any on the loopback. */
+  trustedProxies?: AddressMatcher;
 }) {
   const app = new Hono();
   const buildId = readBuildId(webRoot);
@@ -78,7 +87,7 @@ export function createApp({
 
   // No logs here: criteria hold the start point, and requests hold the client address.
   app.post('/api/v1/route-sets', async (c) => {
-    const admission = admit(clientAddress(c));
+    const admission = admit(clientAddress(c, trustedProxies));
     if (!admission.admitted) {
       return retryLater(c, 429, admission.retryAfter, 'Too many route sets asked for: retry later');
     }
