@@ -1,12 +1,12 @@
 import type { Language } from '../language.ts';
+import { PROSE } from '../ui/index.ts';
 
 const cnil = 'https://www.cnil.fr/fr/plaintes';
 
 export function PrivacyPolicyPage({ language }: { language: Language }) {
   if (language === 'fr') {
     return (
-      <>
-        <h1>Politique de confidentialité</h1>
+      <div className={PROSE}>
         <p>
           Pas de compte, pas de cookie, pas de mesure d’audience, pas de pistage. Vos réglages
           restent dans votre navigateur. Notre serveur calcule les itinéraires et n’en garde rien.
@@ -73,12 +73,11 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
         </p>
 
         <p>Dernière mise à jour : 28 septembre 2026.</p>
-      </>
+      </div>
     );
   }
   return (
-    <>
-      <h1>Privacy policy</h1>
+    <div className={PROSE}>
       <p>
         No account, no cookie, no analytics, no tracking. Your settings stay in your browser.
         Our server generates routes and keeps nothing.
@@ -142,6 +141,6 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
       </p>
 
       <p>Last updated: 28 September 2026.</p>
-    </>
+    </div>
   );
 }

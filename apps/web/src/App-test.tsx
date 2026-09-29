@@ -1,9 +1,18 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import { Map } from 'maplibre-gl';
+
 import { App } from './App.tsx';
 
 // jsdom has no WebGL.
 vi.mock('maplibre-gl');
+
+const onDesktop = () =>
+  vi
+    .spyOn(window, 'matchMedia')
+    .mockImplementation(
+      (query) => ({ media: query, matches: true, addEventListener() {}, removeEventListener() {} }) as never,
+    );
 
 afterEach(() => {
   window.location.hash = '';
@@ -35,6 +44,105 @@ describe('App', () => {
     },
   );
 
+  it('keeps the map across a visit to the settings', async () => {
+    render(<App />);
+    const created = vi.mocked(Map).mock.instances.length;
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Back' }));
+    await screen.findByRole('button', { name: 'Criteria' });
+
+    expect(vi.mocked(Map).mock.instances).toHaveLength(created);
+  });
+
+  it('moves the focus to the title of the page it opens', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toHaveFocus();
+  });
+
+  it('gives the focus back to the settings button once the page is closed', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Back' }));
+
+    expect(await screen.findByRole('link', { name: 'Settings' })).toHaveFocus();
+  });
+
+  it('opens a page as a modal dialog, without the settings button behind it', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toHaveAttribute('open');
+    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+  });
+
+  it('goes back a level from a page on Escape', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Credits' }));
+
+    fireEvent(await screen.findByRole('dialog', { name: 'Credits' }), new Event('cancel', { cancelable: true }));
+
+    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+  });
+
+  it('closes every page on a click on the scrim', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Credits' }));
+
+    fireEvent.click(await screen.findByRole('dialog', { name: 'Credits' }));
+
+    expect(await screen.findByRole('link', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('closes a page with a back arrow on phones', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+
+    expect(await screen.findByRole('link', { name: 'Back' })).toHaveAttribute('href', '#/');
+    expect(screen.queryByRole('link', { name: 'Close' })).not.toBeInTheDocument();
+  });
+
+  it('closes a page with a cross on desktops, and keeps the back arrow for a page within a page', async () => {
+    onDesktop();
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    expect(await screen.findByRole('link', { name: 'Close' })).toHaveAttribute('href', '#/');
+    expect(screen.queryByRole('link', { name: 'Back' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'Credits' }));
+    expect(await screen.findByRole('link', { name: 'Back' })).toHaveAttribute('href', '#/settings');
+    expect(screen.getByRole('link', { name: 'Close' })).toHaveAttribute('href', '#/');
+  });
+
+  it('stays on a page after a click inside it', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+
+    fireEvent.click(await screen.findByRole('heading', { level: 1, name: 'Settings' }));
+
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+  });
+
+  it('shows the settings button again on desktops once the page is closed', async () => {
+    onDesktop();
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(await screen.findByRole('link', { name: 'Close' }));
+
+    expect(await screen.findByRole('link', { name: 'Settings' })).toBeInTheDocument();
+  });
+
   it('speaks French when the browser prefers French', async () => {
     vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['fr-FR']);
     render(<App />);
@@ -59,7 +167,8 @@ describe('App', () => {
     render(<App />);
 
     fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
-    fireEvent.change(await screen.findByLabelText('Language'), { target: { value: 'fr' } });
+    fireEvent.click(await screen.findByRole('button', { name: /^Language/ }));
+    fireEvent.click(screen.getByRole('option', { name: 'Français' }));
 
     expect(screen.getByRole('heading', { level: 1, name: 'Réglages' })).toBeInTheDocument();
     expect(document.documentElement.lang).toBe('fr');

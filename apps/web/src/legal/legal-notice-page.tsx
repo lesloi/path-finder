@@ -1,4 +1,5 @@
 import type { Language } from '../language.ts';
+import { PROSE } from '../ui/index.ts';
 
 const publisher = 'https://github.com/lesloi';
 const contact = 'https://github.com/lesloi/path-finder/issues';
@@ -7,8 +8,7 @@ const scaleway = 'https://www.scaleway.com';
 export function LegalNoticePage({ language }: { language: Language }) {
   if (language === 'fr') {
     return (
-      <>
-        <h1>Mentions légales</h1>
+      <div className={PROSE}>
         <h2>Éditeur</h2>
         <p>
           Path finder est édité à titre non professionnel par un particulier, connu sur GitHub
@@ -24,12 +24,11 @@ export function LegalNoticePage({ language }: { language: Language }) {
           Scaleway SAS, 8 rue de la Ville l’Évêque, 75008 Paris, France. Téléphone : +33 1 84 13
           00 00. <a href={scaleway}>www.scaleway.com</a>
         </p>
-      </>
+      </div>
     );
   }
   return (
-    <>
-      <h1>Legal notice</h1>
+    <div className={PROSE}>
       <h2>Publisher</h2>
       <p>
         Path finder is published on a non-professional basis by a private individual, known on
@@ -45,6 +44,6 @@ export function LegalNoticePage({ language }: { language: Language }) {
         Scaleway SAS, 8 rue de la Ville l’Évêque, 75008 Paris, France. Phone: +33 1 84 13 00 00.{' '}
         <a href={scaleway}>www.scaleway.com</a>
       </p>
-    </>
+    </div>
   );
 }

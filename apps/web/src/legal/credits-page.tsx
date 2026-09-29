@@ -1,4 +1,5 @@
 import type { Language } from '../language.ts';
+import { PROSE } from '../ui/index.ts';
 
 const osmCopyright = 'https://www.openstreetmap.org/copyright';
 const licenceOuverte = 'https://www.etalab.gouv.fr/licence-ouverte-open-licence/';
@@ -8,8 +9,7 @@ const sourceCode = 'https://github.com/lesloi/path-finder';
 export function CreditsPage({ language }: { language: Language }) {
   if (language === 'fr') {
     return (
-      <>
-        <h1>Crédits</h1>
+      <div className={PROSE}>
         <h2>Données</h2>
         <ul>
           <li>
@@ -27,12 +27,11 @@ export function CreditsPage({ language }: { language: Language }) {
           <a href={agpl}>AGPL-3.0-or-later</a>. Son code source est sur{' '}
           <a href={sourceCode}>github.com/lesloi/path-finder</a>.
         </p>
-      </>
+      </div>
     );
   }
   return (
-    <>
-      <h1>Credits</h1>
+    <div className={PROSE}>
       <h2>Data</h2>
       <ul>
         <li>
@@ -49,6 +48,6 @@ export function CreditsPage({ language }: { language: Language }) {
         Path finder is free software under the <a href={agpl}>AGPL-3.0-or-later</a> licence. Its
         source code is at <a href={sourceCode}>github.com/lesloi/path-finder</a>.
       </p>
-    </>
+    </div>
   );
 }

@@ -103,6 +103,8 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
   No i18n library.
 - Shared device state goes through `useSyncExternalStore` (see `settings.ts`), not a
   state library.
+- Styles follow [DESIGN.md](./DESIGN.md): Tailwind classes limited to its tokens, shared
+  class strings in `ui/styles.ts`, and lucide-react icons.
 
 ### Tests
 
