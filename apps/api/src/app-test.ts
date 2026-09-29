@@ -358,14 +358,10 @@ describe('api', () => {
     });
 
     it.each([
-      ['from a public address by default', undefined, '198.51.100.1'],
-      ['from a private network by default', undefined, '172.18.0.3'],
-      ['from a unique local IPv6 address by default', undefined, 'fd12::3'],
-      ['from a connection that is not a trusted proxy', trustedProxies, '198.51.100.1'],
-      ['from a private network left out of the trusted proxies', trustedProxies, '10.0.0.1'],
-      ['from any connection when no proxy is trusted', parseAddressRanges('', 'TRUSTED_PROXIES'), PROXY],
-    ])('ignores X-Forwarded-For %s, so a client cannot rotate it', async (_, proxies, remoteAddress) => {
-      const limited = createApp({ webRoot, engine, heightAt: flat, ...(proxies && { trustedProxies: proxies }) });
+      ['from a connection that is not a trusted proxy', '198.51.100.1'],
+      ['from a private network left out of the trusted proxies', '10.0.0.1'],
+    ])('ignores X-Forwarded-For %s, so a client cannot rotate it', async (_, remoteAddress) => {
+      const limited = createApp({ webRoot, engine, heightAt: flat, trustedProxies });
       await postManyTimes(limited, 60, (i) => `203.0.113.${i}`, remoteAddress);
 
       const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.99' }, remoteAddress);
@@ -373,8 +369,8 @@ describe('api', () => {
       expect(response.status).toBe(429);
     });
 
-    it.each(['127.0.0.1', '127.0.1.1', '::1', '::ffff:127.0.0.1'])(
-      'trusts X-Forwarded-For by default from %s, on the loopback',
+    it.each(['127.0.0.1', '::1', '172.18.0.3', 'fd12::3', '198.51.100.1', '::ffff:198.51.100.1'])(
+      'trusts X-Forwarded-For by default from %s, as every connection is a trusted proxy',
       async (remoteAddress) => {
         const limited = createApp({ webRoot, engine, heightAt: flat });
         await postManyTimes(limited, 60, () => '203.0.113.9', remoteAddress);
@@ -384,20 +380,6 @@ describe('api', () => {
         expect(response.status).toBe(200);
       },
     );
-
-    it('trusts X-Forwarded-For from any connection when every proxy is trusted', async () => {
-      const limited = createApp({
-        webRoot,
-        engine,
-        heightAt: flat,
-        trustedProxies: parseAddressRanges('0.0.0.0/0, ::/0', 'TRUSTED_PROXIES'),
-      });
-      await postManyTimes(limited, 60, () => '203.0.113.9', '198.51.100.1');
-
-      const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.10' }, '198.51.100.1');
-
-      expect(response.status).toBe(200);
-    });
 
     it('trusts X-Forwarded-For from a trusted proxy seen as an IPv4 address mapped to IPv6', async () => {
       const limited = createApp({ webRoot, engine, heightAt: flat, trustedProxies });

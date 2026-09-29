@@ -21,9 +21,10 @@ const IMMUTABLE = 'public, max-age=31536000, immutable';
 const BUSY_RETRY_AFTER = 5;
 // Milliseconds a route set may take, waiting in the queue included.
 const GENERATION_TIMEOUT = 15_000;
-// Only a proxy on the same host connects from the loopback. Private networks are left out, as
-// clients on them could reach the API without a proxy and forge `X-Forwarded-For`.
 const IS_LOOPBACK = parseAddressRanges('127.0.0.0/8, ::1', 'LOOPBACK');
+// Every connection, so the rate limit works behind any proxy without configuration. Clients that
+// reach the API without a proxy can then forge `X-Forwarded-For`.
+const EVERY_ADDRESS = parseAddressRanges('0.0.0.0/0, ::/0', 'EVERY_ADDRESS');
 
 /** ID written by each web app build (see `apps/web/vite.config.ts`), or none when the web app is not built. */
 function readBuildId(webRoot: string): string | undefined {
@@ -55,7 +56,7 @@ export function createApp({
   engine,
   heightAt,
   limits = true,
-  trustedProxies = IS_LOOPBACK,
+  trustedProxies = EVERY_ADDRESS,
   healthAllowlist,
 }: {
   webRoot: string;
@@ -64,7 +65,7 @@ export function createApp({
   heightAt?: HeightAt;
   /** Rate and concurrency limits, turned off in development. */
   limits?: boolean;
-  /** Reverse proxies whose `X-Forwarded-For` counts, by default any on the loopback. */
+  /** Reverse proxies whose `X-Forwarded-For` counts, by default every connection. */
   trustedProxies?: AddressMatcher;
   /**
    * Callers allowed to check the API's health besides the loopback, such as an uptime monitor
