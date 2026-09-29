@@ -96,9 +96,12 @@ departments. Routes outside the converted departments get no elevation.
 
 ## 4. Run it locally
 
-With BRouter running:
+Point `BROUTER_URL` at the BRouter server from [2. BRouter](#2-brouter), or, for quick
+tests, at the public [brouter.de](https://brouter.de) server. brouter.de receives every
+start point, so don't use it in production.
 
 ```sh
+export BROUTER_URL=http://localhost:17777   # or https://brouter.de
 export BDALTI_DIR=$PWD/data/bdalti   # optional
 pnpm dev
 ```
@@ -118,7 +121,7 @@ pnpm start   # http://localhost:3000
 | Variable | Default | Description |
 | --- | --- | --- |
 | `BDALTI_DIR` | none | Tiles written by `convert-bdalti.ts` |
-| `BROUTER_URL` | `http://localhost:17777` | The BRouter server |
+| `BROUTER_URL` | none, required | The BRouter server, such as `http://localhost:17777` |
 | `NODE_ENV` | none | `development` turns off the rate and concurrency limits |
 | `PORT` | `3000` | Port the API listens on |
 
@@ -126,7 +129,18 @@ pnpm start   # http://localhost:3000
 
 The `Dockerfile` builds one image with the API and the web app. Build it with
 `docker build -t path-finder .`, or use the one CI publishes as
-`ghcr.io/lesloi/path-finder:latest`. A `compose.yaml` for BRouter and Path finder:
+`ghcr.io/lesloi/path-finder:latest`.
+
+To try the image without hosting BRouter, point it at the public
+[brouter.de](https://brouter.de) server. It receives every start point, so don't use it in
+production:
+
+```sh
+docker run --rm -p 127.0.0.1:3000:3000 -e BROUTER_URL=https://brouter.de \
+  ghcr.io/lesloi/path-finder:latest
+```
+
+A `compose.yaml` for Path finder with a self-hosted BRouter:
 
 ```yaml
 services:
@@ -140,6 +154,7 @@ services:
     image: ghcr.io/lesloi/path-finder:latest
     depends_on: [brouter]
     environment:
+      BROUTER_URL: http://brouter:17777
       BDALTI_DIR: /data/bdalti   # optional
     volumes:
       - ./data/bdalti:/data/bdalti:ro
@@ -148,5 +163,4 @@ services:
     restart: unless-stopped
 ```
 
-The image already sets `BROUTER_URL=http://brouter:17777`.
 `GET /health` answers `ok` when the API is up.
