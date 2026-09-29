@@ -143,8 +143,26 @@ describe('CriteriaView', () => {
       fireEvent.blur(field());
 
       expect(field()).toHaveAttribute('aria-invalid', 'true');
-      expect(screen.getByRole('alert')).toHaveTextContent('Incorrect coordinates.For example: 48.85, 2.35 (latitude, longitude)');
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Incorrect coordinates.For example: 48.85, 2.35 (latitude, longitude)',
+      );
       expect(markers).toEqual([]);
+    });
+
+    it('says once that coordinates cannot be read, when Enter comes before a blur', () => {
+      vi.useFakeTimers();
+      onDesktop();
+      render(<CriteriaView language="en" />);
+      fireEvent.change(field(), { target: { value: 'Paris' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      act(() => vi.advanceTimersByTime(5_000));
+
+      fireEvent.blur(field());
+      act(() => vi.advanceTimersByTime(1_000));
+      vi.useRealTimers();
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(field()).toHaveAttribute('aria-invalid', 'true');
     });
 
     it('drops what is typed on Escape', () => {

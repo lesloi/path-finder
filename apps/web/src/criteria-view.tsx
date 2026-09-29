@@ -89,23 +89,23 @@ export function CriteriaView({
     setPicking(false);
   }
 
-  // Typed coordinates move the map there, as the device location does.
-  function typeStart(position: Position) {
+  // The device location and typed coordinates move the map there; a pick on the map does not.
+  function moveStart(position: Position) {
     setFocus(position);
     changeStart(position);
+  }
+
+  function warn(problem: 'unavailable' | 'unreadable') {
+    setToast({ problem, start });
   }
 
   // Geolocation is asked for only here, when the user taps a "My location" button.
   function locate() {
     setToast(undefined);
-    if (!navigator.geolocation) return setToast({ problem: 'unavailable', start });
+    if (!navigator.geolocation) return warn('unavailable');
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        const location: Position = [coords.longitude, coords.latitude];
-        setFocus(location);
-        changeStart(location);
-      },
-      () => setToast({ problem: 'unavailable', start }),
+      ({ coords }) => moveStart([coords.longitude, coords.latitude]),
+      () => warn('unavailable'),
       // Without a timeout, a position that never comes would never show the toast.
       { timeout: 10_000 },
     );
@@ -158,8 +158,8 @@ export function CriteriaView({
               start={start}
               language={language}
               picking={picking}
-              onStartChange={typeStart}
-              onUnreadable={() => setToast({ problem: 'unreadable', start })}
+              onStartChange={moveStart}
+              onUnreadable={() => warn('unreadable')}
             >
               <button
                 type="button"
@@ -182,8 +182,8 @@ export function CriteriaView({
           <StartPointField
             start={start}
             language={language}
-            onStartChange={typeStart}
-            onUnreadable={() => setToast({ problem: 'unreadable', start })}
+            onStartChange={moveStart}
+            onUnreadable={() => warn('unreadable')}
           />
           {!start && (
             <button type="button" className={SECONDARY_BUTTON} onClick={locate}>
@@ -238,11 +238,15 @@ function StartPointField({
   const inputId = useId();
   const noteId = useId();
 
+  function reset() {
+    setDraft(shown);
+    setUnreadable(false);
+  }
+
   function commit() {
-    if (draft.trim() === '' || draft === shown) {
-      setDraft(shown);
-      return setUnreadable(false);
-    }
+    // Enter then a blur would say it twice.
+    if (unreadable) return;
+    if (draft.trim() === '' || draft === shown) return reset();
     const position = parsePosition(draft);
     if (!position) {
       setUnreadable(true);
@@ -275,16 +279,16 @@ function StartPointField({
             spellCheck={false}
             aria-invalid={unreadable}
             {...(picking && { 'aria-describedby': noteId })}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setUnreadable(false);
+            }}
             // Selected at once, to copy or to replace.
             onFocus={(event) => event.target.select()}
             onBlur={commit}
             onKeyDown={(event) => {
               if (event.key === 'Enter') commit();
-              if (event.key === 'Escape') {
-                setDraft(shown);
-                setUnreadable(false);
-              }
+              if (event.key === 'Escape') reset();
             }}
           />
         </div>

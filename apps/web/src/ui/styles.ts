@@ -22,8 +22,9 @@ export const GHOST_BUTTON = 'inline-flex min-h-touch items-center gap-2 px-2 fon
 /** The desktop panel floating over the left of the map. */
 export const SIDE_COLUMN =
   // As tall as its content, within the screen.
-  'fixed top-safe-3 left-safe-3 z-4 flex max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-' +
-  'var(--spacing)*6)] w-column flex-col overflow-hidden rounded-md bg-surface shadow-float';
+  'fixed top-safe-3 left-safe-3 z-4 flex w-column flex-col overflow-hidden rounded-md bg-surface shadow-float ' +
+  // One string: Tailwind finds a class only when it is written whole.
+  'max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-(--spacing(6)))]';
 
 /** A row of chips that scrolls sideways. */
 export const CHIPS = 'flex gap-2 overflow-x-auto [scrollbar-width:none]';

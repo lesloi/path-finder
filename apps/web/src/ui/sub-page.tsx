@@ -63,7 +63,7 @@ export function SubPage({
       aria-labelledby={headingId}
       className={
         'fixed inset-0 m-0 flex h-dvh max-h-none w-full max-w-none flex-col bg-surface text-ink ' +
-        'backdrop:bg-scrim desktop:m-auto desktop:max-h-[calc(100dvh-var(--spacing)*12)] desktop:rounded-md ' +
+        'backdrop:bg-scrim desktop:m-auto desktop:max-h-[calc(100dvh-(--spacing(12)))] desktop:rounded-md ' +
         'desktop:h-fit desktop:shadow-float ' +
         (wide ? 'desktop:w-160' : 'desktop:w-120')
       }
@@ -77,7 +77,7 @@ export function SubPage({
     >
       <header
         className={
-          'flex min-h-[calc(56px+env(safe-area-inset-top))] flex-none items-center gap-1 border-b ' +
+          'flex min-h-[calc(--spacing(14)+env(safe-area-inset-top))] flex-none items-center gap-1 border-b ' +
           'border-border pt-safe-0 pr-safe-2 pl-safe-2'
         }
       >
