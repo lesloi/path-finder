@@ -85,7 +85,7 @@ draws them the same way.
 | List row              | `GROUP_TITLE`, then `LIST` of `LIST_ROW`; `LIST_ROW_CHEVRON` for a link |
 | Dropdown              | `<Dropdown label value options onChange>`: a listbox whose options may have icons |
 | Sub-page              | `<SubPage title back wide language>`: a `<dialog>` with its title, a back arrow, and a cross on desktops |
-| Toast                 | `TOAST` with `role="alert"`; the view that shows it hides it after a few seconds |
+| Toast                 | `TOAST` with `role="alert"`, in the floating buttons' colours: what went wrong, then on a second line what to do; the view hides it after a few seconds or on a click |
 | Popover               | `POPOVER`, next to the floating button that opened it                   |
 | Long text             | `PROSE`, for the legal pages                                            |
 

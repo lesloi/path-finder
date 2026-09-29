@@ -5,29 +5,26 @@ import { useEffect, useEffectEvent, useRef } from 'react';
 /** A longitude and a latitude, the shape the API's criteria take. */
 export type Position = [number, number];
 
-/** How the map sets the start point: a long press (phones), or a click once picking is armed (desktops). */
-export type PickBy = 'long-press' | 'click';
-
 const LONG_PRESS_MS = 500;
 
-/** The full-screen map, which shows the start point and sets it the way `pickBy` says. */
+/** The full-screen map, which shows the start point and sets it on a long press, or on a click when `pickOnClick`. */
 export function StartPointMap({
   start,
-  located,
-  pickBy,
+  focus,
+  pickOnClick = false,
   onStartChange,
 }: {
   start?: Position;
-  /** The device location, which the map moves to. */
-  located?: Position;
-  /** Absent: the map never sets the start point. */
-  pickBy?: PickBy;
+  /** Where the map moves to: the device location, or coordinates the user typed. */
+  focus?: Position;
+  /** Desktops arm a click once the user asks to pick the start point. */
+  pickOnClick?: boolean;
   onStartChange: (start: Position) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map>(null);
-  const pick = useEffectEvent((how: PickBy, { lng, lat }: { lng: number; lat: number }) => {
-    if (how === pickBy) onStartChange([lng, lat]);
+  const pick = useEffectEvent((how: 'long-press' | 'click', { lng, lat }: { lng: number; lat: number }) => {
+    if (how === 'long-press' || pickOnClick) onStartChange([lng, lat]);
   });
 
   useEffect(() => {
@@ -96,13 +93,13 @@ export function StartPointMap({
   }, [start]);
 
   useEffect(() => {
-    if (located) mapRef.current!.easeTo({ center: located, zoom: 14 });
-  }, [located]);
+    if (focus) mapRef.current!.easeTo({ center: focus, zoom: 14 });
+  }, [focus]);
 
   // The Plan IGN map stays light in dark mode. MapLibre makes its container `position: relative`
   // from outside Tailwind's layers, so a wrapper pins it to the screen.
   return (
-    <div className={`fixed inset-0 bg-white [color-scheme:light] ${pickBy === 'click' ? 'map-picking' : ''}`}>
+    <div className={`fixed inset-0 bg-white [color-scheme:light] ${pickOnClick ? 'map-picking' : ''}`}>
       <div ref={container} className="size-full" />
     </div>
   );

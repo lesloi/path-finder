@@ -59,11 +59,14 @@ export const LIST_ROW =
 /** The chevron at the end of a list row that links to a page. */
 export const LIST_ROW_CHEVRON = 'flex-none text-ink-2';
 
-/** A short message at the top of the screen, below the floating buttons, centred on the map. */
+/**
+ * A short message at the top of the screen, below the floating buttons, centred on the map, in their
+ * colours; a click drops it.
+ */
 export const TOAST =
   'fixed top-[calc(env(safe-area-inset-top)+--spacing(3)+var(--spacing-touch)+--spacing(2))] left-1/2 z-9 ' +
-  'w-max max-w-[calc(100vw-2*--spacing(4))] -translate-x-1/2 rounded-md bg-ink px-4 py-2 text-sm text-surface ' +
-  'shadow-float desktop:left-(--map-centre) desktop:max-w-[calc(100vw-var(--spacing-column)-3*--spacing(4))]';
+  'w-max max-w-[calc(100vw-2*--spacing(4))] -translate-x-1/2 cursor-pointer rounded-md bg-surface px-4 py-2 text-sm ' +
+  'text-ink shadow-float desktop:left-(--map-centre) desktop:max-w-[calc(100vw-var(--spacing-column)-3*--spacing(4))]';
 
 /** A small card next to the floating button that opened it. */
 export const POPOVER =

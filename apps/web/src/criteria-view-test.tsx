@@ -6,6 +6,7 @@ import { maps, markers } from './maplibre-mock.ts';
 vi.mock('maplibre-gl', () => import('./maplibre-mock.ts'));
 
 const map = () => maps.at(-1)!;
+const field = () => screen.getByRole('textbox', { name: 'Start point' });
 const onDesktop = () =>
   vi
     .spyOn(window, 'matchMedia')
@@ -55,52 +56,59 @@ describe('CriteriaView', () => {
       expect(screen.queryByText('Long-press the map to choose your start point')).not.toBeInTheDocument();
       expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
     });
+
+    it('sets the start point from coordinates typed in the sheet', () => {
+      render(<CriteriaView language="en" />);
+
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
+    });
   });
 
   describe('on desktops', () => {
     it('stops picking the start point when the settings open', () => {
       onDesktop();
       render(<CriteriaView language="en" />);
-      const block = screen.getByRole('button', { name: /^Start point/ });
-      fireEvent.click(block);
+      const crosshair = screen.getByRole('button', { name: 'Choose on the map' });
+      fireEvent.click(crosshair);
 
       fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
 
-      expect(block).toHaveAttribute('aria-pressed', 'false');
+      expect(crosshair).toHaveAttribute('aria-pressed', 'false');
     });
 
-    it('picks the start point with a click on the map once its block is pressed', () => {
+    it('picks the start point with a click on the map once the crosshair is pressed', () => {
       onDesktop();
       render(<CriteriaView language="en" />);
-      const block = screen.getByRole('button', { name: /^Start point/ });
-      expect(block).toHaveTextContent('Choose on the map');
+      const crosshair = screen.getByRole('button', { name: 'Choose on the map' });
 
       act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
       expect(markers).toEqual([]);
 
-      fireEvent.click(block);
-      expect(block).toHaveAttribute('aria-pressed', 'true');
-      expect(block).toHaveTextContent('Click the map');
+      fireEvent.click(crosshair);
+      expect(crosshair).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('Click the map')).toBeInTheDocument();
 
       act(() => map().fire('click', { lngLat: { lng: 6.2, lat: -45.8 } }));
 
-      expect(block).toHaveAttribute('aria-pressed', 'false');
-      expect(block).toHaveTextContent('45.8000° S · 6.2000° E');
+      expect(crosshair).toHaveAttribute('aria-pressed', 'false');
+      expect(field()).toHaveValue('45.8000° S · 6.2000° E');
       expect(markers.at(-1)).toMatchObject({ position: [6.2, -45.8], shown: true });
     });
 
     it('shows the start point coordinates in French', () => {
       onDesktop();
       render(<CriteriaView language="fr" />);
-      const block = screen.getByRole('button', { name: /^Point de départ/ });
 
-      fireEvent.click(block);
+      fireEvent.click(screen.getByRole('button', { name: 'Choisir sur la carte' }));
       act(() => map().fire('click', { lngLat: { lng: -1.5, lat: 47.2 } }));
 
-      expect(block).toHaveTextContent('47,2000° N · 1,5000° O');
+      expect(screen.getByRole('textbox', { name: 'Point de départ' })).toHaveValue('47,2000° N · 1,5000° O');
     });
 
-    it('keeps the start point on a long press', () => {
+    it('sets the start point on a long press too', () => {
       vi.useFakeTimers();
       onDesktop();
       render(<CriteriaView language="en" />);
@@ -111,7 +119,42 @@ describe('CriteriaView', () => {
       });
       vi.useRealTimers();
 
+      expect(field()).toHaveValue('45.8000° N · 6.2000° E');
+      expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
+    });
+
+    it('sets the start point from typed coordinates and moves the map there', () => {
+      onDesktop();
+      render(<CriteriaView language="en" />);
+
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
+      expect(map().easedTo).toMatchObject({ center: [6.2, 45.8] });
+      expect(field()).toHaveValue('45.8000° N · 6.2000° E');
+    });
+
+    it('says in a toast when typed coordinates cannot be read, and keeps the start point', () => {
+      onDesktop();
+      render(<CriteriaView language="en" />);
+
+      fireEvent.change(field(), { target: { value: 'Paris' } });
+      fireEvent.blur(field());
+
+      expect(field()).toHaveAttribute('aria-invalid', 'true');
+      expect(screen.getByRole('alert')).toHaveTextContent('Incorrect coordinates.For example: 48.85, 2.35 (latitude, longitude)');
       expect(markers).toEqual([]);
+    });
+
+    it('drops what is typed on Escape', () => {
+      onDesktop();
+      render(<CriteriaView language="en" />);
+
+      fireEvent.change(field(), { target: { value: 'Paris' } });
+      fireEvent.keyDown(field(), { key: 'Escape' });
+
+      expect(field()).toHaveValue('');
     });
 
     it('shows the logo and no sheet', () => {
@@ -164,7 +207,7 @@ describe('CriteriaView', () => {
 
       fireEvent.click(screen.getAllByRole('button', { name: 'Ma position' })[0]);
 
-      expect(screen.getByRole('alert')).toHaveTextContent(/appuyez longuement sur la carte/i);
+      expect(screen.getByRole('alert')).toHaveTextContent(/appui long sur la carte/i);
       expect(markers).toEqual([]);
     });
 
@@ -175,7 +218,7 @@ describe('CriteriaView', () => {
 
       fireEvent.click(screen.getAllByRole('button', { name: 'My location' })[0]);
 
-      expect(screen.getByRole('alert')).toHaveTextContent(/press Start point, then click the map/i);
+      expect(screen.getByRole('alert')).toHaveTextContent(/long-press the map or type coordinates/i);
     });
 
     it('shows a toast when the browser has no geolocation', () => {
@@ -199,6 +242,25 @@ describe('CriteriaView', () => {
       });
 
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('drops the toast on a click', () => {
+      refuse();
+      render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getAllByRole('button', { name: 'My location' })[0]);
+
+      fireEvent.click(screen.getByRole('alert'));
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('puts the toast on two lines: what went wrong, then what to do', () => {
+      refuse();
+      render(<CriteriaView language="en" />);
+
+      fireEvent.click(screen.getAllByRole('button', { name: 'My location' })[0]);
+
+      expect(screen.getByRole('alert').querySelectorAll('br')).toHaveLength(1);
     });
 
     it('drops the toast after a few seconds', () => {

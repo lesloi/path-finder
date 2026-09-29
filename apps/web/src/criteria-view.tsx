@@ -1,6 +1,7 @@
-import { LocateFixed, Settings } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Crosshair, LocateFixed, Settings } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
+import { formatPosition, parsePosition } from './coordinates.ts';
 import type { Language } from './language.ts';
 import { StartPointMap, type Position } from './start-point-map.tsx';
 import {
@@ -24,12 +25,13 @@ const text = {
     startPoint: 'Start point',
     chooseOnMap: 'Choose on the map',
     clickMap: 'Click the map',
-    unavailable: 'Your location is unavailable. Long-press the map to pick your start point.',
-    unavailableDesktop: 'Your location is unavailable. Press Start point, then click the map.',
-    north: 'N',
-    south: 'S',
-    east: 'E',
-    west: 'W',
+    coordinates: 'Latitude, longitude',
+    unreadable: 'Incorrect coordinates.',
+    // Paris.
+    coordinatesHint: 'For example: 48.85, 2.35 (latitude, longitude)',
+    unavailable: 'Your location is unavailable.',
+    pickHint: 'Long-press the map to pick your start point.',
+    pickHintDesktop: 'Long-press the map or type coordinates.',
   },
   fr: {
     settings: 'Réglages',
@@ -39,14 +41,13 @@ const text = {
     startPoint: 'Point de départ',
     chooseOnMap: 'Choisir sur la carte',
     clickMap: 'Cliquez sur la carte',
-    unavailable:
-      'Votre position n’est pas disponible. Appuyez longuement sur la carte pour choisir votre point de départ.',
-    unavailableDesktop:
-      'Votre position n’est pas disponible. Appuyez sur Point de départ, puis cliquez sur la carte.',
-    north: 'N',
-    south: 'S',
-    east: 'E',
-    west: 'O',
+    coordinates: 'Latitude, longitude',
+    unreadable: 'Coordonnées incorrectes.',
+    coordinatesHint: 'Exemple : 48.85, 2.35 (latitude, longitude)',
+    unavailable: 'Votre position n’est pas disponible.',
+    // One line on a phone.
+    pickHint: 'Choisissez le départ d’un appui long sur la carte.',
+    pickHintDesktop: 'Faites un appui long sur la carte ou saisissez des coordonnées.',
   },
 } satisfies Record<Language, unknown>;
 
@@ -62,11 +63,12 @@ export function CriteriaView({
   const t = text[language];
   const desktop = useDesktop();
   const [start, setStart] = useState<Position>();
-  const [located, setLocated] = useState<Position>();
+  // Where the map moves to: the device location, or typed coordinates.
+  const [focus, setFocus] = useState<Position>();
   const [picking, setPicking] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(false);
-  // The start point when the location was unavailable: setting a new one drops the toast.
-  const [unavailableAt, setUnavailableAt] = useState<{ start?: Position }>();
+  // What went wrong, and the start point then: setting a new one drops the toast.
+  const [toast, setToast] = useState<{ problem: 'unavailable' | 'unreadable'; start?: Position }>();
   const settingsLink = useRef<HTMLAnchorElement>(null);
   const pageWasOpen = useRef(pageOpen);
 
@@ -77,27 +79,33 @@ export function CriteriaView({
   }, [pageOpen]);
 
   useEffect(() => {
-    if (!unavailableAt) return;
-    const timer = setTimeout(() => setUnavailableAt(undefined), TOAST_MS);
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(undefined), TOAST_MS);
     return () => clearTimeout(timer);
-  }, [unavailableAt]);
+  }, [toast]);
 
   function changeStart(position: Position) {
     setStart(position);
     setPicking(false);
   }
 
+  // Typed coordinates move the map there, as the device location does.
+  function typeStart(position: Position) {
+    setFocus(position);
+    changeStart(position);
+  }
+
   // Geolocation is asked for only here, when the user taps a "My location" button.
   function locate() {
-    setUnavailableAt(undefined);
-    if (!navigator.geolocation) return setUnavailableAt({ start });
+    setToast(undefined);
+    if (!navigator.geolocation) return setToast({ problem: 'unavailable', start });
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         const location: Position = [coords.longitude, coords.latitude];
-        setLocated(location);
+        setFocus(location);
         changeStart(location);
       },
-      () => setUnavailableAt({ start }),
+      () => setToast({ problem: 'unavailable', start }),
       // Without a timeout, a position that never comes would never show the toast.
       { timeout: 10_000 },
     );
@@ -107,9 +115,9 @@ export function CriteriaView({
     <>
       <StartPointMap
         start={start}
-        located={located}
-        // On desktops, a long press does nothing: the start point block arms a click instead.
-        pickBy={!desktop ? 'long-press' : picking ? 'click' : undefined}
+        focus={focus}
+        // On desktops, the start point block also arms a click.
+        pickOnClick={desktop && picking}
         onStartChange={changeStart}
       />
       {/* The settings are open, or another page with a way back to them. */}
@@ -146,58 +154,147 @@ export function CriteriaView({
             Path finder
           </div>
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-            <div
-              className={
-                'flex items-center gap-1 rounded-md bg-surface-2 pr-1 ' +
-                (picking ? 'ring-2 ring-accent ring-inset' : '')
-              }
+            <StartPointField
+              start={start}
+              language={language}
+              picking={picking}
+              onStartChange={typeStart}
+              onUnreadable={() => setToast({ problem: 'unreadable', start })}
             >
               <button
                 type="button"
-                className="flex min-h-14 flex-1 items-center gap-3 rounded-md px-3 py-2 text-left"
+                className={`${ICON_BUTTON} aria-pressed:text-accent`}
+                aria-label={t.chooseOnMap}
                 aria-pressed={picking}
                 onClick={() => setPicking(!picking)}
               >
-                <span className="size-4 flex-none rounded-full border-4 border-start bg-white" />
-                <span className="flex flex-col">
-                  <span className="text-sm text-ink-2">{t.startPoint}</span>{' '}
-                  {/* Coordinates only: naming the place would send it to a geocoding service. */}
-                  <span>{picking ? t.clickMap : start ? formatPosition(start, language) : t.chooseOnMap}</span>
-                </span>
+                <Crosshair size={20} aria-hidden />
               </button>
               <button type="button" className={ICON_BUTTON} aria-label={t.myLocation} onClick={locate}>
                 <LocateFixed size={20} aria-hidden />
               </button>
-            </div>
+            </StartPointField>
           </div>
         </aside>
       ) : (
         <BottomSheet label={t.criteria} expanded={sheetExpanded} onExpandedChange={setSheetExpanded}>
+          {!start && <p className="text-center text-sm text-ink-2">{t.longPress}</p>}
+          <StartPointField
+            start={start}
+            language={language}
+            onStartChange={typeStart}
+            onUnreadable={() => setToast({ problem: 'unreadable', start })}
+          />
           {!start && (
-            <>
-              <p className="text-sm text-ink-2">{t.longPress}</p>
-              <button type="button" className={SECONDARY_BUTTON} onClick={locate}>
-                <LocateFixed size={18} aria-hidden />
-                {t.myLocation}
-              </button>
-            </>
+            <button type="button" className={SECONDARY_BUTTON} onClick={locate}>
+              <LocateFixed size={18} aria-hidden />
+              {t.myLocation}
+            </button>
           )}
         </BottomSheet>
       )}
-      {unavailableAt && unavailableAt.start === start && (
-        <p className={TOAST} role="alert">
-          {desktop ? t.unavailableDesktop : t.unavailable}
+      {toast && toast.start === start && (
+        // A click drops it at once.
+        <p className={TOAST} role="alert" onClick={() => setToast(undefined)}>
+          {toast.problem === 'unavailable' ? t.unavailable : t.unreadable}
+          <br />
+          {toast.problem === 'unreadable' ? t.coordinatesHint : desktop ? t.pickHintDesktop : t.pickHint}
         </p>
       )}
     </>
   );
 }
 
-// "45.8000° N · 6.2000° E", about 10 m apart at the last digit.
-function formatPosition([longitude, latitude]: Position, language: Language): string {
+// The start point as coordinates, to copy, or to type or paste to set it. Only coordinates:
+// naming the place would send it to a geocoding service.
+function StartPointField({
+  start,
+  language,
+  picking = false,
+  onStartChange,
+  onUnreadable,
+  children,
+}: {
+  start?: Position;
+  language: Language;
+  picking?: boolean;
+  onStartChange: (start: Position) => void;
+  /** Coordinates that cannot be read were typed: the view says so in a toast. */
+  onUnreadable: () => void;
+  /** Buttons at the end of the field. */
+  children?: ReactNode;
+}) {
   const t = text[language];
-  const format = new Intl.NumberFormat(language, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
-  const latitudeText = `${format.format(Math.abs(latitude))}° ${latitude < 0 ? t.south : t.north}`;
-  const longitudeText = `${format.format(Math.abs(longitude))}° ${longitude < 0 ? t.west : t.east}`;
-  return `${latitudeText} · ${longitudeText}`;
+  const shown = start ? formatPosition(start, language) : '';
+  const [draft, setDraft] = useState(shown);
+  const [unreadable, setUnreadable] = useState(false);
+  const [shownBefore, setShownBefore] = useState(shown);
+  // A new start point, from the map or the location, replaces what is typed.
+  if (shown !== shownBefore) {
+    setShownBefore(shown);
+    setDraft(shown);
+    setUnreadable(false);
+  }
+  const inputId = useId();
+  const noteId = useId();
+
+  function commit() {
+    if (draft.trim() === '' || draft === shown) {
+      setDraft(shown);
+      return setUnreadable(false);
+    }
+    const position = parsePosition(draft);
+    if (!position) {
+      setUnreadable(true);
+      return onUnreadable();
+    }
+    // Written back the usual way, even when it is the start point already.
+    setDraft(formatPosition(position, language));
+    onStartChange(position);
+  }
+
+  return (
+    <div>
+      <div
+        className={
+          'flex items-center gap-1 rounded-md bg-surface-2 pr-1 focus-within:ring-2 focus-within:ring-accent ' +
+          `focus-within:ring-inset ${picking ? 'ring-2 ring-accent ring-inset' : ''}`
+        }
+      >
+        <span className="ml-3 size-4 flex-none rounded-full border-4 border-start bg-white" />
+        <div className="flex min-h-14 min-w-0 flex-1 flex-col justify-center px-3 py-2">
+          <label className="text-sm text-ink-2" htmlFor={inputId}>
+            {t.startPoint}
+          </label>
+          <input
+            id={inputId}
+            className="w-full bg-transparent outline-none placeholder:text-ink-2"
+            value={draft}
+            placeholder={t.coordinates}
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={unreadable}
+            {...(picking && { 'aria-describedby': noteId })}
+            onChange={(event) => setDraft(event.target.value)}
+            // Selected at once, to copy or to replace.
+            onFocus={(event) => event.target.select()}
+            onBlur={commit}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') commit();
+              if (event.key === 'Escape') {
+                setDraft(shown);
+                setUnreadable(false);
+              }
+            }}
+          />
+        </div>
+        {children}
+      </div>
+      {picking && (
+        <p id={noteId} className="mt-1 px-3 text-sm text-ink-2">
+          {t.clickMap}
+        </p>
+      )}
+    </div>
+  );
 }

@@ -21,7 +21,7 @@ afterEach(() => {
 describe('StartPointMap', () => {
   it('sets the start point on a long press', () => {
     const onStartChange = vi.fn();
-    render(<StartPointMap pickBy="long-press" onStartChange={onStartChange} />);
+    render(<StartPointMap onStartChange={onStartChange} />);
 
     act(() => {
       map().fire('touchstart', { lngLat: { lng: 6.2, lat: 45.8 }, originalEvent: touch });
@@ -33,7 +33,7 @@ describe('StartPointMap', () => {
 
   it('sets the start point on a long mouse press', () => {
     const onStartChange = vi.fn();
-    render(<StartPointMap pickBy="long-press" onStartChange={onStartChange} />);
+    render(<StartPointMap onStartChange={onStartChange} />);
 
     act(() => {
       map().fire('mousedown', { lngLat: { lng: 2.3, lat: 48.8 }, originalEvent: { button: 0 } });
@@ -45,7 +45,7 @@ describe('StartPointMap', () => {
 
   it('keeps the start point on a two-finger press', () => {
     const onStartChange = vi.fn();
-    render(<StartPointMap pickBy="long-press" onStartChange={onStartChange} />);
+    render(<StartPointMap onStartChange={onStartChange} />);
 
     act(() => {
       map().fire('touchstart', { lngLat: { lng: 6.2, lat: 45.8 }, originalEvent: { touches: [{}, {}] } });
@@ -63,7 +63,7 @@ describe('StartPointMap', () => {
     ['a box zoom', 'boxzoomstart'],
   ])('keeps the start point on %s', (_, interruption) => {
     const onStartChange = vi.fn();
-    render(<StartPointMap pickBy="long-press" onStartChange={onStartChange} />);
+    render(<StartPointMap onStartChange={onStartChange} />);
 
     act(() => {
       map().fire('touchstart', { lngLat: { lng: 6.2, lat: 45.8 }, originalEvent: touch });
@@ -75,9 +75,9 @@ describe('StartPointMap', () => {
     expect(onStartChange).not.toHaveBeenCalled();
   });
 
-  it('keeps the start point on a click while picking by long press', () => {
+  it('keeps the start point on a click unless picking by click', () => {
     const onStartChange = vi.fn();
-    render(<StartPointMap pickBy="long-press" onStartChange={onStartChange} />);
+    render(<StartPointMap onStartChange={onStartChange} />);
 
     act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
 
@@ -86,24 +86,11 @@ describe('StartPointMap', () => {
 
   it('sets the start point on a click while picking by click', () => {
     const onStartChange = vi.fn();
-    render(<StartPointMap pickBy="click" onStartChange={onStartChange} />);
+    render(<StartPointMap pickOnClick onStartChange={onStartChange} />);
 
     act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
 
     expect(onStartChange).toHaveBeenCalledWith([6.2, 45.8]);
-  });
-
-  it('keeps the start point on a long press or a click while not picking', () => {
-    const onStartChange = vi.fn();
-    render(<StartPointMap onStartChange={onStartChange} />);
-
-    act(() => {
-      map().fire('mousedown', { lngLat: { lng: 2.3, lat: 48.8 }, originalEvent: { button: 0 } });
-      vi.advanceTimersByTime(600);
-      map().fire('click', { lngLat: { lng: 2.3, lat: 48.8 } });
-    });
-
-    expect(onStartChange).not.toHaveBeenCalled();
   });
 
   it('credits IGN and OpenStreetMap in a compact attribution', () => {
@@ -126,10 +113,10 @@ describe('StartPointMap', () => {
     ]);
   });
 
-  it('moves the map to the device location', () => {
+  it('moves the map to its focus', () => {
     const { rerender } = render(<StartPointMap onStartChange={vi.fn()} />);
 
-    rerender(<StartPointMap located={[5.7, 45.2]} onStartChange={vi.fn()} />);
+    rerender(<StartPointMap focus={[5.7, 45.2]} onStartChange={vi.fn()} />);
 
     expect(map().easedTo).toEqual({ center: [5.7, 45.2], zoom: 14 });
   });
