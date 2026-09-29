@@ -41,7 +41,9 @@ jobs:
           name: coverage
           path: coverage/
 
+  # Integration and end-to-end tests run in parallel, only once the unit tests pass.
   integration:
+    needs: unit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -50,6 +52,7 @@ jobs:
 
   # The built web app in Chromium, served by the API; the IGN is answered from fixtures (e2e/test.ts).
   e2e:
+    needs: unit
     runs-on: ubuntu-latest
     # A hang fails fast instead of running for hours; the tests take seconds.
     timeout-minutes: 10
