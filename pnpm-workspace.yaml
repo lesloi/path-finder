@@ -1,4 +1,5 @@
 packages:
   - apps/*
+  - e2e
 minimumReleaseAgeExclude:
   - hono@4.13.9
