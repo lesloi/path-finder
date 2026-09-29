@@ -1,10 +1,11 @@
-import { useEffect, useSyncExternalStore, type ComponentType } from 'react';
+import { useEffect, type ComponentType } from 'react';
 
 import { CriteriaView } from './criteria-view.tsx';
 import { browserLanguage, type Language } from './language.ts';
 import { CreditsPage } from './legal/credits-page.tsx';
 import { LegalNoticePage } from './legal/legal-notice-page.tsx';
 import { PrivacyPolicyPage } from './legal/privacy-policy-page.tsx';
+import { goTo, useHash } from './navigation.ts';
 import { useSettings } from './settings.ts';
 import { SettingsView } from './settings-view.tsx';
 import { SubPage } from './ui/index.ts';
@@ -30,16 +31,6 @@ const pages: Record<
   },
 };
 
-function subscribeToHash(onChange: () => void) {
-  window.addEventListener('hashchange', onChange);
-  return () => window.removeEventListener('hashchange', onChange);
-}
-
-// Hash URLs keep the browser back button working without server-side routes.
-function useHash() {
-  return useSyncExternalStore(subscribeToHash, () => window.location.hash);
-}
-
 export function App() {
   const hash = useHash();
   const [settings] = useSettings();
@@ -62,6 +53,7 @@ export function App() {
           back={page.back}
           {...(page.wide && { wide: true })}
           language={language}
+          navigate={goTo}
         >
           <page.Page language={language} />
         </SubPage>

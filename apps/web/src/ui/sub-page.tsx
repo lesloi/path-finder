@@ -1,5 +1,5 @@
 import { ArrowLeft, X } from 'lucide-react';
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from 'react';
 
 import type { Language } from '../language.ts';
 import { ICON_BUTTON } from './styles.ts';
@@ -23,6 +23,7 @@ export function SubPage({
   back,
   wide = false,
   language,
+  navigate,
   children,
 }: {
   title: string;
@@ -30,6 +31,8 @@ export function SubPage({
   /** Long text, such as the legal pages. */
   wide?: boolean;
   language: Language;
+  /** Shows the page at a hash, for the arrow, the cross, Escape, and the scrim. */
+  navigate: (hash: string) => void;
   children: ReactNode;
 }) {
   const t = text[language];
@@ -48,6 +51,12 @@ export function SubPage({
   // Screen reader and keyboard users start from the page they just opened.
   useEffect(() => heading.current?.focus(), [title]);
 
+  // The links keep their href for a middle click; a plain click leaves the way `navigate` does.
+  const follow = (hash: string) => (event: MouseEvent) => {
+    event.preventDefault();
+    navigate(hash);
+  };
+
   return (
     <dialog
       ref={dialog}
@@ -61,10 +70,10 @@ export function SubPage({
       // Escape goes back, as the arrow does.
       onCancel={(event) => {
         event.preventDefault();
-        window.location.hash = back;
+        navigate(back);
       }}
       // A click outside the page lands on the dialog itself, over its scrim.
-      onClick={(event) => event.target === event.currentTarget && (window.location.hash = HOME)}
+      onClick={(event) => event.target === event.currentTarget && navigate(HOME)}
     >
       <header
         className={
@@ -73,7 +82,7 @@ export function SubPage({
         }
       >
         {(!desktop || back !== HOME) && (
-          <a className={ICON_BUTTON} href={back} aria-label={t.back}>
+          <a className={ICON_BUTTON} href={back} aria-label={t.back} onClick={follow(back)}>
             <ArrowLeft aria-hidden />
           </a>
         )}
@@ -86,7 +95,7 @@ export function SubPage({
           {title}
         </h1>
         {desktop && (
-          <a className={`${ICON_BUTTON} ml-auto`} href={HOME} aria-label={t.close}>
+          <a className={`${ICON_BUTTON} ml-auto`} href={HOME} aria-label={t.close} onClick={follow(HOME)}>
             <X aria-hidden />
           </a>
         )}

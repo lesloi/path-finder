@@ -22,6 +22,8 @@ only, bundled with the app.
   - Escape goes back a level, and a click on the scrim closes every page. Only the content
     scrolls, under the header. Opening a page moves the focus to its title; closing it gives
     the focus back to the settings button, which the page hides.
+  - Leaving a page goes back through the browser history when the tab came from where it
+    leads (`goTo` in `navigation.ts`), so the system's back gesture never reopens it.
 
 The 768 px breakpoint is `--breakpoint-desktop` in [`ui/index.css`](./apps/web/src/ui/index.css)
 and the query in `useDesktop` (`ui/use-desktop.ts`): change both together.
