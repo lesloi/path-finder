@@ -81,6 +81,10 @@ Chip, segmented control, slider, and popover are styles only until a screen uses
 criteria form (#70), the route set view (#9), and the layers button (#58) add their
 behaviour, and the chip dialog with its scrim (`bg-scrim`).
 
+Behaviour comes from native elements first: `<dialog>` for a dialog, the `popover` attribute
+for a popover, `<input type="range">` for a slider. Add a headless library (Base UI) only for
+a component that no native element covers, such as a search with suggestions.
+
 ## Rules
 
 - One primary button per view.
