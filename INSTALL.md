@@ -4,11 +4,11 @@ How to run Path finder on your own machine, for development or to host it yourse
 
 Path finder needs these next to its code:
 
-| Piece | What for | Where it comes from |
-| --- | --- | --- |
-| [BRouter](https://github.com/abrensch/brouter) server | Routing on OpenStreetMap data | Official Docker image or release zip |
-| BRouter segments (`.rd5`) | The OpenStreetMap routing graph | [brouter.de/brouter/segments4](https://brouter.de/brouter/segments4/) |
-| IGN BD ALTI 25 m (optional) | Elevation gain | [IGN Géoplateforme](https://data.geopf.fr/telechargement/resource/BDALTI) |
+| Piece                                                 | What for                        | Where it comes from                                                       |
+| ----------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------- |
+| [BRouter](https://github.com/abrensch/brouter) server | Routing on OpenStreetMap data   | Official Docker image or release zip                                      |
+| BRouter segments (`.rd5`)                             | The OpenStreetMap routing graph | [brouter.de/brouter/segments4](https://brouter.de/brouter/segments4/)     |
+| IGN BD ALTI 25 m (optional)                           | Elevation gain                  | [IGN Géoplateforme](https://data.geopf.fr/telechargement/resource/BDALTI) |
 
 Map tiles (Plan IGN) are loaded by the browser from the IGN Géoplateforme: there is
 nothing to install for them.
@@ -118,12 +118,12 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `BDALTI_DIR` | none | Tiles written by `convert-bdalti.ts` |
-| `BROUTER_URL` | none, required | The BRouter server, such as `http://localhost:17777` |
-| `NODE_ENV` | none | `development` turns off the rate and concurrency limits |
-| `PORT` | `3000` | Port the API listens on |
+| Variable      | Default        | Description                                             |
+| ------------- | -------------- | ------------------------------------------------------- |
+| `BDALTI_DIR`  | none           | Tiles written by `convert-bdalti.ts`                    |
+| `BROUTER_URL` | none, required | The BRouter server, such as `http://localhost:17777`    |
+| `NODE_ENV`    | none           | `development` turns off the rate and concurrency limits |
+| `PORT`        | `3000`         | Port the API listens on                                 |
 
 ## 5. Host it
 
@@ -155,11 +155,11 @@ services:
     depends_on: [brouter]
     environment:
       BROUTER_URL: http://brouter:17777
-      BDALTI_DIR: /data/bdalti   # optional
+      BDALTI_DIR: /data/bdalti # optional
     volumes:
       - ./data/bdalti:/data/bdalti:ro
     ports:
-      - "127.0.0.1:3000:3000"
+      - '127.0.0.1:3000:3000'
     restart: unless-stopped
 ```
 

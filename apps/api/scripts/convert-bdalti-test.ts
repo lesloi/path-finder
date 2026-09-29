@@ -56,8 +56,14 @@ describe('convertAll', () => {
     const [west, east, output] = ['74/west', '73/east', 'tiles'].map((path) => join(dir, path));
     mkdirSync(west, { recursive: true });
     mkdirSync(east, { recursive: true });
-    writeFileSync(join(west, 'BDALTIV2_25M_FXX_0925_6550.asc'), asc((col) => col >= 500));
-    writeFileSync(join(east, 'BDALTIV2_25M_FXX_0925_6550.asc'), asc((col) => col < 500));
+    writeFileSync(
+      join(west, 'BDALTIV2_25M_FXX_0925_6550.asc'),
+      asc((col) => col >= 500),
+    );
+    writeFileSync(
+      join(east, 'BDALTIV2_25M_FXX_0925_6550.asc'),
+      asc((col) => col < 500),
+    );
 
     expect(convertAll(dir, output)).toBe(2);
 

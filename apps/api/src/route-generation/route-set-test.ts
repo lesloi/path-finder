@@ -39,7 +39,9 @@ describe('buildRouteSet', () => {
   it('keeps a route within 25 % of the target distance as a suggestion, with the gap', () => {
     const routeSet = buildRouteSet(criteria, [candidate({ distance: 7.6 })]);
 
-    expect(routeSet).toMatchObject([{ kind: 'suggestion', misses: [{ criterion: 'distance', gap: expect.closeTo(-2.4) }] }]);
+    expect(routeSet).toMatchObject([
+      { kind: 'suggestion', misses: [{ criterion: 'distance', gap: expect.closeTo(-2.4) }] },
+    ]);
   });
 
   it('drops a route more than 25 % off the target distance', () => {
@@ -246,7 +248,12 @@ describe('buildRouteSet ranking', () => {
   it('does not count weaving along a grid cell edge as walking twice', () => {
     // Heads north zigzagging 3 m either side of the start point's meridian, then comes back
     // along another side.
-    const zigzag = [START, ...Array.from({ length: 100 }, (_, i) => at(i % 2 ? 3 : -3, 20 * (i + 1))), at(700, 1_900), START];
+    const zigzag = [
+      START,
+      ...Array.from({ length: 100 }, (_, i) => at(i % 2 ? 3 : -3, 20 * (i + 1))),
+      at(700, 1_900),
+      START,
+    ];
 
     const routeSet = buildRouteSet(criteria, [candidate({ geometry: zigzag }), candidate({ geometry: loop(120) })]);
 
@@ -291,7 +298,10 @@ describe('buildRouteSet diversity', () => {
     const small = [START, at(-150, 400), at(150, 400), START];
     const short: Criteria = { ...criteria, target: { distance: 2 } };
 
-    const routeSet = buildRouteSet(short, [candidate({ geometry: small, distance: 2 }), candidate({ geometry: small, distance: 2 })]);
+    const routeSet = buildRouteSet(short, [
+      candidate({ geometry: small, distance: 2 }),
+      candidate({ geometry: small, distance: 2 }),
+    ]);
 
     expect(routeSet).toHaveLength(1);
   });

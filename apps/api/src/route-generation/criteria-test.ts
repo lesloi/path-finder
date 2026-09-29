@@ -53,7 +53,9 @@ describe('parseCriteria', () => {
 
   it('accepts the bounds themselves', () => {
     expect(() => parseCriteria({ ...valid, target: { distance: 50 }, elevationGain: 2_500 })).not.toThrow();
-    expect(() => parseCriteria({ ...valid, activity: 'hike', target: { distance: 40 }, elevationGain: 0 })).not.toThrow();
+    expect(() =>
+      parseCriteria({ ...valid, activity: 'hike', target: { distance: 40 }, elevationGain: 0 }),
+    ).not.toThrow();
     expect(() => parseCriteria({ ...valid, target: { duration: 360 }, pace: 7.2 })).not.toThrow();
   });
 
@@ -72,7 +74,9 @@ describe('parseCriteria', () => {
     });
 
     it('still rejects a target elevation gain out of bounds', () => {
-      expect(() => parseCriteria({ ...valid, elevationGain: 2_501 }, { countElevationGain: false })).toThrow(RangeError);
+      expect(() => parseCriteria({ ...valid, elevationGain: 2_501 }, { countElevationGain: false })).toThrow(
+        RangeError,
+      );
     });
   });
 

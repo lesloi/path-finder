@@ -38,9 +38,7 @@ describe('App', () => {
 
       fireEvent.click(screen.getByRole('link', { name: 'Back' }));
 
-      expect(
-        await screen.findByRole('heading', { level: 1, name: 'Settings' }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
     },
   );
 
@@ -150,9 +148,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Réglages' }));
     fireEvent.click(await screen.findByRole('link', { name: 'Politique de confidentialité' }));
 
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Politique de confidentialité' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Politique de confidentialité' })).toBeInTheDocument();
   });
 
   it('sets the document language to fr when the browser prefers French', () => {

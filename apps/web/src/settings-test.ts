@@ -37,7 +37,10 @@ describe('useSettings', () => {
   it.each([
     ['corrupted', '{not json'],
     ['not an object', '42'],
-    ['wrong types', JSON.stringify({ pace: { run: -1, hike: 'fast' }, language: 'de', units: 'nautical', lastActivity: 'swim' })],
+    [
+      'wrong types',
+      JSON.stringify({ pace: { run: -1, hike: 'fast' }, language: 'de', units: 'nautical', lastActivity: 'swim' }),
+    ],
   ])('falls back to the defaults on %s data', (_, raw) => {
     localStorage.setItem(KEY, raw);
 
