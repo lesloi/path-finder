@@ -87,12 +87,6 @@ export function CriteriaView({ language }: { language: Language }) {
     );
   }
 
-  const locateButton = (
-    <button type="button" className={FLOATING_BUTTON} aria-label={t.myLocation} onClick={locate}>
-      <LocateFixed size={20} aria-hidden />
-    </button>
-  );
-
   return (
     <>
       <StartPointMap
@@ -110,14 +104,17 @@ export function CriteriaView({ language }: { language: Language }) {
         <Settings size={20} aria-hidden />
       </a>
       {/* Above the sheet on phones, whatever its height. */}
-      <div
+      <button
+        type="button"
         className={
-          'fixed right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3))] z-5 transition-[bottom] ' +
-          'duration-250 ease-[ease] desktop:bottom-safe-6'
+          `${FLOATING_BUTTON} fixed right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3))] z-5 ` +
+          'transition-[bottom] duration-250 ease-[ease] desktop:bottom-safe-6'
         }
+        aria-label={t.myLocation}
+        onClick={locate}
       >
-        {locateButton}
-      </div>
+        <LocateFixed size={20} aria-hidden />
+      </button>
       {desktop ? (
         <aside className={SIDE_COLUMN}>
           <div className="flex items-center gap-2 px-4 pt-4 text-lg font-bold">

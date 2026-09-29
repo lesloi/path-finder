@@ -1,8 +1,7 @@
 /* The design system (DESIGN.md): Tailwind, restricted to these tokens. */
 @import 'tailwindcss';
 
-/* Static: the tokens stay CSS variables even when no utility uses them, for arbitrary values. */
-@theme static {
+@theme {
   --color-*: initial;
   --color-white: #ffffff;
 
@@ -121,14 +120,7 @@
 }
 
 @layer base {
-  html,
-  body,
-  #root {
-    height: 100%;
-  }
-
   body {
-    font-family: var(--font-sans);
     font-size: var(--text-base);
     line-height: 1.4;
     color: var(--color-ink);
@@ -136,8 +128,7 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  button,
-  [role='option'] {
+  button {
     cursor: pointer;
   }
 

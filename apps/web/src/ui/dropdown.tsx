@@ -96,7 +96,7 @@ export function Dropdown<Value extends string>({
                 <li
                   key={option.value}
                   className={
-                    'flex min-h-touch items-center gap-2 rounded-sm px-3 outline-none hover:bg-surface-2 ' +
+                    'flex min-h-touch cursor-pointer items-center gap-2 rounded-sm px-3 outline-none hover:bg-surface-2 ' +
                     'focus:bg-surface-2 aria-selected:bg-accent-soft aria-selected:font-semibold ' +
                     'aria-selected:text-accent'
                   }
