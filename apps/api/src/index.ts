@@ -12,6 +12,7 @@ if (!brouterUrl) throw new Error('BROUTER_URL is not set');
 const bdAltiDir = process.env.BDALTI_DIR;
 if (!bdAltiDir) console.log('BDALTI_DIR is not set: routes have no elevation gain');
 const trustedProxiesList = process.env.TRUSTED_PROXIES;
+const healthAllowlistValue = process.env.HEALTH_ALLOWLIST;
 const app = createApp({
   webRoot: join(import.meta.dirname, '../../web/dist'),
   engine: createBRouter(brouterUrl),
@@ -21,6 +22,10 @@ const app = createApp({
   // Set but empty, it trusts no proxy.
   ...(trustedProxiesList !== undefined && {
     trustedProxies: parseAddressRanges(trustedProxiesList, 'TRUSTED_PROXIES'),
+  }),
+  // Unset or empty, every caller may check the API's health.
+  ...(healthAllowlistValue?.trim() && {
+    healthAllowlist: parseAddressRanges(healthAllowlistValue, 'HEALTH_ALLOWLIST'),
   }),
 });
 

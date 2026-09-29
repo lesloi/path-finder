@@ -35,6 +35,12 @@ describe('parseAddressRanges', () => {
     expect(inRanges('172.18.0.3')).toBe(true);
   });
 
+  it('names the variable it reads in its error', () => {
+    expect(() => parseAddressRanges('uptime.example.org', 'HEALTH_ALLOWLIST')).toThrow(
+      new RangeError('HEALTH_ALLOWLIST must list IP addresses or CIDR ranges, separated by commas'),
+    );
+  });
+
   it.each([
     ['a host name', 'caddy'],
     ['an IPv4 prefix beyond 32', '172.18.0.0/33'],

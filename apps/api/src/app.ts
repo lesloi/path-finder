@@ -23,7 +23,7 @@ const BUSY_RETRY_AFTER = 5;
 const GENERATION_TIMEOUT = 15_000;
 // Only a proxy on the same host connects from the loopback. Private networks are left out, as
 // clients on them could reach the API without a proxy and forge `X-Forwarded-For`.
-const LOOPBACK = '127.0.0.0/8, ::1';
+const IS_LOOPBACK = parseAddressRanges('127.0.0.0/8, ::1', 'LOOPBACK');
 
 /** ID written by each web app build (see `apps/web/vite.config.ts`), or none when the web app is not built. */
 function readBuildId(webRoot: string): string | undefined {
@@ -55,7 +55,8 @@ export function createApp({
   engine,
   heightAt,
   limits = true,
-  trustedProxies = parseAddressRanges(LOOPBACK, 'LOOPBACK'),
+  trustedProxies = IS_LOOPBACK,
+  healthAllowlist,
 }: {
   webRoot: string;
   engine: RoutingEngine;
@@ -65,6 +66,11 @@ export function createApp({
   limits?: boolean;
   /** Reverse proxies whose `X-Forwarded-For` counts, by default any on the loopback. */
   trustedProxies?: AddressMatcher;
+  /**
+   * Callers allowed to check the API's health besides the loopback, such as an uptime monitor
+   * (#89). Without it, every caller is.
+   */
+  healthAllowlist?: AddressMatcher;
 }) {
   const app = new Hono();
   const buildId = readBuildId(webRoot);
@@ -83,7 +89,13 @@ export function createApp({
     c.header('Referrer-Policy', 'no-referrer');
   });
 
-  app.get('/health', (c) => c.text('ok'));
+  // The loopback stays allowed for a healthcheck run inside the container. Others get 404, as if
+  // the route did not exist, and are not logged.
+  app.get('/health', (c) => {
+    if (!healthAllowlist) return c.text('ok');
+    const address = clientAddress(c, trustedProxies);
+    return IS_LOOPBACK(address) || healthAllowlist(address) ? c.text('ok') : c.notFound();
+  });
 
   // No logs here: criteria hold the start point, and requests hold the client address.
   app.post('/api/v1/route-sets', async (c) => {
