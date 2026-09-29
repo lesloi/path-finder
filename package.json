@@ -9,7 +9,7 @@
     "start": "pnpm --filter @path-finder/api start",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:integration": "echo 'No integration tests yet (see #13)'",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "pnpm --filter @path-finder/e2e test",
     "lint": "eslint apps e2e",
     "format": "prettier --write .",

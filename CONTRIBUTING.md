@@ -8,17 +8,18 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 - [INSTALL.md](./INSTALL.md) sets up BRouter and the elevation data.
 - [CONTEXT.md](./CONTEXT.md) holds the domain vocabulary to use in code, tests, and issues.
 
-| Command              | What it does                                                   |
-| -------------------- | -------------------------------------------------------------- |
-| `pnpm format`        | Format the code with Prettier                                  |
-| `pnpm lint`          | ESLint                                                         |
-| `pnpm typecheck`     | Type check the apps and the end-to-end tests                   |
-| `pnpm test`          | Unit tests                                                     |
-| `pnpm test:coverage` | Unit tests with coverage, failing below 80%                    |
-| `pnpm test:e2e`      | End-to-end tests in Chromium, on the built app                 |
-| `pnpm dev`           | Web app on port 5173 and API on port 3000; needs `BROUTER_URL` |
-| `pnpm build`         | Build the web app                                              |
-| `pnpm start`         | Serve the built web app and the API on port 3000               |
+| Command                 | What it does                                                   |
+| ----------------------- | -------------------------------------------------------------- |
+| `pnpm format`           | Format the code with Prettier                                  |
+| `pnpm lint`             | ESLint                                                         |
+| `pnpm typecheck`        | Type check the apps and the end-to-end tests                   |
+| `pnpm test`             | Unit tests                                                     |
+| `pnpm test:coverage`    | Unit tests with coverage, failing below 80%                    |
+| `pnpm test:integration` | API integration tests, through HTTP                            |
+| `pnpm test:e2e`         | End-to-end tests in Chromium, on the built app                 |
+| `pnpm dev`              | Web app on port 5173 and API on port 3000; needs `BROUTER_URL` |
+| `pnpm build`            | Build the web app                                              |
+| `pnpm start`            | Serve the built web app and the API on port 3000               |
 
 ## Privacy-first rules (non-negotiable)
 
@@ -116,6 +117,8 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
 - Every change comes with unit tests, which call functions and components directly. An API
   route is tested through HTTP in an integration test, and a UI feature gets an end-to-end
   scenario in `e2e/` for its main path, while its edge cases stay in unit tests.
+- Integration tests are named `<file>-integration-test.ts` and run in `pnpm test:integration`,
+  never in `pnpm test`.
 - Vitest with globals (`describe`, `it`, `expect`, `vi`), no imports needed.
 - One `describe` per exported function or component. Each `it` is a present-tense
   sentence about behavior: `it('rejects a target duration too short for …')`.
@@ -135,7 +138,8 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
 A pull request is ready when:
 
 - new behavior is tested at each level the [Tests](#tests) conventions ask for;
-- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm test:e2e` pass;
+- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:integration`,
+  and `pnpm test:e2e` pass;
 - coverage stays at or above 80% (`pnpm test:coverage`) and `pnpm build` succeeds, as in CI;
 - `README.md` and `AGENTS.md` match reality;
 - it follows the [project rules](./AGENTS.md#project-rules) and the coding conventions above.

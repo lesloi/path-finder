@@ -33,7 +33,7 @@ implementing it, rather than opening an issue.
 ## Contributor guidelines
 
 - After a change, run `pnpm format`, `pnpm lint` then `pnpm typecheck`.
-- Before committing, run `pnpm test` and `pnpm test:e2e`.
+- Before committing, run `pnpm test`, `pnpm test:integration` and `pnpm test:e2e`.
 - Conventional Commits under 72 characters. Scopes: `routing`, `location`, `elevation`,
   `ui`, `app`.
 - Do not add `Co-authored-by:` in commit messages.
