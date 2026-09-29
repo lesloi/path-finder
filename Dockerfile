@@ -17,7 +17,7 @@ FROM base
 RUN pnpm install --frozen-lockfile --prod --filter @path-finder/api
 COPY apps/api/src apps/api/src
 COPY --from=build /app/apps/web/dist apps/web/dist
-ENV NODE_ENV=production BROUTER_URL=http://brouter:17777
+ENV NODE_ENV=production
 USER node
 EXPOSE 3000
 CMD ["node", "apps/api/src/index.ts"]

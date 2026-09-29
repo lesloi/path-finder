@@ -47,7 +47,7 @@ The API reads these environment variables:
 
 - `BDALTI_DIR`: BD ALTI 25 m tiles converted by `apps/api/scripts/convert-bdalti.ts`. Without
   it, routes have no elevation gain and the target elevation gain is ignored.
-- `BROUTER_URL`: a BRouter server, `http://localhost:17777` by default
+- `BROUTER_URL`: a BRouter server, such as `http://localhost:17777`. Required.
 
 ```sh
 pnpm install
@@ -59,10 +59,6 @@ pnpm test:coverage  # unit tests with coverage (fails below 80 %)
 pnpm lint         # lint
 pnpm typecheck    # type check
 ```
-
-The `Dockerfile` builds the API with the web app. Point `BROUTER_URL` at BRouter
-(`http://brouter:17777` by default). To count elevation gain, mount the tiles and point
-`BDALTI_DIR` at them.
 
 ## Data and credits
 
