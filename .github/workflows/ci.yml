@@ -24,8 +24,8 @@ jobs:
           node-version: 26
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
       - run: pnpm format:check
+      - run: pnpm lint
       - run: pnpm typecheck
 
       # Fails below the coverage threshold set in vitest.config.ts.
