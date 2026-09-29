@@ -32,11 +32,12 @@
 
   --font-*: initial;
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* In rem, so text follows the user's font size: 13, 15, 18, 24 px by default. */
   --text-*: initial;
-  --text-sm: 13px;
-  --text-base: 15px;
-  --text-lg: 18px;
-  --text-xl: 24px;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
 
   /* The left column replaces the bottom sheet from this width on, as in `useDesktop`. */
   --breakpoint-*: initial;

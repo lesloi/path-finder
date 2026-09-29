@@ -17,11 +17,7 @@ only, bundled with the app.
   - on phones, full screen, with a back arrow at the leading edge (Android's top app bar;
     close to iOS's back button), so the page reads as a step in the app;
   - on desktops, centred on a scrim, as tall as their content: 480 px wide, 640 px for the
-    legal pages. A cross at the right closes every page; the back arrow shows only for a page
-    within a page.
-  - Escape goes back a level, and a click on the scrim closes every page. Only the content
-    scrolls, under the header. Opening a page moves the focus to its title; closing it gives
-    the focus back to the settings button, which the page hides.
+    legal pages, with a cross at the right that closes every page.
   - Leaving a page goes back through the browser history when the tab came from where it
     leads (`goTo` in `navigation.ts`), so the system's back gesture never reopens it.
 
@@ -50,14 +46,14 @@ written raw.
 | spacing `1`, `2`, `3`, `4`, `6`                          | 4, 8, 12, 16, 24 px (Tailwind's 4 px steps)      |
 | `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full` | 8, 14, 22 px, and a full pill                    |
 | `shadow-float`                                           | The one shadow, for everything that floats       |
-| `text-sm`, `text-base`, `text-lg`, `text-xl`             | 13, 15, 18, 24 px                                |
+| `text-sm`, `text-base`, `text-lg`, `text-xl`             | 13, 15, 18, 24 px, in `rem` like the spacing     |
 | `font-sans`                                              | The system font stack                            |
 | `touch` (`size-touch`, `min-h-touch`)                    | 44 px, the smallest touch target                 |
 | `column` (`w-column`)                                    | 380 px, the desktop left column                  |
 | `top-safe-*`, `pb-safe-*`, and the other sides          | An offset or a padding from a screen edge, plus its safe area |
 
-**Stacking** (`z-*`): 4 for the sheet and the column, 5 for the floating buttons, 6 for a
-popover, 9 for a toast, 11 and 12 for an open dropdown and its scrim. Sub-pages are in the top
+**Stacking** (`z-*`): 4 for the sheet and the column, 5 for the floating buttons, 9 for a
+toast, 11 and 12 for an open dropdown and its scrim. Sub-pages are in the top
 layer, above them all.
 
 **Dark mode** follows `prefers-color-scheme` for the UI only: UI colours are variables that
@@ -78,20 +74,21 @@ draws them the same way.
 | Round floating button | `FLOATING_BUTTON`, `aria-pressed` when it toggles                       |
 | Bottom sheet          | `<BottomSheet label expanded onExpandedChange>`: collapsed or expanded; its handle is a button with `aria-expanded`, tapped or swiped |
 | Left column           | `SIDE_COLUMN`                                                           |
-| Chip                  | `CHIP` in `CHIPS`; `data-set` when it is not the default                |
-| Buttons               | `PRIMARY_BUTTON`, `SECONDARY_BUTTON`, `GHOST_BUTTON`; `ICON_BUTTON` for an icon alone |
-| Segmented control     | `SEGMENTED_CONTROL` of `SEGMENT` buttons with `aria-pressed`            |
-| Slider                | `SLIDER_VALUE` (an `<output>` in large type), `SLIDER_INPUT`, `SLIDER_SCALE` |
+| Buttons               | `SECONDARY_BUTTON`; `ICON_BUTTON` for an icon alone                     |
 | List row              | `GROUP_TITLE`, then `LIST` of `LIST_ROW`; `LIST_ROW_CHEVRON` for a link |
 | Dropdown              | `<Dropdown label value options onChange>`: a listbox whose options may have icons |
-| Sub-page              | `<SubPage title back wide language>`: a `<dialog>` with its title, a back arrow, and a cross on desktops |
+| Sub-page              | `<SubPage title back wide language navigate>`: a `<dialog>` with its title, a back arrow, and a cross on desktops |
 | Toast                 | `TOAST` with `role="alert"`, in the floating buttons' colours: what went wrong, then on a second line what to do; the view hides it after a few seconds or on a click |
-| Popover               | `POPOVER`, next to the floating button that opened it                   |
 | Long text             | `PROSE`, for the legal pages                                            |
 
-Chip, segmented control, slider, and popover are styles only until a screen uses them: the
-criteria form (#70), the route set view (#9), and the layers button (#58) add their
-behaviour, and the chip dialog with its scrim (`bg-scrim`).
+A component comes with the first screen that uses it, as the prototype on the
+`prototype/ui-redesign` branch draws it:
+
+- the criteria form (#70): chips in a row that scrolls sideways (with `data-set` when a
+  criterion is not the default), the dialog each chip opens, a segmented control, a slider
+  with its value in large type, and the primary button;
+- the route set view (#9): a ghost button to go back to the list;
+- the layers button (#58): a popover next to the floating button that opened it.
 
 Behaviour comes from native elements first: `<dialog>` for a dialog, the `popover` attribute
 for a popover, `<input type="range">` for a slider. Add a headless library (Base UI) only for
