@@ -8,15 +8,16 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 - [INSTALL.md](./INSTALL.md) sets up BRouter and the elevation data.
 - [CONTEXT.md](./CONTEXT.md) holds the domain vocabulary to use in code, tests, and issues.
 
-| Command              | What it does                                                                    |
-| -------------------- | ------------------------------------------------------------------------------- |
-| `pnpm lint`          | ESLint                                                                          |
-| `pnpm typecheck`     | Type check both apps                                                            |
-| `pnpm test`          | Unit tests                                                                      |
-| `pnpm test:coverage` | Unit tests with coverage, failing below 80%                                     |
-| `pnpm dev`           | Web app on port 5173 and API on port 3000; needs `BROUTER_URL` |
-| `pnpm build`         | Build the web app                                                               |
-| `pnpm start`         | Serve the built web app and the API on port 3000                                |
+| Command              | What it does                                                           |
+| -------------------- | ---------------------------------------------------------------------- |
+| `pnpm lint`          | ESLint                                                                 |
+| `pnpm format`        | Format the code with Prettier; `pnpm format:check` checks it, as in CI |
+| `pnpm typecheck`     | Type check both apps                                                   |
+| `pnpm test`          | Unit tests                                                             |
+| `pnpm test:coverage` | Unit tests with coverage, failing below 80%                            |
+| `pnpm dev`           | Web app on port 5173 and API on port 3000; needs `BROUTER_URL`         |
+| `pnpm build`         | Build the web app                                                      |
+| `pnpm start`         | Serve the built web app and the API on port 3000                       |
 
 ## Privacy-first rules (non-negotiable)
 
@@ -53,8 +54,10 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
 ### Formatting
 
+Prettier applies the formatting (`pnpm format`), and CI checks it:
+
 - 2-space indentation, single quotes, semicolons, trailing commas.
-- Lines up to about 120 characters.
+- Lines up to 120 characters.
 - Numeric separators for large numbers: `15_000`, `2_500`.
 
 ### Naming
@@ -123,7 +126,7 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 A pull request is ready when:
 
 - new behavior is tested;
-- `pnpm lint`, `pnpm typecheck`, and `pnpm test` pass;
+- `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, and `pnpm test` pass;
 - coverage stays at or above 80% (`pnpm test:coverage`) and `pnpm build` succeeds, as in CI;
 - `README.md` and `AGENTS.md` match reality;
 - it follows the [project rules](./AGENTS.md#project-rules) and the coding conventions above.

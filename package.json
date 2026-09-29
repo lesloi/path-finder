@@ -11,12 +11,15 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "echo 'No integration tests yet (see #13)'",
     "lint": "eslint apps",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^5.0.0",
     "eslint": "^10.0.0",
     "eslint-plugin-react-hooks": "^7.0.0",
+    "prettier": "^3.9.9",
     "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.0"
   }
