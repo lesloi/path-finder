@@ -57,8 +57,9 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 Prettier applies the formatting (`pnpm format`), and CI checks it:
 
 - 2-space indentation, single quotes, semicolons, trailing commas.
-- Lines up to 120 characters.
-- Numeric separators for large numbers: `15_000`, `2_500`.
+- Lines up to about 120 characters.
+
+Use numeric separators for large numbers: `15_000`, `2_500`.
 
 ### Naming
 
