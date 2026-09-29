@@ -35,6 +35,7 @@ implementing it, rather than opening an issue.
 - Conventional Commits under 72 characters. Scopes: `routing`, `location`, `elevation`,
   `ui`, `app`.
 - Do not add `Co-authored-by:` in commit messages.
+- After a change, run `pnpm format`, `pnpm lint`, `pnpm typecheck`, then `pnpm test`.
 - The privacy-first rules, coding conventions, and pull request expectations: @CONTRIBUTING.md
 
 ## Issues and decisions
