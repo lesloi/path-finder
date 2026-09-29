@@ -55,6 +55,8 @@ describe('api', () => {
     await writeFile(join(webRoot, 'index.html'), '<h1>Path finder</h1>');
     await writeFile(join(webRoot, 'assets', 'index-a1b2c3.js'), 'console.log(1);');
     await writeFile(join(webRoot, 'build-id'), `${BUILD_ID}\n`);
+    // A static file the health check must not fall back to when it rejects a caller.
+    await writeFile(join(webRoot, 'health'), 'static');
     app = createApp({ webRoot, engine, heightAt: flat, trustedProxies });
   });
 
@@ -62,11 +64,69 @@ describe('api', () => {
     await rm(webRoot, { recursive: true });
   });
 
-  it('answers the health check', async () => {
-    const response = await app.request('/health');
+  describe('health check', () => {
+    let monitored: ReturnType<typeof createApp>;
 
-    expect(response.status).toBe(200);
-    expect(await response.text()).toBe('ok');
+    beforeAll(() => {
+      monitored = createApp({
+        webRoot,
+        engine,
+        trustedProxies,
+        healthAllowlist: parseAddressRanges('198.51.100.0/24', 'HEALTH_ALLOWLIST'),
+      });
+    });
+
+    function getHealth(app: ReturnType<typeof createApp>, remoteAddress: string, headers: Record<string, string> = {}) {
+      return app.request('/health', { headers }, { incoming: { socket: { remoteAddress } } });
+    }
+
+    it.each([
+      ['the loopback', '127.0.0.1'],
+      ['a public address', '203.0.113.1'],
+      ['no address', ''],
+    ])('answers %s by default', async (_, address) => {
+      const response = await getHealth(app, address);
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('ok');
+    });
+
+    it.each([
+      ['the IPv4 loopback', '127.0.0.1'],
+      ['the IPv6 loopback', '::1'],
+      ['the IPv4 loopback mapped to IPv6', '::ffff:127.0.0.1'],
+      ['an allowed address', '198.51.100.7'],
+    ])('answers %s with allowed addresses', async (_, address) => {
+      const response = await getHealth(monitored, address);
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('ok');
+    });
+
+    it.each([
+      ['a public address', '203.0.113.1'],
+      ['the Docker bridge gateway', '172.18.0.1'],
+      ['no address', ''],
+    ])('answers 404 to %s with allowed addresses, even with a health file in the web app', async (_, address) => {
+      const response = await getHealth(monitored, address);
+
+      expect(response.status).toBe(404);
+    });
+
+    it.each([
+      ['an allowed client', '198.51.100.7', 200],
+      ['another client', '203.0.113.1', 404],
+    ])('checks %s through a trusted proxy by its forwarded address', async (_, forwarded, status) => {
+      const response = await getHealth(monitored, PROXY, { 'X-Forwarded-For': forwarded });
+
+      expect(response.status).toBe(status);
+    });
+
+    it('answers 404 to a client that is not a trusted proxy, whatever X-Forwarded-For says', async () => {
+      const response = await getHealth(monitored, '203.0.113.1', { 'X-Forwarded-For': '198.51.100.7' });
+
+      expect(response.status).toBe(404);
+    });
   });
 
   it('serves the web app on the same origin', async () => {

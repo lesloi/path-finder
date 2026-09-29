@@ -118,13 +118,14 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable          | Default        | Description                                                                |
-| ----------------- | -------------- | -------------------------------------------------------------------------- |
-| `NODE_ENV`        | none           | `development` turns off the rate and concurrency limits                    |
-| `BDALTI_DIR`      | none           | Tiles written by `convert-bdalti.ts`                                       |
-| `BROUTER_URL`     | none, required | The BRouter server, such as `http://localhost:17777`                       |
-| `PORT`            | `3000`         | Port the API listens on                                                    |
-| `TRUSTED_PROXIES` | loopback       | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy)) |
+| Variable           | Default        | Description                                                                |
+| ------------------ | -------------- | -------------------------------------------------------------------------- |
+| `NODE_ENV`         | none           | `development` turns off the rate and concurrency limits                    |
+| `BDALTI_DIR`       | none           | Tiles written by `convert-bdalti.ts`                                       |
+| `BROUTER_URL`      | none, required | The BRouter server, such as `http://localhost:17777`                       |
+| `HEALTH_ALLOWLIST` | every caller   | Callers allowed on the healthcheck ([details](#health))                    |
+| `PORT`             | `3000`         | Port the API listens on                                                    |
+| `TRUSTED_PROXIES`  | loopback       | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy)) |
 
 ## 5. Host it
 
@@ -177,4 +178,15 @@ Clients can forge that header, so the API reads it only from the addresses liste
 | empty                    | None                                                        |
 | `0.0.0.0/0, ::/0`        | Every connection: for development only                      |
 
+### Health
+
 `GET /health` answers `ok` when the API is up.
+
+By default, it answers every caller. To restrict it, list IP addresses and CIDR ranges in
+`HEALTH_ALLOWLIST`, such as `198.51.100.7, 10.0.0.0/8`:
+
+- listed callers and the loopback get `ok`, so a healthcheck inside the container still works;
+- other callers get `404`.
+
+Behind a [trusted proxy](#behind-a-reverse-proxy), the client's address is checked, not the
+proxy's.
