@@ -42,6 +42,7 @@ implementing it, rather than opening an issue.
 ## Issues and decisions
 
 - Issues: GitHub Issues on `lesloi/path-finder` via `gh`. Triage labels: `needs-triage`,
-  `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`.
+  `needs-info`, `ready-for-agent`, `ready-for-human`, `web` (`apps/web`), `api` (`apps/api`), or
+  `infra` (deployment, Docker, CI).
 - Check the closed issues labeled `decision` before changing the architecture, and record
   new architecture decisions the same way.
