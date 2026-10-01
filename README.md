@@ -24,6 +24,7 @@
 - **Routes on a map**, with elevation profile and estimated duration from your pace
   (elevation gain, its target, and the profile need the server's BD ALTI tiles)
 - **GPX export** for your watch (Garmin, Coros, Polar…)
+- **Supported languages**: English and French
 - **Running and hiking** first (road and trail), cycling/MTB later
 
 ## Privacy-first

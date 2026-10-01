@@ -51,6 +51,12 @@ A soft preference for paved roads, unpaved paths, or no preference. It weights t
 generation and never excludes a route outright.
 _Avoid_: Road type, terrain filter
 
+**Error code**:
+The short key the API answers with when it refuses or fails a request (`invalid-criteria`,
+`rate-limited`…), never a message. For invalid criteria it also names the field. The web
+app words each code in the user's language.
+_Avoid_: Error message
+
 ### Activities and effort
 
 **Activity**:
@@ -115,7 +121,8 @@ otherwise downloaded, so the user can open it in their watch vendor's app.
 _Avoid_: Sync, upload
 
 **Settings**:
-The user's preferences kept on the device: pace per activity, language, units, the last
+The user's preferences kept on the device: pace per activity, language (English or French,
+the browser's until the user picks one), units, the last
 activity used (run on first launch), and which POI categories the map shows. Lost if the user clears the site's data.
 _Avoid_: Profile, account
 
