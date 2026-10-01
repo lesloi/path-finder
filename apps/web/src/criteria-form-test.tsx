@@ -133,6 +133,18 @@ describe('CriteriaForm', () => {
     });
   });
 
+  it('converts the distance the slider shows when the units change, not one it had to clamp', () => {
+    render(<UnitsSwitch onSubmit={vi.fn()} />);
+    fireEvent.change(slider('Distance'), { target: { value: '50' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Hike' }));
+    expect(slider('Distance')).toHaveValue('40');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Imperial' }));
+
+    // 40 km is 24.9 mi, which the slider shows as 25 and the hike's maximum cuts to 24.
+    expect(slider('Distance')).toHaveValue('24');
+  });
+
   describe('elevation gain', () => {
     it('is left out for Any', () => {
       const { onSubmit, submit } = setup();

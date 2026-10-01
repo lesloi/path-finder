@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-import { ACTIVITY_PACES, type Activity } from './activity.ts';
+import { ACTIVITY_PACES, DEFAULT_ACTIVITY, type Activity } from './activity.ts';
 import type { Language } from './language.ts';
 import type { Units } from './units.ts';
 
@@ -38,7 +38,7 @@ function parse(raw: string | null): Settings {
     ),
     ...((language === 'fr' || language === 'en') && { language }),
     units: units === 'imperial' ? 'imperial' : 'metric',
-    lastActivity: ACTIVITIES.includes(lastActivity as Activity) ? (lastActivity as Activity) : 'run',
+    lastActivity: ACTIVITIES.includes(lastActivity as Activity) ? (lastActivity as Activity) : DEFAULT_ACTIVITY,
   };
 }
 

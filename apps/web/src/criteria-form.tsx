@@ -13,7 +13,7 @@ import {
   type Criteria,
   type CriteriaField,
 } from '../../api/src/route-generation/index.ts';
-import { ACTIVITY_NAMES, ACTIVITY_PACES, type Activity } from './activity.ts';
+import { ACTIVITY_NAMES, ACTIVITY_PACES, DEFAULT_ACTIVITY, type Activity } from './activity.ts';
 import type { Language } from './language.ts';
 import { paceFor, useSettings } from './settings.ts';
 import type { Position } from './start-point-map.tsx';
@@ -35,7 +35,14 @@ type Surface = Criteria['surface'];
 type Criterion = 'activity' | 'target' | 'elevation' | 'surface';
 
 // Distance in km or mi, elevation gain in m or ft: the user's units, which the bounds are shown in.
-type Draft = { target: Target; distance: number; duration: number; level: Level; gain: number; surface: Surface };
+export type Draft = {
+  target: Target;
+  distance: number;
+  duration: number;
+  level: Level;
+  gain: number;
+  surface: Surface;
+};
 
 const text = {
   en: {
@@ -153,6 +160,23 @@ function formatDuration(minutes: number, t: (typeof text)[Language]): string {
 }
 
 /**
+ * What the user has set in the form, in their units. It follows a change of units made in the
+ * settings while the view stays mounted.
+ */
+export function useCriteriaDraft(): [Draft, (draft: Draft) => void] {
+  const [{ units, lastActivity }] = useSettings();
+  const [draft, setDraft] = useState(() => defaultDraft(units));
+  const [unitsBefore, setUnitsBefore] = useState(units);
+  if (units !== unitsBefore) {
+    setUnitsBefore(units);
+    // Converts what the slider shows, not a distance it had to clamp.
+    const { distance } = boundsFor(lastActivity, unitsBefore);
+    setDraft(convert({ ...draft, distance: clamp(draft.distance, distance.min, distance.max) }, unitsBefore, units));
+  }
+  return [draft, setDraft];
+}
+
+/**
  * The criteria of a route set: activity, target distance or duration, elevation gain, and
  * surface, over the user's settings. `onSubmit` receives a request body that `parseCriteria`
  * accepts. On a phone, `compact` shows chips that each open one criterion; `onExpand` is
@@ -161,12 +185,15 @@ function formatDuration(minutes: number, t: (typeof text)[Language]): string {
 export function CriteriaForm({
   language,
   start,
+  draft: kept,
   compact = false,
   onExpand,
   onSubmit,
 }: {
   language: Language;
   start?: Position;
+  /** From `useCriteriaDraft`, for a view that mounts the form in more than one place and keeps what was set. */
+  draft?: ReturnType<typeof useCriteriaDraft>;
   compact?: boolean;
   onExpand?: () => void;
   onSubmit: (request: CriteriaRequest) => void;
@@ -176,14 +203,11 @@ export function CriteriaForm({
   const [settings, update] = useSettings();
   const { units } = settings;
   const activity = settings.lastActivity;
-  const [draft, setDraft] = useState(() => defaultDraft(units));
-  const [unitsBefore, setUnitsBefore] = useState(units);
+  const own = useCriteriaDraft();
+  const [draft, setDraft] = kept ?? own;
   const [open, setOpen] = useState<Criterion>();
-  // The settings page can change the units while the view stays mounted.
-  if (units !== unitsBefore) {
-    setUnitsBefore(units);
-    setDraft(convert(draft, unitsBefore, units));
-  }
+  // The sheet expanded behind the dialog.
+  if (open && !(compact && !desktop)) setOpen(undefined);
 
   const bounds = boundsFor(activity, units);
   const unit = unitsFor(units);
@@ -326,7 +350,7 @@ export function CriteriaForm({
     activity: {
       label: ACTIVITY_NAMES[activity][language],
       icon: <ActivityIcon activity={activity} />,
-      set: activity !== 'run',
+      set: activity !== DEFAULT_ACTIVITY,
     },
     target: {
       label: draft.target === 'distance' ? `${distance} ${unit.distance}` : formatDuration(draft.duration, t),

@@ -93,6 +93,17 @@ describe('CriteriaView', () => {
     });
   });
 
+  it('keeps the criteria when the screen changes from a phone to a desktop', () => {
+    const { rerender } = render(<CriteriaView language="en" />);
+    fireEvent.click(screen.getByRole('button', { name: 'All criteria' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Unpaved' }));
+
+    onDesktop();
+    rerender(<CriteriaView language="en" />);
+
+    expect(screen.getByRole('radio', { name: 'Unpaved' })).toBeChecked();
+  });
+
   describe('on desktops', () => {
     it('stops picking the start point when the settings open', () => {
       onDesktop();
