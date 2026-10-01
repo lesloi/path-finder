@@ -583,6 +583,10 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('criteria-sheet-handle')).toHaveAccessibleName(routesText.en.routes);
       fireEvent.click(screen.getByTestId('routes-row-0'));
       expect(screen.getByTestId('route-detail')).toBeInTheDocument();
+      // The collapsed sheet shows the top of the detail only; its handle expands it to the rest.
+      expect(screen.queryByTestId('route-profile')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
+      expect(screen.getByTestId('route-profile')).toBeInTheDocument();
     });
 
     it.each([

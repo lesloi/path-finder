@@ -65,6 +65,7 @@ function View({
   onBack = () => {},
   onHover = () => {},
   open = false,
+  condensed = false,
 }: {
   language?: 'en' | 'fr';
   units?: 'metric' | 'imperial';
@@ -73,6 +74,7 @@ function View({
   onBack?: () => void;
   onHover?: (position: unknown) => void;
   open?: boolean;
+  condensed?: boolean;
 }) {
   const [selected, setSelected] = useState(0);
   const [detail, setDetail] = useState(open);
@@ -90,6 +92,7 @@ function View({
       onDetailChange={setDetail}
       onBack={onBack}
       onHover={onHover}
+      condensed={condensed}
     />
   );
 }
@@ -269,6 +272,30 @@ describe('RouteSetView', () => {
       swipe([200, 100], [100, 100]);
 
       expect(screen.getByTestId('route-miss-elevationGain')).toHaveTextContent('+30% elevation gain');
+    });
+
+    it('puts the distance and the estimated duration side by side, then the climb and the descent', () => {
+      open();
+
+      const figures = within(screen.getByTestId('route-figures'));
+      expect(figures.getAllByRole('definition').map((value) => value.dataset.testid)).toEqual([
+        'route-distance',
+        'route-duration',
+        'route-climb',
+        'route-descent',
+      ]);
+      expect(screen.getByTestId('route-figures')).toHaveTextContent(en.estimatedDuration);
+    });
+
+    it('stops at the figures when condensed, keeping the export', () => {
+      render(<View open condensed />);
+
+      expect(screen.getByTestId('route-figures')).toBeInTheDocument();
+      expect(screen.getByTestId('route-export')).toBeInTheDocument();
+      expect(screen.queryByTestId('route-profile')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('route-slopes')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('route-surface-strip')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('route-surface')).not.toBeInTheDocument();
     });
 
     it('shows the elevation profile with its legend, and the surface breakdown', () => {

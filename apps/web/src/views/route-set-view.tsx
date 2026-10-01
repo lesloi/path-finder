@@ -66,6 +66,7 @@ export function RouteSetView({
   onDetailChange,
   onBack,
   onHover,
+  condensed = false,
 }: {
   display: Display;
   /** The criteria the routes were generated for. */
@@ -81,6 +82,8 @@ export function RouteSetView({
   /** Back to the criteria. */
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
+  /** On a phone with its sheet collapsed, the detail stops at the figures: the rest is for the expanded sheet. */
+  condensed?: boolean;
 }) {
   const desktop = useDesktop();
 
@@ -96,6 +99,7 @@ export function RouteSetView({
         onSelect={onSelect}
         onBack={() => onDetailChange(false)}
         onHover={onHover}
+        condensed={condensed}
       />
     );
   }
@@ -254,6 +258,7 @@ function RouteDetail({
   onSelect,
   onBack,
   onHover,
+  condensed,
 }: {
   display: Display;
   request: RouteSetRequest;
@@ -261,6 +266,7 @@ function RouteDetail({
   snapshot?: MapSnapshot;
   selected: number;
   desktop: boolean;
+  condensed: boolean;
   onSelect: (index: number) => void;
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
@@ -289,21 +295,19 @@ function RouteDetail({
       <Figure label={t.distance} testId="route-distance">
         {formatDistance(route.distance, display)}
       </Figure>
+      <Figure label={t.estimatedDuration} testId="route-duration">
+        {formatDuration(route.estimatedDuration, display.language)}
+      </Figure>
       {route.elevationGain !== undefined && (
-        <>
-          <Figure label={t.climb} testId="route-climb" icon={<ArrowUpRight size={16} aria-hidden />}>
-            {formatHeight(route.elevationGain, display)}
-          </Figure>
-        </>
+        <Figure label={t.climb} testId="route-climb" icon={<ArrowUpRight size={16} aria-hidden />}>
+          {formatHeight(route.elevationGain, display)}
+        </Figure>
       )}
       {route.elevationLoss !== undefined && (
         <Figure label={t.descent} testId="route-descent" icon={<ArrowDownRight size={16} aria-hidden />}>
           {formatHeight(route.elevationLoss, display)}
         </Figure>
       )}
-      <Figure label={t.duration} testId="route-duration">
-        {formatDuration(route.estimatedDuration, display.language)}
-      </Figure>
     </dl>
   );
 
@@ -384,22 +388,29 @@ function RouteDetail({
           ))}
         </div>
       )}
-      <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
-      {route.elevationGain !== undefined && (
-        <p data-testid="route-slopes" className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-2">
-          <span>{t.slope}</span>
-          {([1, 2, 3, 4] as const).map((slope) => (
-            <span key={slope} className="flex items-center gap-1">
-              <i className={`size-2 rounded-full ${SLOPE_DOTS[slope]}`} aria-hidden />
-              {SLOPE_LABELS[slope]}
-            </span>
-          ))}
-        </p>
+      {!condensed && (
+        <>
+          <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
+          {route.elevationGain !== undefined && (
+            <p
+              data-testid="route-slopes"
+              className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-2"
+            >
+              <span>{t.slope}</span>
+              {([1, 2, 3, 4] as const).map((slope) => (
+                <span key={slope} className="flex items-center gap-1">
+                  <i className={`size-2 rounded-full ${SLOPE_DOTS[slope]}`} aria-hidden />
+                  {SLOPE_LABELS[slope]}
+                </span>
+              ))}
+            </p>
+          )}
+          <SurfaceStrip testId="route-surface-strip" surfaces={route.surfaces} />
+          <p data-testid="route-surface" className="m-0 text-sm text-ink-2">
+            {t.paved} {percent.format(1 - unpaved)} · {t.unpaved} {percent.format(unpaved)}
+          </p>
+        </>
       )}
-      <SurfaceStrip testId="route-surface-strip" surfaces={route.surfaces} />
-      <p data-testid="route-surface" className="m-0 text-sm text-ink-2">
-        {t.paved} {percent.format(1 - unpaved)} · {t.unpaved} {percent.format(unpaved)}
-      </p>
       <button
         type="button"
         data-testid="route-export"

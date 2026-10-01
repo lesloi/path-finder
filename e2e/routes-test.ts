@@ -58,6 +58,8 @@ test.describe('the route set', () => {
 
     await page.getByTestId('routes-row-0').click();
     await expect(page.getByTestId('route-position')).toHaveText(/^1\/\d$/);
+    // On phones, the collapsed sheet stops at the figures: its handle expands it to the surface breakdown.
+    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
     await expect(page.getByTestId('route-surface')).toContainText('50%');
 
     if (isMobile) await swipeLeft(page);

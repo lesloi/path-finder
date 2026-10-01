@@ -100,6 +100,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         onDetailChange={browser.openDetail}
         onBack={backToCriteria}
         onHover={browser.setHover}
+        condensed={!desktop && !sheetExpanded}
       />
     ) : (
       loading && <SearchingPanel language={language} />
