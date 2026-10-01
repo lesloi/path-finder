@@ -39,7 +39,8 @@ describe('parseRoutes', () => {
   });
 
   it('reads routes without heights or elevation gain, as without BD ALTI', () => {
-    const { elevationGain: _, ...flat } = route;
+    const { elevationGain, ...flat } = route;
+    expect(elevationGain).toBeDefined();
     const routes = [{ ...flat, geometry: [[6.1, 45.9] as [number, number]] }];
 
     expect(parseRoutes({ routes })).toEqual(routes);
