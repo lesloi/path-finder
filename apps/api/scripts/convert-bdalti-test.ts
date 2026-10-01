@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { bdAltiHeights } from '../src/elevation/bdalti.ts';
+import { bdAltiHeights } from '../src/adapters/index.ts';
 import { lambert93, type Position } from '../src/route-generation/index.ts';
 import { convertAll, convertTile } from './convert-bdalti.ts';
 

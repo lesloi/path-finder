@@ -1,10 +1,8 @@
 import { serve } from '@hono/node-server';
 import { join } from 'node:path';
 
-import { parseAddressRanges } from './addresses.ts';
-import { createApp } from './app.ts';
-import { createBRouter } from './brouter/brouter.ts';
-import { bdAltiHeights } from './elevation/bdalti.ts';
+import { bdAltiHeights, createBRouter } from './adapters/index.ts';
+import { createApp, parseAddressRanges } from './http/index.ts';
 
 // Empty, like unset, it takes the default rather than a random port.
 const port = Number(process.env.PORT || 3000);

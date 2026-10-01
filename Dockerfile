@@ -22,4 +22,4 @@ COPY --from=build /app/apps/web/dist apps/web/dist
 ENV NODE_ENV=production
 USER node
 EXPOSE 3000
-CMD ["node", "apps/api/src/index.ts"]
+CMD ["node", "apps/api/src/main.ts"]
