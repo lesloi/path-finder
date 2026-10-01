@@ -1,9 +1,12 @@
 import { fireEvent, render, renderHook, screen } from '@testing-library/react';
 
 import { expectNamedControls } from '../accessible-names.ts';
+import { commonText, settingsText } from '../i18n/index.ts';
 import { paceFor, useSettings } from '../state/index.ts';
 import { SettingsView } from './settings-view.tsx';
 
+const en = { ...commonText.en, ...settingsText.en };
+const fr = { ...commonText.fr, ...settingsText.fr };
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);
 const saved = () => renderHook(() => useSettings()).result.current[0];
 const pick = (dropdown: 'language' | 'units', option: string) => {
@@ -17,16 +20,16 @@ describe('SettingsView', () => {
 
     expect(screen.getByTestId('settings-pace-run')).toHaveValue('6:00');
     expect(screen.getByTestId('settings-pace-hike')).toHaveValue('4.5');
-    expect(screen.getByTestId('settings-units')).toHaveAccessibleName('Units Metric (km, m)');
+    expect(screen.getByTestId('settings-units')).toHaveAccessibleName(`${en.units} ${en.metric}`);
   });
 
   it('shows the display, pace, and about groups in this order', () => {
     renderView();
 
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
-      'Display',
-      'Pace',
-      'About',
+      en.display,
+      en.pace,
+      en.about,
     ]);
   });
 
@@ -73,9 +76,9 @@ describe('SettingsView', () => {
     pick('units', 'imperial');
 
     expect(saved().units).toBe('imperial');
-    expect(screen.getByTestId('settings-pace-run')).toHaveAccessibleName('Run (min/mi)');
+    expect(screen.getByTestId('settings-pace-run')).toHaveAccessibleName(`${en.activities.run} (min/mi)`);
     expect(screen.getByTestId('settings-pace-run')).toHaveValue('9:39');
-    expect(screen.getByTestId('settings-pace-hike')).toHaveAccessibleName('Hike (mph)');
+    expect(screen.getByTestId('settings-pace-hike')).toHaveAccessibleName(`${en.activities.hike} (mph)`);
     expect(screen.getByTestId('settings-pace-hike')).toHaveValue('2.8');
 
     fireEvent.change(screen.getByTestId('settings-pace-run'), { target: { value: '8:00' } });
@@ -108,12 +111,12 @@ describe('SettingsView', () => {
   it('speaks French', () => {
     renderView('fr');
 
-    expect(screen.getAllByRole('heading', { level: 2 })[1]).toHaveTextContent('Allure');
-    expect(screen.getByTestId('settings-pace-run')).toHaveAccessibleName('Course (min/km)');
+    expect(screen.getAllByRole('heading', { level: 2 })[1]).toHaveTextContent(fr.pace);
+    expect(screen.getByTestId('settings-pace-run')).toHaveAccessibleName(`${fr.activities.run} (min/km)`);
     expect(screen.getByTestId('settings-pace-run')).toHaveValue('6:00');
-    expect(screen.getByTestId('settings-pace-hike')).toHaveAccessibleName('Randonnée (km/h)');
+    expect(screen.getByTestId('settings-pace-hike')).toHaveAccessibleName(`${fr.activities.hike} (km/h)`);
     expect(screen.getByTestId('settings-pace-hike')).toHaveValue('4,5');
-    expect(screen.getByTestId('settings-language')).toHaveAccessibleName('Langue Français');
-    expect(screen.getByTestId('settings-units')).toHaveAccessibleName('Unités Métriques (km, m)');
+    expect(screen.getByTestId('settings-language')).toHaveAccessibleName(`${fr.language} Français`);
+    expect(screen.getByTestId('settings-units')).toHaveAccessibleName(`${fr.units} ${fr.metric}`);
   });
 });

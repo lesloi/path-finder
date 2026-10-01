@@ -1,50 +1,15 @@
 import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
-import {
-  ACTIVITY_NAMES,
-  ACTIVITY_PACES,
-  type Activity,
-  formatPace,
-  paceUnit,
-  parsePace,
-  type Units,
-} from '../core/index.ts';
-import type { Language } from '../language.ts';
+import { ACTIVITY_PACES, type Activity, formatPace, paceUnit, parsePace, type Units } from '../core/index.ts';
+import { commonText, settingsText, type Language } from '../i18n/index.ts';
 import { paceFor, useSettings } from '../state/index.ts';
 import { Dropdown, GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON } from '../components/index.ts';
 
 const FLAG_CLASSES = 'flex-none ring-1 ring-border';
 
-const text = {
-  en: {
-    display: 'Display',
-    pace: 'Pace',
-    language: 'Language',
-    units: 'Units',
-    metric: 'Metric (km, m)',
-    imperial: 'Imperial (mi, ft)',
-    about: 'About',
-    credits: 'Credits',
-    privacy: 'Privacy policy',
-    legalNotice: 'Legal notice',
-  },
-  fr: {
-    display: 'Affichage',
-    pace: 'Allure',
-    language: 'Langue',
-    units: 'Unités',
-    metric: 'Métriques (km, m)',
-    imperial: 'Impériales (mi, ft)',
-    about: 'À propos',
-    credits: 'Crédits',
-    privacy: 'Politique de confidentialité',
-    legalNotice: 'Mentions légales',
-  },
-} satisfies Record<Language, unknown>;
-
 export function SettingsView({ language }: { language: Language }) {
-  const t = text[language];
+  const t = { ...commonText[language], ...settingsText[language] };
   const [settings, update] = useSettings();
   return (
     <>
@@ -112,7 +77,7 @@ function PaceInput({ activity, language, units }: { activity: Activity; language
   const [draft, setDraft] = useState(shown);
   return (
     <label className={LIST_ROW}>
-      {`${ACTIVITY_NAMES[activity][language]} (${paceUnit(display, units)})`}
+      {`${commonText[language].activities[activity]} (${paceUnit(display, units)})`}
       <input
         data-testid={`settings-pace-${activity}`}
         className="min-h-touch w-22 rounded-sm bg-surface-2 px-3 text-right"

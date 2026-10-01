@@ -2,9 +2,13 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { CriteriaView } from './criteria-view.tsx';
 import { expectNamedControls } from '../accessible-names.ts';
+import { criteriaText } from '../i18n/index.ts';
 import { maps, markers } from '../maplibre-mock.ts';
 
 vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
+
+const en = criteriaText.en;
+const fr = criteriaText.fr;
 
 const map = () => maps.at(-1)!;
 const field = () => screen.getByTestId('criteria-start');
@@ -90,13 +94,13 @@ describe('CriteriaView', () => {
   describe('criteria', () => {
     it('shows chips in the collapsed sheet, and the full form once it is expanded', () => {
       render(<CriteriaView language="en" />);
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName('Surface: Any');
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName(`${en.surface}: ${en.anySurface}`);
       expect(screen.queryByTestId('criteria-distance')).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
 
       expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'true');
-      expect(screen.getByTestId('criteria-distance')).toHaveAccessibleName('Distance');
+      expect(screen.getByTestId('criteria-distance')).toHaveAccessibleName(en.distance);
     });
 
     it('offers the elevation gain only when the API has elevation data', async () => {
@@ -211,9 +215,7 @@ describe('CriteriaView', () => {
       fireEvent.blur(field());
 
       expect(field()).toHaveAttribute('aria-invalid', 'true');
-      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(
-        'Incorrect coordinates.For example: 48.85, 2.35 (latitude, longitude)',
-      );
+      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(`${en.unreadable}${en.coordinatesHint}`);
       expect(markers).toEqual([]);
     });
 
@@ -293,7 +295,7 @@ describe('CriteriaView', () => {
 
       fireEvent.click(screen.getByTestId('criteria-locate'));
 
-      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(/appui long sur la carte/i);
+      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(`${fr.unavailable}${fr.pickHint}`);
       expect(markers).toEqual([]);
     });
 
@@ -304,7 +306,7 @@ describe('CriteriaView', () => {
 
       fireEvent.click(screen.getByTestId('criteria-locate'));
 
-      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(/long-press the map or type coordinates/i);
+      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(`${en.unavailable}${en.pickHintDesktop}`);
     });
 
     it('shows a toast when the browser has no geolocation', () => {
@@ -313,7 +315,7 @@ describe('CriteriaView', () => {
 
       fireEvent.click(screen.getByTestId('criteria-locate'));
 
-      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(/long-press the map/i);
+      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(`${en.unavailable}${en.pickHint}`);
     });
 
     it('drops the toast once the start point is set', () => {

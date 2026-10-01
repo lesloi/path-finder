@@ -1,5 +1,5 @@
-import { ACTIVITY_NAMES, type Activity } from './activity.ts';
-import type { Language } from '../language.ts';
+import type { Activity } from './activity.ts';
+import { commonText, type Language } from '../i18n/index.ts';
 import { KM_PER_MILE, METRES_PER_FOOT, type Units } from './units.ts';
 
 /**
@@ -20,5 +20,5 @@ export function routeName(
     elevationGain === undefined
       ? []
       : [metric ? `+${Math.round(elevationGain)} m` : `+${Math.round(elevationGain / METRES_PER_FOOT)} ft`];
-  return [ACTIVITY_NAMES[activity][language], day, length, ...climb].join(' · ');
+  return [commonText[language].activities[activity], day, length, ...climb].join(' · ');
 }

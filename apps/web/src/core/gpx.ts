@@ -1,5 +1,5 @@
-import { ACTIVITY_NAMES, type Activity } from './activity.ts';
-import type { Language } from '../language.ts';
+import { commonText, type Language } from '../i18n/index.ts';
+import type { Activity } from './activity.ts';
 import { routeName } from './route-name.ts';
 import { KM_PER_MILE, METRES_PER_FOOT, type Units } from './units.ts';
 
@@ -19,11 +19,6 @@ export type GpxRoute = {
 
 /** Older watches truncate longer tracks. */
 export const MAX_GPX_POINTS = 2_000;
-
-const ATTRIBUTION: Record<Language, string> = {
-  fr: 'Données © les contributeurs d’OpenStreetMap, ODbL.',
-  en: 'Data © OpenStreetMap contributors, ODbL.',
-};
 
 /**
  * The GPX export of a route, built on the device: a GPX 1.1 file with one track named after
@@ -48,7 +43,7 @@ export function gpxExport(
 <gpx version="1.1" creator="Path finder" xmlns="http://www.topografix.com/GPX/1/1">
 <trk>
 <name>${name}</name>
-<desc>${name} · ${duration}. ${ATTRIBUTION[settings.language]}</desc>
+<desc>${name} · ${duration}. ${commonText[settings.language].gpxAttribution}</desc>
 <trkseg>
 ${points}
 </trkseg>
@@ -66,7 +61,7 @@ function fileName(
   { units, language }: { units: Units; language: Language },
 ): string {
   const metric = units === 'metric';
-  const activityName = ACTIVITY_NAMES[activity][language].normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  const activityName = commonText[language].activities[activity].normalize('NFD').replace(/\p{Diacritic}/gu, '');
   const date = `${day.getDate()}`.padStart(2, '0') + `${day.getMonth() + 1}`.padStart(2, '0');
   const length = metric ? `${Math.round(distance)}km` : `${Math.round(distance / KM_PER_MILE)}mi`;
   const climb =

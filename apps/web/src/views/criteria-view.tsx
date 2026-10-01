@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { useElevation } from '../state/index.ts';
 import { CriteriaForm, useCriteriaDraft, type CriteriaRequest } from './criteria-form.tsx';
 import { formatPosition, parsePosition, type Position } from '../core/index.ts';
-import type { Language } from '../language.ts';
+import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import {
   StartPointMap,
   BottomSheet,
@@ -16,41 +16,6 @@ import {
 } from '../components/index.ts';
 
 const TOAST_MS = 6_000;
-
-const text = {
-  en: {
-    settings: 'Settings',
-    criteria: 'Criteria',
-    myLocation: 'My location',
-    longPress: 'Long-press the map to choose your start point',
-    startPoint: 'Start point',
-    chooseOnMap: 'Choose on the map',
-    clickMap: 'Click the map',
-    coordinates: 'Latitude, longitude',
-    unreadable: 'Incorrect coordinates.',
-    // Paris.
-    coordinatesHint: 'For example: 48.85, 2.35 (latitude, longitude)',
-    unavailable: 'Your location is unavailable.',
-    pickHint: 'Long-press the map to pick your start point.',
-    pickHintDesktop: 'Long-press the map or type coordinates.',
-  },
-  fr: {
-    settings: 'Réglages',
-    criteria: 'Critères',
-    myLocation: 'Ma position',
-    longPress: 'Appuyez longuement sur la carte pour choisir votre point de départ',
-    startPoint: 'Point de départ',
-    chooseOnMap: 'Choisir sur la carte',
-    clickMap: 'Cliquez sur la carte',
-    coordinates: 'Latitude, longitude',
-    unreadable: 'Coordonnées incorrectes.',
-    coordinatesHint: 'Exemple : 48.85, 2.35 (latitude, longitude)',
-    unavailable: 'Votre position n’est pas disponible.',
-    // One line on a phone.
-    pickHint: 'Choisissez le départ d’un appui long sur la carte.',
-    pickHintDesktop: 'Faites un appui long sur la carte ou saisissez des coordonnées.',
-  },
-} satisfies Record<Language, unknown>;
 
 /** The first view: where the user sets the criteria of a route set, over a full-screen map. */
 export function CriteriaView({
@@ -64,7 +29,7 @@ export function CriteriaView({
   /** A sub-page is open over the view. */
   pageOpen?: boolean;
 }) {
-  const t = text[language];
+  const t = { ...commonText[language], ...criteriaText[language] };
   const desktop = useDesktop();
   // Kept here: the form is mounted in the column or in the sheet, whichever the screen shows.
   const draft = useCriteriaDraft();
@@ -252,7 +217,7 @@ function StartPointField({
   /** Buttons at the end of the field. */
   children?: ReactNode;
 }) {
-  const t = text[language];
+  const t = criteriaText[language];
   const shown = start ? formatPosition(start, language) : '';
   const [draft, setDraft] = useState(shown);
   const [unreadable, setUnreadable] = useState(false);
