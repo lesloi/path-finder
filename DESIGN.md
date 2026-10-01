@@ -33,7 +33,7 @@ colour or a radius outside the tokens does not exist. Spacing is Tailwind's own 
 margins use the steps below, and other multiples (`min-h-13`) only give a component its own
 dimensions (a 52 px row). Only the map's own colours are written raw: white under the start point, and the route
 colours that MapLibre and the route thumbnails paint, in `components/route-colors.ts`, which
-pairs with the `route-*` tokens (change both together). A route thumbnail is drawn over the Plan IGN image of the place the route runs through (IGN Géoplateforme WMS, the map's own provider), on a cream background while it loads.
+pairs with the `route-*` tokens (change both together). A route thumbnail is drawn over a snapshot the map takes on the device when it frames a route set, on a cream background until then: nothing is fetched to draw it.
 
 | Utilities                                                 | Values                                                        |
 | --------------------------------------------------------- | ------------------------------------------------------------- |

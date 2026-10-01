@@ -9,6 +9,10 @@ window.ResizeObserver = class {
   disconnect() {}
 };
 Element.prototype.setPointerCapture = () => {};
+// jsdom has no object URLs.
+let objectUrls = 0;
+URL.createObjectURL = () => `blob:object-${++objectUrls}`;
+URL.revokeObjectURL = () => {};
 // jsdom has no modal dialogs.
 HTMLDialogElement.prototype.showModal = function () {
   this.open = true;

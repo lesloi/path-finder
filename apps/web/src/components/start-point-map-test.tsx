@@ -128,10 +128,11 @@ describe('StartPointMap', () => {
     ];
     const routes = [loop(0), loop(1), loop(2)];
 
-    // The style loads, then the routes can be drawn.
+    // The style loads, the map frames the routes and settles: then they are drawn.
     function renderRoutes(props: Partial<Parameters<typeof StartPointMap>[0]> = {}) {
       const view = render(<StartPointMap routes={routes} onStartChange={vi.fn()} {...props} />);
       act(() => map().fire('load'));
+      act(() => map().fire('idle'));
       return view;
     }
 
@@ -152,6 +153,95 @@ describe('StartPointMap', () => {
       render(<StartPointMap routes={routes} onStartChange={vi.fn()} />);
 
       expect(map().sources.routes).toBeUndefined();
+    });
+
+    it('keeps the routes off the map until it has taken its snapshot', () => {
+      render(<StartPointMap routes={routes} onStartChange={vi.fn()} />);
+      act(() => map().fire('load'));
+
+      expect(features()).toEqual([]);
+
+      act(() => map().fire('idle'));
+      expect(features()).toHaveLength(3);
+    });
+
+    it('draws the routes anyway when the map never settles', () => {
+      render(<StartPointMap routes={routes} onStartChange={vi.fn()} />);
+      act(() => map().fire('load'));
+
+      act(() => vi.advanceTimersByTime(5_000));
+
+      expect(features()).toHaveLength(3);
+    });
+
+    describe('the snapshot', () => {
+      it('is taken after framing all the routes at once, and reported with where places lie in it', () => {
+        const onSnapshot = vi.fn();
+        renderRoutes({ onSnapshot });
+
+        expect(map().fitted?.options).toMatchObject({ animate: false });
+        const [snapshot] = onSnapshot.mock.calls.at(-1)!;
+        expect(snapshot).toMatchObject({ url: expect.stringMatching(/^blob:/), width: 800, height: 600, of: routes });
+        // The mock puts the centre, 6° E 45° N, at the middle of its 800 by 600 screen.
+        const [x, y] = snapshot.toPixel([6 * 111_319.49, 5_621_521.5]);
+        expect(x).toBeCloseTo(400, 0);
+        expect(y).toBeCloseTo(300, 0);
+      });
+
+      it('lets later selections move the map with an animation', () => {
+        const { rerender } = renderRoutes({ framing: 'selected', selectedRoute: 0 });
+
+        rerender(<StartPointMap routes={routes} framing="selected" selectedRoute={1} onStartChange={vi.fn()} />);
+
+        expect(map().fitted?.options).not.toMatchObject({ animate: false });
+      });
+
+      it('leads on to the selected route when its detail was opened before the map settled', () => {
+        render(<StartPointMap routes={routes} framing="selected" selectedRoute={1} onStartChange={vi.fn()} />);
+        act(() => map().fire('load'));
+
+        act(() => map().fire('idle'));
+
+        expect(map().fitted?.bounds).toEqual([
+          [7, 45],
+          [7.1, 45.2],
+        ]);
+        expect(map().fitted?.options).not.toMatchObject({ animate: false });
+      });
+
+      it('is dropped with the route set', () => {
+        const onSnapshot = vi.fn();
+        const { rerender } = renderRoutes({ onSnapshot });
+
+        rerender(<StartPointMap onSnapshot={onSnapshot} onStartChange={vi.fn()} />);
+
+        expect(onSnapshot).toHaveBeenLastCalledWith(undefined);
+      });
+
+      it('is taken again for a new route set', () => {
+        const onSnapshot = vi.fn();
+        const { rerender } = renderRoutes({ onSnapshot });
+        const first = onSnapshot.mock.calls.at(-1)![0];
+
+        rerender(<StartPointMap routes={[loop(5)]} onSnapshot={onSnapshot} onStartChange={vi.fn()} />);
+        act(() => map().fire('idle'));
+
+        const second = onSnapshot.mock.calls.at(-1)![0];
+        expect(second.url).not.toBe(first.url);
+        expect(second.of).toEqual([loop(5)]);
+      });
+
+      it('reports nothing when the canvas cannot be read', () => {
+        const onSnapshot = vi.fn();
+        render(<StartPointMap routes={routes} onSnapshot={onSnapshot} onStartChange={vi.fn()} />);
+        act(() => map().fire('load'));
+        map().canvas.toBlob = (callback) => callback(null);
+
+        act(() => map().fire('idle'));
+
+        expect(onSnapshot).toHaveBeenLastCalledWith(undefined);
+        expect(features()).toHaveLength(3);
+      });
     });
 
     it('draws a wide invisible line to hit the routes', () => {
@@ -176,6 +266,25 @@ describe('StartPointMap', () => {
       expect(map().canvas.style.cursor).toBe('pointer');
       act(() => map().fire('mouseleave', {}, 'routes-hit'));
       expect(map().canvas.style.cursor).toBe('');
+    });
+
+    it('lets the start point be set again while the routes are only a backdrop', () => {
+      const onStartChange = vi.fn();
+      renderRoutes({ pickOnClick: true, routesInteractive: false, onStartChange });
+
+      act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
+      act(() => map().fire('click', { features: [{ properties: { index: 2 } }] }, 'routes-hit'));
+
+      expect(onStartChange).toHaveBeenCalledWith([6.2, 45.8]);
+    });
+
+    it('does not select a route that is only a backdrop', () => {
+      const onRouteSelect = vi.fn();
+      renderRoutes({ routesInteractive: false, onRouteSelect });
+
+      act(() => map().fire('click', { features: [{ properties: { index: 2 } }] }, 'routes-hit'));
+
+      expect(onRouteSelect).not.toHaveBeenCalled();
     });
 
     it('keeps the start point while routes are shown', () => {

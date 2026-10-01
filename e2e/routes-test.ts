@@ -44,6 +44,15 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('criteria-start')).toHaveValue('45.8992° N · 6.1294° E');
   });
 
+  test('keeps the routes found when going back to the criteria', async ({ page }) => {
+    await findRoutes(page);
+
+    await page.getByTestId('routes-back').click();
+    await page.getByTestId('criteria-routes').click();
+
+    await expect(page.getByTestId('routes-row-0')).toBeVisible();
+  });
+
   test('opens the detail of a route and moves to the next one', async ({ page, isMobile }) => {
     await findRoutes(page);
 

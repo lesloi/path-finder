@@ -395,6 +395,8 @@ describe('CriteriaView', () => {
       fireEvent.keyDown(field(), { key: 'Enter' });
       fireEvent.click(screen.getByTestId('criteria-submit'));
     }
+    // The map settles on the routes it frames: it then draws them and takes its snapshot.
+    const settle = () => act(() => map().fire('idle'));
     const routesSource = () => (map().sources.routes as unknown as { data: { features: unknown[] } }).data.features;
 
     it('shows a loading state while the API works, with no way back before it answers', async () => {
@@ -419,6 +421,7 @@ describe('CriteriaView', () => {
       await submit();
 
       expect(await screen.findByTestId('routes-count')).toHaveTextContent('2 routes');
+      settle();
       expect(routesSource()).toHaveLength(2);
       expect(map().fitted).toBeDefined();
     });
@@ -430,7 +433,9 @@ describe('CriteriaView', () => {
       act(() => map().fire('load'));
       await submit();
 
-      fireEvent.click(await screen.findByTestId('routes-row-1'));
+      await screen.findByTestId('routes-count');
+      settle();
+      fireEvent.click(screen.getByTestId('routes-row-1'));
       expect(screen.getByTestId('route-position')).toHaveTextContent('2/2');
       expect(map().fitted?.bounds).toEqual([
         [7.2, expect.closeTo(45.8)],
@@ -471,19 +476,98 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('routes-row-1')).toHaveAttribute('data-selected');
     });
 
-    it('goes back to the criteria, kept as they were, and clears the map', async () => {
+    it('draws the thumbnails over the snapshot the map took', async () => {
+      onDesktop();
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+      await submit();
+      await screen.findByTestId('routes-count');
+      expect(screen.queryByTestId('routes-row-0-thumbnail-map')).not.toBeInTheDocument();
+
+      settle();
+
+      expect(document.querySelector('image')).toHaveAttribute('href', expect.stringMatching(/^blob:/));
+    });
+
+    it('goes back to the criteria, kept as they were, with the routes still on the map', async () => {
       onDesktop();
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
       act(() => map().fire('load'));
       fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
       await submit();
+      await screen.findByTestId('routes-count');
+      settle();
 
-      fireEvent.click(await screen.findByTestId('routes-back'));
+      fireEvent.click(screen.getByTestId('routes-back'));
 
       expect(screen.getByTestId('criteria-surface-unpaved')).toBeChecked();
       expect((field() as HTMLInputElement).value).toContain('45.8');
+      expect(routesSource()).toHaveLength(1);
+    });
+
+    it('offers to show the routes found again from the criteria', async () => {
+      onDesktop();
+      ask(answer(route(0), route(1)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+      await submit();
+      fireEvent.click(await screen.findByTestId('routes-row-1'));
+      settle();
+      fireEvent.click(screen.getByTestId('route-back'));
+      fireEvent.click(screen.getByTestId('routes-back'));
+
+      const button = screen.getByTestId('criteria-routes');
+      expect(button).toHaveAccessibleName(routesText.en.showRoutes(2));
+      fireEvent.click(button);
+
+      expect(screen.getByTestId('routes-count')).toHaveTextContent('2 routes');
+      expect(screen.getByTestId('routes-row-1')).toHaveAttribute('data-selected');
+      expect(screen.queryByTestId('criteria-routes')).not.toBeInTheDocument();
+    });
+
+    it('drops the routes found when the start point changes', async () => {
+      onDesktop();
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+      await submit();
+      await screen.findByTestId('routes-count');
+      settle();
+      fireEvent.click(screen.getByTestId('routes-back'));
+
+      fireEvent.change(field(), { target: { value: '45.9, 6.3' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(screen.queryByTestId('criteria-routes')).not.toBeInTheDocument();
       expect(routesSource()).toEqual([]);
+    });
+
+    it('keeps the routes found when the start point is set again to the same place', async () => {
+      onDesktop();
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+      await submit();
+      await screen.findByTestId('routes-count');
+      fireEvent.click(screen.getByTestId('routes-back'));
+
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(screen.getByTestId('criteria-routes')).toBeInTheDocument();
+    });
+
+    it('shows the way back to the routes in the sheet on phones', async () => {
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+      fireEvent.click(await screen.findByTestId('routes-back'));
+
+      expect(screen.getByTestId('criteria-routes')).toBeInTheDocument();
     });
 
     it('shows the route set in the sheet on phones', async () => {

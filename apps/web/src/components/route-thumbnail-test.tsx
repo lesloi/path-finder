@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 
+import type { MapSnapshot } from '../core/index.ts';
 import { RouteThumbnail } from './route-thumbnail.tsx';
 
 const geometry: [number, number][] = [
@@ -16,13 +17,28 @@ describe('RouteThumbnail', () => {
     expect(lines.map((line) => line.getAttribute('stroke'))).toEqual(['#ffffff', '#2563eb']);
   });
 
-  it('draws the route over the Plan IGN of the place it runs through', () => {
+  it('draws a plain background until the map has a snapshot', () => {
     render(<RouteThumbnail testId="thumb" geometry={geometry} index={0} />);
 
-    const url = new URL(screen.getByTestId('thumb-map').getAttribute('href')!);
-    expect(url.origin).toBe('https://data.geopf.fr');
-    expect(url.searchParams.get('LAYERS')).toBe('GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2');
-    expect(url.searchParams.get('WIDTH')).toBe('160');
+    expect(screen.queryByTestId('thumb-map')).not.toBeInTheDocument();
+  });
+
+  it('draws the route over the part of the snapshot it runs through', () => {
+    // One pixel per metre, with the origin at the top left of a 1000 px square: Web Mercator metres.
+    const snapshot: MapSnapshot = {
+      url: 'blob:map',
+      width: 1_000,
+      height: 1_000,
+      toPixel: ([x, y]) => [x / 1_000 + 500, 500 - y / 1_000],
+      of: [geometry],
+    };
+    render(<RouteThumbnail testId="thumb" geometry={geometry} index={0} snapshot={snapshot} />);
+
+    const image = screen.getByTestId('thumb-map');
+    expect(image).toHaveAttribute('href', 'blob:map');
+    // The 100-unit box shows a crop of the snapshot: the image is scaled up to fill it, offset to that crop.
+    expect(Number(image.getAttribute('width'))).toBeGreaterThan(100);
+    expect(Number(image.getAttribute('width')) / Number(image.getAttribute('height'))).toBeCloseTo(1);
   });
 
   it('draws the start point', () => {

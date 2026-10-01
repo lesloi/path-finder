@@ -35,6 +35,7 @@ import {
   missText,
   saveGpx,
   type Position,
+  type MapSnapshot,
   type Route,
   type RouteSetRequest,
   type Display,
@@ -58,6 +59,7 @@ export function RouteSetView({
   display,
   request,
   routes,
+  snapshot,
   selected,
   detail,
   onSelect,
@@ -69,6 +71,8 @@ export function RouteSetView({
   /** The criteria the routes were generated for. */
   request: RouteSetRequest;
   routes: Route[];
+  /** What the map showed for these routes, to draw their thumbnails over. */
+  snapshot?: MapSnapshot;
   selected: number;
   /** Whether the detail of the selected route is shown rather than the list. */
   detail: boolean;
@@ -86,6 +90,7 @@ export function RouteSetView({
         display={display}
         request={request}
         routes={routes}
+        snapshot={snapshot}
         selected={selected}
         desktop={desktop}
         onSelect={onSelect}
@@ -131,6 +136,7 @@ export function RouteSetView({
           <li key={index}>
             <RouteRow
               route={route}
+              snapshot={snapshot}
               index={index}
               count={routes.length}
               selected={index === selected}
@@ -151,6 +157,7 @@ export function RouteSetView({
 
 function RouteRow({
   route,
+  snapshot,
   index,
   count,
   selected,
@@ -160,6 +167,7 @@ function RouteRow({
   onPreview,
 }: {
   route: Route;
+  snapshot?: MapSnapshot;
   index: number;
   count: number;
   selected: boolean;
@@ -196,7 +204,7 @@ function RouteRow({
       onMouseEnter={desktop ? onPreview : undefined}
       onFocus={onPreview}
     >
-      <RouteThumbnail geometry={route.geometry} index={index} />
+      <RouteThumbnail geometry={route.geometry} index={index} {...(snapshot && { snapshot })} />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <strong data-testid={`routes-row-${index}-distance`} className="text-lg">
           {distance}
@@ -240,6 +248,7 @@ function RouteDetail({
   display,
   request,
   routes,
+  snapshot,
   selected,
   desktop,
   onSelect,
@@ -249,6 +258,7 @@ function RouteDetail({
   display: Display;
   request: RouteSetRequest;
   routes: Route[];
+  snapshot?: MapSnapshot;
   selected: number;
   desktop: boolean;
   onSelect: (index: number) => void;
@@ -343,9 +353,24 @@ function RouteDetail({
           )}
         </div>
       </div>
-      {desktop && <RouteThumbnail testId="route-thumbnail" geometry={route.geometry} index={selected} wide />}
+      {desktop && (
+        <RouteThumbnail
+          testId="route-thumbnail"
+          geometry={route.geometry}
+          index={selected}
+          wide
+          {...(snapshot && { snapshot })}
+        />
+      )}
       <div className="flex items-center gap-3">
-        {!desktop && <RouteThumbnail testId="route-thumbnail" geometry={route.geometry} index={selected} />}
+        {!desktop && (
+          <RouteThumbnail
+            testId="route-thumbnail"
+            geometry={route.geometry}
+            index={selected}
+            {...(snapshot && { snapshot })}
+          />
+        )}
         {figures}
       </div>
       {route.misses.length > 0 && (

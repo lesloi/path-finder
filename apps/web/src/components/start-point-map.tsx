@@ -9,11 +9,13 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
-import type { Position } from '../core/index.ts';
+import { toMercator, type MapSnapshot, type Position } from '../core/index.ts';
 import { ROUTE_COLORS } from './route-colors.ts';
 import { useDesktop } from './use-desktop.ts';
 
 const LONG_PRESS_MS = 500;
+// Milliseconds the map may take to settle before its snapshot is taken as it is.
+const SNAPSHOT_TIMEOUT_MS = 5_000;
 
 // Pixels between a framed route and the edge of the visible map: a margin (`--spacing-6`).
 const FRAME_MARGIN = 24;
@@ -48,7 +50,9 @@ export function StartPointMap({
   selectedRoute,
   framing = 'all',
   hover,
+  routesInteractive = true,
   onRouteSelect,
+  onSnapshot,
   onStartChange,
 }: {
   /** The geometry of each route of the route set, in order. */
@@ -58,8 +62,18 @@ export function StartPointMap({
   framing?: 'all' | 'selected';
   /** A place along the selected route, such as where the user points at its elevation profile. */
   hover?: Position;
+  /**
+   * Whether the routes can be tapped, and keep the start point from being set: false while the user
+   * edits the criteria with the routes still on the map.
+   */
+  routesInteractive?: boolean;
   /** A route was tapped on the map. */
   onRouteSelect?: (index: number) => void;
+  /**
+   * The map as it framed a new route set, without the routes drawn, so thumbnails of them can show
+   * the place. Undefined once there is no route set.
+   */
+  onSnapshot?: (snapshot: MapSnapshot | undefined) => void;
   start?: Position;
   /** Where the map moves to: the device location, or coordinates the user typed. */
   focus?: Position;
@@ -71,13 +85,20 @@ export function StartPointMap({
   const mapRef = useRef<Map>(null);
   const [loaded, setLoaded] = useState(false);
   const desktop = useDesktop();
-  const hasRoutes = Boolean(routes?.length);
+  // The route set the map has taken a snapshot for: it draws the routes once it has.
+  const [drawnFor, setDrawnFor] = useState<Position[][]>();
+  const snapshotFor = useRef<Position[][]>(undefined);
+  const snapshotUrl = useRef<string>(undefined);
+  const interactive = Boolean(routes?.length) && routesInteractive;
+  const report = useEffectEvent((snapshot: MapSnapshot | undefined) => onSnapshot?.(snapshot));
   const pick = useEffectEvent((how: 'long-press' | 'click', { lng, lat }: { lng: number; lat: number }) => {
     // A tap on a route selects it: it must not move the start point too.
-    if (hasRoutes) return;
+    if (interactive) return;
     if (how === 'long-press' || pickOnClick) onStartChange([lng, lat]);
   });
-  const selectRoute = useEffectEvent((index: number) => onRouteSelect?.(index));
+  const selectRoute = useEffectEvent((index: number) => {
+    if (interactive) onRouteSelect?.(index);
+  });
 
   useEffect(() => {
     const map = new Map({
@@ -86,6 +107,8 @@ export function StartPointMap({
       center: [2.5, 46.6],
       zoom: 5,
       attributionControl: false,
+      // Read back for the snapshot of a route set; otherwise the canvas is cleared after each frame.
+      canvasContextAttributes: { preserveDrawingBuffer: true },
     });
     // Routes come from OpenStreetMap: credit it from this map on, before any route is drawn.
     // The stylesheet moves it above the sheet on phones and to the centre of the map on desktops.
@@ -186,7 +209,7 @@ export function StartPointMap({
   // Once the style has loaded, which holds the layers the routes are drawn in.
   useEffect(() => {
     if (!loaded) return;
-    const features = (routes ?? []).map((geometry, index) => ({
+    const features = (drawnFor === routes ? (routes ?? []) : []).map((geometry, index) => ({
       type: 'Feature' as const,
       geometry: { type: 'LineString' as const, coordinates: geometry },
       properties: { index, selected: index === selectedRoute, color: ROUTE_COLORS[index % ROUTE_COLORS.length] },
@@ -194,24 +217,88 @@ export function StartPointMap({
     // The selected route last, so it is drawn on top.
     features.sort((a, b) => Number(a.properties.selected) - Number(b.properties.selected));
     (mapRef.current!.getSource('routes') as GeoJSONSource).setData({ type: 'FeatureCollection', features });
-  }, [loaded, routes, selectedRoute]);
+  }, [loaded, routes, selectedRoute, drawnFor]);
 
   // The routes, or the selected one, in the part of the map the panel leaves free.
   const framed = framing === 'selected' ? selectedRoute : undefined;
   useEffect(() => {
     if (!loaded || !routes?.length) return;
+    const map = mapRef.current!;
     const shown = framed === undefined ? routes : [routes[framed] ?? routes[0]];
     const sheet = Number.parseFloat(document.documentElement.style.getPropertyValue('--sheet-height')) || 0;
-    mapRef.current!.fitBounds(boundsOf(shown), {
+    const frame = {
       padding: {
         top: FRAME_MARGIN,
         right: FRAME_MARGIN,
         bottom: FRAME_MARGIN + (desktop ? 0 : sheet),
         left: FRAME_MARGIN + (desktop ? COLUMN_WIDTH : 0),
       },
-    });
-    // Not on every selection: hovering a row of the list must not move the map.
+    };
+    if (snapshotFor.current === routes) {
+      // Not on every selection: hovering a row of the list must not move the map.
+      map.fitBounds(boundsOf(shown), frame);
+      return;
+    }
+    // A new route set: frame all of it at once, and keep what the map shows before drawing the routes
+    // over it, for their thumbnails.
+    map.fitBounds(boundsOf(routes), { ...frame, animate: false });
+    let cancelled = false;
+    const finish = () => {
+      clearTimeout(timer);
+      map.off('idle', finish);
+      if (cancelled) return;
+      const canvas = map.getCanvas();
+      const [centre, width, height] = [map.getCenter(), canvas.clientWidth, canvas.clientHeight];
+      // Pixels are linear in Web Mercator: two places give the whole mapping.
+      const from: Position = [centre.lng, centre.lat];
+      const to: Position = [centre.lng + 0.01, centre.lat + 0.01];
+      const [pixelFrom, pixelTo] = [map.project(from), map.project(to)];
+      const [mercatorFrom, mercatorTo] = [toMercator(from), toMercator(to)];
+      const scaleX = (pixelTo.x - pixelFrom.x) / (mercatorTo[0] - mercatorFrom[0]);
+      const scaleY = (pixelTo.y - pixelFrom.y) / (mercatorTo[1] - mercatorFrom[1]);
+      canvas.toBlob(
+        (blob) => {
+          if (cancelled) return;
+          if (snapshotUrl.current) URL.revokeObjectURL(snapshotUrl.current);
+          snapshotUrl.current = blob ? URL.createObjectURL(blob) : undefined;
+          snapshotFor.current = routes;
+          setDrawnFor(routes);
+          // The detail of a route was opened meanwhile: the map goes on to it.
+          if (framed !== undefined) map.fitBounds(boundsOf(shown), frame);
+          if (!snapshotUrl.current) return report(undefined);
+          report({
+            url: snapshotUrl.current,
+            width,
+            height,
+            toPixel: ([x, y]) => [
+              pixelFrom.x + (x - mercatorFrom[0]) * scaleX,
+              pixelFrom.y + (y - mercatorFrom[1]) * scaleY,
+            ],
+            of: routes,
+          });
+        },
+        'image/jpeg',
+        0.85,
+      );
+    };
+    map.on('idle', finish);
+    // A map that never settles (a tile that does not load) still gets its routes.
+    const timer = setTimeout(finish, SNAPSHOT_TIMEOUT_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      map.off('idle', finish);
+    };
   }, [loaded, routes, framed, desktop]);
+
+  // No route set: no snapshot, and the next one is taken afresh.
+  useEffect(() => {
+    if (routes?.length) return;
+    snapshotFor.current = undefined;
+    if (snapshotUrl.current) URL.revokeObjectURL(snapshotUrl.current);
+    snapshotUrl.current = undefined;
+    report(undefined);
+  }, [routes]);
 
   useEffect(() => {
     if (!hover) return;

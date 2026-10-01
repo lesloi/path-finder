@@ -1,8 +1,8 @@
-import { LoaderCircle } from 'lucide-react';
+import { ChevronRight, LoaderCircle, Route } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { TOAST } from '../components/index.ts';
-import type { Position, RouteSetRequest } from '../core/index.ts';
+import { LIST_ROW_CHEVRON, TOAST } from '../components/index.ts';
+import type { MapSnapshot, Position, RouteSetRequest } from '../core/index.ts';
 import { errorText, routesText, type Language } from '../i18n/index.ts';
 import { useRouteSet, type RouteSetError } from '../state/index.ts';
 
@@ -18,6 +18,9 @@ export function useRouteBrowser() {
   const [selected, setSelected] = useState(0);
   const [detail, setDetail] = useState(false);
   const [hover, setHover] = useState<Position>();
+  // Whether the route set is shown rather than the criteria: leaving it for the criteria keeps it.
+  const [showing, setShowing] = useState(false);
+  const [mapSnapshot, setSnapshot] = useState<MapSnapshot>();
   // Kept while the route set does, so the map's effects only run for a new one.
   const geometries = useMemo(
     () => routeSet?.routes.map(({ geometry }) => geometry.map(([lon, lat]): Position => [lon, lat])),
@@ -30,8 +33,14 @@ export function useRouteBrowser() {
     return () => clearTimeout(timer);
   }, [error]);
 
+  // A snapshot of another route set would draw the wrong places.
+  const snapshot = mapSnapshot?.of === geometries ? mapSnapshot : undefined;
+
   return {
     routeSet,
+    showing: showing && Boolean(routeSet),
+    snapshot,
+    setSnapshot,
     loading,
     error,
     selected,
@@ -45,11 +54,22 @@ export function useRouteBrowser() {
       setError(undefined);
       setSelected(0);
       setDetail(false);
+      setShowing(true);
       find(request);
     },
-    /** Back to the criteria, dropping the route set. */
-    cancel() {
+    /** Back to the criteria: the routes stay on the map, and can be shown again. */
+    leave() {
+      setShowing(false);
+      setDetail(false);
+      setHover(undefined);
+    },
+    show() {
+      setShowing(true);
+    },
+    /** Forgets the route set, such as when a new start point makes it stale. */
+    drop() {
       clear();
+      setShowing(false);
       setDetail(false);
       setHover(undefined);
     },
@@ -58,6 +78,32 @@ export function useRouteBrowser() {
       setHover(undefined);
     },
   };
+}
+
+/** A way back to the routes found, above the criteria that were left for them. */
+export function RoutesFoundButton({
+  language,
+  count,
+  onClick,
+}: {
+  language: Language;
+  count: number;
+  onClick: () => void;
+}) {
+  const t = routesText[language];
+  return (
+    <button
+      type="button"
+      data-testid="criteria-routes"
+      className="flex min-h-touch w-full flex-none items-center gap-3 rounded-md bg-accent-soft px-3 text-left font-semibold text-accent"
+      aria-label={t.showRoutes(count)}
+      onClick={onClick}
+    >
+      <Route size={18} aria-hidden className="flex-none" />
+      <span className="flex-1">{t.routeCount(count)}</span>
+      <ChevronRight size={18} aria-hidden className={LIST_ROW_CHEVRON} />
+    </button>
+  );
 }
 
 /** What replaces the criteria while the API works. */

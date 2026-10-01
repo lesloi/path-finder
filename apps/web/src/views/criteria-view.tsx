@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 import { useElevation, useSettings } from '../state/index.ts';
 import { CriteriaForm, useCriteriaDraft } from './criteria-form.tsx';
-import { RouteErrorToast, SearchingPanel, useRouteBrowser } from './route-browser.tsx';
+import { RouteErrorToast, RoutesFoundButton, SearchingPanel, useRouteBrowser } from './route-browser.tsx';
 import { RouteSetView } from './route-set-view.tsx';
 import { formatPosition, parsePosition, type Position } from '../core/index.ts';
 import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
@@ -55,11 +55,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   }, [toast]);
 
   function backToCriteria() {
-    browser.cancel();
+    browser.leave();
     setSheetExpanded(false);
   }
 
   function changeStart(position: Position) {
+    // Routes from another start point would be stale.
+    if (start && (start[0] !== position[0] || start[1] !== position[1])) browser.drop();
     setStart(position);
     setPicking(false);
   }
@@ -86,20 +88,26 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     );
   }
 
-  const panel = routeSet ? (
-    <RouteSetView
-      display={{ units, language }}
-      request={routeSet.request}
-      routes={routeSet.routes}
-      selected={browser.selected}
-      detail={browser.detail}
-      onSelect={browser.select}
-      onDetailChange={browser.openDetail}
-      onBack={backToCriteria}
-      onHover={browser.setHover}
-    />
-  ) : (
-    loading && <SearchingPanel language={language} />
+  const panel =
+    routeSet && browser.showing ? (
+      <RouteSetView
+        display={{ units, language }}
+        request={routeSet.request}
+        routes={routeSet.routes}
+        snapshot={browser.snapshot}
+        selected={browser.selected}
+        detail={browser.detail}
+        onSelect={browser.select}
+        onDetailChange={browser.openDetail}
+        onBack={backToCriteria}
+        onHover={browser.setHover}
+      />
+    ) : (
+      loading && <SearchingPanel language={language} />
+    );
+  // The criteria came back with the routes still found: a way to see them again.
+  const found = routeSet && !browser.showing && (
+    <RoutesFoundButton language={language} count={routeSet.routes.length} onClick={browser.show} />
   );
 
   return (
@@ -113,7 +121,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         selectedRoute={browser.selected}
         framing={browser.detail ? 'selected' : 'all'}
         {...(browser.detail && browser.hover && { hover: browser.hover })}
+        routesInteractive={browser.showing}
         onRouteSelect={browser.select}
+        onSnapshot={browser.setSnapshot}
         onStartChange={changeStart}
       />
       {/* The settings are open, or another page with a way back to them. */}
@@ -131,7 +141,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         </a>
       )}
       {/* Above the sheet on phones, whatever its height; an expanded sheet leaves it no room. */}
-      {!routeSet && !loading && (desktop || !sheetExpanded) && (
+      {!browser.showing && !loading && (desktop || !sheetExpanded) && (
         <button
           type="button"
           data-testid="criteria-locate"
@@ -154,6 +164,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
             {panel || (
               <>
+                {found}
                 <StartPointField
                   start={start}
                   language={language}
@@ -201,6 +212,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         >
           {panel || (
             <>
+              {found}
               {!start && (
                 <p data-testid="criteria-long-press" className="text-center text-sm text-ink-2">
                   {t.longPress}

@@ -2,7 +2,7 @@ import {
   elevationProfile,
   missText,
   parseRoutes,
-  planImageUrl,
+  toMercator,
   positionAt,
   projectRoute,
   slopeClass,
@@ -211,13 +211,18 @@ describe('projectRoute', () => {
   });
 });
 
-describe('planImageUrl', () => {
-  it('asks the IGN Géoplateforme for the Plan IGN over an area', () => {
-    const url = new URL(planImageUrl([-10, -20, 30.04, 40], 200, 160));
+describe('toMercator', () => {
+  it('puts the equator and the meridian of Greenwich at the origin', () => {
+    const [x, y] = toMercator([0, 0]);
 
-    expect(url.origin + url.pathname).toBe('https://data.geopf.fr/wms-r/wms');
-    expect(url.searchParams.get('CRS')).toBe('EPSG:3857');
-    expect(url.searchParams.get('BBOX')).toBe('-10.0,-20.0,30.0,40.0');
-    expect([url.searchParams.get('WIDTH'), url.searchParams.get('HEIGHT')]).toEqual(['200', '160']);
+    expect(x).toBeCloseTo(0);
+    expect(y).toBeCloseTo(0);
+  });
+
+  it('gives metres, stretching latitudes as the map does', () => {
+    const [x, y] = toMercator([1, 45]);
+
+    expect(x).toBeCloseTo(111_319.5, 0);
+    expect(y).toBeCloseTo(5_621_521.5, 0);
   });
 });

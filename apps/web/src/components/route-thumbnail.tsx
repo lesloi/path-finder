@@ -1,27 +1,27 @@
-import { planImageUrl, projectRoute, type Route } from '../core/index.ts';
+import { projectRoute, type MapSnapshot, type MercatorBounds, type Route } from '../core/index.ts';
 import { ROUTE_COLORS } from './route-colors.ts';
 
 const HEIGHT = 100;
 const MARGIN = 10;
 
-// Image pixels per viewBox unit: sharp on a high-density screen.
-const IMAGE_SCALE = 1.6;
-
 /**
- * A route's shape drawn over the Plan IGN of the place it runs through, from the IGN Géoplateforme,
- * the map's own provider: it sees nothing the map does not show it already. `wide` makes it as wide
- * as its container, otherwise it is square.
+ * A route's shape drawn over the part of the map it runs through, cut from the snapshot the map took
+ * on the device: nothing is fetched to draw it. Without a snapshot yet, the shape is on a plain
+ * background. `wide` makes it as wide as its container, otherwise it is square.
  */
 export function RouteThumbnail({
   geometry,
   index,
   wide = false,
+  snapshot,
   testId,
 }: {
   geometry: Route['geometry'];
   /** The route's position in its route set, which gives its colour. */
   index: number;
   wide?: boolean;
+  /** What the map showed for the route set this route is of. */
+  snapshot?: MapSnapshot;
   testId?: string;
 }) {
   const width = wide ? 250 : HEIGHT;
@@ -35,15 +35,9 @@ export function RouteThumbnail({
       viewBox={`0 0 ${width} ${HEIGHT}`}
       aria-hidden
     >
-      {/* The colour of the Plan IGN under its image, while it loads or if it cannot. */}
+      {/* The colour of the Plan IGN, under the snapshot while it is taken. */}
       <rect width={width} height={HEIGHT} fill="#f4f2ea" />
-      <image
-        data-testid={testId && `${testId}-map`}
-        href={planImageUrl(bounds, Math.round(width * IMAGE_SCALE), Math.round(HEIGHT * IMAGE_SCALE))}
-        width={width}
-        height={HEIGHT}
-        preserveAspectRatio="none"
-      />
+      {snapshot && <MapCrop snapshot={snapshot} bounds={bounds} width={width} testId={testId} />}
       <polyline points={line} fill="none" stroke="#ffffff" strokeWidth="6" strokeLinejoin="round" />
       <polyline
         points={line}
@@ -54,5 +48,33 @@ export function RouteThumbnail({
       />
       <circle cx={startX} cy={startY} r="5" fill="#ffffff" stroke="#6b4f33" strokeWidth="3" />
     </svg>
+  );
+}
+
+// The part of the snapshot the thumbnail's box covers on the map, scaled to fill the box.
+function MapCrop({
+  snapshot,
+  bounds: [west, south, east, north],
+  width,
+  testId,
+}: {
+  snapshot: MapSnapshot;
+  bounds: MercatorBounds;
+  width: number;
+  testId?: string;
+}) {
+  const [left, top] = snapshot.toPixel([west, north]);
+  const [right] = snapshot.toPixel([east, south]);
+  const scale = width / (right - left);
+  return (
+    <image
+      data-testid={testId && `${testId}-map`}
+      href={snapshot.url}
+      x={-left * scale}
+      y={-top * scale}
+      width={snapshot.width * scale}
+      height={snapshot.height * scale}
+      preserveAspectRatio="none"
+    />
   );
 }

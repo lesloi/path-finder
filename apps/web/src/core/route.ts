@@ -174,6 +174,27 @@ const MIN_SPAN = 1_000;
 /** The corners of a box in Web Mercator metres: west, south, east, north. */
 export type MercatorBounds = [number, number, number, number];
 
+/** A position in Web Mercator metres, the projection of the map. */
+export function toMercator([lon, lat]: Position): [number, number] {
+  return [
+    (lon * Math.PI * MERCATOR_RADIUS) / 180,
+    MERCATOR_RADIUS * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)),
+  ];
+}
+
+/**
+ * What the map showed when it framed a route set, kept as an image on the device to draw route
+ * thumbnails over: nothing is fetched to make them. `toPixel` gives where a Web Mercator position
+ * lies in the image, in CSS pixels, and `of` is the geometries of the route set it shows.
+ */
+export type MapSnapshot = {
+  url: string;
+  width: number;
+  height: number;
+  toPixel: (mercator: [number, number]) => [number, number];
+  of: Position[][];
+};
+
 /**
  * A route drawn in a `width` by `height` box as it lies on the map, in Web Mercator with north up:
  * scaled to fit, centred, and `margin` from the edges. Also returns the area the whole box covers
@@ -183,8 +204,9 @@ export function projectRoute(
   geometry: Route['geometry'],
   { width, height, margin }: { width: number; height: number; margin: number },
 ): { points: [number, number][]; bounds: MercatorBounds } {
-  const xs = geometry.map(([lon]) => (lon * Math.PI * MERCATOR_RADIUS) / 180);
-  const ys = geometry.map(([, lat]) => MERCATOR_RADIUS * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)));
+  const mercator = geometry.map(([lon, lat]) => toMercator([lon, lat]));
+  const xs = mercator.map(([x]) => x);
+  const ys = mercator.map(([, y]) => y);
   const [west, east, south, north] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   const [spanX, spanY] = [east - west, north - south];
   // A route along one axis fits by the other axis alone; a single place gets a fixed span.
@@ -204,21 +226,4 @@ export function projectRoute(
     north + offsetY / pixelsPerMetre,
   ];
   return { points, bounds };
-}
-
-/** The Plan IGN image of an area, at `width` by `height` pixels, from the IGN Géoplateforme (the map's own provider). */
-export function planImageUrl([west, south, east, north]: MercatorBounds, width: number, height: number): string {
-  const query = new URLSearchParams({
-    SERVICE: 'WMS',
-    VERSION: '1.3.0',
-    REQUEST: 'GetMap',
-    LAYERS: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
-    STYLES: '',
-    CRS: 'EPSG:3857',
-    BBOX: [west, south, east, north].map((metres) => metres.toFixed(1)).join(','),
-    WIDTH: String(width),
-    HEIGHT: String(height),
-    FORMAT: 'image/png',
-  });
-  return `https://data.geopf.fr/wms-r/wms?${query}`;
 }

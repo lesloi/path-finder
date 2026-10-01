@@ -23,7 +23,13 @@ export class Map {
   fitted?: { bounds: unknown; options: unknown };
   sources: Record<string, GeoJSONSource> = {};
   layers: { id: string }[] = [];
-  canvas = { style: { cursor: '' } };
+  canvas = {
+    style: { cursor: '' },
+    clientWidth: 800,
+    clientHeight: 600,
+    // A JPEG of the canvas, as an empty blob.
+    toBlob: (callback: (blob: Blob | null) => void) => callback(new Blob(['snapshot'], { type: 'image/jpeg' })),
+  };
   constructor() {
     maps.push(this);
   }
@@ -33,6 +39,23 @@ export class Map {
     (this.handlers[key] ??= []).push(listener);
   }
   /** Fires the handlers of a map event, or of a layer's event as `fire('click', event, 'routes-hit')`. */
+  once(type: string, handler: Handler) {
+    const once = (event: object) => {
+      this.off(type, once);
+      handler(event);
+    };
+    this.on(type, once);
+  }
+  off(type: string, handler: Handler) {
+    this.handlers[type] = (this.handlers[type] ?? []).filter((candidate) => candidate !== handler);
+  }
+  getCenter() {
+    return { lng: 6, lat: 45 };
+  }
+  /** One pixel per kilometre of longitude and latitude degree around the centre, to test mappings. */
+  project([lng, lat]: [number, number]) {
+    return { x: 400 + (lng - 6) * 1000, y: 300 - (lat - 45) * 1000 };
+  }
   fire(type: string, event: object = {}, layer?: string) {
     for (const handler of this.handlers[layer ? `${type}:${layer}` : type] ?? []) handler(event);
   }
