@@ -111,17 +111,14 @@ export function RouteSetView({
         <strong data-testid="routes-count">{t.routeCount(routes.length)}</strong>
       </div>
       {desktop && (
-        <button
-          type="button"
+        // What the routes were asked for: the way back to change it is the button above.
+        <p
           data-testid="routes-summary"
-          className="flex min-h-touch items-center gap-2 rounded-md bg-surface-2 px-3 text-left text-sm"
-          aria-label={t.changeCriteria(criteriaSummary(request, display))}
-          onClick={onBack}
+          className="m-0 flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2 text-sm"
         >
           <SlidersHorizontal size={16} aria-hidden className="flex-none" />
           <span className="min-w-0 flex-1 truncate">{criteriaSummary(request, display)}</span>
-          <span className="font-semibold text-accent">{t.change}</span>
-        </button>
+        </p>
       )}
       <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
         {routes.map((route, index) => (

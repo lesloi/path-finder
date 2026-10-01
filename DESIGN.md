@@ -41,7 +41,7 @@ background (`#f2efe6`, white roads, `#b9d7ee` water) in raw colours, like the ma
 | `accent`, `accent-hover`, `accent-soft`                   | `#2b6f9e`; dark mode `#6fb0dd`                                |
 | `on-accent`                                               | Text on the accent: white; dark text in dark mode             |
 | `surface`, `surface-2`, `ink`, `ink-2`, `border`, `scrim` | UI surfaces, text, and borders, light and dark                |
-| `route-1` … `route-5`                                     | `#e0115f`, `#1d2433`, `#7a3fc4`, `#0b7a75`, `#c25e00`         |
+| `route-1` … `route-5`                                     | `#e0115f`, `#2563eb`, `#7a3fc4`, `#0b7a75`, `#c25e00`         |
 | `slope-1` … `slope-4`                                     | Uphill grade < 3 %, 3–6 %, 6–10 %, > 10 %                     |
 | `paved`, `unpaved`                                        | Road surfaces                                                 |
 | `start`                                                   | The start point's brown ring, as in the logo                  |

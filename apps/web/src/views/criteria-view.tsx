@@ -99,7 +99,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       onHover={browser.setHover}
     />
   ) : (
-    loading && <SearchingPanel language={language} onCancel={backToCriteria} />
+    loading && <SearchingPanel language={language} />
   );
 
   return (

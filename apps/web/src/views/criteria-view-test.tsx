@@ -397,7 +397,7 @@ describe('CriteriaView', () => {
     }
     const routesSource = () => (map().sources.routes as unknown as { data: { features: unknown[] } }).data.features;
 
-    it('shows a loading state while the API works, and a way to cancel', async () => {
+    it('shows a loading state while the API works, with no way back before it answers', async () => {
       onDesktop();
       ask(new Promise(() => {}));
       render(<CriteriaView language="en" />);
@@ -407,8 +407,7 @@ describe('CriteriaView', () => {
 
       expect(screen.getByTestId('routes-loading')).toHaveTextContent(routesText.en.finding);
       expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
-      fireEvent.click(screen.getByTestId('routes-cancel'));
-      expect(screen.getByTestId('criteria-submit')).toBeInTheDocument();
+      expect(screen.queryByTestId('routes-cancel')).not.toBeInTheDocument();
     });
 
     it('shows the route set in the column, and draws its routes on the map', async () => {

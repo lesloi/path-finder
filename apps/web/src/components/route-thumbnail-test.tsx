@@ -13,7 +13,7 @@ describe('RouteThumbnail', () => {
     render(<RouteThumbnail testId="thumb" geometry={geometry} index={1} />);
 
     const lines = [...screen.getByTestId('thumb').querySelectorAll('polyline')];
-    expect(lines.map((line) => line.getAttribute('stroke'))).toEqual(['#ffffff', '#1d2433']);
+    expect(lines.map((line) => line.getAttribute('stroke'))).toEqual(['#ffffff', '#2563eb']);
   });
 
   it('draws the start point', () => {

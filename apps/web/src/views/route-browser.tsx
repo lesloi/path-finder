@@ -47,7 +47,7 @@ export function useRouteBrowser() {
       setDetail(false);
       find(request);
     },
-    /** Back to the criteria, dropping the route set or the request still running. */
+    /** Back to the criteria, dropping the route set. */
     cancel() {
       clear();
       setDetail(false);
@@ -60,28 +60,17 @@ export function useRouteBrowser() {
   };
 }
 
-/** What replaces the criteria while the API works: a status, and a way back. */
-export function SearchingPanel({ language, onCancel }: { language: Language; onCancel: () => void }) {
-  const t = routesText[language];
+/** What replaces the criteria while the API works. */
+export function SearchingPanel({ language }: { language: Language }) {
   return (
-    <div className="flex flex-col gap-3">
-      <p
-        role="status"
-        data-testid="routes-loading"
-        className="m-0 flex min-h-touch items-center justify-center gap-2 text-ink-2"
-      >
-        <LoaderCircle size={20} aria-hidden className="animate-spin" />
-        {t.finding}
-      </p>
-      <button
-        type="button"
-        data-testid="routes-cancel"
-        className="min-h-touch rounded-full text-accent"
-        onClick={onCancel}
-      >
-        {t.criteria}
-      </button>
-    </div>
+    <p
+      role="status"
+      data-testid="routes-loading"
+      className="m-0 flex min-h-touch items-center justify-center gap-2 text-ink-2"
+    >
+      <LoaderCircle size={20} aria-hidden className="animate-spin" />
+      {routesText[language].finding}
+    </p>
   );
 }
 

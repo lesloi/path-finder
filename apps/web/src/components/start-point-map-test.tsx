@@ -142,7 +142,7 @@ describe('StartPointMap', () => {
       renderRoutes({ selectedRoute: 0 });
 
       expect(features().map(({ properties }) => properties)).toEqual([
-        { index: 1, selected: false, color: '#1d2433' },
+        { index: 1, selected: false, color: '#2563eb' },
         { index: 2, selected: false, color: '#7a3fc4' },
         { index: 0, selected: true, color: '#e0115f' },
       ]);
