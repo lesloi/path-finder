@@ -11,8 +11,10 @@ COPY apps/web/package.json apps/web/
 FROM base AS build
 RUN pnpm install --frozen-lockfile
 COPY apps/web apps/web
-# The web app imports the route generation's bounds and criteria checks through the API's contract.
+# The web app imports the route generation's bounds and criteria checks, and the error codes,
+# through the API's contract.
 COPY apps/api/src/contract.ts apps/api/src/contract.ts
+COPY apps/api/src/http/errors.ts apps/api/src/http/errors.ts
 COPY apps/api/src/route-generation apps/api/src/route-generation
 RUN pnpm build
 
