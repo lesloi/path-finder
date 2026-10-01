@@ -209,73 +209,56 @@ export type MapSnapshot = {
   of: Position[][];
 };
 
-/**
- * The size of a thumbnail's box and the margin its route keeps from the edges, in its own units. A
- * box is as wide as its route needs, from a square up to `width`.
- */
+/** The size of a thumbnail's box and the margin its route keeps from the edges, in its own units. */
 export type ThumbnailBox = { width: number; height: number; margin: number };
-
-// The width a route needs in a box of this height: as wide as it is, from a square up to the box's width.
-function neededWidth(spanX: number, spanY: number, { width, height, margin }: ThumbnailBox): number {
-  if (!spanY) return spanX ? width : height;
-  return Math.min(Math.max((spanX * (height - 2 * margin)) / spanY + 2 * margin, height), width);
-}
 
 /**
  * A route drawn in a box as it lies on the map, in Web Mercator with north up: scaled to fit, centred,
- * and `margin` from the edges. For a thumbnail without a map snapshot. Returns the width of the box it needs.
+ * and `margin` from the edges. For a thumbnail without a map snapshot.
  */
-export function projectRoute(
-  geometry: Route['geometry'],
-  box: ThumbnailBox,
-): { points: [number, number][]; width: number } {
-  const { height, margin } = box;
+export function projectRoute(geometry: Route['geometry'], { width, height, margin }: ThumbnailBox): [number, number][] {
   const mercator = geometry.map(([lon, lat]) => toMercator([lon, lat]));
   const xs = mercator.map(([x]) => x);
   const ys = mercator.map(([, y]) => y);
   const [west, east, south, north] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   const [spanX, spanY] = [east - west, north - south];
-  const width = neededWidth(spanX, spanY, box);
   // A route along one axis fits by the other axis alone; a single place gets a fixed span.
   const scale =
     Math.min(spanX ? (width - 2 * margin) / spanX : Infinity, spanY ? (height - 2 * margin) / spanY : Infinity) ||
     Infinity;
   const pixelsPerMetre = Number.isFinite(scale) ? scale : (Math.min(width, height) - 2 * margin) / MIN_SPAN;
   const [offsetX, offsetY] = [(width - spanX * pixelsPerMetre) / 2, (height - spanY * pixelsPerMetre) / 2];
-  const points = geometry.map((_, k): [number, number] => [
+  return geometry.map((_, k): [number, number] => [
     offsetX + (xs[k] - west) * pixelsPerMetre,
     offsetY + (north - ys[k]) * pixelsPerMetre,
   ]);
-  return { points, width };
 }
 
 /**
  * A route drawn over the part of a map snapshot it runs through, scaled to fit the box and centred
  * as far as the snapshot reaches. The part shown never leaves the snapshot, so no blank edge shows: a
- * route too big for the box's width gets a narrower box. Returns the width of the box, the route's
- * points in it, and where the whole snapshot lies in it.
+ * route too big for the box's width gets a narrower box, whose `width` is returned with the route's
+ * points in it and where the whole snapshot lies in it.
  */
 export function projectOnSnapshot(
   geometry: Route['geometry'],
   snapshot: MapSnapshot,
-  box: ThumbnailBox,
+  { width, height, margin }: ThumbnailBox,
 ): { points: [number, number][]; image: { x: number; y: number; width: number; height: number }; width: number } {
-  const { height, margin } = box;
   const pixels = geometry.map(([lon, lat]) => snapshot.toPixel(toMercator([lon, lat])));
   const xs = pixels.map(([x]) => x);
   const ys = pixels.map(([, y]) => y);
   const [west, east, north, south] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   const [spanX, spanY] = [east - west, south - north];
-  const wanted = neededWidth(spanX, spanY, box);
   const fit = Math.min(
-    spanX ? (wanted - 2 * margin) / spanX : Infinity,
+    spanX ? (width - 2 * margin) / spanX : Infinity,
     spanY ? (height - 2 * margin) / spanY : Infinity,
   );
   // A single place shows as it lies on the map. Never smaller than what makes the snapshot cover the height.
   const scale = Math.max(Number.isFinite(fit) ? fit : 1, height / snapshot.height);
-  const width = Math.min(wanted, snapshot.width * scale);
+  const boxWidth = Math.min(width, snapshot.width * scale);
   // The part of the snapshot the box shows, in its pixels, kept inside it.
-  const [shownWidth, shownHeight] = [width / scale, height / scale];
+  const [shownWidth, shownHeight] = [boxWidth / scale, height / scale];
   const place = (centre: number, shown: number, size: number) =>
     Math.min(Math.max(centre - shown / 2, 0), size - shown);
   const left = place((west + east) / 2, shownWidth, snapshot.width);
@@ -283,6 +266,6 @@ export function projectOnSnapshot(
   return {
     points: pixels.map(([x, y]): [number, number] => [(x - left) * scale, (y - top) * scale]),
     image: { x: -left * scale, y: -top * scale, width: snapshot.width * scale, height: snapshot.height * scale },
-    width,
+    width: boxWidth,
   };
 }

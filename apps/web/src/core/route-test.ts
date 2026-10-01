@@ -200,7 +200,7 @@ describe('projectRoute', () => {
   const box = { width: 100, height: 100, margin: 10 };
 
   it('fits the route in the box with north up', () => {
-    const { points } = projectRoute(
+    const points = projectRoute(
       [
         [6, 45],
         [6, 45.1],
@@ -220,7 +220,7 @@ describe('projectRoute', () => {
   });
 
   it('centres a route that is wider than tall', () => {
-    const { points } = projectRoute(
+    const points = projectRoute(
       [
         [6, 45],
         [6.2, 45],
@@ -232,35 +232,8 @@ describe('projectRoute', () => {
     expect(points.map(([x]) => x)).toEqual([expect.closeTo(10), expect.closeTo(90)]);
   });
 
-  it('gives a route that is about as wide as it is tall a square box, though the box could be wider', () => {
-    const wide = { width: 250, height: 100, margin: 10 };
-    const { width } = projectRoute(
-      [
-        [6, 45],
-        [6.1, 45.1],
-      ],
-      wide,
-    );
-
-    expect(width).toBeLessThan(150);
-    expect(width).toBeGreaterThanOrEqual(100);
-  });
-
-  it('gives a route much wider than tall the whole width of the box', () => {
-    const wide = { width: 250, height: 100, margin: 10 };
-    const { width } = projectRoute(
-      [
-        [6, 45],
-        [6.5, 45.01],
-      ],
-      wide,
-    );
-
-    expect(width).toBe(250);
-  });
-
   it('puts a route of a single place in the middle', () => {
-    expect(projectRoute([[6, 45]], box).points).toEqual([[50, 50]]);
+    expect(projectRoute([[6, 45]], box)).toEqual([[50, 50]]);
   });
 });
 
@@ -317,13 +290,10 @@ describe('projectOnSnapshot', () => {
     expect(image.y + image.height).toBeGreaterThanOrEqual(100 - 1e-6);
   });
 
-  it('crops a wide box to the route: as wide as the route is, not as the box could be', () => {
-    const wide = { width: 250, height: 100, margin: 10 };
-    const { width, points } = projectOnSnapshot(place(300, 250, 100, 100), snapshot, wide);
-
-    expect(width).toBeCloseTo(100, 0);
-    expect(points[0][0]).toBeCloseTo(10, 0);
-    expect(points[1][0]).toBeCloseTo(90, 0);
+  it('keeps the width of the box when the snapshot covers it', () => {
+    expect(projectOnSnapshot(place(300, 250, 60, 60), snapshot, { width: 250, height: 100, margin: 10 }).width).toBe(
+      250,
+    );
   });
 
   it('shows a route of a single place as it lies on the map', () => {

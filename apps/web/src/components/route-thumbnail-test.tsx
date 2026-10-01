@@ -53,22 +53,10 @@ describe('RouteThumbnail', () => {
     expect(screen.getByTestId('thumb')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('is as wide as a wide route needs when asked to be wide', () => {
-    const flat: [number, number][] = [
-      [6, 45],
-      [6.5, 45.01],
-    ];
-    render(<RouteThumbnail testId="thumb" geometry={flat} index={0} wide />);
-
-    expect(screen.getByTestId('thumb')).toHaveAttribute('viewBox', '0 0 250 100');
-  });
-
-  it('crops a wide thumbnail to a route about as tall as it is wide, and keeps it from growing too big', () => {
+  it('is wider when asked to', () => {
     render(<RouteThumbnail testId="thumb" geometry={geometry} index={0} wide />);
 
-    const [, , width] = screen.getByTestId('thumb').getAttribute('viewBox')!.split(' ').map(Number);
-    expect(width).toBeLessThan(150);
-    expect(screen.getByTestId('thumb').style.maxWidth).toBe(`${width * 1.4}px`);
+    expect(screen.getByTestId('thumb')).toHaveAttribute('viewBox', '0 0 250 100');
   });
 
   it('takes the colour of an index beyond the palette', () => {

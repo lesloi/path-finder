@@ -442,10 +442,7 @@ describe('RouteSetView', () => {
       onDesktop();
       render(<View open />);
 
-      // Wide: as wide as its route needs, up to 250 units, so a route about as tall as wide is cropped to it.
-      const [, , width] = screen.getByTestId('route-thumbnail').getAttribute('viewBox')!.split(' ').map(Number);
-      expect(width).toBeGreaterThanOrEqual(100);
-      expect(screen.getByTestId('route-thumbnail').style.maxWidth).not.toBe('');
+      expect(screen.getByTestId('route-thumbnail')).toHaveAttribute('viewBox', '0 0 250 100');
     });
   });
 

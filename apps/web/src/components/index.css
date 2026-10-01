@@ -15,8 +15,8 @@
 
   /* Road surfaces of a route (#9), and the icon of a criterion a suggestion misses. */
   --color-miss: #ef6c00;
-  --color-paved: #8d8f8a;
-  --color-unpaved: #a47148;
+  --color-paved: #c3c8d0;
+  --color-unpaved: #e0703a;
 
   /* Spacing keeps Tailwind's 4 px steps: 1, 2, 3, 4, 6 are 4, 8, 12, 16, 24 px. */
   --spacing-touch: 44px;

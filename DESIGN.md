@@ -35,23 +35,23 @@ dimensions (a 52 px row). Only the map's own colours are written raw: white unde
 colours that MapLibre and the route thumbnails paint, in `components/route-colors.ts`, which
 pairs with the `route-*` tokens (change both together). A route thumbnail is drawn over a snapshot the map takes on the device when it frames a route set, on a cream background until then: nothing is fetched to draw it.
 
-| Utilities                                                 | Values                                                        |
-| --------------------------------------------------------- | ------------------------------------------------------------- |
-| `accent`, `accent-hover`, `accent-soft`                   | `#2b6f9e`; dark mode `#6fb0dd`                                |
-| `on-accent`                                               | Text on the accent: white; dark text in dark mode             |
-| `surface`, `surface-2`, `ink`, `ink-2`, `border`, `scrim` | UI surfaces, text, and borders, light and dark                |
-| `route-1` … `route-5`                                     | `#e0115f`, `#2563eb`, `#7a3fc4`, `#0b7a75`, `#c25e00`         |
-| `paved`, `unpaved`                                        | Road surfaces: the colours of a route's profile and its strip |
-| `miss`                                                    | The icon of a criterion a suggestion misses                   |
-| `start`                                                   | The start point's brown ring, as in the logo                  |
-| spacing `1`, `2`, `3`, `4`, `6`                           | 4, 8, 12, 16, 24 px (Tailwind's 4 px steps)                   |
-| `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`  | 8, 14, 22 px, and a full pill                                 |
-| `shadow-float`                                            | The one shadow, for everything that floats                    |
-| `text-sm`, `text-base`, `text-lg`, `text-xl`              | 13, 15, 18, 24 px, in `rem` like the spacing                  |
-| `font-sans`                                               | The system font stack                                         |
-| `touch` (`size-touch`, `min-h-touch`)                     | 44 px, the smallest touch target                              |
-| `column` (`w-column`)                                     | 380 px, the desktop left column                               |
-| `top-safe-*`, `pb-safe-*`, and the other sides            | An offset or a padding from a screen edge, plus its safe area |
+| Utilities                                                 | Values                                                                                               |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `accent`, `accent-hover`, `accent-soft`                   | `#2b6f9e`; dark mode `#6fb0dd`                                                                       |
+| `on-accent`                                               | Text on the accent: white; dark text in dark mode                                                    |
+| `surface`, `surface-2`, `ink`, `ink-2`, `border`, `scrim` | UI surfaces, text, and borders, light and dark                                                       |
+| `route-1` … `route-5`                                     | `#e0115f`, `#2563eb`, `#7a3fc4`, `#0b7a75`, `#c25e00`                                                |
+| `paved`, `unpaved`                                        | Surfaces: light grey `#c3c8d0`, terracotta `#e0703a`; the colours of a route's profile and its strip |
+| `miss`                                                    | The icon of a criterion a suggestion misses                                                          |
+| `start`                                                   | The start point's brown ring, as in the logo                                                         |
+| spacing `1`, `2`, `3`, `4`, `6`                           | 4, 8, 12, 16, 24 px (Tailwind's 4 px steps)                                                          |
+| `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`  | 8, 14, 22 px, and a full pill                                                                        |
+| `shadow-float`                                            | The one shadow, for everything that floats                                                           |
+| `text-sm`, `text-base`, `text-lg`, `text-xl`              | 13, 15, 18, 24 px, in `rem` like the spacing                                                         |
+| `font-sans`                                               | The system font stack                                                                                |
+| `touch` (`size-touch`, `min-h-touch`)                     | 44 px, the smallest touch target                                                                     |
+| `column` (`w-column`)                                     | 380 px, the desktop left column                                                                      |
+| `top-safe-*`, `pb-safe-*`, and the other sides            | An offset or a padding from a screen edge, plus its safe area                                        |
 
 **Stacking** (`z-*`): 4 for the sheet and the column, 5 for the floating buttons, 9 for a
 toast, 11 and 12 for an open dropdown and its scrim. Sub-pages are in the top

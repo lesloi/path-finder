@@ -4,10 +4,8 @@ import { ROUTE_COLORS } from './route-colors.ts';
 // Sizes in SVG user units: the drawing scales with the element that shows it.
 const HEIGHT = 100;
 const MARGIN = 10;
-// The widest a wide thumbnail gets, about two and a half times its height: it is narrower for a route that is.
+// The width of a wide thumbnail, about two and a half times its height.
 const WIDE_WIDTH = 250;
-// CSS pixels a user unit of a wide thumbnail may take, so one for a route as tall as wide stays small.
-const WIDE_PX_PER_UNIT = 1.4;
 
 /**
  * A route's shape drawn over the part of the map it runs through, cut from the snapshot the map took
@@ -33,14 +31,13 @@ export function RouteThumbnail({
   // A route too big for the wide box gets a narrower one, so the map shown never has a blank edge.
   const { points, image, width } = snapshot
     ? projectOnSnapshot(geometry, snapshot, box)
-    : { ...projectRoute(geometry, box), image: undefined };
+    : { points: projectRoute(geometry, box), image: undefined, width: box.width };
   const line = points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
   const [startX, startY] = points[0];
   return (
     <svg
       data-testid={testId}
-      className={wide ? 'mx-auto w-full flex-none rounded-sm' : 'size-13 flex-none rounded-sm'}
-      {...(wide && { style: { maxWidth: `${width * WIDE_PX_PER_UNIT}px` } })}
+      className={wide ? 'w-full flex-none rounded-sm' : 'size-13 flex-none rounded-sm'}
       viewBox={`0 0 ${width} ${HEIGHT}`}
       aria-hidden
     >
