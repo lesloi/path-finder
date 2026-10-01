@@ -1,16 +1,11 @@
-import type { Language } from '../language.ts';
+import { commonText, type Language } from '../i18n/index.ts';
 
 /** A longitude and a latitude, the shape the API's criteria take. */
 export type Position = [number, number];
 
-const HEMISPHERES = {
-  en: { north: 'N', south: 'S', east: 'E', west: 'W' },
-  fr: { north: 'N', south: 'S', east: 'E', west: 'O' },
-} satisfies Record<Language, unknown>;
-
 /** A position as "45.8000° N · 6.2000° E", latitude first, about 10 m apart at the last digit. */
 export function formatPosition([longitude, latitude]: Position, language: Language): string {
-  const { north, south, east, west } = HEMISPHERES[language];
+  const { north, south, east, west } = commonText[language].hemispheres;
   const format = new Intl.NumberFormat(language, { minimumFractionDigits: 4, maximumFractionDigits: 4 });
   const latitudeText = `${format.format(Math.abs(latitude))}° ${latitude < 0 ? south : north}`;
   const longitudeText = `${format.format(Math.abs(longitude))}° ${longitude < 0 ? west : east}`;

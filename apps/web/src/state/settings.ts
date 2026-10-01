@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import { ACTIVITY_PACES, DEFAULT_ACTIVITY, type Activity, type Units } from '../core/index.ts';
-import type { Language } from '../language.ts';
+import type { Language } from '../i18n/index.ts';
 
 /** What the user sets once and keeps on the device. Only the pace leaves it, with a route set request. */
 export type Settings = {

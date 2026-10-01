@@ -1,4 +1,4 @@
-import type { Language } from '../../language.ts';
+import type { Language } from '../../i18n/index.ts';
 import { PROSE } from '../../components/index.ts';
 
 const publisher = 'https://github.com/lesloi';

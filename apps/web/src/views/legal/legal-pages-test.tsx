@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 
 import { expectNamedControls } from '../../accessible-names.ts';
-import type { Language } from '../../language.ts';
+import type { Language } from '../../i18n/index.ts';
 import { CreditsPage } from './credits-page.tsx';
 import { LegalNoticePage } from './legal-notice-page.tsx';
 import { PrivacyPolicyPage } from './privacy-policy-page.tsx';

@@ -44,7 +44,8 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
 - `apps/web/src` is grouped by role: `components/` (shared UI and its styles), `views/` (screens,
   with `views/legal/`), `core/` (logic without React: activities, units, coordinates, GPX),
-  `state/` (device state and the API's capabilities). `App.tsx`, `main.tsx` and `language.ts` stay at the root.
+  `state/` (device state and the API's capabilities), `i18n/` (the language and every user-facing label).
+  `App.tsx` and `main.tsx` stay at the root.
 - `apps/api/src` is grouped as `http/` (the Hono app, rate limits, client addresses, build id),
   `adapters/` (BRouter and BD ALTI) and `route-generation/` (plain TypeScript). `main.ts` starts the
   server and `contract.ts` lists what the web app may import from the API.
@@ -112,9 +113,11 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
   exists in both.
 - Function components with inline props types; one exported component per file, with
   small private helpers below it.
-- User-facing strings live in a `text` object per file, typed
-  `satisfies Record<Language, unknown>`, and read through `const t = text[language]`.
-  No i18n library.
+- User-facing strings live in `i18n/`, one dictionary per domain (`criteriaText`, `settingsText`,
+  `errorText`), typed `satisfies Record<Language, unknown>` and read through
+  `const t = criteriaText[language]`. A test checks that English and French have the same keys.
+  The API answers with error codes, never with a message: `errorText` maps each `ErrorCode` to
+  its wording. No i18n library.
 - Shared device state goes through `useSyncExternalStore` (see `state/settings.ts`), not a
   state library.
 - Styles follow [DESIGN.md](./DESIGN.md): Tailwind classes limited to its tokens, shared
@@ -138,8 +141,8 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
   a test finds its element whatever the wording or the language; ESLint enforces it. A role without a name
   (`alert`, `listbox`) is fine for an element that is unique. A component that appears more than
   once takes a `testId` prop that prefixes the ids of its parts (`units`, `units-list`).
-- What an element shows is asserted after finding it, in the language under test:
-  `toHaveAccessibleName`, `toHaveTextContent`. Each view and legal page has a test that every
+- What an element shows is asserted after finding it, against the dictionary
+  (`toHaveTextContent(criteriaText.en.findRoutes)`), never against a literal. Each view and legal page has a test that every
   control has an accessible name in both languages (`expectNamedControls`).
 - Mock `fetch` and BRouter with `vi.fn`; unit tests never call the network.
 - End-to-end tests live in `e2e/`: Playwright drives the built app served by `pnpm start`.

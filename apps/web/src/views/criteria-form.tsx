@@ -13,7 +13,6 @@ import {
 } from '../../../api/src/contract.ts';
 import { CHIP, CHIP_ROW, Dialog, PRIMARY_BUTTON, SegmentedControl, Slider, useDesktop } from '../components/index.ts';
 import {
-  ACTIVITY_NAMES,
   ACTIVITY_PACES,
   DEFAULT_ACTIVITY,
   KM_PER_MILE,
@@ -22,7 +21,7 @@ import {
   type Position,
   type Units,
 } from '../core/index.ts';
-import type { Language } from '../language.ts';
+import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { paceFor, useSettings } from '../state/index.ts';
 
 /** What the form sends: the criteria and the activity, in the shape `parseCriteria` accepts. */
@@ -50,71 +49,6 @@ export type Draft = {
   gain: number;
   surface: Surface;
 };
-
-const text = {
-  en: {
-    activity: 'Activity',
-    target: 'Target',
-    distance: 'Distance',
-    duration: 'Duration',
-    elevationGain: 'Elevation gain',
-    elevationChip: 'Elevation',
-    any: 'Any',
-    flat: 'Flat',
-    hilly: 'Hilly',
-    targetLevel: 'Exact',
-    surface: 'Surface',
-    paved: 'Paved',
-    anySurface: 'Any',
-    unpaved: 'Unpaved',
-    close: 'Close',
-    findRoutes: 'Find routes',
-    aboutPace: 'Your pace',
-    adjustPace: 'Adjust your pace',
-    adjustPaceHint: 'for better estimates.',
-    hour: 'h',
-    minute: 'min',
-    distanceError: (min: number, max: number, unit: string) =>
-      `The distance must be between ${min} and ${max} ${unit}.`,
-    durationError: 'This duration does not fit the elevation gain and your pace.',
-    elevationGainError: (max: number, unit: string) => `The elevation gain must be between 0 and ${max} ${unit}.`,
-    startError: 'Choose a start point.',
-    activityError: 'Choose an activity.',
-    surfaceError: 'Choose a surface.',
-    paceError: 'Your pace is not valid: adjust it in the settings.',
-  },
-  fr: {
-    activity: 'Activité',
-    target: 'Objectif',
-    distance: 'Distance',
-    duration: 'Durée',
-    elevationGain: 'Dénivelé',
-    elevationChip: 'Dénivelé',
-    any: 'Indifférent',
-    flat: 'Plat',
-    hilly: 'Vallonné',
-    targetLevel: 'Précis',
-    surface: 'Revêtement',
-    paved: 'Goudronné',
-    anySurface: 'Indifférent',
-    unpaved: 'Non goudronné',
-    close: 'Fermer',
-    findRoutes: 'Trouver des parcours',
-    aboutPace: 'Votre allure',
-    adjustPace: 'Ajustez votre allure',
-    adjustPaceHint: 'pour de meilleures estimations.',
-    hour: 'h',
-    minute: 'min',
-    distanceError: (min: number, max: number, unit: string) =>
-      `La distance doit être comprise entre ${min} et ${max} ${unit}.`,
-    durationError: 'Cette durée ne convient pas au dénivelé et à votre allure.',
-    elevationGainError: (max: number, unit: string) => `Le dénivelé doit être compris entre 0 et ${max} ${unit}.`,
-    startError: 'Choisissez un point de départ.',
-    activityError: 'Choisissez une activité.',
-    surfaceError: 'Choisissez un revêtement.',
-    paceError: 'Votre allure n’est pas valide : ajustez-la dans les réglages.',
-  },
-} satisfies Record<Language, unknown>;
 
 /** The bounds of the sliders in the user's units, inside the API's bounds once converted back. */
 function boundsFor(activity: Activity, units: Units) {
@@ -162,7 +96,7 @@ function convert(draft: Draft, from: Units, to: Units): Draft {
 
 const round = (value: number, decimals: number) => Math.round(value * 10 ** decimals) / 10 ** decimals;
 
-function formatDuration(minutes: number, t: (typeof text)[Language]): string {
+function formatDuration(minutes: number, t: (typeof criteriaText)[Language]): string {
   const hours = Math.floor(minutes / 60);
   if (hours === 0) return `${minutes} ${t.minute}`;
   return `${hours} ${t.hour} ${`${minutes % 60}`.padStart(2, '0')}`;
@@ -207,7 +141,7 @@ export function CriteriaForm({
   elevation?: boolean;
   onSubmit: (request: CriteriaRequest) => void;
 }) {
-  const t = text[language];
+  const t = { ...commonText[language], ...criteriaText[language] };
   const desktop = useDesktop();
   const [settings, update] = useSettings();
   const { units } = settings;
@@ -260,7 +194,7 @@ export function CriteriaForm({
                 onClick={() => update({ lastActivity: value })}
               >
                 <ActivityIcon activity={value} />
-                {ACTIVITY_NAMES[value][language]}
+                {t.activities[value]}
               </button>
             );
           })}
@@ -384,7 +318,7 @@ export function CriteriaForm({
   // `name` stands for the value on a chip that is the default, so two "Any" chips are told apart.
   const chips: Record<Criterion, { label: string; name?: string; icon?: ReactNode; set: boolean }> = {
     activity: {
-      label: ACTIVITY_NAMES[activity][language],
+      label: t.activities[activity],
       icon: <ActivityIcon activity={activity} />,
       set: activity !== DEFAULT_ACTIVITY,
     },
@@ -500,7 +434,7 @@ function message(
     unit: { distance: string; gain: string };
   },
 ): string {
-  const t = text[language];
+  const t = criteriaText[language];
   const messages: Record<CriteriaField, string> = {
     start: t.startError,
     activity: t.activityError,

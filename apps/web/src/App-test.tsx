@@ -4,6 +4,7 @@ import { Map } from 'maplibre-gl';
 
 import { App } from './App.tsx';
 import { expectNamedControls } from './accessible-names.ts';
+import { commonText } from './i18n/index.ts';
 
 // jsdom has no WebGL.
 vi.mock('maplibre-gl');
@@ -31,9 +32,9 @@ describe('App', () => {
   });
 
   it.each([
-    ['credits', 'Credits'],
-    ['privacy', 'Privacy policy'],
-    ['legal-notice', 'Legal notice'],
+    ['credits', commonText.en.credits],
+    ['privacy', commonText.en.privacy],
+    ['legal-notice', commonText.en.legalNotice],
   ])('opens the %s page from the settings and goes back', async (page, title) => {
     render(<App />);
 
@@ -44,7 +45,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByTestId('sub-page-back'));
 
-    await onPage('Settings');
+    await onPage(commonText.en.settings);
   });
 
   it.each([
@@ -55,7 +56,7 @@ describe('App', () => {
     const { container } = render(<App />);
 
     fireEvent.click(screen.getByTestId('criteria-settings'));
-    await onPage('Settings');
+    await onPage(commonText.en.settings);
 
     expectNamedControls(container);
   });
@@ -95,7 +96,7 @@ describe('App', () => {
     fireEvent.click(screen.getByTestId('criteria-settings'));
 
     expect(await screen.findByTestId('sub-page')).toHaveAttribute('open');
-    expect(screen.getByTestId('sub-page')).toHaveAccessibleName('Settings');
+    expect(screen.getByTestId('sub-page')).toHaveAccessibleName(commonText.en.settings);
     expect(screen.queryByTestId('criteria-settings')).not.toBeInTheDocument();
   });
 
@@ -103,18 +104,18 @@ describe('App', () => {
     render(<App />);
     fireEvent.click(screen.getByTestId('criteria-settings'));
     fireEvent.click(await screen.findByTestId('settings-credits'));
-    await onPage('Credits');
+    await onPage(commonText.en.credits);
 
     fireEvent(screen.getByTestId('sub-page'), new Event('cancel', { cancelable: true }));
 
-    await onPage('Settings');
+    await onPage(commonText.en.settings);
   });
 
   it('closes every page on a click on the scrim', async () => {
     render(<App />);
     fireEvent.click(screen.getByTestId('criteria-settings'));
     fireEvent.click(await screen.findByTestId('settings-credits'));
-    await onPage('Credits');
+    await onPage(commonText.en.credits);
 
     fireEvent.click(screen.getByTestId('sub-page'));
 
@@ -150,7 +151,7 @@ describe('App', () => {
 
     fireEvent.click(await screen.findByTestId('sub-page-title'));
 
-    expect(screen.getByTestId('sub-page')).toHaveAccessibleName('Settings');
+    expect(screen.getByTestId('sub-page')).toHaveAccessibleName(commonText.en.settings);
   });
 
   it('shows the settings button again on desktops once the page is closed', async () => {
@@ -170,7 +171,7 @@ describe('App', () => {
     fireEvent.click(screen.getByTestId('criteria-settings'));
     fireEvent.click(await screen.findByTestId('settings-privacy'));
 
-    await onPage('Politique de confidentialité');
+    await onPage(commonText.fr.privacy);
   });
 
   it('sets the document language to fr when the browser prefers French', () => {
@@ -188,7 +189,7 @@ describe('App', () => {
     fireEvent.click(await screen.findByTestId('settings-language'));
     fireEvent.click(screen.getByTestId('settings-language-fr'));
 
-    expect(screen.getByTestId('sub-page-title')).toHaveTextContent('Réglages');
+    expect(screen.getByTestId('sub-page-title')).toHaveTextContent(commonText.fr.settings);
     expect(document.documentElement.lang).toBe('fr');
   });
 

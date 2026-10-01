@@ -1,25 +1,30 @@
 import { useEffect, type ComponentType } from 'react';
 
 import { SubPage } from './components/index.ts';
-import { browserLanguage, type Language } from './language.ts';
+import { browserLanguage, commonText, type Language } from './i18n/index.ts';
 import { goTo, useHash, useSettings } from './state/index.ts';
 import { CreditsPage, CriteriaView, LegalNoticePage, PrivacyPolicyPage, SettingsView } from './views/index.ts';
 // Each page by its hash, with its title and where its back arrow goes.
 const pages: Record<
   string,
-  { Page: ComponentType<{ language: Language }>; title: Record<Language, string>; back: string; wide?: boolean }
+  {
+    Page: ComponentType<{ language: Language }>;
+    title: 'settings' | 'credits' | 'privacy' | 'legalNotice';
+    back: string;
+    wide?: boolean;
+  }
 > = {
-  '#/settings': { Page: SettingsView, title: { en: 'Settings', fr: 'Réglages' }, back: '#/' },
-  '#/credits': { Page: CreditsPage, title: { en: 'Credits', fr: 'Crédits' }, back: '#/settings', wide: true },
+  '#/settings': { Page: SettingsView, title: 'settings', back: '#/' },
+  '#/credits': { Page: CreditsPage, title: 'credits', back: '#/settings', wide: true },
   '#/privacy': {
     Page: PrivacyPolicyPage,
-    title: { en: 'Privacy policy', fr: 'Politique de confidentialité' },
+    title: 'privacy',
     back: '#/settings',
     wide: true,
   },
   '#/legal-notice': {
     Page: LegalNoticePage,
-    title: { en: 'Legal notice', fr: 'Mentions légales' },
+    title: 'legalNotice',
     back: '#/settings',
     wide: true,
   },
@@ -45,7 +50,7 @@ export function App() {
       <CriteriaView language={language} pageOpen={Boolean(page)} />
       {page && (
         <SubPage
-          title={page.title[language]}
+          title={commonText[language][page.title]}
           back={page.back}
           {...(page.wide && { wide: true })}
           language={language}

@@ -2,9 +2,13 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { parseCriteria } from '../../../api/src/contract.ts';
 import { expectNamedControls } from '../accessible-names.ts';
+import { criteriaText } from '../i18n/index.ts';
 import { CriteriaForm } from './criteria-form.tsx';
 import { useSettings } from '../state/index.ts';
 import type { Position } from '../core/index.ts';
+
+const en = criteriaText.en;
+const fr = criteriaText.fr;
 
 const START: Position = [6.1294, 45.8992];
 
@@ -222,7 +226,7 @@ describe('CriteriaForm', () => {
       setup({ compact: true, elevation: false });
 
       expect(screen.queryByTestId('criteria-chip-elevation')).not.toBeInTheDocument();
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName('Surface: Any');
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName(`${en.surface}: ${en.anySurface}`);
     });
   });
 
@@ -311,9 +315,7 @@ describe('CriteriaForm', () => {
       choose('elevation', 'target');
       fireEvent.change(slider('gain'), { target: { value: '2000' } });
 
-      expect(screen.getByTestId('criteria-error')).toHaveTextContent(
-        'This duration does not fit the elevation gain and your pace.',
-      );
+      expect(screen.getByTestId('criteria-error')).toHaveTextContent(en.durationError);
       expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
     });
 
@@ -324,7 +326,7 @@ describe('CriteriaForm', () => {
       choose('elevation', 'target');
       fireEvent.change(slider('gain'), { target: { value: '2000' } });
 
-      expect(screen.getByTestId('criteria-error')).toHaveTextContent('Cette durée ne convient pas');
+      expect(screen.getByTestId('criteria-error')).toHaveTextContent(fr.durationError);
     });
   });
 
@@ -367,23 +369,23 @@ describe('CriteriaForm', () => {
     it('names the elevation gain and surface chips while they are the default, so they are told apart', () => {
       setup({ compact: true });
 
-      expect(screen.getByTestId('criteria-chip-elevation')).toHaveAccessibleName('Elevation gain: Any');
-      expect(screen.getByTestId('criteria-chip-elevation')).toHaveTextContent('Elevation');
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName('Surface: Any');
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveTextContent('Surface');
+      expect(screen.getByTestId('criteria-chip-elevation')).toHaveAccessibleName(`${en.elevationGain}: ${en.any}`);
+      expect(screen.getByTestId('criteria-chip-elevation')).toHaveTextContent(en.elevationChip);
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName(`${en.surface}: ${en.anySurface}`);
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveTextContent(en.surface);
 
       fireEvent.click(screen.getByTestId('criteria-chip-surface'));
       choose('surface', 'paved');
 
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName('Surface: Paved');
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveTextContent('Paved');
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName(`${en.surface}: ${en.paved}`);
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveTextContent(en.paved);
     });
 
     it('opens one criterion in a dialog and applies its changes as they are made', () => {
       const { onSubmit, submit } = setup({ compact: true });
 
       fireEvent.click(screen.getByTestId('criteria-chip-surface'));
-      expect(screen.getByTestId('criteria-dialog')).toHaveAccessibleName('Surface');
+      expect(screen.getByTestId('criteria-dialog')).toHaveAccessibleName(en.surface);
       choose('surface', 'paved');
 
       expect(screen.getByTestId('criteria-chip-surface')).toHaveAttribute('data-set');
@@ -406,7 +408,7 @@ describe('CriteriaForm', () => {
       fireEvent.change(slider('duration'), { target: { value: '30' } });
 
       expect(within(screen.getByTestId('criteria-dialog')).getByTestId('criteria-error')).toHaveTextContent(
-        'does not fit',
+        en.durationError,
       );
     });
 
@@ -416,7 +418,7 @@ describe('CriteriaForm', () => {
       fireEvent.click(screen.getByTestId('criteria-chip-target'));
       choose('target', 'duration');
 
-      expect(screen.getByTestId('criteria-chip-target')).toHaveAccessibleName('Target: 1 h 00');
+      expect(screen.getByTestId('criteria-chip-target')).toHaveAccessibleName(`${en.target}: 1 ${en.hour} 00`);
       expect(screen.getByTestId('criteria-chip-target')).toHaveAttribute('data-set');
     });
 

@@ -1,17 +1,12 @@
 import { ArrowLeft, X } from 'lucide-react';
 import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from 'react';
 
-import type { Language } from '../language.ts';
+import { commonText, type Language } from '../i18n/index.ts';
 import { ICON_BUTTON } from './styles.ts';
 import { useDesktop } from './use-desktop.ts';
 
 // Where closing a page leads: the map.
 const HOME = '#/';
-
-const text = {
-  en: { back: 'Back', close: 'Close' },
-  fr: { back: 'Retour', close: 'Fermer' },
-} satisfies Record<Language, unknown>;
 
 /**
  * A modal page over the map: full screen on phones, with a back arrow to `back`; centred on
@@ -35,7 +30,7 @@ export function SubPage({
   navigate: (hash: string) => void;
   children: ReactNode;
 }) {
-  const t = text[language];
+  const t = commonText[language];
   const desktop = useDesktop();
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);

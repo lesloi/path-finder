@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 
+import { criteriaText } from '../apps/web/src/i18n/index.ts';
 import { expect, openMap, test } from './test.ts';
 
 // Longer than the map's 500 ms long press.
@@ -62,6 +63,6 @@ test.describe('the start point', () => {
 
     await myLocationButton(page).click();
 
-    await expect(page.getByTestId('criteria-toast')).toContainText('Your location is unavailable.');
+    await expect(page.getByTestId('criteria-toast')).toContainText(criteriaText.en.unavailable);
   });
 });
