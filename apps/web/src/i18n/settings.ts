@@ -4,6 +4,10 @@ export const settingsText = {
   en: {
     display: 'Display',
     pace: 'Pace',
+    theme: 'Theme',
+    system: 'System',
+    light: 'Light',
+    dark: 'Dark',
     language: 'Language',
     units: 'Units',
     metric: 'Metric (km, m)',
@@ -13,6 +17,10 @@ export const settingsText = {
   fr: {
     display: 'Affichage',
     pace: 'Allure',
+    theme: 'Thème',
+    system: 'Système',
+    light: 'Clair',
+    dark: 'Sombre',
     language: 'Langue',
     units: 'Unités',
     metric: 'Métriques (km, m)',

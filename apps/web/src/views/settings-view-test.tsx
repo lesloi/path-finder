@@ -9,7 +9,7 @@ const en = { ...commonText.en, ...settingsText.en };
 const fr = { ...commonText.fr, ...settingsText.fr };
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);
 const saved = () => renderHook(() => useSettings()).result.current[0];
-const pick = (dropdown: 'language' | 'units', option: string) => {
+const pick = (dropdown: 'theme' | 'language' | 'units', option: string) => {
   fireEvent.click(screen.getByTestId(`settings-${dropdown}`));
   fireEvent.click(screen.getByTestId(`settings-${dropdown}-${option}`));
 };
@@ -21,6 +21,22 @@ describe('SettingsView', () => {
     expect(screen.getByTestId('settings-pace-run')).toHaveValue('6:00');
     expect(screen.getByTestId('settings-pace-hike')).toHaveValue('4.5');
     expect(screen.getByTestId('settings-units')).toHaveAccessibleName(`${en.units} ${en.metric}`);
+  });
+
+  it('saves the picked theme', () => {
+    renderView();
+
+    pick('theme', 'dark');
+
+    expect(screen.getByTestId('settings-theme')).toHaveAccessibleName(`${en.theme} ${en.dark}`);
+    expect(saved().theme).toBe('dark');
+  });
+
+  it('shows the theme first in the display group', () => {
+    renderView();
+
+    expect(screen.getByTestId('settings-theme')).toHaveAccessibleName(`${en.theme} ${en.system}`);
+    expect(screen.getAllByRole('button')[0]).toBe(screen.getByTestId('settings-theme'));
   });
 
   it('shows the display, pace, and about groups in this order', () => {
