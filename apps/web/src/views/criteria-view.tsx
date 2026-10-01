@@ -1,11 +1,12 @@
-import { Crosshair, LoaderCircle, LocateFixed, Settings } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Crosshair, LocateFixed, Settings } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
-import { useElevation, useRouteSet, useSettings, type RouteSetError } from '../state/index.ts';
+import { useElevation, useSettings } from '../state/index.ts';
 import { CriteriaForm, useCriteriaDraft } from './criteria-form.tsx';
+import { RouteErrorToast, SearchingPanel, useRouteBrowser } from './route-browser.tsx';
 import { RouteSetView } from './route-set-view.tsx';
-import { formatPosition, parsePosition, type Position, type RouteSetRequest } from '../core/index.ts';
-import { commonText, criteriaText, errorText, routesText, type Language } from '../i18n/index.ts';
+import { formatPosition, parsePosition, type Position } from '../core/index.ts';
+import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
   StartPointMap,
   BottomSheet,
@@ -38,17 +39,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const settingsLink = useRef<HTMLAnchorElement>(null);
   const pageWasOpen = useRef(pageOpen);
   const [{ units }] = useSettings();
-  const [routeError, setRouteError] = useState<RouteSetError | 'no-routes'>();
-  const { routeSet, loading, find, clear } = useRouteSet(setRouteError);
-  const [selected, setSelected] = useState(0);
-  const [detail, setDetail] = useState(false);
-  // Where the user points on the elevation profile, as a place on the map.
-  const [hover, setHover] = useState<Position>();
-  // Kept while the route set does, so the map's effects only run for a new one.
-  const geometries = useMemo(
-    () => routeSet?.routes.map(({ geometry }) => geometry.map(([lon, lat]): Position => [lon, lat])),
-    [routeSet],
-  );
+  const browser = useRouteBrowser();
+  const { routeSet, loading } = browser;
 
   // Keyboard users go on from the button that opened the page.
   useEffect(() => {
@@ -62,29 +54,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     return () => clearTimeout(timer);
   }, [toast]);
 
-  useEffect(() => {
-    if (!routeError) return;
-    const timer = setTimeout(() => setRouteError(undefined), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [routeError]);
-
-  function findRoutes(request: RouteSetRequest) {
-    setRouteError(undefined);
-    setSelected(0);
-    setDetail(false);
-    find(request);
-  }
-
   function backToCriteria() {
-    clear();
-    setDetail(false);
-    setHover(undefined);
+    browser.cancel();
     setSheetExpanded(false);
-  }
-
-  function openDetail(open: boolean) {
-    setDetail(open);
-    setHover(undefined);
   }
 
   function changeStart(position: Position) {
@@ -114,41 +86,22 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     );
   }
 
-  const results = routeSet && (
+  const panel = routeSet ? (
     <RouteSetView
       language={language}
       units={units}
       request={routeSet.request}
       routes={routeSet.routes}
-      selected={selected}
-      detail={detail}
-      onSelect={setSelected}
-      onDetailChange={openDetail}
+      selected={browser.selected}
+      detail={browser.detail}
+      onSelect={browser.select}
+      onDetailChange={browser.openDetail}
       onBack={backToCriteria}
-      onHover={setHover}
+      onHover={browser.setHover}
     />
+  ) : (
+    loading && <SearchingPanel language={language} onCancel={backToCriteria} />
   );
-  const searching = loading && (
-    <div className="flex flex-col gap-3">
-      <p
-        role="status"
-        data-testid="routes-loading"
-        className="m-0 flex min-h-touch items-center justify-center gap-2 text-ink-2"
-      >
-        <LoaderCircle size={20} aria-hidden className="animate-spin" />
-        {t.finding}
-      </p>
-      <button
-        type="button"
-        data-testid="routes-cancel"
-        className="min-h-touch rounded-full text-accent"
-        onClick={backToCriteria}
-      >
-        {t.criteria}
-      </button>
-    </div>
-  );
-  const panel = results || searching;
 
   return (
     <>
@@ -157,11 +110,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         focus={focus}
         // On desktops, the start point block also arms a click.
         pickOnClick={desktop && picking}
-        routes={geometries}
-        selectedRoute={selected}
-        framing={detail ? 'selected' : 'all'}
-        {...(detail && hover && { hover })}
-        onRouteSelect={setSelected}
+        routes={browser.geometries}
+        selectedRoute={browser.selected}
+        framing={browser.detail ? 'selected' : 'all'}
+        {...(browser.detail && browser.hover && { hover: browser.hover })}
+        onRouteSelect={browser.select}
         onStartChange={changeStart}
       />
       {/* The settings are open, or another page with a way back to them. */}
@@ -234,7 +187,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
                   start={start}
                   draft={draft}
                   elevation={elevation}
-                  onSubmit={findRoutes}
+                  onSubmit={browser.ask}
                 />
               </>
             )}
@@ -266,26 +219,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
                 draft={draft}
                 elevation={elevation}
                 compact={!sheetExpanded}
-                onSubmit={findRoutes}
+                onSubmit={browser.ask}
               />
             </>
           )}
         </BottomSheet>
       )}
-      {routeError && (
-        // A click drops it at once.
-        <p className={TOAST} role="alert" data-testid="routes-toast" onClick={() => setRouteError(undefined)}>
-          {routeError === 'no-routes' || routeError === 'unreachable' ? (
-            <>
-              {routeError === 'no-routes' ? t.noRoutes : t.unreachable}
-              <br />
-              {routeError === 'no-routes' ? t.noRoutesHint : t.unreachableHint}
-            </>
-          ) : (
-            errorText[language][routeError]
-          )}
-        </p>
-      )}
+      {browser.error && <RouteErrorToast language={language} error={browser.error} onDismiss={browser.dismissError} />}
       {toast && toast.start === start && (
         // A click drops it at once.
         <p className={TOAST} role="alert" data-testid="criteria-toast" onClick={() => setToast(undefined)}>
