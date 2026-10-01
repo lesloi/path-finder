@@ -20,9 +20,9 @@ import {
   ICON_BUTTON,
   PRIMARY_BUTTON,
   ProfileSparkline,
-  ROUTE_BORDERS,
+  routeBorder,
   RouteThumbnail,
-  SURFACE_DOTS,
+  SURFACE_CLASSES,
   useDesktop,
 } from '../components/index.ts';
 import {
@@ -202,7 +202,7 @@ function RouteRow({
       data-selected={selected ? '' : undefined}
       className={
         `flex min-h-13 w-full items-center gap-3 rounded-md border border-l-4 border-border p-2 text-left ` +
-        `${ROUTE_BORDERS[index % ROUTE_BORDERS.length]} hover:bg-surface-2 data-selected:bg-surface-2`
+        `${routeBorder(index)} hover:bg-surface-2 data-selected:bg-surface-2`
       }
       aria-label={name}
       onClick={onOpen}
@@ -388,10 +388,10 @@ function RouteDetail({
           <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
           {/* The legend of the colours of the profile. */}
           <p data-testid="route-surface" className="m-0 flex items-center gap-1 text-sm text-ink-2">
-            <i className={`size-2 rounded-full ${SURFACE_DOTS.paved}`} aria-hidden />
+            <i className={`size-2 rounded-full ${SURFACE_CLASSES.paved.dot}`} aria-hidden />
             {t.paved} {percent.format(1 - unpaved)}
             <span className="whitespace-pre"> · </span>
-            <i className={`size-2 rounded-full ${SURFACE_DOTS.unpaved}`} aria-hidden />
+            <i className={`size-2 rounded-full ${SURFACE_CLASSES.unpaved.dot}`} aria-hidden />
             {t.unpaved} {percent.format(unpaved)}
           </p>
           <button

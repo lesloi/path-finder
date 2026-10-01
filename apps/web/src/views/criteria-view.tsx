@@ -16,8 +16,8 @@ import {
   FLOATING_BUTTON,
   ICON_BUTTON,
   SIDE_COLUMN,
-  TOAST,
-  TOAST_MS,
+  Toast,
+  useToastTimeout,
   useDesktop,
 } from '../components/index.ts';
 
@@ -50,11 +50,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     pageWasOpen.current = pageOpen;
   }, [pageOpen]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(undefined), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [toast]);
+  useToastTimeout(toast, () => setToast(undefined));
 
   function backToCriteria() {
     browser.leave();
@@ -241,12 +237,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       )}
       {browser.error && <RouteErrorToast language={language} error={browser.error} onDismiss={browser.dismissError} />}
       {toast && toast.start === start && (
-        // A click drops it at once.
-        <p className={TOAST} role="alert" data-testid="criteria-toast" onClick={() => setToast(undefined)}>
+        <Toast testId="criteria-toast" onDismiss={() => setToast(undefined)}>
           {toast.problem === 'unavailable' ? t.unavailable : t.unreadable}
           <br />
           {toast.problem === 'unreadable' ? t.coordinatesHint : desktop ? t.pickHintDesktop : t.pickHint}
-        </p>
+        </Toast>
       )}
     </>
   );

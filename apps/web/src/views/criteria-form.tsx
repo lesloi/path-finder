@@ -26,9 +26,6 @@ import {
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { paceFor, useSettings } from '../state/index.ts';
 
-/** What the form sends: the criteria and the activity, in the shape `parseCriteria` accepts. */
-export type CriteriaRequest = RouteSetRequest;
-
 const ACTIVITIES = Object.keys(ACTIVITY_PACES) as Activity[];
 const ACTIVITY_ICONS = { run: Footprints, hike: Mountain } satisfies Record<Activity, LucideIcon>;
 
@@ -135,7 +132,7 @@ export function CriteriaForm({
   compact?: boolean;
   /** Whether the API has elevation data: without it, the target elevation gain is ignored, so it is not offered. */
   elevation?: boolean;
-  onSubmit: (request: CriteriaRequest) => void;
+  onSubmit: (request: RouteSetRequest) => void;
 }) {
   const t = { ...commonText[language], ...criteriaText[language] };
   const desktop = useDesktop();
@@ -159,7 +156,7 @@ export function CriteriaForm({
   const level = elevation ? draft.level : 'any';
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
-  const request: CriteriaRequest | undefined = start && {
+  const request: RouteSetRequest | undefined = start && {
     start,
     activity,
     target:
@@ -406,7 +403,7 @@ function ActivityIcon({ activity }: { activity: Activity }) {
 }
 
 // The first field `parseCriteria` rejects, as the API would.
-function invalidField(request: CriteriaRequest): CriteriaField | undefined {
+function invalidField(request: RouteSetRequest): CriteriaField | undefined {
   try {
     parseCriteria(request);
   } catch (error) {

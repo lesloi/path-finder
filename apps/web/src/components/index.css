@@ -73,8 +73,10 @@
   --float-1: light-dark(rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.4));
   --float-2: light-dark(rgb(0 0 0 / 0.14), rgb(0 0 0 / 0.45));
   --float: 0 1px 3px var(--float-1), 0 4px 14px var(--float-2);
-  /* The horizontal centre of the map beside the desktop left column and its margin. */
-  --map-centre: calc(50% + (var(--spacing-column) + var(--spacing) * 3) / 2);
+  /* What the desktop left column and its margin cover from the left of the map. */
+  --column-inset: calc(var(--spacing-column) + var(--spacing) * 3);
+  /* The horizontal centre of the map beside it. */
+  --map-centre: calc(50% + var(--column-inset) / 2);
   /* The theme setting sets `data-theme` on <html>; without it the browser's scheme applies. */
   color-scheme: light dark;
 }

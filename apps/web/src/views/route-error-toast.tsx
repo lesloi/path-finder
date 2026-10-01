@@ -1,4 +1,4 @@
-import { TOAST } from '../components/index.ts';
+import { Toast } from '../components/index.ts';
 import { errorText, routesText, type Language } from '../i18n/index.ts';
 import type { RouteSetError } from '../state/index.ts';
 
@@ -22,7 +22,7 @@ export function RouteErrorToast({
           ? [t.failed, t.failedHint]
           : [errorText[language][error]];
   return (
-    <p className={TOAST} role="alert" data-testid="routes-toast" onClick={onDismiss}>
+    <Toast testId="routes-toast" onDismiss={onDismiss}>
       {lines[0]}
       {lines[1] && (
         <>
@@ -30,6 +30,6 @@ export function RouteErrorToast({
           {lines[1]}
         </>
       )}
-    </p>
+    </Toast>
   );
 }

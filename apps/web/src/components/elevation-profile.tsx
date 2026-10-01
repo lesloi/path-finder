@@ -12,7 +12,8 @@ import {
   type Display,
 } from '../core/index.ts';
 import { routesText } from '../i18n/index.ts';
-import { SURFACE_FILLS, SURFACE_STROKES } from './surface-colors.ts';
+import { profileScale } from './profile-scale.ts';
+import { SURFACE_CLASSES } from './surface-colors.ts';
 
 const WIDTH = 300;
 const HEIGHT = 60;
@@ -40,12 +41,8 @@ export function ElevationProfile({
   const profile = elevationProfile(route.geometry);
   if (!profile) return null;
 
-  const total = profile.at(-1)!.distance;
-  const heights = profile.map(({ height }) => height);
-  const [min, max] = [Math.min(...heights), Math.max(...heights)];
+  const { total, min, max, x, y } = profileScale(profile, { width: WIDTH, height: HEIGHT, pad: PAD });
   const middle = (min + max) / 2;
-  const x = (distance: number) => (total ? (distance / total) * WIDTH : 0);
-  const y = (height: number) => HEIGHT - PAD - ((height - min) / (max - min || 1)) * (HEIGHT - 2 * PAD);
 
   function move(event: PointerEvent<HTMLDivElement>) {
     const box = event.currentTarget.getBoundingClientRect();
@@ -78,17 +75,17 @@ export function ElevationProfile({
           {/* As wide as the widest altitude, which the others are placed in. */}
           <span className="invisible block h-0 overflow-hidden whitespace-nowrap">{formatHeight(max, display)}</span>
           {[
-            ['max', max],
-            ['mid', middle],
-            ['min', min],
-          ].map(([name, height]) => (
+            { name: 'max', height: max },
+            { name: 'mid', height: middle },
+            { name: 'min', height: min },
+          ].map(({ name, height }) => (
             <span
               key={name}
               data-testid={testId && `${testId}-${name}`}
               className="absolute right-0 -translate-y-1/2 leading-none"
-              style={{ top: `${(y(height as number) / HEIGHT) * 100}%` }}
+              style={{ top: `${(y(height) / HEIGHT) * 100}%` }}
             >
-              {formatHeight(height as number, display)}
+              {formatHeight(height, display)}
             </span>
           ))}
         </div>
@@ -129,14 +126,14 @@ export function ElevationProfile({
                 <g key={k} data-surface={surface}>
                   <polygon
                     points={`${x0},${HEIGHT} ${x0},${y(from.height)} ${x1},${y(to.height)} ${x1},${HEIGHT}`}
-                    className={`${SURFACE_FILLS[surface]} opacity-30`}
+                    className={`${SURFACE_CLASSES[surface].fill} opacity-30`}
                   />
                   <line
                     x1={x0}
                     y1={y(from.height)}
                     x2={x1}
                     y2={y(to.height)}
-                    className={SURFACE_STROKES[surface]}
+                    className={SURFACE_CLASSES[surface].stroke}
                     strokeWidth="2.5"
                     vectorEffect="non-scaling-stroke"
                   />

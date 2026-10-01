@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import { TOAST_MS } from '../components/index.ts';
+import { useToastTimeout } from '../components/index.ts';
 import type { MapSnapshot, Position, RouteSetRequest } from '../core/index.ts';
 import { useRouteSet, type RouteSetError } from '../state/index.ts';
 
@@ -23,11 +23,7 @@ export function useRouteBrowser() {
     [routeSet],
   );
 
-  useEffect(() => {
-    if (!error) return;
-    const timer = setTimeout(() => setError(undefined), TOAST_MS);
-    return () => clearTimeout(timer);
-  }, [error]);
+  useToastTimeout(error, () => setError(undefined));
 
   // A snapshot of another route set would draw the wrong places.
   const snapshot = mapSnapshot?.of === geometries ? mapSnapshot : undefined;

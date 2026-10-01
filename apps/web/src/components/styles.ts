@@ -27,9 +27,6 @@ export const LIST_ROW =
 /** The chevron at the end of a list row that links to a page. */
 export const LIST_ROW_CHEVRON = 'flex-none text-ink-2';
 
-/** Milliseconds a toast stays before it drops by itself. */
-export const TOAST_MS = 6_000;
-
 /**
  * A short message at the top of the screen, below the floating buttons, centred on the map, in their
  * colours; a click drops it.

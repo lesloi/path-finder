@@ -31,9 +31,10 @@ drops Tailwind's default colours, radii, shadows, fonts, type sizes, and breakpo
 colour or a radius outside the tokens does not exist. Spacing is Tailwind's own scale, in
 `rem` so it follows the user's font size, and any multiple compiles: gaps, paddings, and
 margins use the steps below, and other multiples (`min-h-13`) only give a component its own
-dimensions (a 52 px row). Only the map's own colours are written raw: white under the start point, and the route
-colours that MapLibre and the route thumbnails paint, in `components/route-colors.ts`, which
-pairs with the `route-*` tokens (change both together). A route thumbnail is drawn over a snapshot the map takes on the device when it frames a route set, on a cream background until then: nothing is fetched to draw it.
+dimensions (a 52 px row). Only what MapLibre and the route thumbnails paint is written raw, in `components/route-colors.ts`: the route
+colours, which pair with the `route-*` tokens (change both together), white under a route, the start
+point's brown (the `start` token) and the cream of the Plan IGN's land. A route thumbnail is drawn over a snapshot
+the map takes on the device when it frames a route set, on that cream until then: nothing is fetched to draw it.
 
 | Utilities                                                 | Values                                                                                                |
 | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |

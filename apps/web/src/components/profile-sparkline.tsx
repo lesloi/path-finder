@@ -1,5 +1,6 @@
 import { elevationProfile, type Route } from '../core/index.ts';
-import { ROUTE_COLORS } from './route-colors.ts';
+import { profileScale } from './profile-scale.ts';
+import { routeColor } from './route-colors.ts';
 
 const WIDTH = 100;
 const HEIGHT = 30;
@@ -22,16 +23,9 @@ export function ProfileSparkline({
 }) {
   const profile = elevationProfile(geometry);
   if (!profile) return null;
-  const total = profile.at(-1)!.distance;
-  const heights = profile.map(({ height }) => height);
-  const [min, max] = [Math.min(...heights), Math.max(...heights)];
-  const points = profile.map(({ distance, height }) => {
-    const x = total ? (distance / total) * WIDTH : 0;
-    // A flat route sits in the middle rather than on an edge.
-    const y = max === min ? HEIGHT / 2 : HEIGHT - PAD - ((height - min) / (max - min)) * (HEIGHT - 2 * PAD);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const color = ROUTE_COLORS[index % ROUTE_COLORS.length];
+  const { x, y } = profileScale(profile, { width: WIDTH, height: HEIGHT, pad: PAD });
+  const points = profile.map(({ distance, height }) => `${x(distance).toFixed(1)},${y(height).toFixed(1)}`);
+  const color = routeColor(index);
   return (
     <svg
       data-testid={testId}

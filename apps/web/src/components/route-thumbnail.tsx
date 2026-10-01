@@ -1,5 +1,5 @@
 import { projectOnSnapshot, projectRoute, type MapSnapshot, type Route } from '../core/index.ts';
-import { ROUTE_COLORS } from './route-colors.ts';
+import { MAP_COLORS, routeColor } from './route-colors.ts';
 
 // Sizes in SVG user units: the drawing scales with the element that shows it.
 const HEIGHT = 100;
@@ -33,19 +33,13 @@ export function RouteThumbnail({
   return (
     <svg data-testid={testId} className="size-13 flex-none rounded-sm" viewBox={`0 0 ${width} ${HEIGHT}`} aria-hidden>
       {/* The colour of the Plan IGN, under the snapshot while it is taken. */}
-      <rect width={width} height={HEIGHT} fill="#f4f2ea" />
+      <rect width={width} height={HEIGHT} fill={MAP_COLORS.land} />
       {snapshot && image && (
         <image data-testid={testId && `${testId}-map`} href={snapshot.url} preserveAspectRatio="none" {...image} />
       )}
-      <polyline points={line} fill="none" stroke="#ffffff" strokeWidth={6} strokeLinejoin="round" />
-      <polyline
-        points={line}
-        fill="none"
-        stroke={ROUTE_COLORS[index % ROUTE_COLORS.length]}
-        strokeWidth={3.5}
-        strokeLinejoin="round"
-      />
-      <circle cx={startX} cy={startY} r={5} fill="#ffffff" stroke="#6b4f33" strokeWidth={3} />
+      <polyline points={line} fill="none" stroke={MAP_COLORS.white} strokeWidth={6} strokeLinejoin="round" />
+      <polyline points={line} fill="none" stroke={routeColor(index)} strokeWidth={3.5} strokeLinejoin="round" />
+      <circle cx={startX} cy={startY} r={5} fill={MAP_COLORS.white} stroke={MAP_COLORS.start} strokeWidth={3} />
     </svg>
   );
 }
