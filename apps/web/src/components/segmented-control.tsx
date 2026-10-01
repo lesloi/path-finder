@@ -6,15 +6,18 @@ export function SegmentedControl<Value extends string>({
   value,
   options,
   onChange,
+  testId,
 }: {
   label: string;
   value: Value;
   options: { value: Value; label: string }[];
   onChange: (value: Value) => void;
+  /** Prefix of the test ids: the group, then `-<value>` for each radio button. */
+  testId?: string;
 }) {
   const name = useId();
   return (
-    <div role="radiogroup" aria-label={label} className="flex rounded-full bg-surface-2 p-1">
+    <div role="radiogroup" data-testid={testId} aria-label={label} className="flex rounded-full bg-surface-2 p-1">
       {options.map((option) => (
         <label
           key={option.value}
@@ -26,6 +29,7 @@ export function SegmentedControl<Value extends string>({
         >
           <input
             type="radio"
+            data-testid={testId && `${testId}-${option.value}`}
             className="sr-only"
             name={name}
             value={option.value}

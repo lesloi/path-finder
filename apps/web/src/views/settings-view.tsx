@@ -52,6 +52,7 @@ export function SettingsView({ language }: { language: Language }) {
       <div className={LIST}>
         <div className={LIST_ROW}>
           <Dropdown
+            testId="settings-language"
             label={t.language}
             value={language}
             options={[
@@ -63,6 +64,7 @@ export function SettingsView({ language }: { language: Language }) {
         </div>
         <div className={LIST_ROW}>
           <Dropdown
+            testId="settings-units"
             label={t.units}
             value={settings.units}
             options={[
@@ -88,11 +90,11 @@ export function SettingsView({ language }: { language: Language }) {
       <h2 className={GROUP_TITLE}>{t.about}</h2>
       <nav className={LIST}>
         {[
-          [t.credits, '#/credits'],
-          [t.privacy, '#/privacy'],
-          [t.legalNotice, '#/legal-notice'],
-        ].map(([name, href]) => (
-          <a key={href} className={LIST_ROW} href={href}>
+          [t.credits, '#/credits', 'settings-credits'],
+          [t.privacy, '#/privacy', 'settings-privacy'],
+          [t.legalNotice, '#/legal-notice', 'settings-legal-notice'],
+        ].map(([name, href, testId]) => (
+          <a key={href} className={LIST_ROW} data-testid={testId} href={href}>
             {name}
             <ChevronRight size={18} aria-hidden className={LIST_ROW_CHEVRON} />
           </a>
@@ -112,6 +114,7 @@ function PaceInput({ activity, language, units }: { activity: Activity; language
     <label className={LIST_ROW}>
       {`${ACTIVITY_NAMES[activity][language]} (${paceUnit(display, units)})`}
       <input
+        data-testid={`settings-pace-${activity}`}
         className="min-h-touch w-22 rounded-sm bg-surface-2 px-3 text-right"
         inputMode="decimal"
         value={draft}

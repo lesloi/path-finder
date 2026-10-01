@@ -247,13 +247,14 @@ export function CriteriaForm({
     activity: {
       title: t.activity,
       content: (
-        <div role="group" aria-label={t.activity} className="flex gap-2">
+        <div role="group" data-testid="criteria-activity" aria-label={t.activity} className="flex gap-2">
           {ACTIVITIES.map((value) => {
             return (
               <button
                 key={value}
                 type="button"
                 className={CHIP}
+                data-testid={`criteria-activity-${value}`}
                 data-set={value === activity ? '' : undefined}
                 aria-pressed={value === activity}
                 onClick={() => update({ lastActivity: value })}
@@ -271,6 +272,7 @@ export function CriteriaForm({
       content: (
         <div className="flex flex-col gap-2">
           <SegmentedControl
+            testId="criteria-target"
             label={t.target}
             value={draft.target}
             options={[
@@ -281,6 +283,7 @@ export function CriteriaForm({
           />
           {draft.target === 'distance' ? (
             <Slider
+              testId="criteria-distance"
               label={t.distance}
               value={distance}
               shown={`${distance} ${unit.distance}`}
@@ -291,6 +294,7 @@ export function CriteriaForm({
             />
           ) : (
             <Slider
+              testId="criteria-duration"
               label={t.duration}
               value={draft.duration}
               shown={formatDuration(draft.duration, t)}
@@ -299,6 +303,7 @@ export function CriteriaForm({
                   <button
                     type="button"
                     className="flex min-h-touch items-center gap-1 text-sm text-accent"
+                    data-testid="criteria-pace-info"
                     aria-expanded={paceInfo}
                     onClick={() => setPaceInfo(!paceInfo)}
                   >
@@ -315,7 +320,7 @@ export function CriteriaForm({
           )}
           {showPaceHint && paceInfo && (
             <p className="text-sm text-ink-2">
-              <a className="text-accent underline" href="#/settings">
+              <a className="text-accent underline" data-testid="criteria-pace-link" href="#/settings">
                 {t.adjustPace}
               </a>{' '}
               {t.adjustPaceHint}
@@ -329,6 +334,7 @@ export function CriteriaForm({
       content: (
         <div className="flex flex-col gap-2">
           <SegmentedControl
+            testId="criteria-elevation"
             label={t.elevationGain}
             value={level}
             options={[
@@ -341,6 +347,7 @@ export function CriteriaForm({
           />
           {level === 'target' && (
             <Slider
+              testId="criteria-gain"
               label={t.elevationGain}
               value={gain}
               shown={`${gain} ${unit.gain}`}
@@ -357,6 +364,7 @@ export function CriteriaForm({
       title: t.surface,
       content: (
         <SegmentedControl
+          testId="criteria-surface"
           label={t.surface}
           value={draft.surface}
           options={[
@@ -401,12 +409,12 @@ export function CriteriaForm({
   };
 
   const findRoutes = request && !field && (
-    <button type="button" className={PRIMARY_BUTTON} onClick={() => onSubmit(request)}>
+    <button type="button" className={PRIMARY_BUTTON} data-testid="criteria-submit" onClick={() => onSubmit(request)}>
       {t.findRoutes}
     </button>
   );
   const error = field && (
-    <p role="alert" className="text-sm text-ink">
+    <p role="alert" data-testid="criteria-error" className="text-sm text-ink">
       {message(field, draft.target, { language, distance: bounds.distance, gain: bounds.gain, unit })}
     </p>
   );
@@ -420,6 +428,7 @@ export function CriteriaForm({
               key={criterion}
               type="button"
               className={CHIP}
+              data-testid={`criteria-chip-${criterion}`}
               data-set={chips[criterion].set ? '' : undefined}
               aria-label={`${sections[criterion].title}: ${chips[criterion].label}`}
               onClick={() => setOpen(criterion)}
@@ -432,7 +441,12 @@ export function CriteriaForm({
         {error}
         {findRoutes}
         {open && (
-          <Dialog title={sections[open].title} closeLabel={t.close} onClose={() => setOpen(undefined)}>
+          <Dialog
+            testId="criteria-dialog"
+            title={sections[open].title}
+            closeLabel={t.close}
+            onClose={() => setOpen(undefined)}
+          >
             {sections[open].content}
             {/* The sheet is behind the dialog, and changes apply as they are made. */}
             {error && <div className="mt-2">{error}</div>}

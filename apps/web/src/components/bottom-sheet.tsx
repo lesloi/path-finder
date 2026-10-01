@@ -8,11 +8,14 @@ export function BottomSheet({
   label,
   expanded,
   onExpandedChange,
+  testId,
   children,
 }: {
   label: string;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
+  /** Prefix of the test ids: the sheet, then `-handle` for its handle. */
+  testId?: string;
   children?: ReactNode;
 }) {
   const sheet = useRef<HTMLDivElement>(null);
@@ -53,6 +56,7 @@ export function BottomSheet({
   return (
     <div
       ref={sheet}
+      data-testid={testId}
       className={
         'fixed inset-x-0 bottom-0 z-4 flex flex-col rounded-t-lg bg-surface shadow-float ' +
         'pr-safe-4 pb-safe-4 pl-safe-4 transition-[max-height] duration-250 ease-[ease] desktop:hidden ' +
@@ -61,6 +65,7 @@ export function BottomSheet({
     >
       <button
         type="button"
+        data-testid={testId && `${testId}-handle`}
         className={
           'h-7 w-full flex-none cursor-grab touch-none before:mx-auto before:block before:h-1 before:w-10 ' +
           'before:rounded-full before:bg-border'

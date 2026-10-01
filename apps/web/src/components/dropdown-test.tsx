@@ -8,56 +8,57 @@ const options = [
   { value: 'nautical', label: 'Nautical' },
 ];
 
-const open = () => fireEvent.click(screen.getByRole('button', { name: 'Units Metric' }));
-const option = (name: string) => screen.getByRole('option', { name });
+const open = () => fireEvent.click(screen.getByTestId('units'));
+const option = (value: string) => screen.getByTestId(`units-${value}`);
 
 describe('Dropdown', () => {
   it('names itself with its label and its value', () => {
-    render(<Dropdown label="Units" value="metric" options={options} onChange={vi.fn()} />);
+    render(<Dropdown testId="units" label="Units" value="metric" options={options} onChange={vi.fn()} />);
 
-    expect(screen.getByRole('button', { name: 'Units Metric' })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.getByTestId('units')).toHaveAccessibleName('Units Metric');
+    expect(screen.getByTestId('units')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('units-list')).not.toBeInTheDocument();
   });
 
   it('opens on the current option', () => {
-    render(<Dropdown label="Units" value="metric" options={options} onChange={vi.fn()} />);
+    render(<Dropdown testId="units" label="Units" value="metric" options={options} onChange={vi.fn()} />);
 
     open();
 
-    expect(option('Metric')).toHaveAttribute('aria-selected', 'true');
-    expect(option('Metric')).toHaveFocus();
+    expect(option('metric')).toHaveAttribute('aria-selected', 'true');
+    expect(option('metric')).toHaveFocus();
   });
 
   it('picks a value from its list and closes it', () => {
     const onChange = vi.fn();
-    render(<Dropdown label="Units" value="metric" options={options} onChange={onChange} />);
+    render(<Dropdown testId="units" label="Units" value="metric" options={options} onChange={onChange} />);
     open();
 
-    fireEvent.click(option('Imperial'));
+    fireEvent.click(option('imperial'));
 
     expect(onChange).toHaveBeenCalledWith('imperial');
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('units-list')).not.toBeInTheDocument();
   });
 
   it('picks a value with the keyboard', () => {
     const onChange = vi.fn();
-    render(<Dropdown label="Units" value="metric" options={options} onChange={onChange} />);
+    render(<Dropdown testId="units" label="Units" value="metric" options={options} onChange={onChange} />);
     open();
 
-    fireEvent.keyDown(option('Imperial'), { key: 'Enter' });
+    fireEvent.keyDown(option('imperial'), { key: 'Enter' });
 
     expect(onChange).toHaveBeenCalledWith('imperial');
   });
 
   it.each([
-    ['ArrowDown moves to the next option', ['ArrowDown'], 'Imperial'],
-    ['ArrowDown stops at the last option', ['ArrowDown', 'ArrowDown', 'ArrowDown'], 'Nautical'],
-    ['ArrowUp moves to the previous option', ['End', 'ArrowUp'], 'Imperial'],
-    ['ArrowUp stops at the first option', ['ArrowUp'], 'Metric'],
-    ['End moves to the last option', ['End'], 'Nautical'],
-    ['Home moves to the first option', ['End', 'Home'], 'Metric'],
+    ['ArrowDown moves to the next option', ['ArrowDown'], 'imperial'],
+    ['ArrowDown stops at the last option', ['ArrowDown', 'ArrowDown', 'ArrowDown'], 'nautical'],
+    ['ArrowUp moves to the previous option', ['End', 'ArrowUp'], 'imperial'],
+    ['ArrowUp stops at the first option', ['ArrowUp'], 'metric'],
+    ['End moves to the last option', ['End'], 'nautical'],
+    ['Home moves to the first option', ['End', 'Home'], 'metric'],
   ])('%s', (_, keys, focused) => {
-    render(<Dropdown label="Units" value="metric" options={options} onChange={vi.fn()} />);
+    render(<Dropdown testId="units" label="Units" value="metric" options={options} onChange={vi.fn()} />);
     open();
 
     for (const key of keys) fireEvent.keyDown(document.activeElement!, { key });
@@ -66,7 +67,7 @@ describe('Dropdown', () => {
   });
 
   it('leaves its options out of the tab order', () => {
-    render(<Dropdown label="Units" value="metric" options={options} onChange={vi.fn()} />);
+    render(<Dropdown testId="units" label="Units" value="metric" options={options} onChange={vi.fn()} />);
     open();
 
     expect(screen.getAllByRole('option').map((item) => item.tabIndex)).toEqual([-1, -1, -1]);
@@ -74,24 +75,24 @@ describe('Dropdown', () => {
 
   it('closes without a change on Tab, back on its button', () => {
     const onChange = vi.fn();
-    render(<Dropdown label="Units" value="metric" options={options} onChange={onChange} />);
+    render(<Dropdown testId="units" label="Units" value="metric" options={options} onChange={onChange} />);
     open();
 
-    fireEvent.keyDown(option('Metric'), { key: 'Tab' });
+    fireEvent.keyDown(option('metric'), { key: 'Tab' });
 
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Units Metric' })).toHaveFocus();
+    expect(screen.queryByTestId('units-list')).not.toBeInTheDocument();
+    expect(screen.getByTestId('units')).toHaveFocus();
     expect(onChange).not.toHaveBeenCalled();
   });
 
   it('closes without a change on Escape', () => {
     const onChange = vi.fn();
-    render(<Dropdown label="Units" value="metric" options={options} onChange={onChange} />);
+    render(<Dropdown testId="units" label="Units" value="metric" options={options} onChange={onChange} />);
     open();
 
-    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByTestId('units-list'), { key: 'Escape' });
 
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('units-list')).not.toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
   });
 });

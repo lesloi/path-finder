@@ -8,7 +8,7 @@ const scaleway = 'https://www.scaleway.com';
 export function LegalNoticePage({ language }: { language: Language }) {
   if (language === 'fr') {
     return (
-      <div className={PROSE}>
+      <div className={PROSE} data-testid="legal-notice-page">
         <h2>Éditeur</h2>
         <p>
           Path finder est édité à titre non professionnel par un particulier, connu sur GitHub sous le nom{' '}
@@ -28,7 +28,7 @@ export function LegalNoticePage({ language }: { language: Language }) {
     );
   }
   return (
-    <div className={PROSE}>
+    <div className={PROSE} data-testid="legal-notice-page">
       <h2>Publisher</h2>
       <p>
         Path finder is published on a non-professional basis by a private individual, known on GitHub as{' '}

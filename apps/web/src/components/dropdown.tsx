@@ -13,11 +13,14 @@ export function Dropdown<Value extends string>({
   value,
   options,
   onChange,
+  testId,
 }: {
   label: string;
   value: Value;
   options: DropdownOption<Value>[];
   onChange: (value: Value) => void;
+  /** Prefix of the test ids: the button, then `-list` and `-<value>` for the list and its options. */
+  testId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const labelId = useId();
@@ -73,6 +76,7 @@ export function Dropdown<Value extends string>({
         <button
           ref={button}
           id={buttonId}
+          data-testid={testId}
           type="button"
           className="inline-flex min-h-touch items-center gap-2 rounded-sm bg-surface-2 px-3"
           aria-haspopup="listbox"
@@ -94,6 +98,7 @@ export function Dropdown<Value extends string>({
                 'shadow-float'
               }
               role="listbox"
+              data-testid={testId && `${testId}-list`}
               aria-labelledby={labelId}
               onKeyDown={move}
             >
@@ -106,6 +111,7 @@ export function Dropdown<Value extends string>({
                     'aria-selected:text-accent'
                   }
                   role="option"
+                  data-testid={testId && `${testId}-${option.value}`}
                   aria-selected={option.value === value}
                   tabIndex={-1}
                   onClick={() => pick(option.value)}

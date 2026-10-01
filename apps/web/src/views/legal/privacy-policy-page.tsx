@@ -6,7 +6,7 @@ const cnil = 'https://www.cnil.fr/fr/plaintes';
 export function PrivacyPolicyPage({ language }: { language: Language }) {
   if (language === 'fr') {
     return (
-      <div className={PROSE}>
+      <div className={PROSE} data-testid="privacy-policy-page">
         <p>
           Pas de compte, pas de cookie, pas de mesure d’audience, pas de pistage. Vos réglages restent dans votre
           navigateur. Notre serveur calcule les itinéraires et n’en garde rien.
@@ -72,7 +72,7 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
     );
   }
   return (
-    <div className={PROSE}>
+    <div className={PROSE} data-testid="privacy-policy-page">
       <p>
         No account, no cookie, no analytics, no tracking. Your settings stay in your browser. Our server generates
         routes and keeps nothing.

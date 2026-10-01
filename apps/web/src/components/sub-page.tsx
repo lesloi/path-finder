@@ -60,6 +60,7 @@ export function SubPage({
   return (
     <dialog
       ref={dialog}
+      data-testid="sub-page"
       aria-labelledby={headingId}
       className={
         'fixed inset-0 m-0 flex h-dvh max-h-none w-full max-w-none flex-col bg-surface text-ink ' +
@@ -82,20 +83,27 @@ export function SubPage({
         }
       >
         {(!desktop || back !== HOME) && (
-          <a className={ICON_BUTTON} href={back} aria-label={t.back} onClick={follow(back)}>
+          <a className={ICON_BUTTON} data-testid="sub-page-back" href={back} aria-label={t.back} onClick={follow(back)}>
             <ArrowLeft aria-hidden />
           </a>
         )}
         <h1
           ref={heading}
           id={headingId}
+          data-testid="sub-page-title"
           className={`text-lg font-bold outline-none ${desktop && back === HOME ? 'pl-2' : ''}`}
           tabIndex={-1}
         >
           {title}
         </h1>
         {desktop && (
-          <a className={`${ICON_BUTTON} ml-auto`} href={HOME} aria-label={t.close} onClick={follow(HOME)}>
+          <a
+            className={`${ICON_BUTTON} ml-auto`}
+            data-testid="sub-page-close"
+            href={HOME}
+            aria-label={t.close}
+            onClick={follow(HOME)}
+          >
             <X aria-hidden />
           </a>
         )}
