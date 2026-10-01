@@ -1,25 +1,52 @@
 version: 2
 updates:
   - package-ecosystem: npm
-    directories:
-      - /
-      - /apps/api
-      - /apps/web
-      - /e2e
-    open-pull-requests-limit: 10
-    rebase-strategy: disabled
+    # pnpm workspace: the root lockfile covers apps/* and e2e.
+    directory: /
     versioning-strategy: increase
+    labels:
+      - dependencies
+    cooldown:
+      default-days: 7
+    groups:
+      production:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # @types/node follows the Node major of the Docker image, and TypeScript is pinned.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
     schedule:
       interval: weekly
   - package-ecosystem: github-actions
     directory: /
-    open-pull-requests-limit: 10
-    rebase-strategy: disabled
+    labels:
+      - dependencies
+      - infra
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
     schedule:
       interval: weekly
   - package-ecosystem: docker
     directory: /
-    open-pull-requests-limit: 10
-    rebase-strategy: disabled
+    labels:
+      - dependencies
+      - infra
+    cooldown:
+      default-days: 7
     schedule:
       interval: weekly
