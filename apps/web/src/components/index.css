@@ -58,6 +58,12 @@
   --color-ink-2: var(--ink-2);
   --color-border: var(--border);
   --color-scrim: var(--scrim);
+  /* A route's colour on the UI, which its dark navy would lose in dark mode. */
+  --color-route-ui-1: var(--color-route-1);
+  --color-route-ui-2: var(--route-ui-2);
+  --color-route-ui-3: var(--color-route-3);
+  --color-route-ui-4: var(--color-route-4);
+  --color-route-ui-5: var(--color-route-5);
   --shadow-float: var(--float);
 }
 
@@ -72,6 +78,7 @@
   --ink-2: #5d615c;
   --border: #e1e3df;
   --scrim: rgb(0 0 0 / 0.35);
+  --route-ui-2: #1d2433;
   --float: 0 1px 3px rgb(0 0 0 / 0.12), 0 4px 14px rgb(0 0 0 / 0.14);
   /* The horizontal centre of the map beside the desktop left column and its margin. */
   --map-centre: calc(50% + (var(--spacing-column) + var(--spacing) * 3) / 2);
@@ -90,6 +97,7 @@
     --ink-2: #a3a7a2;
     --border: #363937;
     --float: 0 1px 3px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.45);
+    --route-ui-2: #b4bfd8;
   }
 }
 
