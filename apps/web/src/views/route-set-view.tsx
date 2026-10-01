@@ -21,9 +21,9 @@ import {
   PRIMARY_BUTTON,
   ProfileSparkline,
   ROUTE_BORDERS,
+  RouteSketch,
   RouteThumbnail,
   SURFACE_DOTS,
-  SurfaceStrip,
   useDesktop,
 } from '../components/index.ts';
 import {
@@ -363,6 +363,7 @@ function RouteDetail({
           )}
         </div>
       </div>
+      {desktop && <RouteSketch testId="route-sketch" geometry={route.geometry} index={selected} />}
       <div className="flex items-center gap-3">
         {!desktop && (
           <RouteThumbnail
@@ -384,7 +385,6 @@ function RouteDetail({
       {!condensed && (
         <>
           <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
-          <SurfaceStrip testId="route-surface-strip" surfaces={route.surfaces} />
           {/* The legend of the surface strip and of the colours of the profile. */}
           <p data-testid="route-surface" className="m-0 flex items-center gap-1 text-sm text-ink-2">
             <i className={`size-2 rounded-full ${SURFACE_DOTS.paved}`} aria-hidden />

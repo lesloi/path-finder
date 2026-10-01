@@ -299,7 +299,6 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('route-figures')).toBeInTheDocument();
       expect(screen.queryByTestId('route-export')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-profile')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('route-surface-strip')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-surface')).not.toBeInTheDocument();
     });
 
@@ -308,7 +307,6 @@ describe('RouteSetView', () => {
 
       expect(screen.getByTestId('route-profile')).toBeInTheDocument();
       expect(screen.getByTestId('route-surface')).toHaveTextContent('Paved 70% · Unpaved 30%');
-      expect(screen.getByTestId('route-surface-strip')).toBeInTheDocument();
     });
 
     it('hands the place hovered on the profile to the map', () => {
@@ -443,6 +441,7 @@ describe('RouteSetView', () => {
       render(<View open />);
 
       expect(screen.queryByTestId('route-thumbnail')).not.toBeInTheDocument();
+      expect(screen.getByTestId('route-sketch')).toBeInTheDocument();
     });
   });
 
