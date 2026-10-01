@@ -24,7 +24,6 @@ function setup(props: { start?: Position; compact?: boolean; elevation?: boolean
 }
 
 const slider = (name: string) => screen.getByRole('slider', { name });
-const setGain = (name = 'Set elevation gain') => fireEvent.click(screen.getByRole('button', { name }));
 const choose = (name: string) => fireEvent.click(screen.getByRole('radio', { name }));
 
 beforeEach(() => {
@@ -60,7 +59,7 @@ describe('CriteriaForm', () => {
     const { onSubmit, submit } = setup();
     choose('Duration');
     fireEvent.change(slider('Duration'), { target: { value: '90' } });
-    setGain();
+    choose('Target');
     fireEvent.change(slider('Elevation gain'), { target: { value: '400' } });
     choose('Unpaved');
 
@@ -123,7 +122,7 @@ describe('CriteriaForm', () => {
       const onSubmit = vi.fn();
       render(<UnitsSwitch onSubmit={onSubmit} />);
       fireEvent.change(slider('Distance'), { target: { value: '16' } });
-      setGain();
+      choose('Target');
       fireEvent.change(slider('Elevation gain'), { target: { value: '500' } });
 
       fireEvent.click(screen.getByRole('button', { name: 'Imperial' }));
@@ -169,33 +168,26 @@ describe('CriteriaForm', () => {
 
     it('is a number of metres for Target', () => {
       const { onSubmit, submit } = setup();
-      setGain();
+      choose('Target');
 
       submit();
 
       expect(onSubmit.mock.calls[0][0].elevationGain).toBe(300);
     });
 
-    it('shows its slider once a total is set, and no shortcut is checked then', () => {
+    it('shows its slider for Target only', () => {
       setup();
       expect(screen.queryByRole('slider', { name: 'Elevation gain' })).not.toBeInTheDocument();
-      const shortcuts = () => within(screen.getByRole('radiogroup', { name: 'Elevation gain' }));
-      expect(shortcuts().getByRole('radio', { name: 'Any' })).toBeChecked();
 
-      setGain();
+      choose('Target');
 
       expect(slider('Elevation gain')).toHaveAttribute('max', '2500');
-      expect(shortcuts().queryByRole('radio', { checked: true })).not.toBeInTheDocument();
-
-      choose('Flat');
-
-      expect(screen.queryByRole('slider', { name: 'Elevation gain' })).not.toBeInTheDocument();
     });
 
     it('converts feet to metres, within the API bounds', () => {
       store({ units: 'imperial' });
       const { onSubmit, submit } = setup();
-      setGain();
+      choose('Target');
       expect(slider('Elevation gain')).toHaveAttribute('max', '8200');
       fireEvent.change(slider('Elevation gain'), { target: { value: '8200' } });
 
@@ -320,7 +312,7 @@ describe('CriteriaForm', () => {
       setup();
       choose('Duration');
       fireEvent.change(slider('Duration'), { target: { value: '30' } });
-      setGain();
+      choose('Target');
       fireEvent.change(slider('Elevation gain'), { target: { value: '2000' } });
 
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -333,7 +325,7 @@ describe('CriteriaForm', () => {
       setup({ language: 'fr' });
       choose('Durée');
       fireEvent.change(slider('Durée'), { target: { value: '30' } });
-      setGain('Fixer un dénivelé');
+      choose('Cible');
       fireEvent.change(slider('Dénivelé'), { target: { value: '2000' } });
 
       expect(screen.getByRole('alert')).toHaveTextContent('Cette durée ne convient pas');
@@ -386,7 +378,7 @@ describe('CriteriaForm', () => {
       store({ lastActivity: 'run' });
       setup({ compact: true });
       fireEvent.click(screen.getByRole('button', { name: 'Elevation gain: Any' }));
-      setGain();
+      fireEvent.click(screen.getByRole('radio', { name: 'Target' }));
       fireEvent.change(screen.getByRole('slider', { name: 'Elevation gain' }), { target: { value: '2000' } });
       fireEvent.click(screen.getByRole('button', { name: 'Close' }));
       fireEvent.click(screen.getByRole('button', { name: 'Target: 10 km' }));
