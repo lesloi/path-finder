@@ -21,7 +21,6 @@ import {
   PRIMARY_BUTTON,
   ProfileSparkline,
   ROUTE_BORDERS,
-  RouteSketch,
   RouteThumbnail,
   SURFACE_DOTS,
   useDesktop,
@@ -363,7 +362,6 @@ function RouteDetail({
           )}
         </div>
       </div>
-      {desktop && <RouteSketch testId="route-sketch" geometry={route.geometry} index={selected} />}
       <div className="flex items-center gap-3">
         {!desktop && (
           <RouteThumbnail

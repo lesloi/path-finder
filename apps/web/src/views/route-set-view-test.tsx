@@ -441,7 +441,6 @@ describe('RouteSetView', () => {
       render(<View open />);
 
       expect(screen.queryByTestId('route-thumbnail')).not.toBeInTheDocument();
-      expect(screen.getByTestId('route-sketch')).toBeInTheDocument();
     });
   });
 

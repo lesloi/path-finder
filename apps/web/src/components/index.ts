@@ -10,7 +10,6 @@ export * from './start-point-map.tsx';
 export * from './rich-text.tsx';
 export * from './route-colors.ts';
 export * from './elevation-profile.tsx';
-export * from './route-sketch.tsx';
 export * from './route-thumbnail.tsx';
 export * from './surface-colors.ts';
 export * from './profile-sparkline.tsx';
