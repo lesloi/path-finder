@@ -53,6 +53,7 @@ const text = {
     distance: 'Distance',
     duration: 'Duration',
     elevationGain: 'Elevation gain',
+    elevationChip: 'Elevation',
     any: 'Any',
     flat: 'Flat',
     hilly: 'Hilly',
@@ -83,6 +84,7 @@ const text = {
     distance: 'Distance',
     duration: 'Durée',
     elevationGain: 'Dénivelé positif',
+    elevationChip: 'Dénivelé',
     any: 'Indifférent',
     flat: 'Plat',
     hilly: 'Vallonné',
@@ -366,7 +368,8 @@ export function CriteriaForm({
   const criteria = CRITERIA.filter((criterion) => elevation || criterion !== 'elevation');
   const defaults = defaultDraft(units);
   const TargetIcon = draft.target === 'distance' ? Ruler : Timer;
-  const chips: Record<Criterion, { label: string; icon?: ReactNode; set: boolean }> = {
+  // `name` stands for the value on a chip that is the default, so two "Any" chips are told apart.
+  const chips: Record<Criterion, { label: string; name?: string; icon?: ReactNode; set: boolean }> = {
     activity: {
       label: ACTIVITY_NAMES[activity][language],
       icon: <ActivityIcon activity={activity} />,
@@ -380,11 +383,13 @@ export function CriteriaForm({
     },
     elevation: {
       label: level === 'target' ? `${gain} ${unit.gain}` : { any: t.any, flat: t.flat, hilly: t.hilly }[level],
+      name: t.elevationChip,
       icon: <TrendingUp size={18} aria-hidden />,
       set: level !== 'any',
     },
     surface: {
       label: { paved: t.paved, any: t.anySurface, unpaved: t.unpaved }[draft.surface],
+      name: t.surface,
       icon: <Layers size={18} aria-hidden />,
       set: draft.surface !== 'any',
     },
@@ -415,7 +420,7 @@ export function CriteriaForm({
               onClick={() => setOpen(criterion)}
             >
               {chips[criterion].icon}
-              {chips[criterion].label}
+              {chips[criterion].set ? chips[criterion].label : (chips[criterion].name ?? chips[criterion].label)}
             </button>
           ))}
         </div>

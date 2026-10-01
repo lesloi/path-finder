@@ -349,6 +349,18 @@ describe('CriteriaForm', () => {
       expect(screen.getByRole('button', { name: 'Surface: Any' })).not.toHaveAttribute('data-set');
     });
 
+    it('names the elevation gain and surface chips while they are the default, so they are told apart', () => {
+      setup({ compact: true });
+
+      expect(screen.getByRole('button', { name: 'Elevation gain: Any' })).toHaveTextContent('Elevation');
+      expect(screen.getByRole('button', { name: 'Surface: Any' })).toHaveTextContent('Surface');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Surface: Any' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Paved' }));
+
+      expect(screen.getByRole('button', { name: 'Surface: Paved' })).toHaveTextContent('Paved');
+    });
+
     it('opens one criterion in a dialog and applies its changes as they are made', () => {
       const { onSubmit, submit } = setup({ compact: true });
 

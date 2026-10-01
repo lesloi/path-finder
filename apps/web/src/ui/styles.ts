@@ -54,7 +54,7 @@ export const PRIMARY_BUTTON =
   'text-on-accent hover:bg-accent-hover';
 
 /** A row of chips that scrolls sideways; a chip is highlighted when `data-set`. */
-export const CHIP_ROW = 'flex gap-2 overflow-x-auto pb-1';
+export const CHIP_ROW = 'flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]';
 export const CHIP =
   'flex min-h-touch flex-none items-center gap-2 rounded-full bg-surface-2 px-4 text-sm font-semibold text-ink ' +
   'data-set:bg-accent-soft data-set:text-accent';
