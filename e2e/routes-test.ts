@@ -1,8 +1,9 @@
 import type { Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 import { expect, test } from './test.ts';
 
-// Annecy: the fake BRouter (`fake-brouter.ts`) answers from anywhere.
+// Annecy: the fake BRouter (`fake-brouter.ts`) answers from anywhere, and the fake BD ALTI (`fake-bdalti.ts`) covers it.
 const START = '45.8992, 6.1294';
 
 async function findRoutes(page: Page) {
@@ -35,6 +36,13 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('routes-row-0-distance')).toHaveText(/^\d+\.\d km$/);
   });
 
+  test('shows the elevation gain of each route', async ({ page }) => {
+    await findRoutes(page);
+
+    await expect(page.getByTestId('routes-row-0-gain')).toBeVisible();
+    await expect(page.getByTestId('routes-row-0-profile')).toBeVisible();
+  });
+
   test('goes back to the criteria, still set', async ({ page }) => {
     await findRoutes(page);
 
@@ -61,6 +69,9 @@ test.describe('the route set', () => {
     // On phones, the collapsed sheet stops at the figures: its handle expands it to the surface breakdown.
     if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
     await expect(page.getByTestId('route-surface')).toContainText('50%');
+    await expect(page.getByTestId('route-climb')).toBeVisible();
+    await expect(page.getByTestId('route-descent')).toBeVisible();
+    await expect(page.getByTestId('route-profile')).toBeVisible();
 
     if (isMobile) await swipeLeft(page);
     else await page.getByTestId('route-next').click();
@@ -77,6 +88,9 @@ test.describe('the route set', () => {
     const download = page.waitForEvent('download');
     await page.getByTestId('route-export').click();
 
-    expect((await download).suggestedFilename()).toMatch(/^(Run|Course)-\d{4}-\d+km\.gpx$/);
+    const file = await download;
+    // The elevation gain is in the name, and every point carries its height.
+    expect(file.suggestedFilename()).toMatch(/^(Run|Course)-\d{4}-\d+km_\d+m\.gpx$/);
+    expect(await readFile((await file.path())!, 'utf8')).toContain('<ele>');
   });
 });
