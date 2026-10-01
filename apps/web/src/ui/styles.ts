@@ -9,11 +9,6 @@ export const FLOATING_BUTTON =
 /** A round button with an icon alone, on a surface. */
 export const ICON_BUTTON = 'grid size-touch flex-none place-items-center rounded-full text-ink hover:bg-surface-2';
 
-/** An action beside the view's main one. */
-export const SECONDARY_BUTTON =
-  'flex min-h-touch w-full items-center justify-center gap-2 rounded-full bg-surface-2 px-4 font-semibold ' +
-  'text-ink no-underline';
-
 /** The desktop panel floating over the left of the map. */
 export const SIDE_COLUMN =
   // As tall as its content, within the screen.

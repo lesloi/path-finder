@@ -325,9 +325,8 @@ describe('CriteriaForm', () => {
       setup({ language: 'fr' });
       choose('Durée');
       fireEvent.change(slider('Durée'), { target: { value: '30' } });
-      choose('Objectif');
-      // Two controls are named "Objectif": the elevation gain's is the last one.
-      fireEvent.change(slider('Dénivelé positif'), { target: { value: '2000' } });
+      choose('Cible');
+      fireEvent.change(slider('Dénivelé'), { target: { value: '2000' } });
 
       expect(screen.getByRole('alert')).toHaveTextContent('Cette durée ne convient pas');
     });

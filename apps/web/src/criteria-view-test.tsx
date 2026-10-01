@@ -36,8 +36,8 @@ describe('CriteriaView', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Criteria' }));
 
-      // Only the sheet's own button is left: the floating one would cover the settings button.
-      expect(screen.getAllByRole('button', { name: 'My location' })).toHaveLength(1);
+      // The floating one would cover the settings button.
+      expect(screen.queryByRole('button', { name: 'My location' })).not.toBeInTheDocument();
     });
 
     it('invites a long press in the sheet until the start point is set', () => {
@@ -45,7 +45,7 @@ describe('CriteriaView', () => {
       render(<CriteriaView language="en" />);
       expect(screen.getByRole('button', { name: 'Criteria' })).toHaveAttribute('aria-expanded', 'false');
       expect(screen.getByText('Long-press the map to choose your start point')).toBeInTheDocument();
-      expect(screen.getAllByRole('button', { name: 'My location' })).toHaveLength(2);
+      expect(screen.getAllByRole('button', { name: 'My location' })).toHaveLength(1);
 
       act(() => {
         map().fire('touchstart', { lngLat: { lng: 6.2, lat: 45.8 }, originalEvent: { touches: [{}] } });

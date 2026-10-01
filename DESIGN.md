@@ -74,7 +74,7 @@ draws them the same way.
 | Round floating button | `FLOATING_BUTTON`, `aria-pressed` when it toggles                                                                                                                     |
 | Bottom sheet          | `<BottomSheet label expanded onExpandedChange>`: collapsed or expanded; its handle is a button with `aria-expanded`, tapped or swiped                                 |
 | Left column           | `SIDE_COLUMN`                                                                                                                                                         |
-| Buttons               | `SECONDARY_BUTTON`; `ICON_BUTTON` for an icon alone                                                                                                                   |
+| Buttons               | `ICON_BUTTON` for an icon alone                                                                                                                                       |
 | List row              | `GROUP_TITLE`, then `LIST` of `LIST_ROW`; `LIST_ROW_CHEVRON` for a link                                                                                               |
 | Dropdown              | `<Dropdown label value options onChange>`: a listbox whose options may have icons                                                                                     |
 | Sub-page              | `<SubPage title back wide language navigate>`: a `<dialog>` with its title, a back arrow, and a cross on desktops                                                     |

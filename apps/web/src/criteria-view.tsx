@@ -6,15 +6,7 @@ import { CriteriaForm, useCriteriaDraft, type CriteriaRequest } from './criteria
 import { formatPosition, parsePosition } from './coordinates.ts';
 import type { Language } from './language.ts';
 import { StartPointMap, type Position } from './start-point-map.tsx';
-import {
-  BottomSheet,
-  FLOATING_BUTTON,
-  ICON_BUTTON,
-  SECONDARY_BUTTON,
-  SIDE_COLUMN,
-  TOAST,
-  useDesktop,
-} from './ui/index.ts';
+import { BottomSheet, FLOATING_BUTTON, ICON_BUTTON, SIDE_COLUMN, TOAST, useDesktop } from './ui/index.ts';
 
 const TOAST_MS = 6_000;
 
@@ -194,12 +186,6 @@ export function CriteriaView({
             onStartChange={moveStart}
             onUnreadable={() => warn('unreadable')}
           />
-          {!start && (
-            <button type="button" className={SECONDARY_BUTTON} onClick={locate}>
-              <LocateFixed size={18} aria-hidden />
-              {t.myLocation}
-            </button>
-          )}
           <CriteriaForm
             language={language}
             start={start}
