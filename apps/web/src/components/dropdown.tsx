@@ -78,14 +78,14 @@ export function Dropdown<Value extends string>({
           id={buttonId}
           data-testid={testId}
           type="button"
-          className="inline-flex min-h-touch items-center gap-2 rounded-sm bg-surface-2 px-3"
+          className="inline-flex min-h-touch w-48 items-center gap-2 rounded-sm bg-surface-2 px-3"
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-labelledby={`${labelId} ${buttonId}`}
           onClick={() => setOpen(!open)}
         >
           {selected.icon}
-          {selected.label}
+          <span className="flex-1 text-left">{selected.label}</span>
           <ChevronDown size={16} aria-hidden />
         </button>
         {open && (

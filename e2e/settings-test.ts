@@ -20,4 +20,17 @@ test.describe('the settings', () => {
     await expect(page.getByTestId('settings-pace-run')).toHaveAccessibleName(`${fr.activities.run} (min/mi)`);
     await expect(page.getByTestId('settings-pace-run')).toHaveValue('8:51');
   });
+
+  test('keep a forced theme across a reload', async ({ page }) => {
+    await page.goto('/#/settings');
+
+    await page.getByTestId('settings-theme').click();
+    await page.getByTestId('settings-theme-dark').click();
+
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+
+    await page.reload();
+
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  });
 });
