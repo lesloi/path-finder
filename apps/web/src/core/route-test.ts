@@ -1,11 +1,15 @@
+import type { SurfaceStretch } from '../../../api/src/contract.ts';
 import {
   elevationProfile,
   missText,
   parseRoutes,
+  projectOnSnapshot,
   toMercator,
   positionAt,
   projectRoute,
-  slopeClass,
+  gradeAt,
+  surfaceAt,
+  type MapSnapshot,
   type ProfilePoint,
   type Route,
 } from './route.ts';
@@ -99,17 +103,53 @@ describe('elevationProfile', () => {
   });
 });
 
-describe('slopeClass', () => {
+describe('gradeAt', () => {
+  // 50 m apart: 5 m up, flat, then 2.5 m down.
+  const profile: ProfilePoint[] = [
+    { distance: 0, height: 100 },
+    { distance: 0.05, height: 105 },
+    { distance: 0.1, height: 105 },
+    { distance: 0.15, height: 102.5 },
+  ];
+
   it.each([
-    ['downhill', -12, 1],
-    ['flat', 0, 1],
-    ['gentle', 2.9, 1],
-    ['moderate', 3, 2],
-    ['steep', 6, 3],
-    ['very steep', 10, 3],
-    ['steeper', 10.1, 4],
-  ])('classes a %s grade', (_, grade, expected) => {
-    expect(slopeClass(grade)).toBe(expected);
+    ['uphill', 0.1, 10],
+    ['flat', 0.5, 0],
+    ['downhill', 0.95, -5],
+  ])('gives the grade of the stretch on a %s part', (_, fraction, expected) => {
+    expect(gradeAt(profile, fraction)).toBeCloseTo(expected);
+  });
+
+  it('gives the last stretch at the end of the route', () => {
+    expect(gradeAt(profile, 1)).toBeCloseTo(-5);
+  });
+
+  it('is 0 for a profile of a single sample', () => {
+    expect(gradeAt([{ distance: 0, height: 100 }], 0.5)).toBe(0);
+  });
+});
+
+describe('surfaceAt', () => {
+  const surfaces: SurfaceStretch[] = [
+    { surface: 'paved', share: 0.7 },
+    { surface: 'unpaved', share: 0.3 },
+  ];
+
+  it.each([
+    ['at the start', 0, 'paved'],
+    ['in the first stretch', 0.5, 'paved'],
+    ['in the second stretch', 0.85, 'unpaved'],
+    ['at the end', 1, 'unpaved'],
+  ])('gives the surface %s', (_, fraction, expected) => {
+    expect(surfaceAt(surfaces, fraction)).toBe(expected);
+  });
+
+  it('keeps the last surface when the shares fall short of the end', () => {
+    expect(surfaceAt([{ surface: 'unpaved', share: 0.4 }], 0.9)).toBe('unpaved');
+  });
+
+  it('is paved when nothing is known', () => {
+    expect(surfaceAt([], 0.5)).toBe('paved');
   });
 });
 
@@ -160,7 +200,7 @@ describe('projectRoute', () => {
   const box = { width: 100, height: 100, margin: 10 };
 
   it('fits the route in the box with north up', () => {
-    const { points } = projectRoute(
+    const points = projectRoute(
       [
         [6, 45],
         [6, 45.1],
@@ -180,7 +220,7 @@ describe('projectRoute', () => {
   });
 
   it('centres a route that is wider than tall', () => {
-    const { points } = projectRoute(
+    const points = projectRoute(
       [
         [6, 45],
         [6.2, 45],
@@ -193,23 +233,62 @@ describe('projectRoute', () => {
   });
 
   it('puts a route of a single place in the middle', () => {
-    expect(projectRoute([[6, 45]], box).points).toEqual([[50, 50]]);
+    expect(projectRoute([[6, 45]], box)).toEqual([[50, 50]]);
+  });
+});
+
+describe('projectOnSnapshot', () => {
+  const box = { width: 100, height: 100, margin: 10 };
+  // One pixel per kilometre, the origin of the map at the top left of an 800 by 600 snapshot.
+  const snapshot: MapSnapshot = {
+    url: 'blob:map',
+    width: 800,
+    height: 600,
+    toPixel: ([x, y]) => [x / 1_000, -y / 1_000],
+    of: [],
+  };
+  // A route of `width` by `height` snapshot pixels, its top left at `[left, top]`: positions in Mercator metres.
+  const place = (left: number, top: number, width: number, height: number): Route['geometry'] => {
+    const at = (px: number, py: number): [number, number] => {
+      const x = px * 1_000;
+      const y = -py * 1_000;
+      return [
+        (x * 180) / (Math.PI * 6_378_137),
+        (2 * Math.atan(Math.exp(y / 6_378_137)) - Math.PI / 2) * (180 / Math.PI),
+      ];
+    };
+    return [at(left, top), at(left + width, top + height)];
+  };
+
+  it('scales the route to fill the box and centres it on the snapshot', () => {
+    const { points, image } = projectOnSnapshot(place(300, 200, 100, 100), snapshot, box);
+
+    expect(points[0][0]).toBeCloseTo(10, 1);
+    expect(points[1][0]).toBeCloseTo(90, 1);
+    // The snapshot is scaled by 0.8 box units per pixel, and offset to the part the route is on.
+    expect(image.width).toBeCloseTo(800 * 0.8, 1);
+    expect(image.x).toBeCloseTo(-(300 - 12.5) * 0.8, 1);
   });
 
-  it('gives the area the box covers on the map, in Web Mercator metres', () => {
-    const { bounds } = projectRoute(
-      [
-        [0, 0],
-        [0.1, 0.1],
-      ],
-      box,
-    );
+  it('never shows beyond the snapshot: the box slides back inside it', () => {
+    // A route against the right edge: its box would reach past the snapshot, so it slides left.
+    const { points, image } = projectOnSnapshot(place(740, 250, 55, 55), snapshot, box);
 
-    const [west, south, east, north] = bounds;
-    // The route spans 11 132 m by 11 132 m inside a margin of an eighth of the box on each side.
-    expect(east - west).toBeCloseTo(11_132 * 1.25, -2);
-    expect(north - south).toBeCloseTo(11_132 * 1.25, -2);
-    expect((west + east) / 2).toBeCloseTo(5_566, -1);
+    expect(image.x + image.width).toBeGreaterThanOrEqual(100 - 1e-6);
+    expect(image.x).toBeLessThanOrEqual(1e-6);
+    expect(Math.max(...points.map(([x]) => x))).toBeLessThanOrEqual(100);
+  });
+
+  it('shows what it can of a route larger than the snapshot, centred', () => {
+    const { image } = projectOnSnapshot(place(0, 0, 800, 600), snapshot, { width: 250, height: 100, margin: 10 });
+
+    expect(image.x + image.width / 2).toBeCloseTo(125, 0);
+  });
+
+  it('shows a route of a single place as it lies on the map', () => {
+    const { points } = projectOnSnapshot(place(400, 300, 0, 0).slice(0, 1), snapshot, box);
+
+    expect(points[0][0]).toBeCloseTo(50, 0);
   });
 });
 

@@ -36,7 +36,7 @@ describe('RouteThumbnail', () => {
 
     const image = screen.getByTestId('thumb-map');
     expect(image).toHaveAttribute('href', 'blob:map');
-    // The 100-unit box shows a crop of the snapshot: the image is scaled up to fill it, offset to that crop.
+    // The snapshot is scaled to fill the 100-unit box with the route, and offset to the part it shows.
     expect(Number(image.getAttribute('width'))).toBeGreaterThan(100);
     expect(Number(image.getAttribute('width')) / Number(image.getAttribute('height'))).toBeCloseTo(1);
   });

@@ -22,8 +22,7 @@ import {
   ProfileSparkline,
   ROUTE_BORDERS,
   RouteThumbnail,
-  SLOPE_DOTS,
-  SLOPE_LABELS,
+  SURFACE_DOTS,
   SurfaceStrip,
   useDesktop,
 } from '../components/index.ts';
@@ -245,7 +244,7 @@ function MissMarker({ miss, text, testId }: { miss: Miss; text: string; testId: 
       data-testid={`${testId}-${miss.criterion}`}
       className="flex items-center gap-1 text-sm font-semibold text-ink"
     >
-      <Icon size={14} aria-hidden className="text-slope-3" />
+      <Icon size={14} aria-hidden className="text-miss" />
       {text}
     </span>
   );
@@ -394,23 +393,14 @@ function RouteDetail({
       {!condensed && (
         <>
           <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
-          {route.elevationGain !== undefined && (
-            <p
-              data-testid="route-slopes"
-              className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-2"
-            >
-              <span>{t.slope}</span>
-              {([1, 2, 3, 4] as const).map((slope) => (
-                <span key={slope} className="flex items-center gap-1">
-                  <i className={`size-2 rounded-full ${SLOPE_DOTS[slope]}`} aria-hidden />
-                  {SLOPE_LABELS[slope]}
-                </span>
-              ))}
-            </p>
-          )}
           <SurfaceStrip testId="route-surface-strip" surfaces={route.surfaces} />
-          <p data-testid="route-surface" className="m-0 text-sm text-ink-2">
-            {t.paved} {percent.format(1 - unpaved)} · {t.unpaved} {percent.format(unpaved)}
+          {/* The legend of the surface strip and of the colours of the profile. */}
+          <p data-testid="route-surface" className="m-0 flex items-center gap-1 text-sm text-ink-2">
+            <i className={`size-2 rounded-full ${SURFACE_DOTS.paved}`} aria-hidden />
+            {t.paved} {percent.format(1 - unpaved)}
+            <span className="whitespace-pre"> · </span>
+            <i className={`size-2 rounded-full ${SURFACE_DOTS.unpaved}`} aria-hidden />
+            {t.unpaved} {percent.format(unpaved)}
           </p>
         </>
       )}

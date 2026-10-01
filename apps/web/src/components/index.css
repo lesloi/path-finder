@@ -13,11 +13,8 @@
   --color-route-5: #c25e00;
   --color-start: #6b4f33;
 
-  /* Uphill grade classes and road surfaces of a route (#9). */
-  --color-slope-1: #7cb342; /* < 3 % */
-  --color-slope-2: #f9a825; /* 3–6 % */
-  --color-slope-3: #ef6c00; /* 6–10 % */
-  --color-slope-4: #d32f2f; /* > 10 % */
+  /* Road surfaces of a route (#9), and the icon of a criterion a suggestion misses. */
+  --color-miss: #ef6c00;
   --color-paved: #8d8f8a;
   --color-unpaved: #a47148;
 

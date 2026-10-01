@@ -1,4 +1,4 @@
-import { projectRoute, type MapSnapshot, type MercatorBounds, type Route } from '../core/index.ts';
+import { projectOnSnapshot, projectRoute, type MapSnapshot, type Route } from '../core/index.ts';
 import { ROUTE_COLORS } from './route-colors.ts';
 
 // Sizes in SVG user units: the drawing scales with the element that shows it.
@@ -28,7 +28,10 @@ export function RouteThumbnail({
   testId?: string;
 }) {
   const width = wide ? WIDE_WIDTH : HEIGHT;
-  const { points, bounds } = projectRoute(geometry, { width, height: HEIGHT, margin: MARGIN });
+  const box = { width, height: HEIGHT, margin: MARGIN };
+  const { points, image } = snapshot
+    ? projectOnSnapshot(geometry, snapshot, box)
+    : { points: projectRoute(geometry, box), image: undefined };
   const line = points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
   const [startX, startY] = points[0];
   return (
@@ -40,7 +43,9 @@ export function RouteThumbnail({
     >
       {/* The colour of the Plan IGN, under the snapshot while it is taken. */}
       <rect width={width} height={HEIGHT} fill="#f4f2ea" />
-      {snapshot && <MapCrop snapshot={snapshot} bounds={bounds} width={width} testId={testId} />}
+      {snapshot && image && (
+        <image data-testid={testId && `${testId}-map`} href={snapshot.url} preserveAspectRatio="none" {...image} />
+      )}
       <polyline points={line} fill="none" stroke="#ffffff" strokeWidth="6" strokeLinejoin="round" />
       <polyline
         points={line}
@@ -51,33 +56,5 @@ export function RouteThumbnail({
       />
       <circle cx={startX} cy={startY} r="5" fill="#ffffff" stroke="#6b4f33" strokeWidth="3" />
     </svg>
-  );
-}
-
-// The part of the snapshot the thumbnail's box covers on the map, scaled to fill the box.
-function MapCrop({
-  snapshot,
-  bounds: [west, south, east, north],
-  width,
-  testId,
-}: {
-  snapshot: MapSnapshot;
-  bounds: MercatorBounds;
-  width: number;
-  testId?: string;
-}) {
-  const [left, top] = snapshot.toPixel([west, north]);
-  const [right] = snapshot.toPixel([east, south]);
-  const scale = width / (right - left);
-  return (
-    <image
-      data-testid={testId && `${testId}-map`}
-      href={snapshot.url}
-      x={-left * scale}
-      y={-top * scale}
-      width={snapshot.width * scale}
-      height={snapshot.height * scale}
-      preserveAspectRatio="none"
-    />
   );
 }

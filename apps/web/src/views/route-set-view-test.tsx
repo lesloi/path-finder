@@ -271,7 +271,6 @@ describe('RouteSetView', () => {
       expect(screen.queryByTestId('route-climb')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-descent')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-profile')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('route-slopes')).not.toBeInTheDocument();
     });
 
     it('marks the missed criterion of a suggestion', () => {
@@ -300,17 +299,14 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('route-figures')).toBeInTheDocument();
       expect(screen.getByTestId('route-export')).toBeInTheDocument();
       expect(screen.queryByTestId('route-profile')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('route-slopes')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-surface-strip')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-surface')).not.toBeInTheDocument();
     });
 
-    it('shows the elevation profile with its legend, and the surface breakdown', () => {
+    it('shows the elevation profile, and the surface breakdown that colours it', () => {
       open();
 
       expect(screen.getByTestId('route-profile')).toBeInTheDocument();
-      expect(screen.getByTestId('route-slopes')).toHaveTextContent('< 3 %');
-      expect(screen.getByTestId('route-slopes')).toHaveTextContent('> 10 %');
       expect(screen.getByTestId('route-surface')).toHaveTextContent('Paved 70% · Unpaved 30%');
       expect(screen.getByTestId('route-surface-strip')).toBeInTheDocument();
     });

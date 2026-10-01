@@ -33,11 +33,13 @@ function plot(onHover = vi.fn(), props: Partial<Route> = {}, language: 'en' | 'f
 }
 
 describe('ElevationProfile', () => {
-  it('gives the lowest and the highest altitudes', () => {
+  it('gives the lowest, the middle and the highest altitudes beside the plot', () => {
     plot();
 
     expect(screen.getByTestId('profile-min')).toHaveTextContent('450 m');
+    expect(screen.getByTestId('profile-mid')).toHaveTextContent('475 m');
     expect(screen.getByTestId('profile-max')).toHaveTextContent('500 m');
+    expect(screen.getByTestId('profile-plot')).not.toContainElement(screen.getByTestId('profile-max'));
     expect(screen.getByTestId('profile')).toHaveAccessibleName('Elevation profile, from 450 m to 500 m');
   });
 
@@ -55,15 +57,34 @@ describe('ElevationProfile', () => {
     expect(screen.getByTestId('profile')).toHaveAccessibleName('Profil altimétrique, de 1476 ft à 1640 ft');
   });
 
-  it('colours each stretch by its uphill grade', () => {
+  it('draws a line across the plot at the middle altitude', () => {
+    plot();
+
+    const line = screen.getByTestId('profile-plot').querySelector('svg > line')!;
+    expect(line.getAttribute('x1')).toBe('0');
+    expect(line.getAttribute('x2')).toBe('300');
+    // Halfway between the lowest and the highest altitude, so as far from the top as from the bottom.
+    expect(Number(line.getAttribute('y1'))).toBeCloseTo(30, 5);
+  });
+
+  it('colours each stretch by the surface it runs on', () => {
     const { container } = render(
-      <ElevationProfile route={route} display={{ units: 'metric', language: 'en' }} onHover={vi.fn()} />,
+      <ElevationProfile
+        route={{
+          ...route,
+          surfaces: [
+            { surface: 'paved', share: 0.5 },
+            { surface: 'unpaved', share: 0.5 },
+          ],
+        }}
+        display={{ units: 'metric', language: 'en' }}
+        onHover={vi.fn()}
+      />,
     );
 
-    const slopes = [...container.querySelectorAll('g')].map((group) => group.dataset.slope);
-    // 50 m climbed over the last 400 m is 12.5 %: the steepest class, after flat stretches.
-    expect(slopes.at(0)).toBe('1');
-    expect(slopes.at(-1)).toBe('4');
+    const surfaces = [...container.querySelectorAll('g')].map((group) => group.dataset.surface);
+    expect(surfaces.at(0)).toBe('paved');
+    expect(surfaces.at(-1)).toBe('unpaved');
   });
 
   it('shows the distance and the altitude where the pointer is, and the place on the map', () => {
@@ -72,6 +93,8 @@ describe('ElevationProfile', () => {
     fireEvent.pointerMove(element, { clientX: 200 });
 
     expect(screen.getByTestId('profile-tip')).toHaveTextContent('1.2 km · 500 m');
+    // The last 400 m climb 50 m: 12.5 %.
+    expect(screen.getByTestId('profile-grade')).toHaveTextContent('Slope +12.5 %');
     const [lon, lat] = onHover.mock.calls.at(-1)![0];
     expect(lon).toBeCloseTo(6.1294);
     expect(lat).toBeCloseTo(45.8992 + 1_200 / METRES_PER_DEGREE, 4);

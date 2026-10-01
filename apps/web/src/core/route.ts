@@ -31,9 +31,6 @@ export type Route = {
 /** A sample of the elevation profile: kilometres from the start, and the height there in metres. */
 export type ProfilePoint = { distance: number; height: number };
 
-/** Uphill grade classes, from gentle (1) to very steep (4), as the `slope-*` colours. */
-export type SlopeClass = 1 | 2 | 3 | 4;
-
 // Kilometres between profile samples: adjacent route points can be a few metres apart, and their
 // heights to the decimetre would make noisy grades.
 const PROFILE_STEP = 0.05;
@@ -136,11 +133,26 @@ export function elevationProfile(geometry: Route['geometry']): ProfilePoint[] | 
   return profile;
 }
 
-/** The class of an uphill grade in percent: < 3 %, 3–6 %, 6–10 %, > 10 %. Downhill is gentle. */
-export function slopeClass(grade: number): SlopeClass {
-  if (grade < 3) return 1;
-  if (grade < 6) return 2;
-  return grade <= 10 ? 3 : 4;
+/**
+ * The grade in percent of the profile at `fraction` (0 to 1) of the route: between the two samples
+ * around it, 50 m apart. Positive uphill.
+ */
+export function gradeAt(profile: ProfilePoint[], fraction: number): number {
+  const last = profile.length - 1;
+  if (last < 1) return 0;
+  const from = Math.min(Math.floor(fraction * last), last - 1);
+  const [a, b] = [profile[from], profile[from + 1]];
+  return b.distance === a.distance ? 0 : ((b.height - a.height) / ((b.distance - a.distance) * 1000)) * 100;
+}
+
+/** The surface of the route at `fraction` (0 to 1) of its length, from its stretches in order. */
+export function surfaceAt(surfaces: SurfaceStretch[], fraction: number): SurfaceStretch['surface'] {
+  let end = 0;
+  for (const { surface, share } of surfaces) {
+    end += share;
+    if (fraction <= end) return surface;
+  }
+  return surfaces.at(-1)?.surface ?? 'paved';
 }
 
 /** The position `distance` kilometres along the route from its start, kept on the route. */
@@ -176,9 +188,6 @@ const MERCATOR_RADIUS = 6_378_137;
 // Metres a box spans for a route of a single place.
 const MIN_SPAN = 1_000;
 
-/** The corners of a box in Web Mercator metres: west, south, east, north. */
-export type MercatorBounds = [number, number, number, number];
-
 /** A position in Web Mercator metres, the projection of the map. */
 export function toMercator([lon, lat]: Position): [number, number] {
   return [
@@ -200,15 +209,14 @@ export type MapSnapshot = {
   of: Position[][];
 };
 
+/** The size of a thumbnail's box and the margin its route keeps from the edges, in its own units. */
+export type ThumbnailBox = { width: number; height: number; margin: number };
+
 /**
- * A route drawn in a `width` by `height` box as it lies on the map, in Web Mercator with north up:
- * scaled to fit, centred, and `margin` from the edges. Also returns the area the whole box covers
- * on the map, to cut the matching part out of the map's snapshot.
+ * A route drawn in a box as it lies on the map, in Web Mercator with north up: scaled to fit, centred,
+ * and `margin` from the edges. For a thumbnail without a map snapshot.
  */
-export function projectRoute(
-  geometry: Route['geometry'],
-  { width, height, margin }: { width: number; height: number; margin: number },
-): { points: [number, number][]; bounds: MercatorBounds } {
+export function projectRoute(geometry: Route['geometry'], { width, height, margin }: ThumbnailBox): [number, number][] {
   const mercator = geometry.map(([lon, lat]) => toMercator([lon, lat]));
   const xs = mercator.map(([x]) => x);
   const ys = mercator.map(([, y]) => y);
@@ -220,15 +228,41 @@ export function projectRoute(
     Infinity;
   const pixelsPerMetre = Number.isFinite(scale) ? scale : (Math.min(width, height) - 2 * margin) / MIN_SPAN;
   const [offsetX, offsetY] = [(width - spanX * pixelsPerMetre) / 2, (height - spanY * pixelsPerMetre) / 2];
-  const points = geometry.map((_, k): [number, number] => [
+  return geometry.map((_, k): [number, number] => [
     offsetX + (xs[k] - west) * pixelsPerMetre,
     offsetY + (north - ys[k]) * pixelsPerMetre,
   ]);
-  const bounds: MercatorBounds = [
-    west - offsetX / pixelsPerMetre,
-    south - (height - offsetY - spanY * pixelsPerMetre) / pixelsPerMetre,
-    east + (width - offsetX - spanX * pixelsPerMetre) / pixelsPerMetre,
-    north + offsetY / pixelsPerMetre,
-  ];
-  return { points, bounds };
+}
+
+/**
+ * A route drawn over the part of a map snapshot it runs through, scaled to fit the box and centred
+ * as far as the snapshot reaches: the part shown never leaves the snapshot, so no blank edge shows.
+ * Returns the route's points in the box, and where the whole snapshot lies in it.
+ */
+export function projectOnSnapshot(
+  geometry: Route['geometry'],
+  snapshot: MapSnapshot,
+  { width, height, margin }: ThumbnailBox,
+): { points: [number, number][]; image: { x: number; y: number; width: number; height: number } } {
+  const pixels = geometry.map(([lon, lat]) => snapshot.toPixel(toMercator([lon, lat])));
+  const xs = pixels.map(([x]) => x);
+  const ys = pixels.map(([, y]) => y);
+  const [west, east, north, south] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const [spanX, spanY] = [east - west, south - north];
+  const fit = Math.min(
+    spanX ? (width - 2 * margin) / spanX : Infinity,
+    spanY ? (height - 2 * margin) / spanY : Infinity,
+  );
+  // A single place shows as it lies on the map.
+  const scale = Number.isFinite(fit) ? fit : 1;
+  // The part of the snapshot the box shows, in its pixels, kept inside it where it can be.
+  const [shownWidth, shownHeight] = [width / scale, height / scale];
+  const place = (centre: number, shown: number, size: number) =>
+    shown >= size ? (size - shown) / 2 : Math.min(Math.max(centre - shown / 2, 0), size - shown);
+  const left = place((west + east) / 2, shownWidth, snapshot.width);
+  const top = place((north + south) / 2, shownHeight, snapshot.height);
+  return {
+    points: pixels.map(([x, y]): [number, number] => [(x - left) * scale, (y - top) * scale]),
+    image: { x: -left * scale, y: -top * scale, width: snapshot.width * scale, height: snapshot.height * scale },
+  };
 }
