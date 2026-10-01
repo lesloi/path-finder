@@ -82,6 +82,9 @@ export function createApp({
     return IS_LOOPBACK(address) || healthAllowlist(address) ? c.text('ok') : c.notFound();
   });
 
+  // What the API can do, for the web app to offer only that. Nothing about the caller.
+  app.get('/api/v1/capabilities', (c) => c.json({ elevation: heightAt !== undefined }));
+
   // No logs here: criteria hold the start point, and requests hold the client address.
   app.post('/api/v1/route-sets', async (c) => {
     const admission = admit(requestClientAddress(c, trustedProxies));

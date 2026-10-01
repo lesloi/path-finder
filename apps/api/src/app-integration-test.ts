@@ -205,6 +205,18 @@ describe('api', () => {
     );
   });
 
+  describe('capabilities', () => {
+    const capabilities = (app: ReturnType<typeof createApp>) => app.request('/api/v1/capabilities');
+
+    it('says the API has elevation data when it has a height source', async () => {
+      expect(await (await capabilities(app)).json()).toEqual({ elevation: true });
+    });
+
+    it('says it has none without BD ALTI', async () => {
+      expect(await (await capabilities(createApp({ webRoot, engine }))).json()).toEqual({ elevation: false });
+    });
+  });
+
   describe('without BD ALTI', () => {
     const noElevation = () => createApp({ webRoot, engine });
 

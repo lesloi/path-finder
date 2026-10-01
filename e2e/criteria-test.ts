@@ -13,15 +13,15 @@ test.describe('the criteria form', () => {
 
   test('sets the criteria in the full form', async ({ page, isMobile }) => {
     await page.goto('/');
-    // On phones, the sheet shows chips until it is expanded to the full form.
-    if (isMobile) await page.getByRole('button', { name: 'All criteria' }).click();
+    // On phones, the sheet shows chips until its handle expands it to the full form.
+    if (isMobile) await page.getByRole('button', { name: 'Criteria' }).click();
 
     // The radio buttons are visually hidden: the user clicks their labels.
     await page.locator('label', { hasText: 'Duration' }).click();
-    await page.locator('label', { hasText: 'Target' }).click();
 
     await expect(page.getByRole('slider', { name: 'Duration' })).toBeVisible();
-    await expect(page.getByRole('slider', { name: 'Elevation gain' })).toBeVisible();
+    // The e2e server has no BD ALTI: the elevation gain is not offered.
+    await expect(page.getByRole('radio', { name: 'Hilly' })).toBeHidden();
     await expect(page.getByRole('link', { name: 'Adjust your pace' })).toHaveAttribute('href', '#/settings');
   });
 });

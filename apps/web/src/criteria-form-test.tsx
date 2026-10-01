@@ -16,7 +16,7 @@ const onDesktop = () =>
     );
 
 // The form is the full one, as on desktops, unless a test asks for the compact one.
-function setup(props: { start?: Position; compact?: boolean; onExpand?: () => void; language?: 'en' | 'fr' } = {}) {
+function setup(props: { start?: Position; compact?: boolean; elevation?: boolean; language?: 'en' | 'fr' } = {}) {
   const onSubmit = vi.fn();
   render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} {...props} />);
   const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Find routes' }));
@@ -197,6 +197,36 @@ describe('CriteriaForm', () => {
     });
   });
 
+  describe('without elevation data', () => {
+    it('does not offer the elevation gain, and sends none', () => {
+      const { onSubmit, submit } = setup({ elevation: false });
+      expect(screen.queryByRole('radio', { name: 'Hilly' })).not.toBeInTheDocument();
+
+      submit();
+
+      expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('elevationGain');
+    });
+
+    it('drops the elevation gain chosen before the data went away', () => {
+      const onSubmit = vi.fn();
+      const { rerender } = render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} />);
+      choose('Hilly');
+
+      rerender(<CriteriaForm language="en" start={START} elevation={false} onSubmit={onSubmit} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Find routes' }));
+
+      expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('elevationGain');
+    });
+
+    it('has no elevation chip on phones', () => {
+      vi.restoreAllMocks();
+      setup({ compact: true, elevation: false });
+
+      expect(screen.queryByRole('button', { name: /^Elevation gain/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Surface: Any' })).toBeInTheDocument();
+    });
+  });
+
   describe('surface', () => {
     it.each([
       ['Paved', 'paved'],
@@ -328,15 +358,6 @@ describe('CriteriaForm', () => {
       fireEvent.click(screen.getByRole('radio', { name: 'Duration' }));
 
       expect(screen.getByRole('button', { name: 'Target: 1 h 00' })).toHaveAttribute('data-set');
-    });
-
-    it('asks the view to expand for the last chip', () => {
-      const onExpand = vi.fn();
-      setup({ compact: true, onExpand });
-
-      fireEvent.click(screen.getByRole('button', { name: 'All criteria' }));
-
-      expect(onExpand).toHaveBeenCalled();
     });
 
     it('hides Find routes until a start point is set', () => {

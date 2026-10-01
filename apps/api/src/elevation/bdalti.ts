@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { bilinearHeight, type HeightAt } from '../route-generation/index.ts';
@@ -49,3 +49,13 @@ export function bdAltiHeights(dir: string, cacheSize = 64): HeightAt {
 // No coordinates in the message: the API logs no locations.
 const noData = () =>
   new Error('No BD ALTI elevation data here: outside metropolitan France, or a tile missing from BDALTI_DIR');
+
+/** Whether `dir` holds at least one tile: a missing or empty directory gives no elevation. */
+export function hasBdAltiTiles(dir: string): boolean {
+  try {
+    return readdirSync(dir).some((name) => name.endsWith('.u16'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}

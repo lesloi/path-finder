@@ -1,6 +1,7 @@
 import { Crosshair, LocateFixed, Settings } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
+import { useElevation } from './capabilities.ts';
 import { CriteriaForm, useCriteriaDraft, type CriteriaRequest } from './criteria-form.tsx';
 import { formatPosition, parsePosition } from './coordinates.ts';
 import type { Language } from './language.ts';
@@ -68,6 +69,7 @@ export function CriteriaView({
   const desktop = useDesktop();
   // Kept here: the form is mounted in the column or in the sheet, whichever the screen shows.
   const draft = useCriteriaDraft();
+  const elevation = useElevation();
   const [start, setStart] = useState<Position>();
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
@@ -180,7 +182,7 @@ export function CriteriaView({
                 <LocateFixed size={20} aria-hidden />
               </button>
             </StartPointField>
-            <CriteriaForm language={language} start={start} draft={draft} onSubmit={onSubmit} />
+            <CriteriaForm language={language} start={start} draft={draft} elevation={elevation} onSubmit={onSubmit} />
           </div>
         </aside>
       ) : (
@@ -202,8 +204,8 @@ export function CriteriaView({
             language={language}
             start={start}
             draft={draft}
+            elevation={elevation}
             compact={!sheetExpanded}
-            onExpand={() => setSheetExpanded(true)}
             onSubmit={onSubmit}
           />
         </BottomSheet>

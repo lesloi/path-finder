@@ -73,10 +73,22 @@ describe('CriteriaView', () => {
       expect(screen.getByRole('button', { name: 'Surface: Any' })).toBeInTheDocument();
       expect(screen.queryByRole('slider')).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'All criteria' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Criteria' }));
 
       expect(screen.getByRole('button', { name: 'Criteria' })).toHaveAttribute('aria-expanded', 'true');
       expect(screen.getByRole('slider', { name: 'Distance' })).toBeInTheDocument();
+    });
+
+    it('offers the elevation gain only when the API has elevation data', async () => {
+      onDesktop();
+      const fetchMock = vi.fn().mockResolvedValue(Response.json({ elevation: true }));
+      vi.stubGlobal('fetch', fetchMock);
+      render(<CriteriaView language="en" />);
+      expect(screen.queryByRole('radio', { name: 'Hilly' })).not.toBeInTheDocument();
+
+      expect(await screen.findByRole('radio', { name: 'Hilly' })).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledWith('/api/v1/capabilities', expect.anything());
+      vi.unstubAllGlobals();
     });
 
     it('shows the full form in the desktop column and passes the criteria on', () => {
@@ -95,7 +107,7 @@ describe('CriteriaView', () => {
 
   it('keeps the criteria when the screen changes from a phone to a desktop', () => {
     const { rerender } = render(<CriteriaView language="en" />);
-    fireEvent.click(screen.getByRole('button', { name: 'All criteria' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Criteria' }));
     fireEvent.click(screen.getByRole('radio', { name: 'Unpaved' }));
 
     onDesktop();

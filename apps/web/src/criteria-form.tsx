@@ -1,13 +1,4 @@
-import {
-  Footprints,
-  Layers,
-  Mountain,
-  Ruler,
-  SlidersHorizontal,
-  Timer,
-  TrendingUp,
-  type LucideIcon,
-} from 'lucide-react';
+import { Footprints, Layers, Mountain, Ruler, Timer, TrendingUp, type LucideIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import {
@@ -35,13 +26,15 @@ export type CriteriaRequest = Criteria & { activity: Activity };
 const ACTIVITIES = Object.keys(ACTIVITY_PACES) as Activity[];
 const ACTIVITY_ICONS = { run: Footprints, hike: Mountain } satisfies Record<Activity, LucideIcon>;
 
+const CRITERIA = ['activity', 'target', 'elevation', 'surface'] as const;
+
 const DURATION_STEP = 5; // minutes
 const DURATION_DEFAULT = 60; // minutes
 
 type Target = 'distance' | 'duration';
 type Level = 'any' | 'flat' | 'hilly' | 'target';
 type Surface = Criteria['surface'];
-type Criterion = 'activity' | 'target' | 'elevation' | 'surface';
+type Criterion = (typeof CRITERIA)[number];
 
 // Distance in km or mi, elevation gain in m or ft: the user's units, which the bounds are shown in.
 export type Draft = {
@@ -68,7 +61,6 @@ const text = {
     paved: 'Paved',
     anySurface: 'Any',
     unpaved: 'Unpaved',
-    allCriteria: 'All criteria',
     close: 'Close',
     findRoutes: 'Find routes',
     adjustPace: 'Adjust your pace',
@@ -98,7 +90,6 @@ const text = {
     paved: 'Goudronné',
     anySurface: 'Indifférent',
     unpaved: 'Non goudronné',
-    allCriteria: 'Tous les critères',
     close: 'Fermer',
     findRoutes: 'Trouver des parcours',
     adjustPace: 'Ajustez votre allure',
@@ -188,15 +179,14 @@ export function useCriteriaDraft(): [Draft, (draft: Draft) => void] {
 /**
  * The criteria of a route set: activity, target distance or duration, elevation gain, and
  * surface, over the user's settings. `onSubmit` receives a request body that `parseCriteria`
- * accepts. On a phone, `compact` shows chips that each open one criterion; `onExpand` is
- * called for the last chip.
+ * accepts. On a phone, `compact` shows chips that each open one criterion.
  */
 export function CriteriaForm({
   language,
   start,
   draft: kept,
   compact = false,
-  onExpand,
+  elevation = true,
   onSubmit,
 }: {
   language: Language;
@@ -204,7 +194,8 @@ export function CriteriaForm({
   /** From `useCriteriaDraft`, for a view that mounts the form in more than one place and keeps what was set. */
   draft?: ReturnType<typeof useCriteriaDraft>;
   compact?: boolean;
-  onExpand?: () => void;
+  /** Whether the API has elevation data: without it, the target elevation gain is ignored, so it is not offered. */
+  elevation?: boolean;
   onSubmit: (request: CriteriaRequest) => void;
 }) {
   const t = text[language];
@@ -223,6 +214,7 @@ export function CriteriaForm({
   // A new activity may have a shorter maximum distance.
   const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
   const gain = clamp(draft.gain, 0, bounds.gain.max);
+  const level = elevation ? draft.level : 'any';
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
   const request: CriteriaRequest | undefined = start && {
@@ -232,8 +224,8 @@ export function CriteriaForm({
       draft.target === 'distance'
         ? { distance: round(distance * unit.kmPerDistanceUnit, 2) }
         : { duration: draft.duration },
-    ...(draft.level === 'target' && { elevationGain: Math.round(gain * unit.metresPerGainUnit) }),
-    ...((draft.level === 'flat' || draft.level === 'hilly') && { elevationGain: draft.level }),
+    ...(level === 'target' && { elevationGain: Math.round(gain * unit.metresPerGainUnit) }),
+    ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
     surface: draft.surface,
     pace: paceFor(settings, activity),
   };
@@ -313,7 +305,7 @@ export function CriteriaForm({
         <div className="flex flex-col gap-2">
           <SegmentedControl
             label={t.elevationGain}
-            value={draft.level}
+            value={level}
             options={[
               { value: 'any', label: t.any },
               { value: 'flat', label: t.flat },
@@ -322,7 +314,7 @@ export function CriteriaForm({
             ]}
             onChange={(level) => change({ level })}
           />
-          {draft.level === 'target' && (
+          {level === 'target' && (
             <Slider
               label={t.elevationGain}
               value={gain}
@@ -353,6 +345,7 @@ export function CriteriaForm({
     },
   };
 
+  const criteria = CRITERIA.filter((criterion) => elevation || criterion !== 'elevation');
   const defaults = defaultDraft(units);
   const TargetIcon = draft.target === 'distance' ? Ruler : Timer;
   const chips: Record<Criterion, { label: string; icon?: ReactNode; set: boolean }> = {
@@ -368,10 +361,9 @@ export function CriteriaForm({
         draft.target === 'duration' || distance !== clamp(defaults.distance, bounds.distance.min, bounds.distance.max),
     },
     elevation: {
-      label:
-        draft.level === 'target' ? `${gain} ${unit.gain}` : { any: t.any, flat: t.flat, hilly: t.hilly }[draft.level],
+      label: level === 'target' ? `${gain} ${unit.gain}` : { any: t.any, flat: t.flat, hilly: t.hilly }[level],
       icon: <TrendingUp size={18} aria-hidden />,
-      set: draft.level !== 'any',
+      set: level !== 'any',
     },
     surface: {
       label: { paved: t.paved, any: t.anySurface, unpaved: t.unpaved }[draft.surface],
@@ -392,7 +384,6 @@ export function CriteriaForm({
   );
 
   if (compact && !desktop) {
-    const criteria = ['activity', 'target', 'elevation', 'surface'] as const;
     return (
       <>
         <div className={CHIP_ROW}>
@@ -409,10 +400,6 @@ export function CriteriaForm({
               {chips[criterion].label}
             </button>
           ))}
-          <button type="button" className={CHIP} onClick={onExpand}>
-            <SlidersHorizontal size={18} aria-hidden />
-            {t.allCriteria}
-          </button>
         </div>
         {error}
         {findRoutes}
@@ -427,7 +414,7 @@ export function CriteriaForm({
 
   return (
     <>
-      {(['activity', 'target', 'elevation', 'surface'] as const).map((criterion) => (
+      {criteria.map((criterion) => (
         <section key={criterion} className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-ink-2">{sections[criterion].title}</h2>
           {sections[criterion].content}
