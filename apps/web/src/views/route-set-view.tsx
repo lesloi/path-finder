@@ -402,18 +402,18 @@ function RouteDetail({
             <i className={`size-2 rounded-full ${SURFACE_DOTS.unpaved}`} aria-hidden />
             {t.unpaved} {percent.format(unpaved)}
           </p>
+          <button
+            type="button"
+            data-testid="route-export"
+            className={PRIMARY_BUTTON}
+            // Nothing awaited before the share sheet: it needs the tap that opened it.
+            onClick={() => void saveGpx(gpxExport(route, request.activity, new Date(), display))}
+          >
+            <Download size={18} aria-hidden />
+            {t.exportGpx}
+          </button>
         </>
       )}
-      <button
-        type="button"
-        data-testid="route-export"
-        className={PRIMARY_BUTTON}
-        // Nothing awaited before the share sheet: it needs the tap that opened it.
-        onClick={() => void saveGpx(gpxExport(route, request.activity, new Date(), display))}
-      >
-        <Download size={18} aria-hidden />
-        {t.exportGpx}
-      </button>
     </div>
   );
 }

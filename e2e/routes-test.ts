@@ -68,9 +68,11 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('route-position')).toHaveText(/^2\/\d$/);
   });
 
-  test('exports the route as a GPX file', async ({ page }) => {
+  test('exports the route as a GPX file', async ({ page, isMobile }) => {
     await findRoutes(page);
     await page.getByTestId('routes-row-0').click();
+    // On phones, the collapsed sheet stops at the figures: its handle expands it to the export.
+    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
 
     const download = page.waitForEvent('download');
     await page.getByTestId('route-export').click();

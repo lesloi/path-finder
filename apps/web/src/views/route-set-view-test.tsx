@@ -293,11 +293,11 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('route-figures')).toHaveTextContent(en.estimatedDuration);
     });
 
-    it('stops at the figures when condensed, keeping the export', () => {
+    it('stops at the figures when condensed, the export included', () => {
       render(<View open condensed />);
 
       expect(screen.getByTestId('route-figures')).toBeInTheDocument();
-      expect(screen.getByTestId('route-export')).toBeInTheDocument();
+      expect(screen.queryByTestId('route-export')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-profile')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-surface-strip')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-surface')).not.toBeInTheDocument();
@@ -442,7 +442,10 @@ describe('RouteSetView', () => {
       onDesktop();
       render(<View open />);
 
-      expect(screen.getByTestId('route-thumbnail')).toHaveAttribute('viewBox', '0 0 250 100');
+      // Wide: as wide as its route needs, up to 250 units, so a route about as tall as wide is cropped to it.
+      const [, , width] = screen.getByTestId('route-thumbnail').getAttribute('viewBox')!.split(' ').map(Number);
+      expect(width).toBeGreaterThanOrEqual(100);
+      expect(screen.getByTestId('route-thumbnail').style.maxWidth).not.toBe('');
     });
   });
 

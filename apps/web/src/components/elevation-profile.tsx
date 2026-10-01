@@ -71,7 +71,9 @@ export function ElevationProfile({
     >
       <div className="flex gap-2">
         {/* The altitudes of the top, the middle and the bottom of the plot, beside it and not over the trace. */}
-        <div className="relative h-24 w-14 flex-none text-right text-sm text-ink-2" aria-hidden>
+        <div className="relative h-24 flex-none text-right text-sm text-ink-2" aria-hidden>
+          {/* As wide as the widest altitude, which the others are placed in. */}
+          <span className="invisible block h-0 overflow-hidden whitespace-nowrap">{formatHeight(max, display)}</span>
           {[
             ['max', max],
             ['mid', middle],
@@ -102,17 +104,20 @@ export function ElevationProfile({
           onPointerLeave={leave}
         >
           <svg className="size-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" aria-hidden>
-            {/* The middle altitude, across the whole plot. */}
-            <line
-              x1="0"
-              x2={WIDTH}
-              y1={y(middle)}
-              y2={y(middle)}
-              className="stroke-border"
-              strokeWidth="1"
-              strokeDasharray="4 3"
-              vectorEffect="non-scaling-stroke"
-            />
+            {/* The highest and the middle altitude, across the whole plot. */}
+            {[max, middle].map((height) => (
+              <line
+                key={height}
+                x1="0"
+                x2={WIDTH}
+                y1={y(height)}
+                y2={y(height)}
+                className="stroke-border"
+                strokeWidth="1"
+                strokeDasharray="4 3"
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
             {profile.slice(0, -1).map((from, k) => {
               const to = profile[k + 1];
               const surface = surfaceAt(route.surfaces, total ? (from.distance + to.distance) / 2 / total : 0);

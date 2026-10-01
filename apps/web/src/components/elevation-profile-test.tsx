@@ -57,14 +57,17 @@ describe('ElevationProfile', () => {
     expect(screen.getByTestId('profile')).toHaveAccessibleName('Profil altimétrique, de 1476 ft à 1640 ft');
   });
 
-  it('draws a line across the plot at the middle altitude', () => {
+  it('draws a line across the plot at the highest altitude and at the middle one', () => {
     plot();
 
-    const line = screen.getByTestId('profile-plot').querySelector('svg > line')!;
-    expect(line.getAttribute('x1')).toBe('0');
-    expect(line.getAttribute('x2')).toBe('300');
-    // Halfway between the lowest and the highest altitude, so as far from the top as from the bottom.
-    expect(Number(line.getAttribute('y1'))).toBeCloseTo(30, 5);
+    const [top, middle] = [...screen.getByTestId('profile-plot').querySelectorAll('svg > line')];
+    for (const line of [top, middle]) {
+      expect(line.getAttribute('x1')).toBe('0');
+      expect(line.getAttribute('x2')).toBe('300');
+    }
+    // The middle is halfway between the lowest and the highest altitude: as far from the top as from the bottom.
+    expect(Number(top.getAttribute('y1'))).toBeCloseTo(8, 5);
+    expect(Number(middle.getAttribute('y1'))).toBeCloseTo(30, 5);
   });
 
   it('colours each stretch by the surface it runs on', () => {
