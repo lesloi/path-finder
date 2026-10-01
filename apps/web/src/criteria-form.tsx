@@ -217,6 +217,8 @@ export function CriteriaForm({
   // A new activity may have a shorter maximum distance.
   const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
   const gain = clamp(draft.gain, 0, bounds.gain.max);
+  // The pace only turns a duration into a distance.
+  const showPaceHint = draft.target === 'duration' && settings.pace[activity] === undefined;
   const level = elevation ? draft.level : 'any';
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
@@ -285,33 +287,32 @@ export function CriteriaForm({
               label={t.duration}
               value={draft.duration}
               shown={formatDuration(draft.duration, t)}
+              aside={
+                showPaceHint && (
+                  <button
+                    type="button"
+                    className="flex min-h-touch items-center gap-1 text-sm text-accent"
+                    aria-expanded={paceInfo}
+                    onClick={() => setPaceInfo(!paceInfo)}
+                  >
+                    <Info size={16} aria-hidden />
+                    {t.aboutPace}
+                  </button>
+                )
+              }
               min={TARGET_DURATION.min}
               max={TARGET_DURATION.max}
               step={DURATION_STEP}
               onChange={(value) => change({ duration: value })}
             />
           )}
-          {/* The pace only turns a duration into a distance. */}
-          {draft.target === 'duration' && settings.pace[activity] === undefined && (
-            <div className="text-sm text-ink-2">
-              <button
-                type="button"
-                className="flex items-center gap-1 text-accent"
-                aria-expanded={paceInfo}
-                onClick={() => setPaceInfo(!paceInfo)}
-              >
-                <Info size={16} aria-hidden />
-                {t.aboutPace}
-              </button>
-              {paceInfo && (
-                <p className="mt-1">
-                  <a className="text-accent underline" href="#/settings">
-                    {t.adjustPace}
-                  </a>{' '}
-                  {t.adjustPaceHint}
-                </p>
-              )}
-            </div>
+          {showPaceHint && paceInfo && (
+            <p className="text-sm text-ink-2">
+              <a className="text-accent underline" href="#/settings">
+                {t.adjustPace}
+              </a>{' '}
+              {t.adjustPaceHint}
+            </p>
           )}
         </div>
       ),

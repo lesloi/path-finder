@@ -1,8 +1,11 @@
-/** A native range input, with its value in large type above it. */
+import type { ReactNode } from 'react';
+
+/** A native range input, with its value in large type above it and an optional `aside` on the same line. */
 export function Slider({
   label,
   value,
   shown,
+  aside,
   min,
   max,
   step,
@@ -12,6 +15,7 @@ export function Slider({
   value: number;
   /** The value as text, with its unit. */
   shown: string;
+  aside?: ReactNode;
   min: number;
   max: number;
   step: number;
@@ -19,7 +23,10 @@ export function Slider({
 }) {
   return (
     <div>
-      <output className="block text-xl font-bold">{shown}</output>
+      <div className="flex items-center justify-between gap-2">
+        <output className="text-xl font-bold">{shown}</output>
+        {aside}
+      </div>
       <input
         type="range"
         className="h-touch w-full accent-accent"
