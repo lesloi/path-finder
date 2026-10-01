@@ -36,24 +36,23 @@ colours that MapLibre and the route thumbnails paint, in `components/route-color
 pairs with the `route-*` tokens (change both together). A route thumbnail also draws a map-like
 background (`#f2efe6`, white roads, `#b9d7ee` water) in raw colours, like the map it stands for.
 
-| Utilities                                                 | Values                                                         |
-| --------------------------------------------------------- | -------------------------------------------------------------- |
-| `accent`, `accent-hover`, `accent-soft`                   | `#2b6f9e`; dark mode `#6fb0dd`                                 |
-| `on-accent`                                               | Text on the accent: white; dark text in dark mode              |
-| `surface`, `surface-2`, `ink`, `ink-2`, `border`, `scrim` | UI surfaces, text, and borders, light and dark                 |
-| `route-1` … `route-5`                                     | `#e0115f`, `#1d2433`, `#7a3fc4`, `#0b7a75`, `#c25e00`          |
-| `route-ui-1` … `route-ui-5`                               | A route's colour on the UI: `route-2` turns light in dark mode |
-| `slope-1` … `slope-4`                                     | Uphill grade < 3 %, 3–6 %, 6–10 %, > 10 %                      |
-| `paved`, `unpaved`                                        | Road surfaces                                                  |
-| `start`                                                   | The start point's brown ring, as in the logo                   |
-| spacing `1`, `2`, `3`, `4`, `6`                           | 4, 8, 12, 16, 24 px (Tailwind's 4 px steps)                    |
-| `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`  | 8, 14, 22 px, and a full pill                                  |
-| `shadow-float`                                            | The one shadow, for everything that floats                     |
-| `text-sm`, `text-base`, `text-lg`, `text-xl`              | 13, 15, 18, 24 px, in `rem` like the spacing                   |
-| `font-sans`                                               | The system font stack                                          |
-| `touch` (`size-touch`, `min-h-touch`)                     | 44 px, the smallest touch target                               |
-| `column` (`w-column`)                                     | 380 px, the desktop left column                                |
-| `top-safe-*`, `pb-safe-*`, and the other sides            | An offset or a padding from a screen edge, plus its safe area  |
+| Utilities                                                 | Values                                                        |
+| --------------------------------------------------------- | ------------------------------------------------------------- |
+| `accent`, `accent-hover`, `accent-soft`                   | `#2b6f9e`; dark mode `#6fb0dd`                                |
+| `on-accent`                                               | Text on the accent: white; dark text in dark mode             |
+| `surface`, `surface-2`, `ink`, `ink-2`, `border`, `scrim` | UI surfaces, text, and borders, light and dark                |
+| `route-1` … `route-5`                                     | `#e0115f`, `#1d2433`, `#7a3fc4`, `#0b7a75`, `#c25e00`         |
+| `slope-1` … `slope-4`                                     | Uphill grade < 3 %, 3–6 %, 6–10 %, > 10 %                     |
+| `paved`, `unpaved`                                        | Road surfaces                                                 |
+| `start`                                                   | The start point's brown ring, as in the logo                  |
+| spacing `1`, `2`, `3`, `4`, `6`                           | 4, 8, 12, 16, 24 px (Tailwind's 4 px steps)                   |
+| `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`  | 8, 14, 22 px, and a full pill                                 |
+| `shadow-float`                                            | The one shadow, for everything that floats                    |
+| `text-sm`, `text-base`, `text-lg`, `text-xl`              | 13, 15, 18, 24 px, in `rem` like the spacing                  |
+| `font-sans`                                               | The system font stack                                         |
+| `touch` (`size-touch`, `min-h-touch`)                     | 44 px, the smallest touch target                              |
+| `column` (`w-column`)                                     | 380 px, the desktop left column                               |
+| `top-safe-*`, `pb-safe-*`, and the other sides            | An offset or a padding from a screen edge, plus its safe area |
 
 **Stacking** (`z-*`): 4 for the sheet and the column, 5 for the floating buttons, 9 for a
 toast, 11 and 12 for an open dropdown and its scrim. Sub-pages are in the top

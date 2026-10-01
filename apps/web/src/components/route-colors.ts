@@ -4,7 +4,7 @@
  */
 export const ROUTE_COLORS = ['#e0115f', '#1d2433', '#7a3fc4', '#0b7a75', '#c25e00'];
 
-/** The left border of a route's row, in the route's colour, lightened for route 2 in dark mode. */
+/** The left border of a route's row, in the route's colour. */
 export const ROUTE_BORDERS = [
   'border-l-route-1',
   'border-l-route-2',
