@@ -59,7 +59,7 @@ describe('CriteriaForm', () => {
     const { onSubmit, submit } = setup();
     choose('Duration');
     fireEvent.change(slider('Duration'), { target: { value: '90' } });
-    choose('Target');
+    choose('Exact');
     fireEvent.change(slider('Elevation gain'), { target: { value: '400' } });
     choose('Unpaved');
 
@@ -122,7 +122,7 @@ describe('CriteriaForm', () => {
       const onSubmit = vi.fn();
       render(<UnitsSwitch onSubmit={onSubmit} />);
       fireEvent.change(slider('Distance'), { target: { value: '16' } });
-      choose('Target');
+      choose('Exact');
       fireEvent.change(slider('Elevation gain'), { target: { value: '500' } });
 
       fireEvent.click(screen.getByRole('button', { name: 'Imperial' }));
@@ -168,18 +168,18 @@ describe('CriteriaForm', () => {
 
     it('is a number of metres for Target', () => {
       const { onSubmit, submit } = setup();
-      choose('Target');
+      choose('Exact');
 
       submit();
 
       expect(onSubmit.mock.calls[0][0].elevationGain).toBe(300);
     });
 
-    it('shows its slider for Target only', () => {
+    it('shows its slider for Exact only', () => {
       setup();
       expect(screen.queryByRole('slider', { name: 'Elevation gain' })).not.toBeInTheDocument();
 
-      choose('Target');
+      choose('Exact');
 
       expect(slider('Elevation gain')).toHaveAttribute('max', '2500');
     });
@@ -187,7 +187,7 @@ describe('CriteriaForm', () => {
     it('converts feet to metres, within the API bounds', () => {
       store({ units: 'imperial' });
       const { onSubmit, submit } = setup();
-      choose('Target');
+      choose('Exact');
       expect(slider('Elevation gain')).toHaveAttribute('max', '8200');
       fireEvent.change(slider('Elevation gain'), { target: { value: '8200' } });
 
@@ -312,7 +312,7 @@ describe('CriteriaForm', () => {
       setup();
       choose('Duration');
       fireEvent.change(slider('Duration'), { target: { value: '30' } });
-      choose('Target');
+      choose('Exact');
       fireEvent.change(slider('Elevation gain'), { target: { value: '2000' } });
 
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -325,7 +325,7 @@ describe('CriteriaForm', () => {
       setup({ language: 'fr' });
       choose('Durée');
       fireEvent.change(slider('Durée'), { target: { value: '30' } });
-      choose('Cible');
+      choose('Précis');
       fireEvent.change(slider('Dénivelé'), { target: { value: '2000' } });
 
       expect(screen.getByRole('alert')).toHaveTextContent('Cette durée ne convient pas');
@@ -378,7 +378,7 @@ describe('CriteriaForm', () => {
       store({ lastActivity: 'run' });
       setup({ compact: true });
       fireEvent.click(screen.getByRole('button', { name: 'Elevation gain: Any' }));
-      fireEvent.click(screen.getByRole('radio', { name: 'Target' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Exact' }));
       fireEvent.change(screen.getByRole('slider', { name: 'Elevation gain' }), { target: { value: '2000' } });
       fireEvent.click(screen.getByRole('button', { name: 'Close' }));
       fireEvent.click(screen.getByRole('button', { name: 'Target: 10 km' }));
