@@ -107,8 +107,6 @@ export function StartPointMap({
       center: [2.5, 46.6],
       zoom: 5,
       attributionControl: false,
-      // Read back for the snapshot of a route set; otherwise the canvas is cleared after each frame.
-      canvasContextAttributes: { preserveDrawingBuffer: true },
     });
     // Routes come from OpenStreetMap: credit it from this map on, before any route is drawn.
     // The stylesheet moves it above the sheet on phones and to the centre of the map on desktops.
@@ -243,9 +241,8 @@ export function StartPointMap({
     // over it, for their thumbnails.
     map.fitBounds(boundsOf(routes), { ...frame, animate: false });
     let cancelled = false;
-    const finish = () => {
-      clearTimeout(timer);
-      map.off('idle', finish);
+    // Read in the frame's own render event, while the canvas still holds it: the browser clears it after.
+    const capture = () => {
       if (cancelled) return;
       const canvas = map.getCanvas();
       const [centre, width, height] = [map.getCenter(), canvas.clientWidth, canvas.clientHeight];
@@ -281,6 +278,12 @@ export function StartPointMap({
         0.85,
       );
     };
+    const finish = () => {
+      clearTimeout(timer);
+      map.off('idle', finish);
+      map.once('render', capture);
+      map.triggerRepaint();
+    };
     map.on('idle', finish);
     // A map that never settles (a tile that does not load) still gets its routes.
     const timer = setTimeout(finish, SNAPSHOT_TIMEOUT_MS);
@@ -288,6 +291,7 @@ export function StartPointMap({
       cancelled = true;
       clearTimeout(timer);
       map.off('idle', finish);
+      map.off('render', capture);
     };
   }, [loaded, routes, framed, desktop]);
 

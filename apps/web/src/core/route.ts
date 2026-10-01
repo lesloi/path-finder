@@ -17,6 +17,8 @@ export type Route = {
   distance: number;
   /** Metres. */
   elevationGain?: number;
+  /** Metres, sampled as the elevation gain is. */
+  elevationLoss?: number;
   /** Minutes. */
   estimatedDuration: number;
   kind: 'match' | 'suggestion';
@@ -48,10 +50,12 @@ const isPoint = (value: unknown): value is number[] =>
 
 function parseRoute(value: unknown): Route | undefined {
   if (!isObject(value)) return undefined;
-  const { geometry, distance, elevationGain, estimatedDuration, kind, misses, unpavedShare, surfaces } = value;
+  const { geometry, distance, elevationGain, elevationLoss, estimatedDuration, kind, misses, unpavedShare, surfaces } =
+    value;
   if (!Array.isArray(geometry) || !geometry.every(isPoint)) return undefined;
   if (!isNumber(distance) || !isNumber(estimatedDuration) || !isNumber(unpavedShare)) return undefined;
   if (elevationGain !== undefined && !isNumber(elevationGain)) return undefined;
+  if (elevationLoss !== undefined && !isNumber(elevationLoss)) return undefined;
   if (kind !== 'match' && kind !== 'suggestion') return undefined;
   const validMisses =
     Array.isArray(misses) &&
@@ -69,6 +73,7 @@ function parseRoute(value: unknown): Route | undefined {
     geometry: geometry as Route['geometry'],
     distance,
     ...(elevationGain !== undefined && { elevationGain }),
+    ...(elevationLoss !== undefined && { elevationLoss }),
     estimatedDuration,
     kind,
     misses: (misses as Miss[]).map(({ criterion, gap }) => ({ criterion, gap })),

@@ -1,4 +1,12 @@
-import { bilinearHeight, elevationGain, elevationProfile, lambert93, resample, type Position } from './index.ts';
+import {
+  bilinearHeight,
+  elevationGain,
+  elevationLoss,
+  elevationProfile,
+  lambert93,
+  resample,
+  type Position,
+} from './index.ts';
 
 const START: Position = [6.1294, 45.8992];
 
@@ -69,6 +77,18 @@ describe('elevationGain', () => {
     const bumps = (_lon: number, lat: number) => (Math.round(((lat - START[1]) * 111_195) / 30) % 2) * 0.5;
 
     expect(elevationGain([north(0), north(1_200)], bumps)).toBeCloseTo(10, 1);
+  });
+});
+
+describe('elevationLoss', () => {
+  it('counts the descents of a loop and not its climbs', () => {
+    const outAndBack = [north(0), north(600), north(0)];
+
+    expect(elevationLoss(outAndBack, slope)).toBeCloseTo(60, 0);
+  });
+
+  it('is 0 along a climb', () => {
+    expect(elevationLoss([north(0), north(600)], slope)).toBe(0);
   });
 });
 

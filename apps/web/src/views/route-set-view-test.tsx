@@ -13,6 +13,7 @@ function route(overrides: Partial<Route> = {}): Route {
     geometry: [0, 1, 2, 3].map((k) => [6.1294, 45.8992 + (k * 400) / METRES_PER_DEGREE, 450 + 30 * k]),
     distance: 12.34,
     elevationGain: 340,
+    elevationLoss: 352,
     estimatedDuration: 85,
     kind: 'match',
     misses: [],
@@ -27,8 +28,8 @@ function route(overrides: Partial<Route> = {}): Route {
 
 // What the API sends without BD ALTI: no heights, and no elevation gain.
 function withoutElevation(): Route {
-  const { elevationGain, ...rest } = route();
-  expect(elevationGain).toBeDefined();
+  const { elevationGain, elevationLoss, ...rest } = route();
+  expect([elevationGain, elevationLoss]).not.toContain(undefined);
   return { ...rest, geometry: rest.geometry.map(([lon, lat]) => [lon, lat]) as [number, number][] };
 }
 
@@ -250,8 +251,7 @@ describe('RouteSetView', () => {
 
       expect(screen.getByTestId('route-distance')).toHaveTextContent('12.3 km');
       expect(screen.getByTestId('route-climb')).toHaveTextContent('340 m');
-      // A loop descends what it climbs.
-      expect(screen.getByTestId('route-descent')).toHaveTextContent('340 m');
+      expect(screen.getByTestId('route-descent')).toHaveTextContent('352 m');
       expect(screen.getByTestId('route-duration')).toHaveTextContent('1 h 25');
     });
 

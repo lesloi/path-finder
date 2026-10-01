@@ -73,3 +73,11 @@ export function elevationGain(geometry: Position[], heightAt: HeightAt): number 
   for (let k = 1; k < profile.length; k++) gain += Math.max(0, profile[k] - profile[k - 1]);
   return gain;
 }
+
+/** Elevation loss in metres along a geometry, counted as the elevation gain is: every descent in its profile. */
+export function elevationLoss(geometry: Position[], heightAt: HeightAt): number {
+  const profile = elevationProfile(geometry, heightAt);
+  let loss = 0;
+  for (let k = 1; k < profile.length; k++) loss += Math.max(0, profile[k - 1] - profile[k]);
+  return loss;
+}

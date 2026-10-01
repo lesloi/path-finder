@@ -49,6 +49,10 @@ export class Map {
   off(type: string, handler: Handler) {
     this.handlers[type] = (this.handlers[type] ?? []).filter((candidate) => candidate !== handler);
   }
+  /** A repaint renders a frame at once. */
+  triggerRepaint() {
+    this.fire('render');
+  }
   getCenter() {
     return { lng: 6, lat: 45 };
   }

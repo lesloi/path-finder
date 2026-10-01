@@ -294,11 +294,12 @@ function RouteDetail({
           <Figure label={t.climb} testId="route-climb" icon={<ArrowUpRight size={16} aria-hidden />}>
             {formatHeight(route.elevationGain, display)}
           </Figure>
-          {/* A loop comes back to its start: it descends what it climbs. */}
-          <Figure label={t.descent} testId="route-descent" icon={<ArrowDownRight size={16} aria-hidden />}>
-            {formatHeight(route.elevationGain, display)}
-          </Figure>
         </>
+      )}
+      {route.elevationLoss !== undefined && (
+        <Figure label={t.descent} testId="route-descent" icon={<ArrowDownRight size={16} aria-hidden />}>
+          {formatHeight(route.elevationLoss, display)}
+        </Figure>
       )}
       <Figure label={t.duration} testId="route-duration">
         {formatDuration(route.estimatedDuration, display.language)}

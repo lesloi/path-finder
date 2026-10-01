@@ -22,6 +22,7 @@ const route: Route = {
   geometry: northward([400, 410, 420]),
   distance: 10,
   elevationGain: 400,
+  elevationLoss: 390,
   estimatedDuration: 84,
   kind: 'match',
   misses: [],
@@ -40,8 +41,8 @@ describe('parseRoutes', () => {
   });
 
   it('reads routes without heights or elevation gain, as without BD ALTI', () => {
-    const { elevationGain, ...flat } = route;
-    expect(elevationGain).toBeDefined();
+    const { elevationGain, elevationLoss, ...flat } = route;
+    expect([elevationGain, elevationLoss]).not.toContain(undefined);
     const routes = [{ ...flat, geometry: [[6.1, 45.9] as [number, number]] }];
 
     expect(parseRoutes({ routes })).toEqual(routes);
@@ -59,6 +60,7 @@ describe('parseRoutes', () => {
     ['a height that is not a number', { routes: [{ ...route, geometry: [[6.1, 45.9, 'high']] }] }],
     ['no distance', { routes: [{ ...route, distance: undefined }] }],
     ['an elevation gain that is not a number', { routes: [{ ...route, elevationGain: '400' }] }],
+    ['an elevation loss that is not a number', { routes: [{ ...route, elevationLoss: '390' }] }],
     ['an unknown kind', { routes: [{ ...route, kind: 'perfect' }] }],
     ['an unknown missed criterion', { routes: [{ ...route, misses: [{ criterion: 'surface', gap: 1 }] }] }],
     ['an unknown surface', { routes: [{ ...route, surfaces: [{ surface: 'ice', share: 1 }] }] }],
