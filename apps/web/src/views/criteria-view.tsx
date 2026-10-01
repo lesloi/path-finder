@@ -1,10 +1,11 @@
-import { Crosshair, LocateFixed, Settings } from 'lucide-react';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Crosshair, LoaderCircle, LocateFixed, Settings } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import { useElevation } from '../state/index.ts';
-import { CriteriaForm, useCriteriaDraft, type CriteriaRequest } from './criteria-form.tsx';
+import { useElevation, useRouteSet, useSettings, type RouteSetError } from '../state/index.ts';
+import { CriteriaForm, useCriteriaDraft } from './criteria-form.tsx';
+import { RouteSetView } from './route-set-view.tsx';
 import { formatPosition, parsePosition, type Position } from '../core/index.ts';
-import { commonText, criteriaText, type Language } from '../i18n/index.ts';
+import { commonText, criteriaText, errorText, routesText, type Language } from '../i18n/index.ts';
 import {
   StartPointMap,
   BottomSheet,
@@ -17,19 +18,12 @@ import {
 
 const TOAST_MS = 6_000;
 
-/** The first view: where the user sets the criteria of a route set, over a full-screen map. */
-export function CriteriaView({
-  language,
-  pageOpen = false,
-  onSubmit = () => {},
-}: {
-  language: Language;
-  /** The user asked for routes with these criteria. */
-  onSubmit?: (request: CriteriaRequest) => void;
-  /** A sub-page is open over the view. */
-  pageOpen?: boolean;
-}) {
-  const t = { ...commonText[language], ...criteriaText[language] };
+/**
+ * The first view: where the user sets the criteria of a route set, over a full-screen map. Asking
+ * for routes replaces the criteria with the route set, its routes drawn on the map.
+ */
+export function CriteriaView({ language, pageOpen = false }: { language: Language; pageOpen?: boolean }) {
+  const t = { ...commonText[language], ...criteriaText[language], ...routesText[language] };
   const desktop = useDesktop();
   // Kept here: the form is mounted in the column or in the sheet, whichever the screen shows.
   const draft = useCriteriaDraft();
@@ -43,6 +37,18 @@ export function CriteriaView({
   const [toast, setToast] = useState<{ problem: 'unavailable' | 'unreadable'; start?: Position }>();
   const settingsLink = useRef<HTMLAnchorElement>(null);
   const pageWasOpen = useRef(pageOpen);
+  const [{ units }] = useSettings();
+  const [routeError, setRouteError] = useState<RouteSetError | 'no-routes'>();
+  const { routeSet, loading, find, clear } = useRouteSet(setRouteError);
+  const [selected, setSelected] = useState(0);
+  const [detail, setDetail] = useState(false);
+  // Where the user points on the elevation profile, as a place on the map.
+  const [hover, setHover] = useState<Position>();
+  // Kept while the route set does, so the map's effects only run for a new one.
+  const geometries = useMemo(
+    () => routeSet?.routes.map(({ geometry }) => geometry.map(([lon, lat]): Position => [lon, lat])),
+    [routeSet],
+  );
 
   // Keyboard users go on from the button that opened the page.
   useEffect(() => {
@@ -55,6 +61,33 @@ export function CriteriaView({
     const timer = setTimeout(() => setToast(undefined), TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!routeError) return;
+    const timer = setTimeout(() => setRouteError(undefined), TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [routeError]);
+
+  function findRoutes(request: Parameters<typeof find>[0]) {
+    setRouteError(undefined);
+    setSelected(0);
+    setDetail(false);
+    find(request);
+  }
+
+  function backToCriteria() {
+    clear();
+    setDetail(false);
+    setHover(undefined);
+    setSheetExpanded(false);
+  }
+
+  function openDetail(open: boolean) {
+    setDetail(open);
+    setHover(undefined);
+    // The detail is taller than the list.
+    setSheetExpanded(open);
+  }
 
   function changeStart(position: Position) {
     setStart(position);
@@ -83,6 +116,42 @@ export function CriteriaView({
     );
   }
 
+  const results = routeSet && (
+    <RouteSetView
+      language={language}
+      units={units}
+      request={routeSet.request}
+      routes={routeSet.routes}
+      selected={selected}
+      detail={detail}
+      onSelect={setSelected}
+      onDetailChange={openDetail}
+      onBack={backToCriteria}
+      onHover={setHover}
+    />
+  );
+  const searching = loading && (
+    <div className="flex flex-col gap-3">
+      <p
+        role="status"
+        data-testid="routes-loading"
+        className="m-0 flex min-h-touch items-center justify-center gap-2 text-ink-2"
+      >
+        <LoaderCircle size={20} aria-hidden className="animate-spin" />
+        {t.finding}
+      </p>
+      <button
+        type="button"
+        data-testid="routes-cancel"
+        className="min-h-touch rounded-full text-accent"
+        onClick={backToCriteria}
+      >
+        {t.criteria}
+      </button>
+    </div>
+  );
+  const panel = results || searching;
+
   return (
     <>
       <StartPointMap
@@ -90,6 +159,11 @@ export function CriteriaView({
         focus={focus}
         // On desktops, the start point block also arms a click.
         pickOnClick={desktop && picking}
+        routes={geometries}
+        selectedRoute={selected}
+        framing={detail ? 'selected' : 'all'}
+        {...(detail && hover && { hover })}
+        onRouteSelect={setSelected}
         onStartChange={changeStart}
       />
       {/* The settings are open, or another page with a way back to them. */}
@@ -107,7 +181,7 @@ export function CriteriaView({
         </a>
       )}
       {/* Above the sheet on phones, whatever its height; an expanded sheet leaves it no room. */}
-      {(desktop || !sheetExpanded) && (
+      {!routeSet && !loading && (desktop || !sheetExpanded) && (
         <button
           type="button"
           data-testid="criteria-locate"
@@ -128,63 +202,91 @@ export function CriteriaView({
             Path finder
           </div>
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-            <StartPointField
-              start={start}
-              language={language}
-              picking={picking}
-              onStartChange={moveStart}
-              onUnreadable={() => warn('unreadable')}
-            >
-              <button
-                type="button"
-                data-testid="criteria-start-pick"
-                className={`${ICON_BUTTON} aria-pressed:text-accent`}
-                aria-label={t.chooseOnMap}
-                aria-pressed={picking}
-                onClick={() => setPicking(!picking)}
-              >
-                <Crosshair size={20} aria-hidden />
-              </button>
-              <button
-                type="button"
-                className={ICON_BUTTON}
-                data-testid="criteria-start-locate"
-                aria-label={t.myLocation}
-                onClick={locate}
-              >
-                <LocateFixed size={20} aria-hidden />
-              </button>
-            </StartPointField>
-            <CriteriaForm language={language} start={start} draft={draft} elevation={elevation} onSubmit={onSubmit} />
+            {panel || (
+              <>
+                <StartPointField
+                  start={start}
+                  language={language}
+                  picking={picking}
+                  onStartChange={moveStart}
+                  onUnreadable={() => warn('unreadable')}
+                >
+                  <button
+                    type="button"
+                    data-testid="criteria-start-pick"
+                    className={`${ICON_BUTTON} aria-pressed:text-accent`}
+                    aria-label={t.chooseOnMap}
+                    aria-pressed={picking}
+                    onClick={() => setPicking(!picking)}
+                  >
+                    <Crosshair size={20} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className={ICON_BUTTON}
+                    data-testid="criteria-start-locate"
+                    aria-label={t.myLocation}
+                    onClick={locate}
+                  >
+                    <LocateFixed size={20} aria-hidden />
+                  </button>
+                </StartPointField>
+                <CriteriaForm
+                  language={language}
+                  start={start}
+                  draft={draft}
+                  elevation={elevation}
+                  onSubmit={findRoutes}
+                />
+              </>
+            )}
           </div>
         </aside>
       ) : (
         <BottomSheet
           testId="criteria-sheet"
-          label={t.criteria}
+          label={routeSet ? t.routes : t.criteria}
           expanded={sheetExpanded}
           onExpandedChange={setSheetExpanded}
         >
-          {!start && (
-            <p data-testid="criteria-long-press" className="text-center text-sm text-ink-2">
-              {t.longPress}
-            </p>
+          {panel || (
+            <>
+              {!start && (
+                <p data-testid="criteria-long-press" className="text-center text-sm text-ink-2">
+                  {t.longPress}
+                </p>
+              )}
+              <StartPointField
+                start={start}
+                language={language}
+                onStartChange={moveStart}
+                onUnreadable={() => warn('unreadable')}
+              />
+              <CriteriaForm
+                language={language}
+                start={start}
+                draft={draft}
+                elevation={elevation}
+                compact={!sheetExpanded}
+                onSubmit={findRoutes}
+              />
+            </>
           )}
-          <StartPointField
-            start={start}
-            language={language}
-            onStartChange={moveStart}
-            onUnreadable={() => warn('unreadable')}
-          />
-          <CriteriaForm
-            language={language}
-            start={start}
-            draft={draft}
-            elevation={elevation}
-            compact={!sheetExpanded}
-            onSubmit={onSubmit}
-          />
         </BottomSheet>
+      )}
+      {routeError && (
+        // A click drops it at once.
+        <p className={TOAST} role="alert" data-testid="routes-toast" onClick={() => setRouteError(undefined)}>
+          {routeError === 'no-routes' || routeError === 'unreachable' ? (
+            <>
+              {routeError === 'no-routes' ? t.noRoutes : t.unreachable}
+              <br />
+              {routeError === 'no-routes' ? t.noRoutesHint : t.unreachableHint}
+            </>
+          ) : (
+            errorText[language][routeError]
+          )}
+        </p>
       )}
       {toast && toast.start === start && (
         // A click drops it at once.

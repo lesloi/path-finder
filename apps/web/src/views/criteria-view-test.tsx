@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { CriteriaView } from './criteria-view.tsx';
 import { expectNamedControls } from '../accessible-names.ts';
-import { criteriaText } from '../i18n/index.ts';
+import { criteriaText, errorText, routesText } from '../i18n/index.ts';
 import { maps, markers } from '../maplibre-mock.ts';
 
 vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
@@ -116,15 +116,20 @@ describe('CriteriaView', () => {
 
     it('shows the full form in the desktop column and passes the criteria on', () => {
       onDesktop();
-      const onSubmit = vi.fn();
-      render(<CriteriaView language="en" onSubmit={onSubmit} />);
+      const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => new Promise(() => {}));
+      vi.stubGlobal('fetch', fetchMock);
+      render(<CriteriaView language="en" />);
       expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
 
       fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
       fireEvent.keyDown(field(), { key: 'Enter' });
       fireEvent.click(screen.getByTestId('criteria-submit'));
 
-      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ start: [6.2, 45.8], activity: 'run' }));
+      const [, { body }] = fetchMock.mock.calls.find(([url]) => url === '/api/v1/route-sets')! as unknown as [
+        string,
+        RequestInit,
+      ];
+      expect(JSON.parse(body as string)).toMatchObject({ start: [6.2, 45.8], activity: 'run' });
     });
   });
 
@@ -360,6 +365,178 @@ describe('CriteriaView', () => {
       act(() => vi.advanceTimersByTime(6_000));
 
       expect(screen.queryByTestId('criteria-toast')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('asking for routes', () => {
+    const METRES_PER_DEGREE = 111_195;
+    const route = (offset: number, overrides = {}) => ({
+      geometry: [0, 1, 2, 3].map((k) => [6.2 + offset, 45.8 + (k * 400) / METRES_PER_DEGREE, 450 + 30 * k]),
+      distance: 10 + offset,
+      elevationGain: 300,
+      estimatedDuration: 70,
+      kind: 'match',
+      misses: [],
+      unpavedShare: 0.3,
+      surfaces: [{ surface: 'paved', share: 1 }],
+      ...overrides,
+    });
+    const answer = (...routes: object[]) => Response.json({ routes });
+
+    function ask(response: Promise<Response> | Response) {
+      const routeSets = vi.fn(() => Promise.resolve(response));
+      vi.stubGlobal('fetch', (url: string) =>
+        url === '/api/v1/route-sets' ? routeSets() : Promise.resolve(Response.json({ elevation: false })),
+      );
+      return routeSets;
+    }
+    async function submit() {
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+    }
+    const routesSource = () => (map().sources.routes as unknown as { data: { features: unknown[] } }).data.features;
+
+    it('shows a loading state while the API works, and a way to cancel', async () => {
+      onDesktop();
+      ask(new Promise(() => {}));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+
+      await submit();
+
+      expect(screen.getByTestId('routes-loading')).toHaveTextContent(routesText.en.finding);
+      expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('routes-cancel'));
+      expect(screen.getByTestId('criteria-submit')).toBeInTheDocument();
+    });
+
+    it('shows the route set in the column, and draws its routes on the map', async () => {
+      onDesktop();
+      ask(answer(route(0), route(1, { kind: 'suggestion', misses: [{ criterion: 'distance', gap: 1 }] })));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+
+      await submit();
+
+      expect(await screen.findByTestId('routes-count')).toHaveTextContent('2 routes');
+      expect(routesSource()).toHaveLength(2);
+      expect(map().fitted).toBeDefined();
+    });
+
+    it('opens the detail of a route, frames it on the map, and goes back to the list', async () => {
+      onDesktop();
+      ask(answer(route(0), route(1)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+      await submit();
+
+      fireEvent.click(await screen.findByTestId('routes-row-1'));
+      expect(screen.getByTestId('route-position')).toHaveTextContent('2/2');
+      expect(map().fitted?.bounds).toEqual([
+        [7.2, expect.closeTo(45.8)],
+        [7.2, expect.closeTo(45.8 + 1_200 / METRES_PER_DEGREE)],
+      ]);
+
+      fireEvent.click(screen.getByTestId('route-back'));
+      expect(screen.getByTestId('routes-count')).toBeInTheDocument();
+    });
+
+    it('shows a dot on the map where the user points on the profile', async () => {
+      onDesktop();
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+      await submit();
+      fireEvent.click(await screen.findByTestId('routes-row-0'));
+      const plot = screen.getByTestId('route-profile-plot');
+      plot.getBoundingClientRect = () => ({ left: 0, width: 100 }) as DOMRect;
+
+      fireEvent.pointerMove(plot, { clientX: 50 });
+      expect(markers.filter((marker) => marker.shown)).toHaveLength(2);
+
+      fireEvent.pointerLeave(plot);
+      expect(markers.filter((marker) => marker.shown)).toHaveLength(1);
+    });
+
+    it('selects the row of a route tapped on the map', async () => {
+      onDesktop();
+      ask(answer(route(0), route(1)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+      await submit();
+      await screen.findByTestId('routes-count');
+
+      act(() => map().fire('click', { features: [{ properties: { index: 1 } }] }, 'routes-hit'));
+
+      expect(screen.getByTestId('routes-row-1')).toHaveAttribute('data-selected');
+    });
+
+    it('goes back to the criteria, kept as they were, and clears the map', async () => {
+      onDesktop();
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+      fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
+      await submit();
+
+      fireEvent.click(await screen.findByTestId('routes-back'));
+
+      expect(screen.getByTestId('criteria-surface-unpaved')).toBeChecked();
+      expect((field() as HTMLInputElement).value).toContain('45.8');
+      expect(routesSource()).toEqual([]);
+    });
+
+    it('shows the route set in the sheet on phones, expanded for a detail', async () => {
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('load'));
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      expect(await screen.findByTestId('routes-count')).toBeInTheDocument();
+      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAccessibleName(routesText.en.routes);
+      fireEvent.click(screen.getByTestId('routes-row-0'));
+      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it.each([
+      ['an empty route set', answer(), routesText.en.noRoutes],
+      ['an error code', Response.json({ error: 'rate-limited' }, { status: 429 }), errorText.en['rate-limited']],
+      ['an unreachable API', new Response('', { status: 502 }), routesText.en.unreachable],
+    ])('says what happened on %s, and keeps the criteria', async (_, response, message) => {
+      onDesktop();
+      ask(response);
+      render(<CriteriaView language="en" />);
+
+      await submit();
+
+      expect(await screen.findByTestId('routes-toast')).toHaveTextContent(message);
+      expect(screen.getByTestId('criteria-submit')).toBeInTheDocument();
+    });
+
+    it('drops the message on a click', async () => {
+      onDesktop();
+      ask(answer());
+      render(<CriteriaView language="fr" />);
+      await submit();
+
+      fireEvent.click(await screen.findByTestId('routes-toast'));
+
+      expect(screen.queryByTestId('routes-toast')).not.toBeInTheDocument();
+    });
+
+    it.each(['en', 'fr'] as const)('names every control of the route set in %s', async (language) => {
+      ask(answer(route(0)));
+      const { container } = render(<CriteriaView language={language} />);
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+      await screen.findByTestId('routes-count');
+
+      expectNamedControls(container);
     });
   });
 });
