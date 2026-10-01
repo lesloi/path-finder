@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { expectNamedControls } from '../accessible-names.ts';
 import type { Route, RouteSetRequest } from '../core/index.ts';
-import { commonText, routesText } from '../i18n/index.ts';
+import { commonText, criteriaText, routesText } from '../i18n/index.ts';
 import { RouteSetView } from './route-set-view.tsx';
 
 const METRES_PER_DEGREE = 111_195;
@@ -314,7 +314,7 @@ describe('RouteSetView', () => {
 
       expect(screen.getByTestId('route-profile')).toBeInTheDocument();
       expect(screen.getByTestId('route-surface')).toHaveTextContent(
-        `${routesText.en.paved} 70% · ${routesText.en.unpaved} 30%`,
+        `${criteriaText.en.paved} 70% · ${criteriaText.en.unpaved} 30%`,
       );
     });
 

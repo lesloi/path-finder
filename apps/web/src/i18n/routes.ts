@@ -1,29 +1,25 @@
 import type { Miss } from '../../../api/src/contract.ts';
 import type { Language } from './language.ts';
 
-/** The route set view, the route detail, and what the app says while it asks for routes. */
+/**
+ * The route set view, the route detail, and what the app says while it asks for routes. Labels it shares
+ * with the criteria (distance, elevation gain, surface…) are in `criteriaText`.
+ */
 export const routesText = {
   en: {
     routes: 'Routes',
-    criteria: 'Criteria',
     routeCount: (count: number) => (count === 1 ? '1 route' : `${count} routes`),
     changeCriteria: (summary: string) => `Change the criteria: ${summary}`,
     showRoutes: (count: number) => (count === 1 ? 'Show the route found' : `Show the ${count} routes found`),
     route: (index: number, count: number) => `Route ${index} of ${count}`,
     previous: 'Previous route',
     next: 'Next route',
-    distance: 'Distance',
     climb: 'Climb',
     descent: 'Descent',
-    duration: 'Duration',
-    elevationGain: 'Elevation gain',
     estimatedDuration: 'Estimated duration',
     profile: (min: string, max: string) => `Elevation profile, from ${min} to ${max}`,
     altitude: 'Altitude',
     slope: 'Slope',
-    surface: 'Surface',
-    paved: 'Paved',
-    unpaved: 'Unpaved',
     exportGpx: 'Export GPX',
     finding: 'Finding routes…',
     // The worded gap of a missed criterion: "+30% elevation gain".
@@ -37,25 +33,18 @@ export const routesText = {
   },
   fr: {
     routes: 'Parcours',
-    criteria: 'Critères',
     routeCount: (count: number) => `${count} parcours`,
     changeCriteria: (summary: string) => `Modifier les critères : ${summary}`,
     showRoutes: (count: number) => (count === 1 ? 'Voir le parcours trouvé' : `Voir les ${count} parcours trouvés`),
     route: (index: number, count: number) => `Parcours ${index} sur ${count}`,
     previous: 'Parcours précédent',
     next: 'Parcours suivant',
-    distance: 'Distance',
     climb: 'Montée',
     descent: 'Descente',
-    duration: 'Durée',
-    elevationGain: 'Dénivelé',
     estimatedDuration: 'Durée estimée',
     profile: (min: string, max: string) => `Profil altimétrique, de ${min} à ${max}`,
     altitude: 'Altitude',
     slope: 'Pente',
-    surface: 'Revêtement',
-    paved: 'Goudronné',
-    unpaved: 'Non goudronné',
     exportGpx: 'Exporter en GPX',
     finding: 'Recherche de parcours…',
     misses: { distance: 'de distance', duration: 'de durée', elevationGain: 'de dénivelé' },

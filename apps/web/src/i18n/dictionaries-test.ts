@@ -36,6 +36,18 @@ describe.each([
   });
 });
 
+describe('the dictionaries a view spreads together', () => {
+  it.each([
+    ['criteria view', [commonText, criteriaText, routesText]],
+    ['route set view', [criteriaText, routesText]],
+    ['settings view', [commonText, settingsText]],
+  ] as const)('share no key in the %s, so none hides another', (_, dictionaries) => {
+    const keys = dictionaries.flatMap((dictionary) => Object.keys(dictionary.en));
+
+    expect(keys.filter((key, k) => keys.indexOf(key) !== k)).toEqual([]);
+  });
+});
+
 describe('the criteria dictionary', () => {
   it.each(['en', 'fr'] as const)('words its parameterized messages in %s', (language) => {
     const { distanceError, elevationGainError } = criteriaText[language];

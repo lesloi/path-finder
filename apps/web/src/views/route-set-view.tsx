@@ -39,7 +39,7 @@ import {
   type RouteSetRequest,
   type Display,
 } from '../core/index.ts';
-import { routesText } from '../i18n/index.ts';
+import { criteriaText, routesText } from '../i18n/index.ts';
 
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
@@ -48,6 +48,9 @@ const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp
   Miss['criterion'],
   LucideIcon
 >;
+
+// The words of the route set: its own, and the labels it shares with the criteria.
+const words = ({ language }: Display) => ({ ...criteriaText[language], ...routesText[language] });
 
 /**
  * The route set the user asked for: first a list of its routes, then the detail of one, which
@@ -103,7 +106,7 @@ export function RouteSetView({
     );
   }
 
-  const t = routesText[display.language];
+  const t = words(display);
   const summary = criteriaSummary(request, display);
   return (
     <>
@@ -180,7 +183,7 @@ function RouteRow({
   /** The pointer or the focus is on the row: its route is the one the map highlights. */
   onPreview: () => void;
 }) {
-  const t = routesText[display.language];
+  const t = words(display);
   const distance = formatDistance(route.distance, display);
   const duration = formatDuration(route.estimatedDuration, display.language);
   const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, display);
@@ -272,7 +275,7 @@ function RouteDetail({
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
 }) {
-  const t = routesText[display.language];
+  const t = words(display);
   const route = routes[selected];
   const swipeFrom = useRef<[number, number]>(undefined);
   const hasPrevious = selected > 0;
