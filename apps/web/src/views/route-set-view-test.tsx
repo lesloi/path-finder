@@ -77,8 +77,7 @@ function View({
   const [detail, setDetail] = useState(open);
   return (
     <RouteSetView
-      language={language}
-      units={units}
+      display={{ units, language }}
       request={request}
       routes={list}
       selected={selected}

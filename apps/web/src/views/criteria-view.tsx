@@ -88,8 +88,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   const panel = routeSet ? (
     <RouteSetView
-      language={language}
-      units={units}
+      display={{ units, language }}
       request={routeSet.request}
       routes={routeSet.routes}
       selected={browser.selected}

@@ -37,9 +37,9 @@ import {
   type Position,
   type Route,
   type RouteSetRequest,
-  type Units,
+  type Display,
 } from '../core/index.ts';
-import { routesText, type Language } from '../i18n/index.ts';
+import { routesText } from '../i18n/index.ts';
 
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
@@ -55,8 +55,7 @@ const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp
  * list or the detail, `onHover` a place the user points at on the elevation profile.
  */
 export function RouteSetView({
-  language,
-  units,
+  display,
   request,
   routes,
   selected,
@@ -66,8 +65,7 @@ export function RouteSetView({
   onBack,
   onHover,
 }: {
-  language: Language;
-  units: Units;
+  display: Display;
   /** The criteria the routes were generated for. */
   request: RouteSetRequest;
   routes: Route[];
@@ -81,13 +79,11 @@ export function RouteSetView({
   onHover: (position: Position | undefined) => void;
 }) {
   const desktop = useDesktop();
-  const settings = { units, language };
 
   if (detail) {
     return (
       <RouteDetail
-        language={language}
-        units={units}
+        display={display}
         request={request}
         routes={routes}
         selected={selected}
@@ -99,7 +95,7 @@ export function RouteSetView({
     );
   }
 
-  const t = routesText[language];
+  const t = routesText[display.language];
   return (
     <>
       <div className="flex items-center justify-between gap-2">
@@ -119,11 +115,11 @@ export function RouteSetView({
           type="button"
           data-testid="routes-summary"
           className="flex min-h-touch items-center gap-2 rounded-md bg-surface-2 px-3 text-left text-sm"
-          aria-label={t.changeCriteria(criteriaSummary(request, settings))}
+          aria-label={t.changeCriteria(criteriaSummary(request, display))}
           onClick={onBack}
         >
           <SlidersHorizontal size={16} aria-hidden className="flex-none" />
-          <span className="min-w-0 flex-1 truncate">{criteriaSummary(request, settings)}</span>
+          <span className="min-w-0 flex-1 truncate">{criteriaSummary(request, display)}</span>
           <span className="font-semibold text-accent">{t.change}</span>
         </button>
       )}
@@ -135,8 +131,7 @@ export function RouteSetView({
               index={index}
               count={routes.length}
               selected={index === selected}
-              language={language}
-              units={units}
+              display={display}
               desktop={desktop}
               onOpen={() => {
                 onSelect(index);
@@ -156,8 +151,7 @@ function RouteRow({
   index,
   count,
   selected,
-  language,
-  units,
+  display,
   desktop,
   onOpen,
   onPreview,
@@ -166,18 +160,17 @@ function RouteRow({
   index: number;
   count: number;
   selected: boolean;
-  language: Language;
-  units: Units;
+  display: Display;
   desktop: boolean;
   onOpen: () => void;
   /** The pointer or the focus is on the row: its route is the one the map highlights. */
   onPreview: () => void;
 }) {
-  const t = routesText[language];
-  const distance = formatDistance(route.distance, units, language);
-  const duration = formatDuration(route.estimatedDuration, language);
-  const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, units, language);
-  const misses = route.misses.map((miss) => missText(miss, route, { units, language }));
+  const t = routesText[display.language];
+  const distance = formatDistance(route.distance, display);
+  const duration = formatDuration(route.estimatedDuration, display.language);
+  const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, display);
+  const misses = route.misses.map((miss) => missText(miss, route, display));
   const name = [
     t.route(index + 1, count),
     distance,
@@ -241,8 +234,7 @@ function MissMarker({ miss, text, testId }: { miss: Miss; text: string; testId: 
 }
 
 function RouteDetail({
-  language,
-  units,
+  display,
   request,
   routes,
   selected,
@@ -251,8 +243,7 @@ function RouteDetail({
   onBack,
   onHover,
 }: {
-  language: Language;
-  units: Units;
+  display: Display;
   request: RouteSetRequest;
   routes: Route[];
   selected: number;
@@ -261,12 +252,12 @@ function RouteDetail({
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
 }) {
-  const t = routesText[language];
+  const t = routesText[display.language];
   const route = routes[selected];
   const swipeFrom = useRef<[number, number]>(undefined);
   const hasPrevious = selected > 0;
   const hasNext = selected < routes.length - 1;
-  const percent = new Intl.NumberFormat(language, { style: 'percent' });
+  const percent = new Intl.NumberFormat(display.language, { style: 'percent' });
   const unpaved = route.unpavedShare;
 
   function swipeEnd(event: PointerEvent) {
@@ -283,21 +274,21 @@ function RouteDetail({
   const figures = (
     <dl className="m-0 grid flex-1 grid-cols-2 gap-x-4 gap-y-2" data-testid="route-figures">
       <Figure label={t.distance} testId="route-distance">
-        {formatDistance(route.distance, units, language)}
+        {formatDistance(route.distance, display)}
       </Figure>
       {route.elevationGain !== undefined && (
         <>
           <Figure label={t.climb} testId="route-climb" icon={<ArrowUpRight size={16} aria-hidden />}>
-            {formatHeight(route.elevationGain, units, language)}
+            {formatHeight(route.elevationGain, display)}
           </Figure>
           {/* A loop comes back to its start: it descends what it climbs. */}
           <Figure label={t.descent} testId="route-descent" icon={<ArrowDownRight size={16} aria-hidden />}>
-            {formatHeight(route.elevationGain, units, language)}
+            {formatHeight(route.elevationGain, display)}
           </Figure>
         </>
       )}
       <Figure label={t.duration} testId="route-duration">
-        {formatDuration(route.estimatedDuration, language)}
+        {formatDuration(route.estimatedDuration, display.language)}
       </Figure>
     </dl>
   );
@@ -357,16 +348,11 @@ function RouteDetail({
       {route.misses.length > 0 && (
         <div className="flex flex-wrap gap-x-4 gap-y-1">
           {route.misses.map((miss) => (
-            <MissMarker
-              key={miss.criterion}
-              miss={miss}
-              text={missText(miss, route, { units, language })}
-              testId="route-miss"
-            />
+            <MissMarker key={miss.criterion} miss={miss} text={missText(miss, route, display)} testId="route-miss" />
           ))}
         </div>
       )}
-      <ElevationProfile testId="route-profile" route={route} units={units} language={language} onHover={onHover} />
+      <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
       {route.elevationGain !== undefined && (
         <p data-testid="route-slopes" className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-2">
           <span>{t.slope}</span>
@@ -387,7 +373,7 @@ function RouteDetail({
         data-testid="route-export"
         className={PRIMARY_BUTTON}
         // Nothing awaited before the share sheet: it needs the tap that opened it.
-        onClick={() => void saveGpx(gpxExport(route, request.activity, new Date(), { units, language }))}
+        onClick={() => void saveGpx(gpxExport(route, request.activity, new Date(), display))}
       >
         <Download size={18} aria-hidden />
         {t.exportGpx}

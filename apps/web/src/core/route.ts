@@ -1,8 +1,8 @@
 import type { Criteria, Miss, SurfaceStretch } from '../../../api/src/contract.ts';
-import { routesText, type Language } from '../i18n/index.ts';
+import { routesText } from '../i18n/index.ts';
 import type { Activity } from './activity.ts';
 import type { Position } from './coordinates.ts';
-import { formatHeight, type Units } from './units.ts';
+import { formatHeight, type Display } from './units.ts';
 
 /** The body of a route set request: the criteria and the activity, as `parseCriteria` accepts them. */
 export type RouteSetRequest = Criteria & { activity: Activity };
@@ -151,19 +151,16 @@ export function positionAt(geometry: Route['geometry'], distance: number): Posit
  * A missed criterion of a suggestion as the user reads it, such as "+30% elevation gain": its gap
  * as a share of the target, or in metres or feet for a small target elevation gain.
  */
-export function missText(
-  { criterion, gap }: Miss,
-  route: Route,
-  { units, language }: { units: Units; language: Language },
-): string {
+export function missText({ criterion, gap }: Miss, route: Route, display: Display): string {
   const value = { distance: route.distance, duration: route.estimatedDuration, elevationGain: route.elevationGain }[
     criterion
   ];
   // The route's value minus the gap gives the target, also for the flat and hilly bounds.
   const target = (value ?? 0) - gap;
+  const { language } = display;
   const words = routesText[language].misses[criterion];
   if (criterion === 'elevationGain' && target < MIN_SHARED_ELEVATION_GAIN) {
-    return `${gap < 0 ? '-' : '+'}${formatHeight(Math.abs(gap), units, language)} ${words}`;
+    return `${gap < 0 ? '-' : '+'}${formatHeight(Math.abs(gap), display)} ${words}`;
   }
   const share = new Intl.NumberFormat(language, { style: 'percent', signDisplay: 'always' }).format(gap / target);
   return `${share} ${words}`;

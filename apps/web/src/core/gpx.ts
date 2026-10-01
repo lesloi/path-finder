@@ -1,7 +1,7 @@
-import { commonText, type Language } from '../i18n/index.ts';
+import { commonText } from '../i18n/index.ts';
 import type { Activity } from './activity.ts';
 import { routeName } from './route-name.ts';
-import { KM_PER_MILE, METRES_PER_FOOT, type Units } from './units.ts';
+import { KM_PER_MILE, METRES_PER_FOOT, type Display } from './units.ts';
 
 /**
  * A route as the API sends it: longitude, latitude, and height in metres on every point, or
@@ -28,7 +28,7 @@ export function gpxExport(
   route: GpxRoute,
   activity: Activity,
   day: Date,
-  settings: { units: Units; language: Language },
+  settings: Display,
 ): { fileName: string; content: string } {
   const name = routeName(activity, day, route, settings);
   const minutes = Math.round(route.estimatedDuration);
@@ -58,7 +58,7 @@ function fileName(
   { distance, elevationGain }: GpxRoute,
   activity: Activity,
   day: Date,
-  { units, language }: { units: Units; language: Language },
+  { units, language }: Display,
 ): string {
   const metric = units === 'metric';
   const activityName = commonText[language].activities[activity].normalize('NFD').replace(/\p{Diacritic}/gu, '');

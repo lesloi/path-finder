@@ -6,7 +6,7 @@ describe('formatDistance', () => {
     ['with a decimal comma in French', 12.34, 'metric', 'fr', '12,3 km'],
     ['in miles', 16.09344, 'imperial', 'en', '10.0 mi'],
   ] as const)('writes a distance %s', (_, km, units, language, expected) => {
-    expect(formatDistance(km, units, language)).toBe(expected);
+    expect(formatDistance(km, { units, language })).toBe(expected);
   });
 });
 
@@ -16,7 +16,7 @@ describe('formatHeight', () => {
     ['in feet', 339.6, 'imperial', '1114 ft'],
     ['without a thousands separator', 1_234, 'metric', '1234 m'],
   ] as const)('writes a height %s', (_, metres, units, expected) => {
-    expect(formatHeight(metres, units, 'fr')).toBe(expected);
+    expect(formatHeight(metres, { units, language: 'fr' })).toBe(expected);
   });
 });
 

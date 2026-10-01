@@ -8,9 +8,9 @@ import {
   slopeClass,
   type Position,
   type Route,
-  type Units,
+  type Display,
 } from '../core/index.ts';
-import { routesText, type Language } from '../i18n/index.ts';
+import { routesText } from '../i18n/index.ts';
 import { SLOPE_FILLS, SLOPE_STROKES } from './slopes.ts';
 
 const WIDTH = 300;
@@ -25,18 +25,16 @@ const PAD = 8;
  */
 export function ElevationProfile({
   route,
-  units,
-  language,
+  display,
   onHover,
   testId,
 }: {
   route: Route;
-  units: Units;
-  language: Language;
+  display: Display;
   onHover: (position: Position | undefined) => void;
   testId?: string;
 }) {
-  const t = routesText[language];
+  const t = routesText[display.language];
   const [at, setAt] = useState<number>();
   const profile = elevationProfile(route.geometry);
   if (!profile) return null;
@@ -63,7 +61,7 @@ export function ElevationProfile({
     <figure
       data-testid={testId}
       className="m-0"
-      aria-label={t.profile(formatHeight(min, units, language), formatHeight(max, units, language))}
+      aria-label={t.profile(formatHeight(min, display), formatHeight(max, display))}
     >
       <div
         data-testid={testId && `${testId}-plot`}
@@ -105,10 +103,10 @@ export function ElevationProfile({
           })}
         </svg>
         <span data-testid={testId && `${testId}-max`} className="absolute top-0 left-0 text-sm text-ink-2">
-          {formatHeight(max, units, language)}
+          {formatHeight(max, display)}
         </span>
         <span data-testid={testId && `${testId}-min`} className="absolute bottom-0 left-0 text-sm text-ink-2">
-          {formatHeight(min, units, language)}
+          {formatHeight(min, display)}
         </span>
         {at !== undefined && hovered && (
           <>
@@ -118,7 +116,7 @@ export function ElevationProfile({
               className="absolute top-0 -translate-x-1/2 rounded-sm bg-surface px-2 text-sm whitespace-nowrap shadow-float"
               style={{ left: `${Math.min(80, Math.max(20, at * 100))}%` }}
             >
-              {formatDistance(hovered.distance, units, language)} · {formatHeight(hovered.height, units, language)}
+              {formatDistance(hovered.distance, display)} · {formatHeight(hovered.height, display)}
             </span>
           </>
         )}

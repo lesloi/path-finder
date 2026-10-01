@@ -22,8 +22,7 @@ function plot(onHover = vi.fn(), props: Partial<Route> = {}, language: 'en' | 'f
     <ElevationProfile
       testId="profile"
       route={{ ...route, ...props }}
-      units="metric"
-      language={language}
+      display={{ units: 'metric', language }}
       onHover={onHover}
     />,
   );
@@ -43,14 +42,23 @@ describe('ElevationProfile', () => {
   });
 
   it('shows the altitudes in the units and the language of the settings', () => {
-    render(<ElevationProfile testId="profile" route={route} units="imperial" language="fr" onHover={vi.fn()} />);
+    render(
+      <ElevationProfile
+        testId="profile"
+        route={route}
+        display={{ units: 'imperial', language: 'fr' }}
+        onHover={vi.fn()}
+      />,
+    );
 
     expect(screen.getByTestId('profile-max')).toHaveTextContent('1640 ft');
     expect(screen.getByTestId('profile')).toHaveAccessibleName('Profil altimétrique, de 1476 ft à 1640 ft');
   });
 
   it('colours each stretch by its uphill grade', () => {
-    const { container } = render(<ElevationProfile route={route} units="metric" language="en" onHover={vi.fn()} />);
+    const { container } = render(
+      <ElevationProfile route={route} display={{ units: 'metric', language: 'en' }} onHover={vi.fn()} />,
+    );
 
     const slopes = [...container.querySelectorAll('g')].map((group) => group.dataset.slope);
     // 50 m climbed over the last 400 m is 12.5 %: the steepest class, after flat stretches.
@@ -89,7 +97,12 @@ describe('ElevationProfile', () => {
     const swipe = vi.fn();
     render(
       <div onPointerDown={swipe}>
-        <ElevationProfile testId="profile" route={route} units="metric" language="en" onHover={vi.fn()} />
+        <ElevationProfile
+          testId="profile"
+          route={route}
+          display={{ units: 'metric', language: 'en' }}
+          onHover={vi.fn()}
+        />
       </div>,
     );
 
@@ -112,7 +125,11 @@ describe('ElevationProfile', () => {
     const geometry = route.geometry.map(([lon, lat]) => [lon, lat]) as [number, number][];
 
     const { container } = render(
-      <ElevationProfile route={{ ...route, geometry }} units="metric" language="en" onHover={vi.fn()} />,
+      <ElevationProfile
+        route={{ ...route, geometry }}
+        display={{ units: 'metric', language: 'en' }}
+        onHover={vi.fn()}
+      />,
     );
 
     expect(container).toBeEmptyDOMElement();
