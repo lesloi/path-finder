@@ -363,15 +363,6 @@ function RouteDetail({
           )}
         </div>
       </div>
-      {desktop && (
-        <RouteThumbnail
-          testId="route-thumbnail"
-          geometry={route.geometry}
-          index={selected}
-          wide
-          {...(snapshot && { snapshot })}
-        />
-      )}
       <div className="flex items-center gap-3">
         {!desktop && (
           <RouteThumbnail

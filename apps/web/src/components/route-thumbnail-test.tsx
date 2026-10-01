@@ -53,12 +53,6 @@ describe('RouteThumbnail', () => {
     expect(screen.getByTestId('thumb')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('is wider when asked to', () => {
-    render(<RouteThumbnail testId="thumb" geometry={geometry} index={0} wide />);
-
-    expect(screen.getByTestId('thumb')).toHaveAttribute('viewBox', '0 0 250 100');
-  });
-
   it('takes the colour of an index beyond the palette', () => {
     render(<RouteThumbnail testId="thumb" geometry={geometry} index={5} />);
 

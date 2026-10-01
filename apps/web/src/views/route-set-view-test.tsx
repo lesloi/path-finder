@@ -434,15 +434,15 @@ describe('RouteSetView', () => {
       });
     });
 
-    it('uses the thumbnail beside the figures on phones, and above them on desktops', () => {
+    it('shows the thumbnail beside the figures on phones only', () => {
       const { unmount } = render(<View open />);
-      expect(screen.getByTestId('route-thumbnail')).toHaveAttribute('viewBox', '0 0 100 100');
+      expect(screen.getByTestId('route-thumbnail')).toBeInTheDocument();
       unmount();
 
       onDesktop();
       render(<View open />);
 
-      expect(screen.getByTestId('route-thumbnail')).toHaveAttribute('viewBox', '0 0 250 100');
+      expect(screen.queryByTestId('route-thumbnail')).not.toBeInTheDocument();
     });
   });
 
