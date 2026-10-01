@@ -3,8 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { ErrorCode } from '../../../api/src/contract.ts';
 import { parseRoutes, type Route, type RouteSetRequest } from '../core/index.ts';
 
-/** Why there is no route set: an error code of the API, or the API cannot be reached. */
-export type RouteSetError = ErrorCode | 'unreachable';
+/**
+ * Why there is no route set: an error code of the API, the API cannot be reached, or it answered
+ * something that is not a route set.
+ */
+export type RouteSetError = ErrorCode | 'unreachable' | 'failed';
+
+// A gateway or a proxy answers these when the API behind it is down.
+const GATEWAY_STATUSES = [502, 503, 504];
 
 // Every code, so a new one fails the typecheck until it is known here.
 const ERROR_CODES = {
@@ -48,13 +54,13 @@ export async function requestRouteSet(
   const body: unknown = await response.json().catch(() => undefined);
   if (!response.ok) {
     const code = typeof body === 'object' && body !== null && 'error' in body ? body.error : undefined;
-    if (!isErrorCode(code)) return { error: 'unreachable' };
+    if (!isErrorCode(code)) return { error: GATEWAY_STATUSES.includes(response.status) ? 'unreachable' : 'failed' };
     // A tab left open across a deploy: the new build words the answer.
     if (code === 'stale-build') window.location.reload();
     return { error: code };
   }
   const routes = parseRoutes(body);
-  return routes ? { routes } : { error: 'unreachable' };
+  return routes ? { routes } : { error: 'failed' };
 }
 
 /**

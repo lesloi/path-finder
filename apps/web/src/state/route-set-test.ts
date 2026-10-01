@@ -81,13 +81,21 @@ describe('requestRouteSet', () => {
 
   it.each([
     ['cannot be reached', () => Promise.reject(new TypeError('Failed to fetch'))],
-    ['fails without an error code', () => Promise.resolve(new Response('Bad gateway', { status: 502 }))],
-    ['answers an unknown error code', () => Promise.resolve(Response.json({ error: 'odd' }, { status: 500 }))],
-    ['answers something that is not a route set', () => Promise.resolve(Response.json({ routes: 'none' }))],
+    ['sits behind a gateway that fails', () => Promise.resolve(new Response('Bad gateway', { status: 502 }))],
   ])('says the API is unreachable when it %s', async (_, response) => {
     vi.stubGlobal('fetch', vi.fn(response));
 
     expect(await requestRouteSet(request)).toEqual({ error: 'unreachable' });
+  });
+
+  it.each([
+    ['fails without an error code', () => Promise.resolve(new Response('Oops', { status: 500 }))],
+    ['answers an unknown error code', () => Promise.resolve(Response.json({ error: 'odd' }, { status: 500 }))],
+    ['answers something that is not a route set', () => Promise.resolve(Response.json({ routes: 'none' }))],
+  ])('says the API failed when it %s', async (_, response) => {
+    vi.stubGlobal('fetch', vi.fn(response));
+
+    expect(await requestRouteSet(request)).toEqual({ error: 'failed' });
   });
 
   it('rejects once the request is cancelled', async () => {

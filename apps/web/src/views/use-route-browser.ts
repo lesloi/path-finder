@@ -1,9 +1,7 @@
-import { ChevronRight, LoaderCircle, Route } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { LIST_ROW_CHEVRON, TOAST, TOAST_MS } from '../components/index.ts';
+import { TOAST_MS } from '../components/index.ts';
 import type { MapSnapshot, Position, RouteSetRequest } from '../core/index.ts';
-import { errorText, routesText, type Language } from '../i18n/index.ts';
 import { useRouteSet, type RouteSetError } from '../state/index.ts';
 
 /**
@@ -76,74 +74,4 @@ export function useRouteBrowser() {
       setHover(undefined);
     },
   };
-}
-
-/** A way back to the routes found, above the criteria that were left for them. */
-export function RoutesFoundButton({
-  language,
-  count,
-  onClick,
-}: {
-  language: Language;
-  count: number;
-  onClick: () => void;
-}) {
-  const t = routesText[language];
-  return (
-    <button
-      type="button"
-      data-testid="criteria-routes"
-      className="flex min-h-touch w-full flex-none items-center gap-3 rounded-md bg-accent-soft px-3 text-left font-semibold text-accent"
-      aria-label={t.showRoutes(count)}
-      onClick={onClick}
-    >
-      <Route size={18} aria-hidden className="flex-none" />
-      <span className="flex-1">{t.routeCount(count)}</span>
-      <ChevronRight size={18} aria-hidden className={LIST_ROW_CHEVRON} />
-    </button>
-  );
-}
-
-/** What replaces the criteria while the API works. */
-export function SearchingPanel({ language }: { language: Language }) {
-  return (
-    <p
-      role="status"
-      data-testid="routes-loading"
-      className="m-0 flex min-h-touch items-center justify-center gap-2 text-ink-2"
-    >
-      <LoaderCircle size={20} aria-hidden className="animate-spin" />
-      {routesText[language].finding}
-    </p>
-  );
-}
-
-/** Why a request gave no routes, in the user's language; a click drops it. */
-export function RouteErrorToast({
-  language,
-  error,
-  onDismiss,
-}: {
-  language: Language;
-  error: RouteSetError | 'no-routes';
-  onDismiss: () => void;
-}) {
-  const t = routesText[language];
-  const lines =
-    error === 'no-routes'
-      ? [t.noRoutes, t.noRoutesHint]
-      : error === 'unreachable'
-        ? [t.unreachable, t.unreachableHint]
-        : [errorText[language][error]];
-  return (
-    <p className={TOAST} role="alert" data-testid="routes-toast" onClick={onDismiss}>
-      {lines[0]}
-      {lines[1] && (
-        <>
-          <br />
-          {lines[1]}
-        </>
-      )}
-    </p>
-  );
 }

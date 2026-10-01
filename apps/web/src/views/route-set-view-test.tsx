@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { expectNamedControls } from '../accessible-names.ts';
 import type { Route, RouteSetRequest } from '../core/index.ts';
-import { routesText } from '../i18n/index.ts';
+import { commonText, routesText } from '../i18n/index.ts';
 import { RouteSetView } from './route-set-view.tsx';
 
 const METRES_PER_DEGREE = 111_195;
@@ -142,8 +142,10 @@ describe('RouteSetView', () => {
       render(<View />);
 
       const marker = screen.getByTestId('routes-row-1-miss-elevationGain');
-      expect(marker).toHaveTextContent('+30% elevation gain');
-      expect(screen.getByTestId('routes-row-1')).toHaveAccessibleName(expect.stringContaining('+30% elevation gain'));
+      expect(marker).toHaveTextContent(`+30% ${routesText.en.misses.elevationGain}`);
+      expect(screen.getByTestId('routes-row-1')).toHaveAccessibleName(
+        expect.stringContaining(`+30% ${routesText.en.misses.elevationGain}`),
+      );
     });
 
     it('marks no criterion on a match', () => {
@@ -163,7 +165,9 @@ describe('RouteSetView', () => {
       });
       render(<View list={[both]} />);
 
-      expect(screen.getByTestId('routes-row-0-miss-distance')).toHaveTextContent('+15% distance');
+      expect(screen.getByTestId('routes-row-0-miss-distance')).toHaveTextContent(
+        `+15% ${routesText.en.misses.distance}`,
+      );
       expect(screen.getByTestId('routes-row-0-miss-elevationGain')).toBeInTheDocument();
     });
 
@@ -217,8 +221,9 @@ describe('RouteSetView', () => {
       const onBack = vi.fn();
       render(<View onBack={onBack} />);
 
-      expect(screen.getByTestId('routes-summary')).toHaveTextContent('Run · 10.0 km · 400 m');
-      expect(screen.getByTestId('routes-change')).toHaveAccessibleName('Change the criteria: Run · 10.0 km · 400 m');
+      const summary = `${commonText.en.activities.run} · 10.0 km · 400 m`;
+      expect(screen.getByTestId('routes-summary')).toHaveTextContent(summary);
+      expect(screen.getByTestId('routes-change')).toHaveAccessibleName(routesText.en.changeCriteria(summary));
 
       fireEvent.click(screen.getByTestId('routes-change'));
       expect(onBack).toHaveBeenCalled();
@@ -277,7 +282,9 @@ describe('RouteSetView', () => {
       render(<View open />);
       swipe([200, 100], [100, 100]);
 
-      expect(screen.getByTestId('route-miss-elevationGain')).toHaveTextContent('+30% elevation gain');
+      expect(screen.getByTestId('route-miss-elevationGain')).toHaveTextContent(
+        `+30% ${routesText.en.misses.elevationGain}`,
+      );
     });
 
     it('puts the distance and the estimated duration side by side, then the climb and the descent', () => {
@@ -306,7 +313,9 @@ describe('RouteSetView', () => {
       open();
 
       expect(screen.getByTestId('route-profile')).toBeInTheDocument();
-      expect(screen.getByTestId('route-surface')).toHaveTextContent('Paved 70% · Unpaved 30%');
+      expect(screen.getByTestId('route-surface')).toHaveTextContent(
+        `${routesText.en.paved} 70% · ${routesText.en.unpaved} 30%`,
+      );
     });
 
     it('hands the place hovered on the profile to the map', () => {

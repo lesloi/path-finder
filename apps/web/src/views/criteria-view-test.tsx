@@ -593,6 +593,7 @@ describe('CriteriaView', () => {
       ['an empty route set', answer(), routesText.en.noRoutes],
       ['an error code', Response.json({ error: 'rate-limited' }, { status: 429 }), errorText.en['rate-limited']],
       ['an unreachable API', new Response('', { status: 502 }), routesText.en.unreachable],
+      ['a failing API', new Response('', { status: 500 }), routesText.en.failed],
     ])('says what happened on %s, and keeps the criteria', async (_, response, message) => {
       onDesktop();
       ask(response);

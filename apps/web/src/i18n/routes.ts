@@ -32,6 +32,8 @@ export const routesText = {
     noRoutesHint: 'Try another start point or other criteria.',
     unreachable: 'The service cannot be reached.',
     unreachableHint: 'Check your connection, then try again.',
+    failed: 'The service did not answer properly.',
+    failedHint: 'Try again in a moment.',
   },
   fr: {
     routes: 'Parcours',
@@ -61,5 +63,7 @@ export const routesText = {
     noRoutesHint: 'Essayez un autre point de départ ou d’autres critères.',
     unreachable: 'Le service est injoignable.',
     unreachableHint: 'Vérifiez votre connexion, puis réessayez.',
+    failed: 'Le service n’a pas répondu correctement.',
+    failedHint: 'Réessayez dans un instant.',
   },
 } satisfies Record<Language, { misses: Record<Miss['criterion'], string> } & Record<string, unknown>>;

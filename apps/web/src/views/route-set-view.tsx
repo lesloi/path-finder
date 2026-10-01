@@ -383,7 +383,7 @@ function RouteDetail({
       {!condensed && (
         <>
           <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
-          {/* The legend of the surface strip and of the colours of the profile. */}
+          {/* The legend of the colours of the profile. */}
           <p data-testid="route-surface" className="m-0 flex items-center gap-1 text-sm text-ink-2">
             <i className={`size-2 rounded-full ${SURFACE_DOTS.paved}`} aria-hidden />
             {t.paved} {percent.format(1 - unpaved)}

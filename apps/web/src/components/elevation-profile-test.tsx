@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import type { Route } from '../core/index.ts';
+import { routesText } from '../i18n/index.ts';
 import { ElevationProfile } from './elevation-profile.tsx';
 
 // 1.1 km north, 450 m then up to 500 m (flat first, then steep).
@@ -106,7 +107,7 @@ describe('ElevationProfile', () => {
 
     expect(screen.getByTestId('profile-tip')).toHaveTextContent('1.2 km · 500 m');
     // The last 400 m climb 50 m: 12.5 %.
-    expect(screen.getByTestId('profile-grade')).toHaveTextContent('Slope +12.5 %');
+    expect(screen.getByTestId('profile-grade')).toHaveTextContent(`${routesText.en.slope} +12.5 %`);
     const [lon, lat] = onHover.mock.calls.at(-1)![0];
     expect(lon).toBeCloseTo(6.1294);
     expect(lat).toBeCloseTo(45.8992 + 1_200 / METRES_PER_DEGREE, 4);
