@@ -1,5 +1,12 @@
 import { HEADINGS, LOOP_PER_RADIUS, UNPAVED_HIGHWAYS, UNPAVED_SURFACES } from './constants.ts';
-import { effortDistance, targetDistance, type Candidate, type Criteria, type Position } from './route-set.ts';
+import {
+  effortDistance,
+  targetDistance,
+  type Candidate,
+  type Criteria,
+  type Position,
+  type SurfaceStretch,
+} from './route-set.ts';
 
 export type Activity = 'run' | 'hike';
 
@@ -27,15 +34,37 @@ export type RoutingEngine = (request: LoopRequest, signal: AbortSignal) => Promi
 /** Elevation gain along a geometry, in metres. */
 export type ElevationGain = (geometry: Position[]) => number;
 
+// From the way's OSM `surface`, falling back to `highway`.
+const isUnpaved = ({ surface, highway }: Way) =>
+  surface === undefined ? UNPAVED_HIGHWAYS.has(highway ?? '') : UNPAVED_SURFACES.has(surface);
+
 /** Share of the length on unpaved ways, from their OSM `surface`, falling back to `highway`. */
 export function unpavedShare(ways: Way[]): number {
   let total = 0;
   let unpaved = 0;
-  for (const { length, surface, highway } of ways) {
-    total += length;
-    if (surface === undefined ? UNPAVED_HIGHWAYS.has(highway ?? '') : UNPAVED_SURFACES.has(surface)) unpaved += length;
+  for (const way of ways) {
+    total += way.length;
+    if (isUnpaved(way)) unpaved += way.length;
   }
   return total ? unpaved / total : 0;
+}
+
+/**
+ * Where the loop is paved or unpaved, in its order: consecutive ways of the same surface merged,
+ * each with its share of the ways' length, so the shares add up to 1 whatever the loop's distance.
+ */
+export function surfaceStretches(ways: Way[]): SurfaceStretch[] {
+  const total = ways.reduce((sum, { length }) => sum + length, 0);
+  const stretches: SurfaceStretch[] = [];
+  for (const way of ways) {
+    if (way.length <= 0) continue;
+    const surface = isUnpaved(way) ? 'unpaved' : 'paved';
+    const share = way.length / total;
+    const last = stretches.at(-1);
+    if (last?.surface === surface) last.share += share;
+    else stretches.push({ surface, share });
+  }
+  return stretches;
 }
 
 /**
@@ -72,6 +101,7 @@ export async function generateCandidates(
         distance,
         ...(elevationGain && { elevationGain: elevationGain(geometry) }),
         unpavedShare: unpavedShare(ways),
+        surfaces: surfaceStretches(ways),
       };
     } catch {
       return undefined;

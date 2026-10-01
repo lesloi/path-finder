@@ -18,7 +18,17 @@ function loop(heading: number): Position[] {
 }
 
 function candidate(overrides: Partial<Candidate> = {}): Candidate {
-  return { geometry: loop(0), distance: 10, elevationGain: 300, unpavedShare: 0.5, ...overrides };
+  return {
+    geometry: loop(0),
+    distance: 10,
+    elevationGain: 300,
+    unpavedShare: 0.5,
+    surfaces: [
+      { surface: 'paved', share: 0.5 },
+      { surface: 'unpaved', share: 0.5 },
+    ],
+    ...overrides,
+  };
 }
 
 const criteria: Criteria = {

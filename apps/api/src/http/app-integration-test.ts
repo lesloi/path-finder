@@ -155,7 +155,13 @@ describe('api', () => {
     expect(response.status).toBe(200);
     const { routes } = await response.json();
     expect(routes.length).toBeGreaterThanOrEqual(3);
-    expect(routes[0]).toMatchObject({ kind: 'match', distance: expect.closeTo(10), elevationGain: 0, unpavedShare: 1 });
+    expect(routes[0]).toMatchObject({
+      kind: 'match',
+      distance: expect.closeTo(10),
+      elevationGain: 0,
+      unpavedShare: 1,
+      surfaces: [{ surface: 'unpaved', share: 1 }],
+    });
   });
 
   it('asks the routing engine with the activity and measures elevation gain on BD ALTI', async () => {
