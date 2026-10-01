@@ -14,10 +14,9 @@ import {
   ICON_BUTTON,
   SIDE_COLUMN,
   TOAST,
+  TOAST_MS,
   useDesktop,
 } from '../components/index.ts';
-
-const TOAST_MS = 6_000;
 
 /**
  * The first view: where the user sets the criteria of a route set, over a full-screen map. Asking

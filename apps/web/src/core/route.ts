@@ -198,7 +198,7 @@ export type MapSnapshot = {
 /**
  * A route drawn in a `width` by `height` box as it lies on the map, in Web Mercator with north up:
  * scaled to fit, centred, and `margin` from the edges. Also returns the area the whole box covers
- * on the map, to fetch a background that matches.
+ * on the map, to cut the matching part out of the map's snapshot.
  */
 export function projectRoute(
   geometry: Route['geometry'],

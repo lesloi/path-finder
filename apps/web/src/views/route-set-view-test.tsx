@@ -96,7 +96,7 @@ function View({
 const en = routesText.en;
 const swipe = (from: [number, number], to: [number, number]) => {
   const detail = screen.getByTestId('route-detail');
-  fireEvent.pointerDown(detail, { clientX: from[0], clientY: from[1] });
+  fireEvent.pointerDown(detail, { clientX: from[0], clientY: from[1], pointerType: 'touch' });
   fireEvent.pointerUp(detail, { clientX: to[0], clientY: to[1] });
 };
 
@@ -336,11 +336,21 @@ describe('RouteSetView', () => {
         expect(screen.getByTestId('route-position')).toHaveTextContent('1/3');
       });
 
+      it('ignores a drag of the mouse, which desktops leave to the arrow buttons', () => {
+        open();
+        const detail = screen.getByTestId('route-detail');
+
+        fireEvent.pointerDown(detail, { clientX: 200, clientY: 100, pointerType: 'mouse' });
+        fireEvent.pointerUp(detail, { clientX: 100, clientY: 100, pointerType: 'mouse' });
+
+        expect(screen.getByTestId('route-position')).toHaveTextContent('1/3');
+      });
+
       it('ignores a swipe that was cancelled', () => {
         open();
         const detail = screen.getByTestId('route-detail');
 
-        fireEvent.pointerDown(detail, { clientX: 200, clientY: 100 });
+        fireEvent.pointerDown(detail, { clientX: 200, clientY: 100, pointerType: 'touch' });
         fireEvent.pointerCancel(detail);
         fireEvent.pointerUp(detail, { clientX: 100, clientY: 100 });
 

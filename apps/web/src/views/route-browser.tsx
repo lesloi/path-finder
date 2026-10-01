@@ -1,12 +1,10 @@
 import { ChevronRight, LoaderCircle, Route } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-import { LIST_ROW_CHEVRON, TOAST } from '../components/index.ts';
+import { LIST_ROW_CHEVRON, TOAST, TOAST_MS } from '../components/index.ts';
 import type { MapSnapshot, Position, RouteSetRequest } from '../core/index.ts';
 import { errorText, routesText, type Language } from '../i18n/index.ts';
 import { useRouteSet, type RouteSetError } from '../state/index.ts';
-
-const TOAST_MS = 6_000;
 
 /**
  * What the user does with a route set: asking for it, the route selected, whether its detail is open,

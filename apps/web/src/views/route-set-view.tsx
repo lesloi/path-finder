@@ -311,7 +311,10 @@ function RouteDetail({
       data-testid="route-detail"
       // Vertical moves stay the panel's own, to scroll it.
       className="flex touch-pan-y flex-col gap-3"
-      onPointerDown={(event) => (swipeFrom.current = [event.clientX, event.clientY])}
+      // A finger swipes; on desktops, the arrow buttons move between routes.
+      onPointerDown={(event) => {
+        if (event.pointerType !== 'mouse') swipeFrom.current = [event.clientX, event.clientY];
+      }}
       onPointerUp={swipeEnd}
       onPointerCancel={() => (swipeFrom.current = undefined)}
     >

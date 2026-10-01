@@ -1,8 +1,11 @@
 import { projectRoute, type MapSnapshot, type MercatorBounds, type Route } from '../core/index.ts';
 import { ROUTE_COLORS } from './route-colors.ts';
 
+// Sizes in SVG user units: the drawing scales with the element that shows it.
 const HEIGHT = 100;
 const MARGIN = 10;
+// The width of a wide thumbnail, about two and a half times its height.
+const WIDE_WIDTH = 250;
 
 /**
  * A route's shape drawn over the part of the map it runs through, cut from the snapshot the map took
@@ -24,7 +27,7 @@ export function RouteThumbnail({
   snapshot?: MapSnapshot;
   testId?: string;
 }) {
-  const width = wide ? 250 : HEIGHT;
+  const width = wide ? WIDE_WIDTH : HEIGHT;
   const { points, bounds } = projectRoute(geometry, { width, height: HEIGHT, margin: MARGIN });
   const line = points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
   const [startX, startY] = points[0];
