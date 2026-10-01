@@ -57,7 +57,7 @@ const text = {
     any: 'Any',
     flat: 'Flat',
     hilly: 'Hilly',
-    targetLevel: 'Target',
+    setGain: 'Set elevation gain',
     surface: 'Surface',
     paved: 'Paved',
     anySurface: 'Any',
@@ -88,7 +88,7 @@ const text = {
     any: 'Indifférent',
     flat: 'Plat',
     hilly: 'Vallonné',
-    targetLevel: 'Cible',
+    setGain: 'Fixer un dénivelé',
     surface: 'Revêtement',
     paved: 'Goudronné',
     anySurface: 'Indifférent',
@@ -325,16 +325,16 @@ export function CriteriaForm({
         <div className="flex flex-col gap-2">
           <SegmentedControl
             label={t.elevationGain}
-            value={level}
+            // A total set below leaves the shortcuts unchecked.
+            value={level === 'target' ? undefined : level}
             options={[
               { value: 'any', label: t.any },
               { value: 'flat', label: t.flat },
               { value: 'hilly', label: t.hilly },
-              { value: 'target', label: t.targetLevel },
             ]}
             onChange={(level) => change({ level })}
           />
-          {level === 'target' && (
+          {level === 'target' ? (
             <Slider
               label={t.elevationGain}
               value={gain}
@@ -344,6 +344,14 @@ export function CriteriaForm({
               step={unit.gainStep}
               onChange={(value) => change({ gain: value })}
             />
+          ) : (
+            <button
+              type="button"
+              className="min-h-touch self-start text-sm font-semibold text-accent"
+              onClick={() => change({ level: 'target' })}
+            >
+              {t.setGain}
+            </button>
           )}
         </div>
       ),

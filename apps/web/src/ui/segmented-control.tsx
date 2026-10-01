@@ -1,6 +1,6 @@
 import { useId } from 'react';
 
-/** Exclusive choices side by side, as native radio buttons; the label names the group. */
+/** Exclusive choices side by side, as native radio buttons; the label names the group. None is checked without a `value`. */
 export function SegmentedControl<Value extends string>({
   label,
   value,
@@ -8,7 +8,7 @@ export function SegmentedControl<Value extends string>({
   onChange,
 }: {
   label: string;
-  value: Value;
+  value?: Value;
   options: { value: Value; label: string }[];
   onChange: (value: Value) => void;
 }) {
