@@ -27,11 +27,11 @@ export function RouteThumbnail({
   snapshot?: MapSnapshot;
   testId?: string;
 }) {
-  const width = wide ? WIDE_WIDTH : HEIGHT;
-  const box = { width, height: HEIGHT, margin: MARGIN };
-  const { points, image } = snapshot
+  const box = { width: wide ? WIDE_WIDTH : HEIGHT, height: HEIGHT, margin: MARGIN };
+  // A route too big for the wide box gets a narrower one, so the map shown never has a blank edge.
+  const { points, image, width } = snapshot
     ? projectOnSnapshot(geometry, snapshot, box)
-    : { points: projectRoute(geometry, box), image: undefined };
+    : { points: projectRoute(geometry, box), image: undefined, width: box.width };
   const line = points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
   const [startX, startY] = points[0];
   return (

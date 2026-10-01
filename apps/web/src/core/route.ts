@@ -236,14 +236,15 @@ export function projectRoute(geometry: Route['geometry'], { width, height, margi
 
 /**
  * A route drawn over the part of a map snapshot it runs through, scaled to fit the box and centred
- * as far as the snapshot reaches: the part shown never leaves the snapshot, so no blank edge shows.
- * Returns the route's points in the box, and where the whole snapshot lies in it.
+ * as far as the snapshot reaches. The part shown never leaves the snapshot, so no blank edge shows: a
+ * route too big for the box's width gets a narrower box, whose `width` is returned with the route's
+ * points in it and where the whole snapshot lies in it.
  */
 export function projectOnSnapshot(
   geometry: Route['geometry'],
   snapshot: MapSnapshot,
   { width, height, margin }: ThumbnailBox,
-): { points: [number, number][]; image: { x: number; y: number; width: number; height: number } } {
+): { points: [number, number][]; image: { x: number; y: number; width: number; height: number }; width: number } {
   const pixels = geometry.map(([lon, lat]) => snapshot.toPixel(toMercator([lon, lat])));
   const xs = pixels.map(([x]) => x);
   const ys = pixels.map(([, y]) => y);
@@ -253,16 +254,18 @@ export function projectOnSnapshot(
     spanX ? (width - 2 * margin) / spanX : Infinity,
     spanY ? (height - 2 * margin) / spanY : Infinity,
   );
-  // A single place shows as it lies on the map.
-  const scale = Number.isFinite(fit) ? fit : 1;
-  // The part of the snapshot the box shows, in its pixels, kept inside it where it can be.
-  const [shownWidth, shownHeight] = [width / scale, height / scale];
+  // A single place shows as it lies on the map. Never smaller than what makes the snapshot cover the height.
+  const scale = Math.max(Number.isFinite(fit) ? fit : 1, height / snapshot.height);
+  const boxWidth = Math.min(width, snapshot.width * scale);
+  // The part of the snapshot the box shows, in its pixels, kept inside it.
+  const [shownWidth, shownHeight] = [boxWidth / scale, height / scale];
   const place = (centre: number, shown: number, size: number) =>
-    shown >= size ? (size - shown) / 2 : Math.min(Math.max(centre - shown / 2, 0), size - shown);
+    Math.min(Math.max(centre - shown / 2, 0), size - shown);
   const left = place((west + east) / 2, shownWidth, snapshot.width);
   const top = place((north + south) / 2, shownHeight, snapshot.height);
   return {
     points: pixels.map(([x, y]): [number, number] => [(x - left) * scale, (y - top) * scale]),
     image: { x: -left * scale, y: -top * scale, width: snapshot.width * scale, height: snapshot.height * scale },
+    width: boxWidth,
   };
 }

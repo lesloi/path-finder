@@ -279,10 +279,21 @@ describe('projectOnSnapshot', () => {
     expect(Math.max(...points.map(([x]) => x))).toBeLessThanOrEqual(100);
   });
 
-  it('shows what it can of a route larger than the snapshot, centred', () => {
-    const { image } = projectOnSnapshot(place(0, 0, 800, 600), snapshot, { width: 250, height: 100, margin: 10 });
+  it('narrows a wide box for a route too big for it, so the snapshot still covers the box', () => {
+    const wide = { width: 250, height: 100, margin: 10 };
+    const { width, image } = projectOnSnapshot(place(100, 50, 600, 500), snapshot, wide);
 
-    expect(image.x + image.width / 2).toBeCloseTo(125, 0);
+    expect(width).toBeLessThan(250);
+    expect(image.x).toBeLessThanOrEqual(1e-6);
+    expect(image.x + image.width).toBeGreaterThanOrEqual(width - 1e-6);
+    expect(image.y).toBeLessThanOrEqual(1e-6);
+    expect(image.y + image.height).toBeGreaterThanOrEqual(100 - 1e-6);
+  });
+
+  it('keeps the width of the box when the snapshot covers it', () => {
+    expect(projectOnSnapshot(place(300, 250, 60, 60), snapshot, { width: 250, height: 100, margin: 10 }).width).toBe(
+      250,
+    );
   });
 
   it('shows a route of a single place as it lies on the map', () => {
