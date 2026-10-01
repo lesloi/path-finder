@@ -117,7 +117,8 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
   `errorText`), typed `satisfies Record<Language, unknown>` and read through
   `const t = criteriaText[language]`. A test checks that English and French have the same keys.
   The API answers with error codes, never with a message: `errorText` maps each `ErrorCode` to
-  its wording. No i18n library.
+  its wording. The legal pages are data too (`legalText`): sections of paragraphs, where `{id}` in a
+  paragraph stands for a link whose address is in `i18n/links.ts`. No i18n library.
 - Shared device state goes through `useSyncExternalStore` (see `state/settings.ts`), not a
   state library.
 - Styles follow [DESIGN.md](./DESIGN.md): Tailwind classes limited to its tokens, shared
@@ -142,7 +143,7 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
   (`alert`, `listbox`) is fine for an element that is unique. A component that appears more than
   once takes a `testId` prop that prefixes the ids of its parts (`units`, `units-list`).
 - What an element shows is asserted after finding it, against the dictionary
-  (`toHaveTextContent(criteriaText.en.findRoutes)`), never against a literal. Each view and legal page has a test that every
+  (`toHaveTextContent(criteriaText.en.findRoutes)`), never against a literal (a proper name such as `Scaleway` is fine). Each view and legal page has a test that every
   control has an accessible name in both languages (`expectNamedControls`).
 - Mock `fetch` and BRouter with `vi.fn`; unit tests never call the network.
 - End-to-end tests live in `e2e/`: Playwright drives the built app served by `pnpm start`.

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 
 import { expectNamedControls } from '../../accessible-names.ts';
-import type { Language } from '../../i18n/index.ts';
+import { legalText, LINKS, type Language } from '../../i18n/index.ts';
 import { CreditsPage } from './credits-page.tsx';
 import { LegalNoticePage } from './legal-notice-page.tsx';
 import { PrivacyPolicyPage } from './privacy-policy-page.tsx';
@@ -12,15 +12,12 @@ describe.each(languages)('legal pages in %s', (language) => {
   it('credits OpenStreetMap and IGN, and links to the source code', () => {
     render(<CreditsPage language={language} />);
 
-    expect(screen.getByTestId('credits-odbl')).toHaveAttribute('href', 'https://www.openstreetmap.org/copyright');
+    expect(screen.getByTestId('credits-page-odbl')).toHaveAttribute('href', LINKS.odbl);
     expect(screen.getByTestId('credits-page')).toHaveTextContent(/Plan IGN/);
     expect(screen.getByTestId('credits-page')).toHaveTextContent(/BD ALTI/);
-    expect(screen.getByTestId('credits-licence')).toHaveAttribute(
-      'href',
-      'https://www.etalab.gouv.fr/licence-ouverte-open-licence/',
-    );
-    expect(screen.getByTestId('credits-source')).toHaveAttribute('href', 'https://github.com/lesloi/path-finder');
-    expect(screen.getByTestId('credits-agpl')).toBeInTheDocument();
+    expect(screen.getByTestId('credits-page-licence')).toHaveAttribute('href', LINKS.licence);
+    expect(screen.getByTestId('credits-page-source')).toHaveAttribute('href', LINKS.source);
+    expect(screen.getByTestId('credits-page-agpl')).toBeInTheDocument();
   });
 
   it.each([
@@ -46,5 +43,35 @@ describe.each(languages)('legal pages in %s', (language) => {
 
     expect(screen.getByTestId('legal-notice-page')).toHaveTextContent(/lesloi/);
     expect(screen.getByTestId('legal-notice-page')).toHaveTextContent(/Scaleway SAS/);
+  });
+
+  it.each([
+    ['credits', 'credits-page', <CreditsPage key="credits" language={language} />, legalText[language].credits],
+    [
+      'privacy policy',
+      'privacy-policy-page',
+      <PrivacyPolicyPage key="privacy" language={language} />,
+      legalText[language].privacy,
+    ],
+    [
+      'legal notice',
+      'legal-notice-page',
+      <LegalNoticePage key="notice" language={language} />,
+      legalText[language].legalNotice,
+    ],
+  ])('shows every section heading of the %s', (_, testId, page, sections) => {
+    render(page);
+
+    for (const { id, title } of sections) {
+      if (title) expect(screen.getByTestId(`${testId}-section-${id}`)).toHaveTextContent(title);
+    }
+  });
+
+  it('dates the privacy policy in the language', () => {
+    render(<PrivacyPolicyPage language={language} />);
+
+    expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(
+      { en: 'Last updated: 28 September 2026.', fr: 'Dernière mise à jour : 28 septembre 2026.' }[language],
+    );
   });
 });
