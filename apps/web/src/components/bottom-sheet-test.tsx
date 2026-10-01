@@ -18,7 +18,7 @@ function keyboardViewport(height: number) {
 function Sheet({ children }: { children?: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <BottomSheet label="Criteria" expanded={expanded} onExpandedChange={setExpanded}>
+    <BottomSheet testId="sheet" label="Criteria" expanded={expanded} onExpandedChange={setExpanded}>
       {children}
     </BottomSheet>
   );
@@ -26,15 +26,20 @@ function Sheet({ children }: { children?: ReactNode }) {
 
 describe('BottomSheet', () => {
   it('shows its content', () => {
-    render(<Sheet>Long-press the map</Sheet>);
+    render(
+      <Sheet>
+        <p data-testid="content" />
+      </Sheet>,
+    );
 
-    expect(screen.getByText('Long-press the map')).toBeInTheDocument();
+    expect(screen.getByTestId('sheet')).toContainElement(screen.getByTestId('content'));
   });
 
   it('expands and collapses from its handle', () => {
     render(<Sheet />);
-    const handle = screen.getByRole('button', { name: 'Criteria' });
+    const handle = screen.getByTestId('sheet-handle');
     expect(handle).toHaveAttribute('aria-expanded', 'false');
+    expect(handle).toHaveAccessibleName('Criteria');
 
     fireEvent.click(handle);
     expect(handle).toHaveAttribute('aria-expanded', 'true');
@@ -48,7 +53,7 @@ describe('BottomSheet', () => {
     ['stays collapsed on a swipe down', 200, 300, 'false'],
   ])('%s of its handle', (_, from, to, expanded) => {
     render(<Sheet />);
-    const handle = screen.getByRole('button', { name: 'Criteria' });
+    const handle = screen.getByTestId('sheet-handle');
 
     fireEvent.pointerDown(handle, { clientY: from });
     fireEvent.pointerUp(handle, { clientY: to });
@@ -66,30 +71,28 @@ describe('BottomSheet', () => {
       const openKeyboard = keyboardViewport(300);
       render(
         <Sheet>
-          <input aria-label="Start point" />
+          <input data-testid="field" />
         </Sheet>,
       );
-      const field = screen.getByRole('textbox', { name: 'Start point' });
+      const field = screen.getByTestId('field');
 
       field.focus();
       act(openKeyboard);
 
-      expect(field.closest('.fixed')).toHaveStyle({ bottom: '300px' });
+      expect(screen.getByTestId('sheet')).toHaveStyle({ bottom: '300px' });
     });
 
     it('stays at the bottom when the keyboard is for something else', () => {
       const openKeyboard = keyboardViewport(300);
       render(
         <Sheet>
-          <input aria-label="Start point" />
+          <input />
         </Sheet>,
       );
 
-      const field = screen.getByRole('textbox', { name: 'Start point' });
-
       act(openKeyboard);
 
-      expect(field.closest('.fixed')).not.toHaveStyle({ bottom: '300px' });
+      expect(screen.getByTestId('sheet')).not.toHaveStyle({ bottom: '300px' });
     });
   });
 });

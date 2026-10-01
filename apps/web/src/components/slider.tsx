@@ -10,6 +10,7 @@ export function Slider({
   max,
   step,
   onChange,
+  testId,
 }: {
   label: string;
   value: number;
@@ -20,15 +21,20 @@ export function Slider({
   max: number;
   step: number;
   onChange: (value: number) => void;
+  /** Prefix of the test ids: the range input, then `-value` for the value shown above it. */
+  testId?: string;
 }) {
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <output className="text-xl font-bold">{shown}</output>
+        <output data-testid={testId && `${testId}-value`} className="text-xl font-bold">
+          {shown}
+        </output>
         {aside}
       </div>
       <input
         type="range"
+        data-testid={testId}
         className="h-touch w-full accent-accent"
         aria-label={label}
         value={value}

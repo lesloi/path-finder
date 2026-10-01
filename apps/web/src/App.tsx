@@ -38,7 +38,9 @@ export function App() {
   return (
     <main>
       {/* The map says what the app is: the name is for screen readers. */}
-      <h1 className="sr-only">Path finder</h1>
+      <h1 data-testid="app-title" className="sr-only">
+        Path finder
+      </h1>
       {/* Pages open over the map, which stays mounted so it keeps its view and start point. */}
       <CriteriaView language={language} pageOpen={Boolean(page)} />
       {page && (

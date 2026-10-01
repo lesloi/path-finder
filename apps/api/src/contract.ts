@@ -1,5 +1,6 @@
 // What the web app may import from the API: the criteria vocabulary and its bounds, which it
-// validates with before sending. Anything else in `apps/api` is internal.
+// validates with before sending, and the error codes it words. Anything else in `apps/api` is internal.
+export type { ApiError, ErrorCode } from './http/errors.ts';
 export {
   CriteriaError,
   parseCriteria,

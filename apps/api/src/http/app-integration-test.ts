@@ -250,23 +250,27 @@ describe('api', () => {
   });
 
   it.each([
-    ['invalid criteria', { ...criteria, target: { distance: 100 } }],
+    ['invalid criteria', { ...criteria, target: { distance: 100 } }, { error: 'invalid-criteria', field: 'target' }],
     [
       'a target duration too short for the target elevation gain',
       { ...criteria, target: { duration: 30 }, elevationGain: 2_000 },
+      { error: 'invalid-criteria', field: 'target' },
     ],
-    ['a body that is not JSON', '{'],
-  ])('answers 400 on %s', async (_, body) => {
+    ['a surface that does not exist', { ...criteria, surface: 'mud' }, { error: 'invalid-criteria', field: 'surface' }],
+    // The syntax error of a body quotes it, and the body holds the start point.
+    ['a body that is not JSON', '{"start": [6.1294, 45.8992', { error: 'invalid-json' }],
+  ])('answers 400 with a code only on %s', async (_, body, expected) => {
     const response = await postRouteSet(app, body);
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: expect.any(String) });
+    expect(await response.json()).toEqual(expected);
   });
 
   it('answers 426 to a web app from another build', async () => {
     const response = await postRouteSet(app, criteria, { 'X-Build-Id': 'older' });
 
     expect(response.status).toBe(426);
+    expect(await response.json()).toEqual({ error: 'stale-build' });
   });
 
   it.each([
@@ -326,6 +330,7 @@ describe('api', () => {
       const response = await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.9' });
 
       expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({ error: 'rate-limited' });
       expect(response.headers.get('Retry-After')).toBe('600');
       expect((await postRouteSet(limited, criteria, { 'X-Forwarded-For': '203.0.113.10' })).status).toBe(200);
     });
@@ -419,6 +424,7 @@ describe('api', () => {
     const statuses = (await Promise.all(requests)).map((response) => response.status);
 
     expect(turnedAway.status).toBe(503);
+    expect(await turnedAway.json()).toEqual({ error: 'overloaded' });
     expect(turnedAway.headers.get('Retry-After')).toBe('5');
     expect(statuses.sort()).toEqual([200, 200, 200, 503]);
   });
@@ -454,7 +460,7 @@ describe('api', () => {
       await vi.advanceTimersByTimeAsync(15_000);
 
       expect((await response).status).toBe(504);
-      expect(await (await response).json()).toEqual({ error: expect.any(String) });
+      expect(await (await response).json()).toEqual({ error: 'generation-timeout' });
     });
 
     it('aborts the pending routing engine calls at the deadline', async () => {

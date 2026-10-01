@@ -5,9 +5,9 @@ import { expect, openMap, test } from './test.ts';
 // Longer than the map's 500 ms long press.
 const LONG_PRESS_HOLD_MS = 700;
 
-const startPoint = (page: Page) => page.getByLabel('Start point');
-// Both layouts also show it next to the start point: take the one over the map, which comes first.
-const myLocationButton = (page: Page) => page.getByRole('button', { name: 'My location' }).first();
+const startPoint = (page: Page) => page.getByTestId('criteria-start');
+// The one over the map: desktops also show one next to the start point.
+const myLocationButton = (page: Page) => page.getByTestId('criteria-locate');
 
 // A touch on phones, a mouse press on desktops. Playwright's touchscreen only taps, hence the DevTools protocol.
 async function longPress(page: Page, isMobile: boolean) {
@@ -62,6 +62,6 @@ test.describe('the start point', () => {
 
     await myLocationButton(page).click();
 
-    await expect(page.getByRole('alert')).toContainText('Your location is unavailable.');
+    await expect(page.getByTestId('criteria-toast')).toContainText('Your location is unavailable.');
   });
 });

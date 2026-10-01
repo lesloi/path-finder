@@ -4,6 +4,7 @@ import { Hono, type Context } from 'hono';
 
 import {
   buildRouteSet,
+  CriteriaError,
   elevationGain,
   generateCandidates,
   parseCriteria,
@@ -12,6 +13,7 @@ import {
 } from '../route-generation/index.ts';
 import { clientAddress, parseAddressRanges, type AddressMatcher } from './addresses.ts';
 import { readBuildId } from './build-id.ts';
+import type { ApiError } from './errors.ts';
 import { createConcurrencyLimiter, createRateLimiter, type Admission } from './limits.ts';
 
 // Vite fingerprints the files it emits under /assets, so they never change.
@@ -30,9 +32,9 @@ function requestClientAddress(c: Context, trustedProxies: AddressMatcher): strin
   return clientAddress(getConnInfo(c).remote.address ?? '', c.req.header('X-Forwarded-For'), trustedProxies);
 }
 
-function retryLater(c: Context, status: 429 | 503, seconds: number, error: string) {
+function retryLater(c: Context, status: 429 | 503, seconds: number, error: 'rate-limited' | 'overloaded') {
   c.header('Retry-After', String(seconds));
-  return c.json({ error }, status);
+  return c.json({ error } satisfies ApiError, status);
 }
 
 export function createApp({
@@ -89,20 +91,22 @@ export function createApp({
   app.post('/api/v1/route-sets', async (c) => {
     const admission = admit(requestClientAddress(c, trustedProxies));
     if (!admission.admitted) {
-      return retryLater(c, 429, admission.retryAfter, 'Too many route sets asked for: retry later');
+      return retryLater(c, 429, admission.retryAfter, 'rate-limited');
     }
     // A tab left open across a deploy sends the ID of the previous build: it must reload.
     const clientBuildId = c.req.header('X-Build-Id');
     if (buildId && clientBuildId && clientBuildId !== buildId) {
-      return c.json({ error: 'The web app has a new version: reload it' }, 426);
+      return c.json({ error: 'stale-build' } satisfies ApiError, 426);
     }
     let parsed: ReturnType<typeof parseCriteria>;
     try {
       parsed = parseCriteria(await c.req.json(), { countElevationGain: heightAt !== undefined });
     } catch (error) {
-      // JSON syntax errors quote the body, so they get a message of their own.
-      if (error instanceof SyntaxError) return c.json({ error: 'Criteria must be JSON' }, 400);
-      if (error instanceof RangeError) return c.json({ error: error.message }, 400);
+      // Never the error's message: a JSON syntax error quotes the body, which holds the start point.
+      if (error instanceof SyntaxError) return c.json({ error: 'invalid-json' } satisfies ApiError, 400);
+      if (error instanceof CriteriaError) {
+        return c.json({ error: 'invalid-criteria', field: error.field } satisfies ApiError, 400);
+      }
       throw error;
     }
     const { criteria, activity } = parsed;
@@ -132,12 +136,12 @@ export function createApp({
         });
       });
       if (!routes) {
-        return retryLater(c, 503, BUSY_RETRY_AFTER, 'Too many route sets being generated: retry in a few seconds');
+        return retryLater(c, 503, BUSY_RETRY_AFTER, 'overloaded');
       }
       return c.json({ routes: await routes });
     } catch (error) {
       // Only the deadline itself: any other error is a bug, not a slow generation.
-      if (error === deadline.signal.reason) return c.json({ error: 'The route set took too long to generate' }, 504);
+      if (error === deadline.signal.reason) return c.json({ error: 'generation-timeout' } satisfies ApiError, 504);
       throw error;
     } finally {
       clearTimeout(timer);

@@ -1,12 +1,13 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { CriteriaView } from './criteria-view.tsx';
+import { expectNamedControls } from '../accessible-names.ts';
 import { maps, markers } from '../maplibre-mock.ts';
 
 vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
 
 const map = () => maps.at(-1)!;
-const field = () => screen.getByRole('textbox', { name: 'Start point' });
+const field = () => screen.getByTestId('criteria-start');
 const onDesktop = () =>
   vi
     .spyOn(window, 'matchMedia')
@@ -27,25 +28,44 @@ describe('CriteriaView', () => {
   it('links to the settings', () => {
     render(<CriteriaView language="en" />);
 
-    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '#/settings');
+    expect(screen.getByTestId('criteria-settings')).toHaveAttribute('href', '#/settings');
+  });
+
+  describe('accessibility', () => {
+    it.each(['en', 'fr'] as const)('names every control on phones in %s, sheet collapsed then expanded', (language) => {
+      const { container } = render(<CriteriaView language={language} />);
+      expectNamedControls(container);
+
+      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
+
+      expectNamedControls(container);
+    });
+
+    it.each(['en', 'fr'] as const)('names every control on desktops in %s', (language) => {
+      onDesktop();
+      const { container } = render(<CriteriaView language={language} />);
+
+      expectNamedControls(container);
+    });
   });
 
   describe('on phones', () => {
     it('hides the floating My location button while the sheet is expanded', () => {
       render(<CriteriaView language="en" />);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Criteria' }));
+      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
 
       // The floating one would cover the settings button.
-      expect(screen.queryByRole('button', { name: 'My location' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-locate')).not.toBeInTheDocument();
     });
 
     it('invites a long press in the sheet until the start point is set', () => {
       vi.useFakeTimers();
       render(<CriteriaView language="en" />);
-      expect(screen.getByRole('button', { name: 'Criteria' })).toHaveAttribute('aria-expanded', 'false');
-      expect(screen.getByText('Long-press the map to choose your start point')).toBeInTheDocument();
-      expect(screen.getAllByRole('button', { name: 'My location' })).toHaveLength(1);
+      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('criteria-long-press')).toBeInTheDocument();
+      expect(screen.getByTestId('criteria-locate')).toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-start-locate')).not.toBeInTheDocument();
 
       act(() => {
         map().fire('touchstart', { lngLat: { lng: 6.2, lat: 45.8 }, originalEvent: { touches: [{}] } });
@@ -53,7 +73,7 @@ describe('CriteriaView', () => {
       });
       vi.useRealTimers();
 
-      expect(screen.queryByText('Long-press the map to choose your start point')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-long-press')).not.toBeInTheDocument();
       expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
     });
 
@@ -70,13 +90,13 @@ describe('CriteriaView', () => {
   describe('criteria', () => {
     it('shows chips in the collapsed sheet, and the full form once it is expanded', () => {
       render(<CriteriaView language="en" />);
-      expect(screen.getByRole('button', { name: 'Surface: Any' })).toBeInTheDocument();
-      expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName('Surface: Any');
+      expect(screen.queryByTestId('criteria-distance')).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Criteria' }));
+      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
 
-      expect(screen.getByRole('button', { name: 'Criteria' })).toHaveAttribute('aria-expanded', 'true');
-      expect(screen.getByRole('slider', { name: 'Distance' })).toBeInTheDocument();
+      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByTestId('criteria-distance')).toHaveAccessibleName('Distance');
     });
 
     it('offers the elevation gain only when the API has elevation data', async () => {
@@ -84,9 +104,9 @@ describe('CriteriaView', () => {
       const fetchMock = vi.fn().mockResolvedValue(Response.json({ elevation: true }));
       vi.stubGlobal('fetch', fetchMock);
       render(<CriteriaView language="en" />);
-      expect(screen.queryByRole('radio', { name: 'Hilly' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-elevation-hilly')).not.toBeInTheDocument();
 
-      expect(await screen.findByRole('radio', { name: 'Hilly' })).toBeInTheDocument();
+      expect(await screen.findByTestId('criteria-elevation-hilly')).toBeInTheDocument();
       expect(fetchMock).toHaveBeenCalledWith('/api/v1/capabilities', expect.anything());
     });
 
@@ -94,11 +114,11 @@ describe('CriteriaView', () => {
       onDesktop();
       const onSubmit = vi.fn();
       render(<CriteriaView language="en" onSubmit={onSubmit} />);
-      expect(screen.queryByRole('button', { name: 'Find routes' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
 
       fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
       fireEvent.keyDown(field(), { key: 'Enter' });
-      fireEvent.click(screen.getByRole('button', { name: 'Find routes' }));
+      fireEvent.click(screen.getByTestId('criteria-submit'));
 
       expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ start: [6.2, 45.8], activity: 'run' }));
     });
@@ -106,23 +126,23 @@ describe('CriteriaView', () => {
 
   it('keeps the criteria when the screen changes from a phone to a desktop', () => {
     const { rerender } = render(<CriteriaView language="en" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Criteria' }));
-    fireEvent.click(screen.getByRole('radio', { name: 'Unpaved' }));
+    fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
+    fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
 
     onDesktop();
     rerender(<CriteriaView language="en" />);
 
-    expect(screen.getByRole('radio', { name: 'Unpaved' })).toBeChecked();
+    expect(screen.getByTestId('criteria-surface-unpaved')).toBeChecked();
   });
 
   describe('on desktops', () => {
     it('stops picking the start point when the settings open', () => {
       onDesktop();
       render(<CriteriaView language="en" />);
-      const crosshair = screen.getByRole('button', { name: 'Choose on the map' });
+      const crosshair = screen.getByTestId('criteria-start-pick');
       fireEvent.click(crosshair);
 
-      fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+      fireEvent.click(screen.getByTestId('criteria-settings'));
 
       expect(crosshair).toHaveAttribute('aria-pressed', 'false');
     });
@@ -130,14 +150,14 @@ describe('CriteriaView', () => {
     it('picks the start point with a click on the map once the crosshair is pressed', () => {
       onDesktop();
       render(<CriteriaView language="en" />);
-      const crosshair = screen.getByRole('button', { name: 'Choose on the map' });
+      const crosshair = screen.getByTestId('criteria-start-pick');
 
       act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
       expect(markers).toEqual([]);
 
       fireEvent.click(crosshair);
       expect(crosshair).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.getByText('Click the map')).toBeInTheDocument();
+      expect(screen.getByTestId('criteria-pick-note')).toBeInTheDocument();
 
       act(() => map().fire('click', { lngLat: { lng: 6.2, lat: -45.8 } }));
 
@@ -150,10 +170,10 @@ describe('CriteriaView', () => {
       onDesktop();
       render(<CriteriaView language="fr" />);
 
-      fireEvent.click(screen.getByRole('button', { name: 'Choisir sur la carte' }));
+      fireEvent.click(screen.getByTestId('criteria-start-pick'));
       act(() => map().fire('click', { lngLat: { lng: -1.5, lat: 47.2 } }));
 
-      expect(screen.getByRole('textbox', { name: 'Point de départ' })).toHaveValue('47,2000° N · 1,5000° O');
+      expect(screen.getByTestId('criteria-start')).toHaveValue('47,2000° N · 1,5000° O');
     });
 
     it('sets the start point on a long press too', () => {
@@ -191,7 +211,7 @@ describe('CriteriaView', () => {
       fireEvent.blur(field());
 
       expect(field()).toHaveAttribute('aria-invalid', 'true');
-      expect(screen.getByRole('alert')).toHaveTextContent(
+      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(
         'Incorrect coordinates.For example: 48.85, 2.35 (latitude, longitude)',
       );
       expect(markers).toEqual([]);
@@ -209,7 +229,7 @@ describe('CriteriaView', () => {
       act(() => vi.advanceTimersByTime(1_000));
       vi.useRealTimers();
 
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-toast')).not.toBeInTheDocument();
       expect(field()).toHaveAttribute('aria-invalid', 'true');
     });
 
@@ -227,8 +247,8 @@ describe('CriteriaView', () => {
       onDesktop();
       render(<CriteriaView language="en" />);
 
-      expect(screen.getByText('Path finder')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Criteria' })).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-title')).toHaveTextContent('Path finder');
+      expect(screen.queryByTestId('criteria-sheet')).not.toBeInTheDocument();
     });
   });
 
@@ -261,7 +281,7 @@ describe('CriteriaView', () => {
       );
       render(<CriteriaView language="en" />);
 
-      fireEvent.click(screen.getAllByRole('button', { name: 'My location' })[0]);
+      fireEvent.click(screen.getByTestId('criteria-locate'));
 
       expect(markers.at(-1)).toMatchObject({ position: [5.7, 45.2], shown: true });
       expect(map().easedTo).toEqual({ center: [5.7, 45.2], zoom: 14 });
@@ -271,9 +291,9 @@ describe('CriteriaView', () => {
       refuse();
       render(<CriteriaView language="fr" />);
 
-      fireEvent.click(screen.getAllByRole('button', { name: 'Ma position' })[0]);
+      fireEvent.click(screen.getByTestId('criteria-locate'));
 
-      expect(screen.getByRole('alert')).toHaveTextContent(/appui long sur la carte/i);
+      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(/appui long sur la carte/i);
       expect(markers).toEqual([]);
     });
 
@@ -282,62 +302,62 @@ describe('CriteriaView', () => {
       refuse();
       render(<CriteriaView language="en" />);
 
-      fireEvent.click(screen.getAllByRole('button', { name: 'My location' })[0]);
+      fireEvent.click(screen.getByTestId('criteria-locate'));
 
-      expect(screen.getByRole('alert')).toHaveTextContent(/long-press the map or type coordinates/i);
+      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(/long-press the map or type coordinates/i);
     });
 
     it('shows a toast when the browser has no geolocation', () => {
       Reflect.deleteProperty(navigator, 'geolocation');
       render(<CriteriaView language="en" />);
 
-      fireEvent.click(screen.getAllByRole('button', { name: 'My location' })[0]);
+      fireEvent.click(screen.getByTestId('criteria-locate'));
 
-      expect(screen.getByRole('alert')).toHaveTextContent(/long-press the map/i);
+      expect(screen.getByTestId('criteria-toast')).toHaveTextContent(/long-press the map/i);
     });
 
     it('drops the toast once the start point is set', () => {
       vi.useFakeTimers();
       refuse();
       render(<CriteriaView language="en" />);
-      fireEvent.click(screen.getAllByRole('button', { name: 'My location' })[0]);
+      fireEvent.click(screen.getByTestId('criteria-locate'));
 
       act(() => {
         map().fire('touchstart', { lngLat: { lng: 6.2, lat: 45.8 }, originalEvent: { touches: [{}] } });
         vi.advanceTimersByTime(600);
       });
 
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-toast')).not.toBeInTheDocument();
     });
 
     it('drops the toast on a click', () => {
       refuse();
       render(<CriteriaView language="en" />);
-      fireEvent.click(screen.getAllByRole('button', { name: 'My location' })[0]);
+      fireEvent.click(screen.getByTestId('criteria-locate'));
 
-      fireEvent.click(screen.getByRole('alert'));
+      fireEvent.click(screen.getByTestId('criteria-toast'));
 
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-toast')).not.toBeInTheDocument();
     });
 
     it('puts the toast on two lines: what went wrong, then what to do', () => {
       refuse();
       render(<CriteriaView language="en" />);
 
-      fireEvent.click(screen.getAllByRole('button', { name: 'My location' })[0]);
+      fireEvent.click(screen.getByTestId('criteria-locate'));
 
-      expect(screen.getByRole('alert').querySelectorAll('br')).toHaveLength(1);
+      expect(screen.getByTestId('criteria-toast').querySelectorAll('br')).toHaveLength(1);
     });
 
     it('drops the toast after a few seconds', () => {
       vi.useFakeTimers();
       refuse();
       render(<CriteriaView language="en" />);
-      fireEvent.click(screen.getAllByRole('button', { name: 'My location' })[0]);
+      fireEvent.click(screen.getByTestId('criteria-locate'));
 
       act(() => vi.advanceTimersByTime(6_000));
 
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-toast')).not.toBeInTheDocument();
     });
   });
 });

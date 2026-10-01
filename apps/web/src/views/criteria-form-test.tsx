@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { parseCriteria } from '../../../api/src/contract.ts';
+import { expectNamedControls } from '../accessible-names.ts';
 import { CriteriaForm } from './criteria-form.tsx';
 import { useSettings } from '../state/index.ts';
 import type { Position } from '../core/index.ts';
@@ -19,12 +20,13 @@ const onDesktop = () =>
 function setup(props: { start?: Position; compact?: boolean; elevation?: boolean; language?: 'en' | 'fr' } = {}) {
   const onSubmit = vi.fn();
   render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} {...props} />);
-  const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Find routes' }));
+  const submit = () => fireEvent.click(screen.getByTestId('criteria-submit'));
   return { onSubmit, submit };
 }
 
-const slider = (name: string) => screen.getByRole('slider', { name });
-const choose = (name: string) => fireEvent.click(screen.getByRole('radio', { name }));
+const slider = (name: 'distance' | 'duration' | 'gain') => screen.getByTestId(`criteria-${name}`);
+const choose = (group: 'target' | 'elevation' | 'surface', value: string) =>
+  fireEvent.click(screen.getByTestId(`criteria-${group}-${value}`));
 
 beforeEach(() => {
   onDesktop();
@@ -52,16 +54,16 @@ describe('CriteriaForm', () => {
   it('hides Find routes until a start point is set', () => {
     setup({ start: undefined });
 
-    expect(screen.queryByRole('button', { name: 'Find routes' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
   });
 
   it('sends criteria that parseCriteria accepts', () => {
     const { onSubmit, submit } = setup();
-    choose('Duration');
-    fireEvent.change(slider('Duration'), { target: { value: '90' } });
-    choose('Exact');
-    fireEvent.change(slider('Elevation gain'), { target: { value: '400' } });
-    choose('Unpaved');
+    choose('target', 'duration');
+    fireEvent.change(slider('duration'), { target: { value: '90' } });
+    choose('elevation', 'target');
+    fireEvent.change(slider('gain'), { target: { value: '400' } });
+    choose('surface', 'unpaved');
 
     submit();
 
@@ -73,17 +75,17 @@ describe('CriteriaForm', () => {
   describe('target', () => {
     it('is a distance or a duration, never both', () => {
       const { onSubmit, submit } = setup();
-      fireEvent.change(slider('Distance'), { target: { value: '21' } });
+      fireEvent.change(slider('distance'), { target: { value: '21' } });
 
-      choose('Duration');
+      choose('target', 'duration');
 
-      expect(screen.queryByRole('slider', { name: 'Distance' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-distance')).not.toBeInTheDocument();
       submit();
       expect(onSubmit.mock.calls[0][0].target).toEqual({ duration: 60 });
 
-      choose('Distance');
+      choose('target', 'distance');
 
-      expect(slider('Distance')).toHaveValue('21');
+      expect(slider('distance')).toHaveValue('21');
     });
 
     it.each([
@@ -95,22 +97,22 @@ describe('CriteriaForm', () => {
       store({ units, lastActivity: activity });
       setup();
 
-      expect(slider('Distance')).toHaveAttribute('min', `${min}`);
-      expect(slider('Distance')).toHaveAttribute('max', `${max}`);
+      expect(slider('distance')).toHaveAttribute('min', `${min}`);
+      expect(slider('distance')).toHaveAttribute('max', `${max}`);
     });
 
     it('keeps the duration slider within the API bounds', () => {
       setup();
-      choose('Duration');
+      choose('target', 'duration');
 
-      expect(slider('Duration')).toHaveAttribute('min', '15');
-      expect(slider('Duration')).toHaveAttribute('max', '360');
+      expect(slider('duration')).toHaveAttribute('min', '15');
+      expect(slider('duration')).toHaveAttribute('max', '360');
     });
 
     it('converts miles to kilometres', () => {
       store({ units: 'imperial' });
       const { onSubmit, submit } = setup();
-      fireEvent.change(slider('Distance'), { target: { value: '31' } });
+      fireEvent.change(slider('distance'), { target: { value: '31' } });
 
       submit();
 
@@ -121,28 +123,28 @@ describe('CriteriaForm', () => {
     it('follows a change of units from the settings page', () => {
       const onSubmit = vi.fn();
       render(<UnitsSwitch onSubmit={onSubmit} />);
-      fireEvent.change(slider('Distance'), { target: { value: '16' } });
-      choose('Exact');
-      fireEvent.change(slider('Elevation gain'), { target: { value: '500' } });
+      fireEvent.change(slider('distance'), { target: { value: '16' } });
+      choose('elevation', 'target');
+      fireEvent.change(slider('gain'), { target: { value: '500' } });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Imperial' }));
+      fireEvent.click(screen.getByTestId('imperial'));
 
       // 16 km is 9.9 mi, and 500 m is 1,640 ft, which the sliders round to their steps.
-      expect(slider('Distance')).toHaveValue('10');
-      expect(slider('Elevation gain')).toHaveValue('1600');
+      expect(slider('distance')).toHaveValue('10');
+      expect(slider('gain')).toHaveValue('1600');
     });
   });
 
   it('converts the distance the slider shows when the units change, not one it had to clamp', () => {
     render(<UnitsSwitch onSubmit={vi.fn()} />);
-    fireEvent.change(slider('Distance'), { target: { value: '50' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Hike' }));
-    expect(slider('Distance')).toHaveValue('40');
+    fireEvent.change(slider('distance'), { target: { value: '50' } });
+    fireEvent.click(screen.getByTestId('criteria-activity-hike'));
+    expect(slider('distance')).toHaveValue('40');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Imperial' }));
+    fireEvent.click(screen.getByTestId('imperial'));
 
     // 40 km is 24.9 mi, which the slider shows as 25 and the hike's maximum cuts to 24.
-    expect(slider('Distance')).toHaveValue('24');
+    expect(slider('distance')).toHaveValue('24');
   });
 
   describe('elevation gain', () => {
@@ -154,12 +156,9 @@ describe('CriteriaForm', () => {
       expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('elevationGain');
     });
 
-    it.each([
-      ['Flat', 'flat'],
-      ['Hilly', 'hilly'],
-    ])('is sent as %s', (label, expected) => {
+    it.each(['flat', 'hilly'])('is sent as %s', (expected) => {
       const { onSubmit, submit } = setup();
-      choose(label);
+      choose('elevation', expected);
 
       submit();
 
@@ -168,7 +167,7 @@ describe('CriteriaForm', () => {
 
     it('is a number of metres for Target', () => {
       const { onSubmit, submit } = setup();
-      choose('Exact');
+      choose('elevation', 'target');
 
       submit();
 
@@ -177,19 +176,19 @@ describe('CriteriaForm', () => {
 
     it('shows its slider for Exact only', () => {
       setup();
-      expect(screen.queryByRole('slider', { name: 'Elevation gain' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-gain')).not.toBeInTheDocument();
 
-      choose('Exact');
+      choose('elevation', 'target');
 
-      expect(slider('Elevation gain')).toHaveAttribute('max', '2500');
+      expect(slider('gain')).toHaveAttribute('max', '2500');
     });
 
     it('converts feet to metres, within the API bounds', () => {
       store({ units: 'imperial' });
       const { onSubmit, submit } = setup();
-      choose('Exact');
-      expect(slider('Elevation gain')).toHaveAttribute('max', '8200');
-      fireEvent.change(slider('Elevation gain'), { target: { value: '8200' } });
+      choose('elevation', 'target');
+      expect(slider('gain')).toHaveAttribute('max', '8200');
+      fireEvent.change(slider('gain'), { target: { value: '8200' } });
 
       submit();
 
@@ -200,7 +199,7 @@ describe('CriteriaForm', () => {
   describe('without elevation data', () => {
     it('does not offer the elevation gain, and sends none', () => {
       const { onSubmit, submit } = setup({ elevation: false });
-      expect(screen.queryByRole('radio', { name: 'Hilly' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-elevation-hilly')).not.toBeInTheDocument();
 
       submit();
 
@@ -210,10 +209,10 @@ describe('CriteriaForm', () => {
     it('drops the elevation gain chosen before the data went away', () => {
       const onSubmit = vi.fn();
       const { rerender } = render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} />);
-      choose('Hilly');
+      choose('elevation', 'hilly');
 
       rerender(<CriteriaForm language="en" start={START} elevation={false} onSubmit={onSubmit} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Find routes' }));
+      fireEvent.click(screen.getByTestId('criteria-submit'));
 
       expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('elevationGain');
     });
@@ -222,18 +221,15 @@ describe('CriteriaForm', () => {
       vi.restoreAllMocks();
       setup({ compact: true, elevation: false });
 
-      expect(screen.queryByRole('button', { name: /^Elevation gain/ })).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Surface: Any' })).toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-chip-elevation')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName('Surface: Any');
     });
   });
 
   describe('surface', () => {
-    it.each([
-      ['Paved', 'paved'],
-      ['Unpaved', 'unpaved'],
-    ])('sends %s', (label, expected) => {
+    it.each(['paved', 'unpaved'])('sends %s', (expected) => {
       const { onSubmit, submit } = setup();
-      choose(label);
+      choose('surface', expected);
 
       submit();
 
@@ -249,14 +245,14 @@ describe('CriteriaForm', () => {
       submit();
 
       expect(onSubmit.mock.calls[0][0]).toMatchObject({ activity: 'hike', pace: 60 / 4.5 });
-      expect(screen.getByRole('button', { name: 'Hike' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('criteria-activity-hike')).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('stores the activity picked and uses its pace', () => {
       store({ pace: { hike: 15 } });
       const { onSubmit, submit } = setup();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Hike' }));
+      fireEvent.click(screen.getByTestId('criteria-activity-hike'));
       submit();
 
       expect(JSON.parse(localStorage.getItem('path-finder.settings')!)).toMatchObject({ lastActivity: 'hike' });
@@ -265,19 +261,19 @@ describe('CriteriaForm', () => {
 
     it('brings the distance down to the longest one of a new activity', () => {
       const { onSubmit, submit } = setup();
-      fireEvent.change(slider('Distance'), { target: { value: '50' } });
+      fireEvent.change(slider('distance'), { target: { value: '50' } });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Hike' }));
+      fireEvent.click(screen.getByTestId('criteria-activity-hike'));
       submit();
 
-      expect(slider('Distance')).toHaveValue('40');
+      expect(slider('distance')).toHaveValue('40');
       expect(onSubmit.mock.calls[0][0].target).toEqual({ distance: 40 });
     });
   });
 
   describe('pace hint', () => {
-    const info = () => screen.queryByRole('button', { name: 'Your pace' });
-    const link = () => screen.queryByRole('link', { name: 'Adjust your pace' });
+    const info = () => screen.queryByTestId('criteria-pace-info');
+    const link = () => screen.queryByTestId('criteria-pace-link');
 
     it('is not offered for a distance, which does not need the pace', () => {
       setup();
@@ -287,7 +283,7 @@ describe('CriteriaForm', () => {
 
     it('links to the settings from the info button of a duration, while the activity has no pace', () => {
       setup();
-      choose('Duration');
+      choose('target', 'duration');
       expect(link()).not.toBeInTheDocument();
 
       fireEvent.click(info()!);
@@ -298,10 +294,10 @@ describe('CriteriaForm', () => {
     it('goes away for the activity whose pace is set, and stays for the others', () => {
       store({ pace: { run: 5.5 } });
       setup();
-      choose('Duration');
+      choose('target', 'duration');
       expect(info()).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByRole('button', { name: 'Hike' }));
+      fireEvent.click(screen.getByTestId('criteria-activity-hike'));
 
       expect(info()).toBeInTheDocument();
     });
@@ -310,25 +306,45 @@ describe('CriteriaForm', () => {
   describe('errors', () => {
     it('names the field and hides Find routes when the target duration does not fit the elevation gain', () => {
       setup();
-      choose('Duration');
-      fireEvent.change(slider('Duration'), { target: { value: '30' } });
-      choose('Exact');
-      fireEvent.change(slider('Elevation gain'), { target: { value: '2000' } });
+      choose('target', 'duration');
+      fireEvent.change(slider('duration'), { target: { value: '30' } });
+      choose('elevation', 'target');
+      fireEvent.change(slider('gain'), { target: { value: '2000' } });
 
-      expect(screen.getByRole('alert')).toHaveTextContent(
+      expect(screen.getByTestId('criteria-error')).toHaveTextContent(
         'This duration does not fit the elevation gain and your pace.',
       );
-      expect(screen.queryByRole('button', { name: 'Find routes' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
     });
 
     it('is shown in French', () => {
       setup({ language: 'fr' });
-      choose('Durée');
-      fireEvent.change(slider('Durée'), { target: { value: '30' } });
-      choose('Précis');
-      fireEvent.change(slider('Dénivelé'), { target: { value: '2000' } });
+      choose('target', 'duration');
+      fireEvent.change(slider('duration'), { target: { value: '30' } });
+      choose('elevation', 'target');
+      fireEvent.change(slider('gain'), { target: { value: '2000' } });
 
-      expect(screen.getByRole('alert')).toHaveTextContent('Cette durée ne convient pas');
+      expect(screen.getByTestId('criteria-error')).toHaveTextContent('Cette durée ne convient pas');
+    });
+  });
+
+  describe('accessibility', () => {
+    it.each(['en', 'fr'] as const)('names every control of the full form in %s', (language) => {
+      const { container } = render(<CriteriaForm language={language} start={START} onSubmit={vi.fn()} />);
+      choose('target', 'duration');
+      choose('elevation', 'target');
+
+      expectNamedControls(container);
+    });
+
+    it.each(['en', 'fr'] as const)('names every chip and the dialog of the compact form in %s', (language) => {
+      vi.restoreAllMocks();
+      const { container } = render(<CriteriaForm language={language} start={START} compact onSubmit={vi.fn()} />);
+      expectNamedControls(container);
+
+      fireEvent.click(screen.getByTestId('criteria-chip-surface'));
+
+      expectNamedControls(container);
     });
   });
 
@@ -342,34 +358,37 @@ describe('CriteriaForm', () => {
       store({ lastActivity: 'hike' });
       setup({ compact: true });
 
-      expect(screen.queryByRole('slider')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Activity: Hike' })).toHaveAttribute('data-set');
-      expect(screen.getByRole('button', { name: 'Target: 10 km' })).not.toHaveAttribute('data-set');
-      expect(screen.getByRole('button', { name: 'Surface: Any' })).not.toHaveAttribute('data-set');
+      expect(screen.queryByTestId('criteria-distance')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-chip-activity')).toHaveAttribute('data-set');
+      expect(screen.getByTestId('criteria-chip-target')).not.toHaveAttribute('data-set');
+      expect(screen.getByTestId('criteria-chip-surface')).not.toHaveAttribute('data-set');
     });
 
     it('names the elevation gain and surface chips while they are the default, so they are told apart', () => {
       setup({ compact: true });
 
-      expect(screen.getByRole('button', { name: 'Elevation gain: Any' })).toHaveTextContent('Elevation');
-      expect(screen.getByRole('button', { name: 'Surface: Any' })).toHaveTextContent('Surface');
+      expect(screen.getByTestId('criteria-chip-elevation')).toHaveAccessibleName('Elevation gain: Any');
+      expect(screen.getByTestId('criteria-chip-elevation')).toHaveTextContent('Elevation');
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName('Surface: Any');
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveTextContent('Surface');
 
-      fireEvent.click(screen.getByRole('button', { name: 'Surface: Any' }));
-      fireEvent.click(screen.getByRole('radio', { name: 'Paved' }));
+      fireEvent.click(screen.getByTestId('criteria-chip-surface'));
+      choose('surface', 'paved');
 
-      expect(screen.getByRole('button', { name: 'Surface: Paved' })).toHaveTextContent('Paved');
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName('Surface: Paved');
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveTextContent('Paved');
     });
 
     it('opens one criterion in a dialog and applies its changes as they are made', () => {
       const { onSubmit, submit } = setup({ compact: true });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Surface: Any' }));
-      const dialog = screen.getByRole('dialog', { name: 'Surface' });
-      fireEvent.click(within(dialog).getByRole('radio', { name: 'Paved' }));
+      fireEvent.click(screen.getByTestId('criteria-chip-surface'));
+      expect(screen.getByTestId('criteria-dialog')).toHaveAccessibleName('Surface');
+      choose('surface', 'paved');
 
-      expect(screen.getByRole('button', { name: 'Surface: Paved' })).toHaveAttribute('data-set');
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAttribute('data-set');
+      fireEvent.click(screen.getByTestId('criteria-dialog-close'));
+      expect(screen.queryByTestId('criteria-dialog')).not.toBeInTheDocument();
       submit();
       expect(onSubmit.mock.calls[0][0].surface).toBe('paved');
     });
@@ -377,31 +396,34 @@ describe('CriteriaForm', () => {
     it('shows the error inside the dialog, which covers the sheet', () => {
       store({ lastActivity: 'run' });
       setup({ compact: true });
-      fireEvent.click(screen.getByRole('button', { name: 'Elevation gain: Any' }));
-      fireEvent.click(screen.getByRole('radio', { name: 'Exact' }));
-      fireEvent.change(screen.getByRole('slider', { name: 'Elevation gain' }), { target: { value: '2000' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Target: 10 km' }));
+      fireEvent.click(screen.getByTestId('criteria-chip-elevation'));
+      choose('elevation', 'target');
+      fireEvent.change(slider('gain'), { target: { value: '2000' } });
+      fireEvent.click(screen.getByTestId('criteria-dialog-close'));
+      fireEvent.click(screen.getByTestId('criteria-chip-target'));
 
-      fireEvent.click(screen.getByRole('radio', { name: 'Duration' }));
-      fireEvent.change(screen.getByRole('slider', { name: 'Duration' }), { target: { value: '30' } });
+      choose('target', 'duration');
+      fireEvent.change(slider('duration'), { target: { value: '30' } });
 
-      expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('does not fit');
+      expect(within(screen.getByTestId('criteria-dialog')).getByTestId('criteria-error')).toHaveTextContent(
+        'does not fit',
+      );
     });
 
     it('shows the target as a duration with its own chip', () => {
       setup({ compact: true });
 
-      fireEvent.click(screen.getByRole('button', { name: 'Target: 10 km' }));
-      fireEvent.click(screen.getByRole('radio', { name: 'Duration' }));
+      fireEvent.click(screen.getByTestId('criteria-chip-target'));
+      choose('target', 'duration');
 
-      expect(screen.getByRole('button', { name: 'Target: 1 h 00' })).toHaveAttribute('data-set');
+      expect(screen.getByTestId('criteria-chip-target')).toHaveAccessibleName('Target: 1 h 00');
+      expect(screen.getByTestId('criteria-chip-target')).toHaveAttribute('data-set');
     });
 
     it('hides Find routes until a start point is set', () => {
       setup({ compact: true, start: undefined });
 
-      expect(screen.queryByRole('button', { name: 'Find routes' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
     });
   });
 });
@@ -411,7 +433,7 @@ function UnitsSwitch({ onSubmit }: { onSubmit: () => void }) {
   const [, update] = useSettings();
   return (
     <>
-      <button type="button" onClick={() => update({ units: 'imperial' })}>
+      <button type="button" data-testid="imperial" onClick={() => update({ units: 'imperial' })}>
         Imperial
       </button>
       <CriteriaForm language="en" start={START} onSubmit={onSubmit} />

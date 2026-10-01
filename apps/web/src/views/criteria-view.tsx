@@ -131,6 +131,7 @@ export function CriteriaView({
       {!pageOpen && (
         <a
           ref={settingsLink}
+          data-testid="criteria-settings"
           className={`${FLOATING_BUTTON} fixed top-safe-3 right-safe-3 z-5`}
           href="#/settings"
           aria-label={t.settings}
@@ -144,6 +145,7 @@ export function CriteriaView({
       {(desktop || !sheetExpanded) && (
         <button
           type="button"
+          data-testid="criteria-locate"
           className={
             `${FLOATING_BUTTON} fixed right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3))] z-5 ` +
             'transition-[bottom] duration-250 ease-[ease] desktop:bottom-safe-6'
@@ -156,7 +158,7 @@ export function CriteriaView({
       )}
       {desktop ? (
         <aside className={SIDE_COLUMN}>
-          <div className="flex items-center gap-2 px-4 pt-4 text-lg font-bold">
+          <div data-testid="criteria-title" className="flex items-center gap-2 px-4 pt-4 text-lg font-bold">
             <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
             Path finder
           </div>
@@ -170,6 +172,7 @@ export function CriteriaView({
             >
               <button
                 type="button"
+                data-testid="criteria-start-pick"
                 className={`${ICON_BUTTON} aria-pressed:text-accent`}
                 aria-label={t.chooseOnMap}
                 aria-pressed={picking}
@@ -177,7 +180,13 @@ export function CriteriaView({
               >
                 <Crosshair size={20} aria-hidden />
               </button>
-              <button type="button" className={ICON_BUTTON} aria-label={t.myLocation} onClick={locate}>
+              <button
+                type="button"
+                className={ICON_BUTTON}
+                data-testid="criteria-start-locate"
+                aria-label={t.myLocation}
+                onClick={locate}
+              >
                 <LocateFixed size={20} aria-hidden />
               </button>
             </StartPointField>
@@ -185,8 +194,17 @@ export function CriteriaView({
           </div>
         </aside>
       ) : (
-        <BottomSheet label={t.criteria} expanded={sheetExpanded} onExpandedChange={setSheetExpanded}>
-          {!start && <p className="text-center text-sm text-ink-2">{t.longPress}</p>}
+        <BottomSheet
+          testId="criteria-sheet"
+          label={t.criteria}
+          expanded={sheetExpanded}
+          onExpandedChange={setSheetExpanded}
+        >
+          {!start && (
+            <p data-testid="criteria-long-press" className="text-center text-sm text-ink-2">
+              {t.longPress}
+            </p>
+          )}
           <StartPointField
             start={start}
             language={language}
@@ -205,7 +223,7 @@ export function CriteriaView({
       )}
       {toast && toast.start === start && (
         // A click drops it at once.
-        <p className={TOAST} role="alert" onClick={() => setToast(undefined)}>
+        <p className={TOAST} role="alert" data-testid="criteria-toast" onClick={() => setToast(undefined)}>
           {toast.problem === 'unavailable' ? t.unavailable : t.unreadable}
           <br />
           {toast.problem === 'unreadable' ? t.coordinatesHint : desktop ? t.pickHintDesktop : t.pickHint}
@@ -282,6 +300,7 @@ function StartPointField({
           </label>
           <input
             id={inputId}
+            data-testid="criteria-start"
             className="w-full bg-transparent outline-none placeholder:text-ink-2"
             value={draft}
             placeholder={t.coordinates}
@@ -305,7 +324,7 @@ function StartPointField({
         {children}
       </div>
       {picking && (
-        <p id={noteId} className="mt-1 px-3 text-sm text-ink-2">
+        <p id={noteId} data-testid="criteria-pick-note" className="mt-1 px-3 text-sm text-ink-2">
           {t.clickMap}
         </p>
       )}

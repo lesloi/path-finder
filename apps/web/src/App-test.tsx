@@ -1,8 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { Map } from 'maplibre-gl';
 
 import { App } from './App.tsx';
+import { expectNamedControls } from './accessible-names.ts';
 
 // jsdom has no WebGL.
 vi.mock('maplibre-gl');
@@ -14,6 +15,9 @@ const onDesktop = () =>
       (query) => ({ media: query, matches: true, addEventListener() {}, removeEventListener() {} }) as never,
     );
 
+// The page whose title is shown: the sub-page stays mounted while it changes from one page to the next.
+const onPage = (title: string) => waitFor(() => expect(screen.getByTestId('sub-page-title')).toHaveTextContent(title));
+
 afterEach(() => {
   window.location.hash = '';
   vi.restoreAllMocks();
@@ -23,32 +27,47 @@ describe('App', () => {
   it('shows the app name', () => {
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'Path finder' })).toBeInTheDocument();
+    expect(screen.getByTestId('app-title')).toHaveTextContent('Path finder');
   });
 
-  it.each(['Credits', 'Privacy policy', 'Legal notice'])(
-    'opens the %s page from the settings and goes back',
-    async (page) => {
-      render(<App />);
+  it.each([
+    ['credits', 'Credits'],
+    ['privacy', 'Privacy policy'],
+    ['legal-notice', 'Legal notice'],
+  ])('opens the %s page from the settings and goes back', async (page, title) => {
+    render(<App />);
 
-      fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
-      fireEvent.click(await screen.findByRole('link', { name: page }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    fireEvent.click(await screen.findByTestId(`settings-${page}`));
 
-      expect(await screen.findByRole('heading', { level: 1, name: page })).toBeInTheDocument();
+    await onPage(title);
 
-      fireEvent.click(screen.getByRole('link', { name: 'Back' }));
+    fireEvent.click(screen.getByTestId('sub-page-back'));
 
-      expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
-    },
-  );
+    await onPage('Settings');
+  });
+
+  it.each([
+    ['phones', false],
+    ['desktops', true],
+  ])('names the controls of a page on %s', async (_, desktop) => {
+    if (desktop) onDesktop();
+    const { container } = render(<App />);
+
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    await onPage('Settings');
+
+    expectNamedControls(container);
+  });
 
   it('keeps the map across a visit to the settings', async () => {
     render(<App />);
     const created = vi.mocked(Map).mock.instances.length;
 
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
-    fireEvent.click(await screen.findByRole('link', { name: 'Back' }));
-    await screen.findByRole('button', { name: 'Criteria' });
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    fireEvent.click(await screen.findByTestId('sub-page-back'));
+    // The settings button comes back once the page is closed: the sheet handle never left.
+    await screen.findByTestId('criteria-settings');
 
     expect(vi.mocked(Map).mock.instances).toHaveLength(created);
   });
@@ -56,99 +75,102 @@ describe('App', () => {
   it('moves the focus to the title of the page it opens', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toHaveFocus();
+    expect(await screen.findByTestId('sub-page-title')).toHaveFocus();
   });
 
   it('gives the focus back to the settings button once the page is closed', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
-    fireEvent.click(await screen.findByRole('link', { name: 'Back' }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    fireEvent.click(await screen.findByTestId('sub-page-back'));
 
-    expect(await screen.findByRole('link', { name: 'Settings' })).toHaveFocus();
+    expect(await screen.findByTestId('criteria-settings')).toHaveFocus();
   });
 
   it('opens a page as a modal dialog, without the settings button behind it', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
 
-    expect(await screen.findByRole('dialog', { name: 'Settings' })).toHaveAttribute('open');
-    expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
+    expect(await screen.findByTestId('sub-page')).toHaveAttribute('open');
+    expect(screen.getByTestId('sub-page')).toHaveAccessibleName('Settings');
+    expect(screen.queryByTestId('criteria-settings')).not.toBeInTheDocument();
   });
 
   it('goes back a level from a page on Escape', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
-    fireEvent.click(await screen.findByRole('link', { name: 'Credits' }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    fireEvent.click(await screen.findByTestId('settings-credits'));
+    await onPage('Credits');
 
-    fireEvent(await screen.findByRole('dialog', { name: 'Credits' }), new Event('cancel', { cancelable: true }));
+    fireEvent(screen.getByTestId('sub-page'), new Event('cancel', { cancelable: true }));
 
-    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+    await onPage('Settings');
   });
 
   it('closes every page on a click on the scrim', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
-    fireEvent.click(await screen.findByRole('link', { name: 'Credits' }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    fireEvent.click(await screen.findByTestId('settings-credits'));
+    await onPage('Credits');
 
-    fireEvent.click(await screen.findByRole('dialog', { name: 'Credits' }));
+    fireEvent.click(screen.getByTestId('sub-page'));
 
-    expect(await screen.findByRole('link', { name: 'Settings' })).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('criteria-settings')).toBeInTheDocument();
+    expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument();
   });
 
   it('closes a page with a back arrow on phones', async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
 
-    expect(await screen.findByRole('link', { name: 'Back' })).toHaveAttribute('href', '#/');
-    expect(screen.queryByRole('link', { name: 'Close' })).not.toBeInTheDocument();
+    expect(await screen.findByTestId('sub-page-back')).toHaveAttribute('href', '#/');
+    expect(screen.queryByTestId('sub-page-close')).not.toBeInTheDocument();
   });
 
   it('closes a page with a cross on desktops, and keeps the back arrow for a page within a page', async () => {
     onDesktop();
     render(<App />);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
-    expect(await screen.findByRole('link', { name: 'Close' })).toHaveAttribute('href', '#/');
-    expect(screen.queryByRole('link', { name: 'Back' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    expect(await screen.findByTestId('sub-page-close')).toHaveAttribute('href', '#/');
+    expect(screen.queryByTestId('sub-page-back')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('link', { name: 'Credits' }));
-    expect(await screen.findByRole('link', { name: 'Back' })).toHaveAttribute('href', '#/settings');
-    expect(screen.getByRole('link', { name: 'Close' })).toHaveAttribute('href', '#/');
+    fireEvent.click(screen.getByTestId('settings-credits'));
+    expect(await screen.findByTestId('sub-page-back')).toHaveAttribute('href', '#/settings');
+    expect(screen.getByTestId('sub-page-close')).toHaveAttribute('href', '#/');
   });
 
   it('stays on a page after a click inside it', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
 
-    fireEvent.click(await screen.findByRole('heading', { level: 1, name: 'Settings' }));
+    fireEvent.click(await screen.findByTestId('sub-page-title'));
 
-    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+    expect(screen.getByTestId('sub-page')).toHaveAccessibleName('Settings');
   });
 
   it('shows the settings button again on desktops once the page is closed', async () => {
     onDesktop();
     render(<App />);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
-    fireEvent.click(await screen.findByRole('link', { name: 'Close' }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    fireEvent.click(await screen.findByTestId('sub-page-close'));
 
-    expect(await screen.findByRole('link', { name: 'Settings' })).toBeInTheDocument();
+    expect(await screen.findByTestId('criteria-settings')).toBeInTheDocument();
   });
 
   it('speaks French when the browser prefers French', async () => {
     vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['fr-FR']);
     render(<App />);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Réglages' }));
-    fireEvent.click(await screen.findByRole('link', { name: 'Politique de confidentialité' }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    fireEvent.click(await screen.findByTestId('settings-privacy'));
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Politique de confidentialité' })).toBeInTheDocument();
+    await onPage('Politique de confidentialité');
   });
 
   it('sets the document language to fr when the browser prefers French', () => {
@@ -162,11 +184,11 @@ describe('App', () => {
     vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['en-US']);
     render(<App />);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Settings' }));
-    fireEvent.click(await screen.findByRole('button', { name: /^Language/ }));
-    fireEvent.click(screen.getByRole('option', { name: 'Français' }));
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    fireEvent.click(await screen.findByTestId('settings-language'));
+    fireEvent.click(screen.getByTestId('settings-language-fr'));
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Réglages' })).toBeInTheDocument();
+    expect(screen.getByTestId('sub-page-title')).toHaveTextContent('Réglages');
     expect(document.documentElement.lang).toBe('fr');
   });
 

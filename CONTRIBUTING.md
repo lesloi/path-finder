@@ -133,8 +133,14 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
 - Use `it.each` for tables of cases, with a readable label as the first column.
 - Separate arrange, act, and assert with blank lines.
 - Build test inputs by spreading a valid base: `{ ...valid, pace: 0 }`.
-- Components are tested through what the user sees, with Testing Library queries by
-  label or role.
+- Tests find an element by its `data-testid` (`getByTestId`), written as a literal in kebab-case:
+  `criteria-submit`, `settings-units`. Never by the text, label, or accessible name it shows, so
+  a test finds its element whatever the wording or the language; ESLint enforces it. A role without a name
+  (`alert`, `listbox`) is fine for an element that is unique. A component that appears more than
+  once takes a `testId` prop that prefixes the ids of its parts (`units`, `units-list`).
+- What an element shows is asserted after finding it, in the language under test:
+  `toHaveAccessibleName`, `toHaveTextContent`. Each view and legal page has a test that every
+  control has an accessible name in both languages (`expectNamedControls`).
 - Mock `fetch` and BRouter with `vi.fn`; unit tests never call the network.
 - End-to-end tests live in `e2e/`: Playwright drives the built app served by `pnpm start`.
   Import `test` and `expect` from `e2e/test.ts`, which answers the IGN Géoplateforme from
