@@ -69,6 +69,9 @@ export function ElevationProfile({
       className="m-0"
       aria-label={t.profile(formatHeight(min, display), formatHeight(max, display))}
     >
+      <figcaption data-testid={testId && `${testId}-title`} className="mb-1 text-sm font-semibold text-ink-2">
+        {t.altitude}
+      </figcaption>
       <div className="flex gap-2">
         {/* The altitudes of the top, the middle and the bottom of the plot, beside it and not over the trace. */}
         <div className="relative h-24 flex-none text-right text-sm text-ink-2" aria-hidden>

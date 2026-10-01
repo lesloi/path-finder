@@ -33,6 +33,15 @@ function plot(onHover = vi.fn(), props: Partial<Route> = {}, language: 'en' | 'f
 }
 
 describe('ElevationProfile', () => {
+  it.each([
+    ['en', 'Altitude'],
+    ['fr', 'Altitude'],
+  ] as const)('is titled in %s', (language, title) => {
+    plot(vi.fn(), {}, language);
+
+    expect(screen.getByTestId('profile-title')).toHaveTextContent(title);
+  });
+
   it('gives the lowest, the middle and the highest altitudes beside the plot', () => {
     plot();
 
