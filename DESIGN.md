@@ -31,15 +31,16 @@ drops Tailwind's default colours, radii, shadows, fonts, type sizes, and breakpo
 colour or a radius outside the tokens does not exist. Spacing is Tailwind's own scale, in
 `rem` so it follows the user's font size, and any multiple compiles: gaps, paddings, and
 margins use the steps below, and other multiples (`min-h-13`) only give a component its own
-dimensions (a 52 px row). Only the map's own colours (white under the start point) are
-written raw.
+dimensions (a 52 px row). Only the map's own colours are written raw: white under the start point, and the route
+colours that MapLibre and the route thumbnails paint, in `components/route-colors.ts`, which
+pairs with the `route-*` tokens (change both together).
 
 | Utilities                                                 | Values                                                        |
 | --------------------------------------------------------- | ------------------------------------------------------------- |
 | `accent`, `accent-hover`, `accent-soft`                   | `#2b6f9e`; dark mode `#6fb0dd`                                |
 | `on-accent`                                               | Text on the accent: white; dark text in dark mode             |
 | `surface`, `surface-2`, `ink`, `ink-2`, `border`, `scrim` | UI surfaces, text, and borders, light and dark                |
-| `route-1`, `route-2`, `route-3`                           | `#e0115f`, `#1d2433`, `#7a3fc4`                               |
+| `route-1` … `route-5`                                     | `#e0115f`, `#1d2433`, `#7a3fc4`, `#0b7a75`, `#c25e00`         |
 | `slope-1` … `slope-4`                                     | Uphill grade < 3 %, 3–6 %, 6–10 %, > 10 %                     |
 | `paved`, `unpaved`                                        | Road surfaces                                                 |
 | `start`                                                   | The start point's brown ring, as in the logo                  |
@@ -89,7 +90,6 @@ draws them the same way.
 A component comes with the first screen that uses it, as the prototype on the
 `prototype/ui-redesign` branch draws it:
 
-- the route set view (#9): a ghost button to go back to the list;
 - the layers button (#58): a popover next to the floating button that opened it.
 
 Behaviour comes from native elements first: `<dialog>` for a dialog, the `popover` attribute

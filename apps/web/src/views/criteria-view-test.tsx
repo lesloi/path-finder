@@ -487,7 +487,7 @@ describe('CriteriaView', () => {
       expect(routesSource()).toEqual([]);
     });
 
-    it('shows the route set in the sheet on phones, expanded for a detail', async () => {
+    it('shows the route set in the sheet on phones', async () => {
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
       act(() => map().fire('load'));
@@ -499,7 +499,7 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'false');
       expect(screen.getByTestId('criteria-sheet-handle')).toHaveAccessibleName(routesText.en.routes);
       fireEvent.click(screen.getByTestId('routes-row-0'));
-      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByTestId('route-detail')).toBeInTheDocument();
     });
 
     it.each([

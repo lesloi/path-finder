@@ -85,8 +85,6 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   function openDetail(open: boolean) {
     setDetail(open);
     setHover(undefined);
-    // The detail is taller than the list.
-    setSheetExpanded(open);
   }
 
   function changeStart(position: Position) {
