@@ -78,15 +78,17 @@ draws them the same way.
 | List row              | `GROUP_TITLE`, then `LIST` of `LIST_ROW`; `LIST_ROW_CHEVRON` for a link                                                                                               |
 | Dropdown              | `<Dropdown label value options onChange>`: a listbox whose options may have icons                                                                                     |
 | Sub-page              | `<SubPage title back wide language navigate>`: a `<dialog>` with its title, a back arrow, and a cross on desktops                                                     |
+| Chips                 | `CHIP_ROW` of `CHIP`, a row that scrolls sideways; `data-set` highlights a criterion that is not the default                                                          |
+| Segmented control     | `<SegmentedControl label value options onChange>`: native radio buttons, side by side                                                                                 |
+| Slider                | `<Slider label value shown min max step onChange>`: a native range input with its value in large type                                                                 |
+| Dialog                | `<Dialog title closeLabel onClose>`: a native `<dialog>` that applies changes as they are made, closed by its cross, Escape, or its scrim                             |
+| Primary button        | `PRIMARY_BUTTON`: the view's one main action                                                                                                                          |
 | Toast                 | `TOAST` with `role="alert"`, in the floating buttons' colours: what went wrong, then on a second line what to do; the view hides it after a few seconds or on a click |
 | Long text             | `PROSE`, for the legal pages                                                                                                                                          |
 
 A component comes with the first screen that uses it, as the prototype on the
 `prototype/ui-redesign` branch draws it:
 
-- the criteria form (#70): chips in a row that scrolls sideways (with `data-set` when a
-  criterion is not the default), the dialog each chip opens, a segmented control, a slider
-  with its value in large type, and the primary button;
 - the route set view (#9): a ghost button to go back to the list;
 - the layers button (#58): a popover next to the floating button that opened it.
 

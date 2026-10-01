@@ -1,4 +1,4 @@
-import { parseCriteria } from './index.ts';
+import { CriteriaError, parseCriteria } from './index.ts';
 
 const valid = {
   start: [6.1294, 45.8992],
@@ -7,6 +7,14 @@ const valid = {
   surface: 'any',
   pace: 6,
 };
+
+function catchError(run: () => unknown): unknown {
+  try {
+    run();
+  } catch (error) {
+    return error;
+  }
+}
 
 describe('parseCriteria', () => {
   it('returns the criteria and the activity', () => {
@@ -29,25 +37,26 @@ describe('parseCriteria', () => {
   });
 
   it.each([
-    ['a body that is not an object', null],
-    ['a missing start point', { ...valid, start: undefined }],
-    ['a start point that is not a longitude and a latitude', { ...valid, start: [6.1294] }],
-    ['a latitude out of range', { ...valid, start: [6.1294, 91] }],
-    ['an unknown activity', { ...valid, activity: 'ride' }],
-    ['no target', { ...valid, target: {} }],
-    ['both a target distance and a target duration', { ...valid, target: { distance: 10, duration: 60 } }],
-    ['a target distance under 2 km', { ...valid, target: { distance: 1.9 } }],
-    ['a run over 50 km', { ...valid, target: { distance: 51 } }],
-    ['a hike over 40 km', { ...valid, activity: 'hike', target: { distance: 41 } }],
-    ['a target duration under 15 min', { ...valid, target: { duration: 14 } }],
-    ['a target duration over 6 h', { ...valid, target: { duration: 361 } }],
-    ['a negative target elevation gain', { ...valid, elevationGain: -1 }],
-    ['a target elevation gain over 2,500 m', { ...valid, elevationGain: 2_501 }],
-    ['an unknown elevation gain shortcut', { ...valid, elevationGain: 'steep' }],
-    ['an unknown surface preference', { ...valid, surface: 'sand' }],
-    ['a pace that is not a positive number', { ...valid, pace: 0 }],
-    ['a number given as a string', { ...valid, pace: '6' }],
-  ])('rejects %s', (_, body) => {
+    ['a body that is not an object', 'start', null],
+    ['a missing start point', 'start', { ...valid, start: undefined }],
+    ['a start point that is not a longitude and a latitude', 'start', { ...valid, start: [6.1294] }],
+    ['a latitude out of range', 'start', { ...valid, start: [6.1294, 91] }],
+    ['an unknown activity', 'activity', { ...valid, activity: 'ride' }],
+    ['no target', 'target', { ...valid, target: {} }],
+    ['both a target distance and a target duration', 'target', { ...valid, target: { distance: 10, duration: 60 } }],
+    ['a target distance under 2 km', 'target', { ...valid, target: { distance: 1.9 } }],
+    ['a run over 50 km', 'target', { ...valid, target: { distance: 51 } }],
+    ['a hike over 40 km', 'target', { ...valid, activity: 'hike', target: { distance: 41 } }],
+    ['a target duration under 15 min', 'target', { ...valid, target: { duration: 14 } }],
+    ['a target duration over 6 h', 'target', { ...valid, target: { duration: 361 } }],
+    ['a negative target elevation gain', 'elevationGain', { ...valid, elevationGain: -1 }],
+    ['a target elevation gain over 2,500 m', 'elevationGain', { ...valid, elevationGain: 2_501 }],
+    ['an unknown elevation gain shortcut', 'elevationGain', { ...valid, elevationGain: 'steep' }],
+    ['an unknown surface preference', 'surface', { ...valid, surface: 'sand' }],
+    ['a pace that is not a positive number', 'pace', { ...valid, pace: 0 }],
+    ['a number given as a string', 'pace', { ...valid, pace: '6' }],
+  ])('rejects %s, naming the %s field', (_, field, body) => {
+    expect(() => parseCriteria(body)).toThrow(expect.objectContaining({ name: 'CriteriaError', field }));
     expect(() => parseCriteria(body)).toThrow(RangeError);
   });
 
@@ -60,7 +69,10 @@ describe('parseCriteria', () => {
   });
 
   it('rejects a target duration too short for the target elevation gain', () => {
-    expect(() => parseCriteria({ ...valid, target: { duration: 30 }, elevationGain: 2_000 })).toThrow(RangeError);
+    const error = catchError(() => parseCriteria({ ...valid, target: { duration: 30 }, elevationGain: 2_000 }));
+
+    expect(error).toBeInstanceOf(CriteriaError);
+    expect(error).toMatchObject({ field: 'target' });
   });
 
   describe('without counting elevation gain', () => {
@@ -81,7 +93,9 @@ describe('parseCriteria', () => {
   });
 
   it('rejects a target duration that makes too long a route for the activity', () => {
-    expect(() => parseCriteria({ ...valid, target: { duration: 360 }, pace: 6 })).toThrow(RangeError);
+    expect(() => parseCriteria({ ...valid, target: { duration: 360 }, pace: 6 })).toThrow(
+      expect.objectContaining({ field: 'target' }),
+    );
     expect(() => parseCriteria({ ...valid, activity: 'hike', target: { duration: 360 }, pace: 9 })).not.toThrow();
   });
 });

@@ -67,6 +67,32 @@ describe('CriteriaView', () => {
     });
   });
 
+  describe('criteria', () => {
+    it('shows chips in the collapsed sheet, and the full form once it is expanded', () => {
+      render(<CriteriaView language="en" />);
+      expect(screen.getByRole('button', { name: 'Surface: Any' })).toBeInTheDocument();
+      expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'All criteria' }));
+
+      expect(screen.getByRole('button', { name: 'Criteria' })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('slider', { name: 'Distance' })).toBeInTheDocument();
+    });
+
+    it('shows the full form in the desktop column and passes the criteria on', () => {
+      onDesktop();
+      const onSubmit = vi.fn();
+      render(<CriteriaView language="en" onSubmit={onSubmit} />);
+      expect(screen.queryByRole('button', { name: 'Find routes' })).not.toBeInTheDocument();
+
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByRole('button', { name: 'Find routes' }));
+
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ start: [6.2, 45.8], activity: 'run' }));
+    });
+  });
+
   describe('on desktops', () => {
     it('stops picking the start point when the settings open', () => {
       onDesktop();

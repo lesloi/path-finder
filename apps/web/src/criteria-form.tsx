@@ -1,0 +1,447 @@
+import { Footprints, Mountain, Ruler, SlidersHorizontal, Timer, type LucideIcon } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+
+import {
+  MAX_TARGET_DISTANCE,
+  MAX_TARGET_ELEVATION_GAIN,
+  MIN_TARGET_DISTANCE,
+  TARGET_DURATION,
+} from '../../api/src/route-generation/constants.ts';
+import {
+  CriteriaError,
+  parseCriteria,
+  type Criteria,
+  type CriteriaField,
+} from '../../api/src/route-generation/index.ts';
+import { ACTIVITY_NAMES, ACTIVITY_PACES, type Activity } from './activity.ts';
+import type { Language } from './language.ts';
+import { paceFor, useSettings } from './settings.ts';
+import type { Position } from './start-point-map.tsx';
+import { CHIP, CHIP_ROW, Dialog, PRIMARY_BUTTON, SegmentedControl, Slider, useDesktop } from './ui/index.ts';
+import { KM_PER_MILE, METRES_PER_FOOT, type Units } from './units.ts';
+
+/** What the form sends: the criteria and the activity, in the shape `parseCriteria` accepts. */
+export type CriteriaRequest = Criteria & { activity: Activity };
+
+const ACTIVITIES = Object.keys(ACTIVITY_PACES) as Activity[];
+const ACTIVITY_ICONS = { run: Footprints, hike: Mountain } satisfies Record<Activity, LucideIcon>;
+
+const DURATION_STEP = 5; // minutes
+const DURATION_DEFAULT = 60; // minutes
+
+type Target = 'distance' | 'duration';
+type Level = 'any' | 'flat' | 'hilly' | 'target';
+type Surface = Criteria['surface'];
+type Criterion = 'activity' | 'target' | 'elevation' | 'surface';
+
+// Distance in km or mi, elevation gain in m or ft: the user's units, which the bounds are shown in.
+type Draft = { target: Target; distance: number; duration: number; level: Level; gain: number; surface: Surface };
+
+const text = {
+  en: {
+    activity: 'Activity',
+    target: 'Target',
+    distance: 'Distance',
+    duration: 'Duration',
+    elevationGain: 'Elevation gain',
+    any: 'Any',
+    flat: 'Flat',
+    hilly: 'Hilly',
+    targetLevel: 'Target',
+    surface: 'Surface',
+    paved: 'Paved',
+    anySurface: 'Any',
+    unpaved: 'Unpaved',
+    allCriteria: 'All criteria',
+    close: 'Close',
+    findRoutes: 'Find routes',
+    adjustPace: 'Adjust your pace',
+    adjustPaceHint: 'in the settings for better estimates.',
+    hour: 'h',
+    minute: 'min',
+    distanceError: (min: number, max: number, unit: string) =>
+      `The distance must be between ${min} and ${max} ${unit}.`,
+    durationError: 'This duration does not fit the elevation gain and your pace.',
+    elevationGainError: (max: number, unit: string) => `The elevation gain must be between 0 and ${max} ${unit}.`,
+    startError: 'Choose a start point.',
+    activityError: 'Choose an activity.',
+    surfaceError: 'Choose a surface.',
+    paceError: 'Your pace is not valid: adjust it in the settings.',
+  },
+  fr: {
+    activity: 'Activité',
+    target: 'Objectif',
+    distance: 'Distance',
+    duration: 'Durée',
+    elevationGain: 'Dénivelé positif',
+    any: 'Indifférent',
+    flat: 'Plat',
+    hilly: 'Vallonné',
+    targetLevel: 'Objectif',
+    surface: 'Revêtement',
+    paved: 'Goudronné',
+    anySurface: 'Indifférent',
+    unpaved: 'Non goudronné',
+    allCriteria: 'Tous les critères',
+    close: 'Fermer',
+    findRoutes: 'Trouver des parcours',
+    adjustPace: 'Ajustez votre allure',
+    adjustPaceHint: 'dans les réglages pour de meilleures estimations.',
+    hour: 'h',
+    minute: 'min',
+    distanceError: (min: number, max: number, unit: string) =>
+      `La distance doit être comprise entre ${min} et ${max} ${unit}.`,
+    durationError: 'Cette durée ne convient pas au dénivelé et à votre allure.',
+    elevationGainError: (max: number, unit: string) => `Le dénivelé doit être compris entre 0 et ${max} ${unit}.`,
+    startError: 'Choisissez un point de départ.',
+    activityError: 'Choisissez une activité.',
+    surfaceError: 'Choisissez un revêtement.',
+    paceError: 'Votre allure n’est pas valide : ajustez-la dans les réglages.',
+  },
+} satisfies Record<Language, unknown>;
+
+/** The bounds of the sliders in the user's units, inside the API's bounds once converted back. */
+function boundsFor(activity: Activity, units: Units) {
+  const { kmPerDistanceUnit, metresPerGainUnit, gainStep } = unitsFor(units);
+  return {
+    distance: {
+      min: Math.ceil(MIN_TARGET_DISTANCE / kmPerDistanceUnit),
+      max: Math.floor(MAX_TARGET_DISTANCE[activity] / kmPerDistanceUnit),
+    },
+    gain: { max: Math.floor(MAX_TARGET_ELEVATION_GAIN / metresPerGainUnit / gainStep) * gainStep },
+  };
+}
+
+function unitsFor(units: Units) {
+  return units === 'metric'
+    ? { kmPerDistanceUnit: 1, metresPerGainUnit: 1, gainStep: 50, distance: 'km', gain: 'm', defaults: [10, 300] }
+    : {
+        kmPerDistanceUnit: KM_PER_MILE,
+        metresPerGainUnit: METRES_PER_FOOT,
+        gainStep: 100,
+        distance: 'mi',
+        gain: 'ft',
+        defaults: [6, 1_000],
+      };
+}
+
+function defaultDraft(units: Units): Draft {
+  const [distance, gain] = unitsFor(units).defaults;
+  return { target: 'distance', distance, duration: DURATION_DEFAULT, level: 'any', gain, surface: 'any' };
+}
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+// The same distance and elevation gain in other units, as close as the sliders' steps allow.
+function convert(draft: Draft, from: Units, to: Units): Draft {
+  const a = unitsFor(from);
+  const b = unitsFor(to);
+  const gain = Math.round((draft.gain * a.metresPerGainUnit) / b.metresPerGainUnit / b.gainStep) * b.gainStep;
+  return {
+    ...draft,
+    distance: Math.round((draft.distance * a.kmPerDistanceUnit) / b.kmPerDistanceUnit),
+    gain,
+  };
+}
+
+const round = (value: number, decimals: number) => Math.round(value * 10 ** decimals) / 10 ** decimals;
+
+function formatDuration(minutes: number, t: (typeof text)[Language]): string {
+  const hours = Math.floor(minutes / 60);
+  if (hours === 0) return `${minutes} ${t.minute}`;
+  return `${hours} ${t.hour} ${`${minutes % 60}`.padStart(2, '0')}`;
+}
+
+/**
+ * The criteria of a route set: activity, target distance or duration, elevation gain, and
+ * surface, over the user's settings. `onSubmit` receives a request body that `parseCriteria`
+ * accepts. On a phone, `compact` shows chips that each open one criterion; `onExpand` is
+ * called for the last chip.
+ */
+export function CriteriaForm({
+  language,
+  start,
+  compact = false,
+  onExpand,
+  onSubmit,
+}: {
+  language: Language;
+  start?: Position;
+  compact?: boolean;
+  onExpand?: () => void;
+  onSubmit: (request: CriteriaRequest) => void;
+}) {
+  const t = text[language];
+  const desktop = useDesktop();
+  const [settings, update] = useSettings();
+  const { units } = settings;
+  const activity = settings.lastActivity;
+  const [draft, setDraft] = useState(() => defaultDraft(units));
+  const [unitsBefore, setUnitsBefore] = useState(units);
+  const [open, setOpen] = useState<Criterion>();
+  // The settings page can change the units while the view stays mounted.
+  if (units !== unitsBefore) {
+    setUnitsBefore(units);
+    setDraft(convert(draft, unitsBefore, units));
+  }
+
+  const bounds = boundsFor(activity, units);
+  const unit = unitsFor(units);
+  // A new activity may have a shorter maximum distance.
+  const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
+  const gain = clamp(draft.gain, 0, bounds.gain.max);
+  const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
+
+  const request: CriteriaRequest | undefined = start && {
+    start,
+    activity,
+    target:
+      draft.target === 'distance'
+        ? { distance: round(distance * unit.kmPerDistanceUnit, 2) }
+        : { duration: draft.duration },
+    ...(draft.level === 'target' && { elevationGain: Math.round(gain * unit.metresPerGainUnit) }),
+    ...((draft.level === 'flat' || draft.level === 'hilly') && { elevationGain: draft.level }),
+    surface: draft.surface,
+    pace: paceFor(settings, activity),
+  };
+  const field = request && invalidField(request);
+
+  const sections: Record<Criterion, { title: string; content: ReactNode }> = {
+    activity: {
+      title: t.activity,
+      content: (
+        <div role="group" aria-label={t.activity} className="flex gap-2">
+          {ACTIVITIES.map((value) => {
+            return (
+              <button
+                key={value}
+                type="button"
+                className={CHIP}
+                data-set={value === activity ? '' : undefined}
+                aria-pressed={value === activity}
+                onClick={() => update({ lastActivity: value })}
+              >
+                <ActivityIcon activity={value} />
+                {ACTIVITY_NAMES[value][language]}
+              </button>
+            );
+          })}
+        </div>
+      ),
+    },
+    target: {
+      title: t.target,
+      content: (
+        <div className="flex flex-col gap-2">
+          <SegmentedControl
+            label={t.target}
+            value={draft.target}
+            options={[
+              { value: 'distance', label: t.distance },
+              { value: 'duration', label: t.duration },
+            ]}
+            onChange={(target) => change({ target })}
+          />
+          {draft.target === 'distance' ? (
+            <Slider
+              label={t.distance}
+              value={distance}
+              shown={`${distance} ${unit.distance}`}
+              min={bounds.distance.min}
+              max={bounds.distance.max}
+              step={1}
+              onChange={(value) => change({ distance: value })}
+            />
+          ) : (
+            <Slider
+              label={t.duration}
+              value={draft.duration}
+              shown={formatDuration(draft.duration, t)}
+              min={TARGET_DURATION.min}
+              max={TARGET_DURATION.max}
+              step={DURATION_STEP}
+              onChange={(value) => change({ duration: value })}
+            />
+          )}
+          {settings.pace[activity] === undefined && (
+            <p className="text-sm text-ink-2">
+              <a className="text-accent underline" href="#/settings">
+                {t.adjustPace}
+              </a>{' '}
+              {t.adjustPaceHint}
+            </p>
+          )}
+        </div>
+      ),
+    },
+    elevation: {
+      title: t.elevationGain,
+      content: (
+        <div className="flex flex-col gap-2">
+          <SegmentedControl
+            label={t.elevationGain}
+            value={draft.level}
+            options={[
+              { value: 'any', label: t.any },
+              { value: 'flat', label: t.flat },
+              { value: 'hilly', label: t.hilly },
+              { value: 'target', label: t.targetLevel },
+            ]}
+            onChange={(level) => change({ level })}
+          />
+          {draft.level === 'target' && (
+            <Slider
+              label={t.elevationGain}
+              value={gain}
+              shown={`${gain} ${unit.gain}`}
+              min={0}
+              max={bounds.gain.max}
+              step={unit.gainStep}
+              onChange={(value) => change({ gain: value })}
+            />
+          )}
+        </div>
+      ),
+    },
+    surface: {
+      title: t.surface,
+      content: (
+        <SegmentedControl
+          label={t.surface}
+          value={draft.surface}
+          options={[
+            { value: 'paved', label: t.paved },
+            { value: 'any', label: t.anySurface },
+            { value: 'unpaved', label: t.unpaved },
+          ]}
+          onChange={(surface) => change({ surface })}
+        />
+      ),
+    },
+  };
+
+  const defaults = defaultDraft(units);
+  const TargetIcon = draft.target === 'distance' ? Ruler : Timer;
+  const chips: Record<Criterion, { label: string; icon?: ReactNode; set: boolean }> = {
+    activity: {
+      label: ACTIVITY_NAMES[activity][language],
+      icon: <ActivityIcon activity={activity} />,
+      set: activity !== 'run',
+    },
+    target: {
+      label: draft.target === 'distance' ? `${distance} ${unit.distance}` : formatDuration(draft.duration, t),
+      icon: <TargetIcon size={18} aria-hidden />,
+      set:
+        draft.target === 'duration' || distance !== clamp(defaults.distance, bounds.distance.min, bounds.distance.max),
+    },
+    elevation: {
+      label:
+        draft.level === 'target' ? `${gain} ${unit.gain}` : { any: t.any, flat: t.flat, hilly: t.hilly }[draft.level],
+      set: draft.level !== 'any',
+    },
+    surface: {
+      label: { paved: t.paved, any: t.anySurface, unpaved: t.unpaved }[draft.surface],
+      set: draft.surface !== 'any',
+    },
+  };
+
+  const findRoutes = request && !field && (
+    <button type="button" className={PRIMARY_BUTTON} onClick={() => onSubmit(request)}>
+      {t.findRoutes}
+    </button>
+  );
+  const error = field && (
+    <p role="alert" className="text-sm text-ink">
+      {message(field, draft.target, { language, distance: bounds.distance, gain: bounds.gain, unit })}
+    </p>
+  );
+
+  if (compact && !desktop) {
+    const criteria = ['activity', 'target', 'elevation', 'surface'] as const;
+    return (
+      <>
+        <div className={CHIP_ROW}>
+          {criteria.map((criterion) => (
+            <button
+              key={criterion}
+              type="button"
+              className={CHIP}
+              data-set={chips[criterion].set ? '' : undefined}
+              aria-label={`${sections[criterion].title}: ${chips[criterion].label}`}
+              onClick={() => setOpen(criterion)}
+            >
+              {chips[criterion].icon}
+              {chips[criterion].label}
+            </button>
+          ))}
+          <button type="button" className={CHIP} onClick={onExpand}>
+            <SlidersHorizontal size={18} aria-hidden />
+            {t.allCriteria}
+          </button>
+        </div>
+        {error}
+        {findRoutes}
+        {open && (
+          <Dialog title={sections[open].title} closeLabel={t.close} onClose={() => setOpen(undefined)}>
+            {sections[open].content}
+          </Dialog>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {(['activity', 'target', 'elevation', 'surface'] as const).map((criterion) => (
+        <section key={criterion} className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-ink-2">{sections[criterion].title}</h2>
+          {sections[criterion].content}
+        </section>
+      ))}
+      {error}
+      {findRoutes}
+    </>
+  );
+}
+
+function ActivityIcon({ activity }: { activity: Activity }) {
+  const Icon = ACTIVITY_ICONS[activity];
+  return <Icon size={18} aria-hidden />;
+}
+
+// The first field `parseCriteria` rejects, as the API would.
+function invalidField(request: CriteriaRequest): CriteriaField | undefined {
+  try {
+    parseCriteria(request);
+  } catch (error) {
+    if (error instanceof CriteriaError) return error.field;
+    throw error;
+  }
+}
+
+function message(
+  field: CriteriaField,
+  target: Target,
+  {
+    language,
+    distance,
+    gain,
+    unit,
+  }: {
+    language: Language;
+    distance: { min: number; max: number };
+    gain: { max: number };
+    unit: { distance: string; gain: string };
+  },
+): string {
+  const t = text[language];
+  const messages: Record<CriteriaField, string> = {
+    start: t.startError,
+    activity: t.activityError,
+    target: target === 'distance' ? t.distanceError(distance.min, distance.max, unit.distance) : t.durationError,
+    elevationGain: t.elevationGainError(gain.max, unit.gain),
+    surface: t.surfaceError,
+    pace: t.paceError,
+  };
+  return messages[field];
+}

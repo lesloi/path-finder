@@ -1,6 +1,7 @@
 import { Crosshair, LocateFixed, Settings } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
+import { CriteriaForm, type CriteriaRequest } from './criteria-form.tsx';
 import { formatPosition, parsePosition } from './coordinates.ts';
 import type { Language } from './language.ts';
 import { StartPointMap, type Position } from './start-point-map.tsx';
@@ -55,8 +56,11 @@ const text = {
 export function CriteriaView({
   language,
   pageOpen = false,
+  onSubmit = () => {},
 }: {
   language: Language;
+  /** The user asked for routes with these criteria. */
+  onSubmit?: (request: CriteriaRequest) => void;
   /** A sub-page is open over the view. */
   pageOpen?: boolean;
 }) {
@@ -174,6 +178,7 @@ export function CriteriaView({
                 <LocateFixed size={20} aria-hidden />
               </button>
             </StartPointField>
+            <CriteriaForm language={language} start={start} onSubmit={onSubmit} />
           </div>
         </aside>
       ) : (
@@ -191,6 +196,13 @@ export function CriteriaView({
               {t.myLocation}
             </button>
           )}
+          <CriteriaForm
+            language={language}
+            start={start}
+            compact={!sheetExpanded}
+            onExpand={() => setSheetExpanded(true)}
+            onSubmit={onSubmit}
+          />
         </BottomSheet>
       )}
       {toast && toast.start === start && (
