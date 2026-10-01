@@ -25,8 +25,8 @@ test.describe('the criteria form', () => {
     await choose(page, 'target', 'duration');
 
     await expect(page.getByTestId('criteria-duration')).toBeVisible();
-    // The e2e server has no BD ALTI: the elevation gain is not offered.
-    await expect(page.getByTestId('criteria-elevation-hilly')).toBeHidden();
+    // The e2e server has stand-in BD ALTI tiles (`fake-bdalti.ts`): the elevation gain is offered.
+    await expect(page.getByTestId('criteria-elevation-hilly')).toBeAttached();
     await page.getByTestId('criteria-pace-info').click();
     await expect(page.getByTestId('criteria-pace-link')).toHaveAttribute('href', '#/settings');
   });
