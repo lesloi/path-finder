@@ -1,5 +1,5 @@
-import type { Language } from '../language.ts';
-import { PROSE } from '../ui/index.ts';
+import type { Language } from '../../language.ts';
+import { PROSE } from '../../components/index.ts';
 
 const osmCopyright = 'https://www.openstreetmap.org/copyright';
 const licenceOuverte = 'https://www.etalab.gouv.fr/licence-ouverte-open-licence/';

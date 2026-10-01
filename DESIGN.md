@@ -1,7 +1,7 @@
 # Design system
 
 The web app's look, in [Tailwind CSS](https://tailwindcss.com) restricted to the project's
-tokens, in [`apps/web/src/ui`](./apps/web/src/ui). Tailwind compiles at build time: nothing
+tokens, in [`apps/web/src/components`](./apps/web/src/components). Tailwind compiles at build time: nothing
 loads at runtime. No component library. Icons come from [lucide-react](https://lucide.dev)
 only, bundled with the app.
 
@@ -21,12 +21,12 @@ only, bundled with the app.
   - Leaving a page goes back through the browser history when the tab came from where it
     leads (`goTo` in `navigation.ts`), so the system's back gesture never reopens it.
 
-The 768 px breakpoint is `--breakpoint-desktop` in [`ui/index.css`](./apps/web/src/ui/index.css)
+The 768 px breakpoint is `--breakpoint-desktop` in [`components/index.css`](./apps/web/src/components/index.css)
 and the query in `useDesktop` (`ui/use-desktop.ts`): change both together.
 
 ## Tokens
 
-All in [`ui/index.css`](./apps/web/src/ui/index.css), as Tailwind theme variables. The theme
+All in [`components/index.css`](./apps/web/src/components/index.css), as Tailwind theme variables. The theme
 drops Tailwind's default colours, radii, shadows, fonts, type sizes, and breakpoints, so a
 colour or a radius outside the tokens does not exist. Spacing is Tailwind's own scale, in
 `rem` so it follows the user's font size, and any multiple compiles: gaps, paddings, and
@@ -66,7 +66,7 @@ elements (attribution, cursor) are styled in plain CSS at the end of `ui/index.c
 ## Components
 
 React components exist where markup alone is not enough. The others are Tailwind class
-strings in [`ui/styles.ts`](./apps/web/src/ui/styles.ts), one per element, so every screen
+strings in [`components/styles.ts`](./apps/web/src/components/styles.ts), one per element, so every screen
 draws them the same way.
 
 | Component             | Where                                                                                                                                                                 |

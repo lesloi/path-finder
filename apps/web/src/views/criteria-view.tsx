@@ -1,12 +1,19 @@
 import { Crosshair, LocateFixed, Settings } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
-import { useElevation } from './capabilities.ts';
+import { useElevation } from '../state/index.ts';
 import { CriteriaForm, useCriteriaDraft, type CriteriaRequest } from './criteria-form.tsx';
-import { formatPosition, parsePosition } from './coordinates.ts';
-import type { Language } from './language.ts';
-import { StartPointMap, type Position } from './start-point-map.tsx';
-import { BottomSheet, FLOATING_BUTTON, ICON_BUTTON, SIDE_COLUMN, TOAST, useDesktop } from './ui/index.ts';
+import { formatPosition, parsePosition, type Position } from '../core/index.ts';
+import type { Language } from '../language.ts';
+import {
+  StartPointMap,
+  BottomSheet,
+  FLOATING_BUTTON,
+  ICON_BUTTON,
+  SIDE_COLUMN,
+  TOAST,
+  useDesktop,
+} from '../components/index.ts';
 
 const TOAST_MS = 6_000;
 

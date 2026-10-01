@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { CriteriaView } from './criteria-view.tsx';
-import { maps, markers } from './maplibre-mock.ts';
+import { maps, markers } from '../maplibre-mock.ts';
 
-vi.mock('maplibre-gl', () => import('./maplibre-mock.ts'));
+vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
 
 const map = () => maps.at(-1)!;
 const field = () => screen.getByRole('textbox', { name: 'Start point' });

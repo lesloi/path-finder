@@ -1,15 +1,9 @@
 import { useEffect, type ComponentType } from 'react';
 
-import { CriteriaView } from './criteria-view.tsx';
+import { SubPage } from './components/index.ts';
 import { browserLanguage, type Language } from './language.ts';
-import { CreditsPage } from './legal/credits-page.tsx';
-import { LegalNoticePage } from './legal/legal-notice-page.tsx';
-import { PrivacyPolicyPage } from './legal/privacy-policy-page.tsx';
-import { goTo, useHash } from './navigation.ts';
-import { useSettings } from './settings.ts';
-import { SettingsView } from './settings-view.tsx';
-import { SubPage } from './ui/index.ts';
-
+import { goTo, useHash, useSettings } from './state/index.ts';
+import { CreditsPage, CriteriaView, LegalNoticePage, PrivacyPolicyPage, SettingsView } from './views/index.ts';
 // Each page by its hash, with its title and where its back arrow goes.
 const pages: Record<
   string,

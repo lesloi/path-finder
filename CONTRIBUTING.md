@@ -42,6 +42,12 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
 ### Files and modules
 
+- `apps/web/src` is grouped by role: `components/` (shared UI and its styles), `views/` (screens,
+  with `views/legal/`), `core/` (logic without React: activities, units, coordinates, GPX),
+  `state/` (device state and the API's capabilities). `App.tsx`, `main.tsx` and `language.ts` stay at the root.
+- `apps/api/src` is grouped as `http/` (the Hono app, rate limits, client addresses, build id),
+  `adapters/` (BRouter and BD ALTI) and `route-generation/` (plain TypeScript). `main.ts` starts the
+  server and `contract.ts` lists what the web app may import from the API.
 - File names are kebab-case: `route-set.ts`, `start-point-map.tsx`.
 - Tests sit next to the code they test, named `<file>-test.ts` or `<file>-test.tsx`.
 - Import local files with their extension (`./settings.ts`), as Node runs the API's
@@ -49,7 +55,9 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 - Import types with `import type` or an inline `type` (`verbatimModuleSyntax`).
 - External imports come first, then a blank line, then local imports.
 - Named exports only; no default exports.
-- A folder exposes its public API through an `index.ts` that re-exports its modules.
+- A folder exposes its public API through an `index.ts` that re-exports its modules, and
+  files of other folders import it through that `index.ts`. The web app imports the API only
+  through `apps/api/src/contract.ts`.
 - Use `type` aliases, plain objects, and functions: no `class`, `interface`, or `enum`.
   Factories are named `create*` and return functions or objects that close over their
   state (`createApp`, `createRateLimiter`, `createBRouter`).
@@ -107,10 +115,10 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
 - User-facing strings live in a `text` object per file, typed
   `satisfies Record<Language, unknown>`, and read through `const t = text[language]`.
   No i18n library.
-- Shared device state goes through `useSyncExternalStore` (see `settings.ts`), not a
+- Shared device state goes through `useSyncExternalStore` (see `state/settings.ts`), not a
   state library.
 - Styles follow [DESIGN.md](./DESIGN.md): Tailwind classes limited to its tokens, shared
-  class strings in `ui/styles.ts`, and lucide-react icons.
+  class strings in `components/styles.ts`, and lucide-react icons.
 
 ### Tests
 

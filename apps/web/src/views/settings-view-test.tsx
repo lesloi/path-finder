@@ -1,6 +1,6 @@
 import { fireEvent, render, renderHook, screen } from '@testing-library/react';
 
-import { paceFor, useSettings } from './settings.ts';
+import { paceFor, useSettings } from '../state/index.ts';
 import { SettingsView } from './settings-view.tsx';
 
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);

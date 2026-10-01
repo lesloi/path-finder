@@ -1,5 +1,5 @@
-import type { Language } from '../language.ts';
-import { PROSE } from '../ui/index.ts';
+import type { Language } from '../../language.ts';
+import { PROSE } from '../../components/index.ts';
 
 const cnil = 'https://www.cnil.fr/fr/plaintes';
 

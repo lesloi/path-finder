@@ -2,8 +2,7 @@ import { AttributionControl, Map, Marker, type MapMouseEvent, type MapTouchEvent
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useEffectEvent, useRef } from 'react';
 
-/** A longitude and a latitude, the shape the API's criteria take. */
-export type Position = [number, number];
+import type { Position } from '../core/index.ts';
 
 const LONG_PRESS_MS = 500;
 

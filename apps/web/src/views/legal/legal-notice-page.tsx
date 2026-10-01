@@ -1,5 +1,5 @@
-import type { Language } from '../language.ts';
-import { PROSE } from '../ui/index.ts';
+import type { Language } from '../../language.ts';
+import { PROSE } from '../../components/index.ts';
 
 const publisher = 'https://github.com/lesloi';
 const contact = 'https://github.com/lesloi/path-finder/issues';

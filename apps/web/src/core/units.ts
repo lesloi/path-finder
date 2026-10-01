@@ -1,4 +1,4 @@
-import type { Language } from './language.ts';
+import type { Language } from '../language.ts';
 
 export type Units = 'metric' | 'imperial';
 
