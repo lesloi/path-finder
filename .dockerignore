@@ -4,3 +4,6 @@ coverage
 .git
 .claude
 data
+# Tests sit next to the code but are not needed to build or run the image.
+**/*-test.ts
+**/*-test.tsx

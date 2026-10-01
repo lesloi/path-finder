@@ -28,10 +28,10 @@ export default defineConfig({
         '**/*.d.ts',
         '**/test-setup.ts',
         // Entry points that only start the server or mount the app.
-        'apps/api/src/index.ts',
+        'apps/api/src/main.ts',
         'apps/web/src/main.tsx',
         // Only the integration suite, left out of this coverage, calls its routes (#88).
-        'apps/api/src/app.ts',
+        'apps/api/src/http/app.ts',
       ],
       reporter: [['text', { skipFull: false }], 'lcov'],
       thresholds: { statements: 90, branches: 90, functions: 90, lines: 90 },

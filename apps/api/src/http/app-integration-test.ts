@@ -6,7 +6,7 @@ import type { Mock } from 'vitest';
 
 import { parseAddressRanges } from './addresses.ts';
 import { createApp } from './app.ts';
-import type { Position, RoutingEngine } from './route-generation/index.ts';
+import type { Position, RoutingEngine } from '../route-generation/index.ts';
 
 const START: Position = [6.1294, 45.8992];
 

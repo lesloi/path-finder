@@ -1,5 +1,5 @@
 import { ACTIVITY_NAMES, type Activity } from './activity.ts';
-import type { Language } from './language.ts';
+import type { Language } from '../language.ts';
 import { routeName } from './route-name.ts';
 import { KM_PER_MILE, METRES_PER_FOOT, type Units } from './units.ts';
 

@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import { parseCriteria } from '../../api/src/route-generation/index.ts';
+import { parseCriteria } from '../../../api/src/contract.ts';
 import { CriteriaForm } from './criteria-form.tsx';
-import { useSettings } from './settings.ts';
-import type { Position } from './start-point-map.tsx';
+import { useSettings } from '../state/index.ts';
+import type { Position } from '../core/index.ts';
 
 const START: Position = [6.1294, 45.8992];
 

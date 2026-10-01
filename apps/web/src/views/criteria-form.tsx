@@ -2,23 +2,28 @@ import { Footprints, Info, Layers, Mountain, Ruler, Timer, TrendingUp, type Luci
 import { useState, type ReactNode } from 'react';
 
 import {
+  CriteriaError,
   MAX_TARGET_DISTANCE,
   MAX_TARGET_ELEVATION_GAIN,
   MIN_TARGET_DISTANCE,
-  TARGET_DURATION,
-} from '../../api/src/route-generation/constants.ts';
-import {
-  CriteriaError,
   parseCriteria,
+  TARGET_DURATION,
   type Criteria,
   type CriteriaField,
-} from '../../api/src/route-generation/index.ts';
-import { ACTIVITY_NAMES, ACTIVITY_PACES, DEFAULT_ACTIVITY, type Activity } from './activity.ts';
-import type { Language } from './language.ts';
-import { paceFor, useSettings } from './settings.ts';
-import type { Position } from './start-point-map.tsx';
-import { CHIP, CHIP_ROW, Dialog, PRIMARY_BUTTON, SegmentedControl, Slider, useDesktop } from './ui/index.ts';
-import { KM_PER_MILE, METRES_PER_FOOT, type Units } from './units.ts';
+} from '../../../api/src/contract.ts';
+import { CHIP, CHIP_ROW, Dialog, PRIMARY_BUTTON, SegmentedControl, Slider, useDesktop } from '../components/index.ts';
+import {
+  ACTIVITY_NAMES,
+  ACTIVITY_PACES,
+  DEFAULT_ACTIVITY,
+  KM_PER_MILE,
+  METRES_PER_FOOT,
+  type Activity,
+  type Position,
+  type Units,
+} from '../core/index.ts';
+import type { Language } from '../language.ts';
+import { paceFor, useSettings } from '../state/index.ts';
 
 /** What the form sends: the criteria and the activity, in the shape `parseCriteria` accepts. */
 export type CriteriaRequest = Criteria & { activity: Activity };

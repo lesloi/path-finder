@@ -1,9 +1,9 @@
 import { act, render } from '@testing-library/react';
 
-import { maps, markers } from './maplibre-mock.ts';
+import { maps, markers } from '../maplibre-mock.ts';
 import { StartPointMap } from './start-point-map.tsx';
 
-vi.mock('maplibre-gl', () => import('./maplibre-mock.ts'));
+vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
 
 const map = () => maps.at(-1)!;
 const touch = { touches: [{}] };

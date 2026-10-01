@@ -1,11 +1,18 @@
 import { ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
-import { ACTIVITY_NAMES, ACTIVITY_PACES, type Activity } from './activity.ts';
-import type { Language } from './language.ts';
-import { paceFor, useSettings } from './settings.ts';
-import { Dropdown, GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON } from './ui/index.ts';
-import { formatPace, paceUnit, parsePace, type Units } from './units.ts';
+import {
+  ACTIVITY_NAMES,
+  ACTIVITY_PACES,
+  type Activity,
+  formatPace,
+  paceUnit,
+  parsePace,
+  type Units,
+} from '../core/index.ts';
+import type { Language } from '../language.ts';
+import { paceFor, useSettings } from '../state/index.ts';
+import { Dropdown, GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON } from '../components/index.ts';
 
 const FLAG_CLASSES = 'flex-none ring-1 ring-border';
 

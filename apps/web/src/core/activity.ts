@@ -1,5 +1,5 @@
-import type { Activity } from '../../api/src/route-generation/index.ts';
-import type { Language } from './language.ts';
+import type { Activity } from '../../../api/src/contract.ts';
+import type { Language } from '../language.ts';
 import type { PaceDisplay } from './units.ts';
 
 export type { Activity };

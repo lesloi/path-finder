@@ -6,3 +6,4 @@ export * from './slider.tsx';
 export * from './styles.ts';
 export * from './sub-page.tsx';
 export * from './use-desktop.ts';
+export * from './start-point-map.tsx';

@@ -9,7 +9,7 @@ import {
   parseCriteria,
   type HeightAt,
   type RoutingEngine,
-} from './route-generation/index.ts';
+} from '../route-generation/index.ts';
 import { clientAddress, parseAddressRanges, type AddressMatcher } from './addresses.ts';
 import { readBuildId } from './build-id.ts';
 import { createConcurrencyLimiter, createRateLimiter, type Admission } from './limits.ts';

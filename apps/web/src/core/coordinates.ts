@@ -1,5 +1,7 @@
-import type { Language } from './language.ts';
-import type { Position } from './start-point-map.tsx';
+import type { Language } from '../language.ts';
+
+/** A longitude and a latitude, the shape the API's criteria take. */
+export type Position = [number, number];
 
 const HEMISPHERES = {
   en: { north: 'N', south: 'S', east: 'E', west: 'W' },
