@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'rea
 import { useElevation, useRouteSet, useSettings, type RouteSetError } from '../state/index.ts';
 import { CriteriaForm, useCriteriaDraft } from './criteria-form.tsx';
 import { RouteSetView } from './route-set-view.tsx';
-import { formatPosition, parsePosition, type Position } from '../core/index.ts';
+import { formatPosition, parsePosition, type Position, type RouteSetRequest } from '../core/index.ts';
 import { commonText, criteriaText, errorText, routesText, type Language } from '../i18n/index.ts';
 import {
   StartPointMap,
@@ -68,7 +68,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     return () => clearTimeout(timer);
   }, [routeError]);
 
-  function findRoutes(request: Parameters<typeof find>[0]) {
+  function findRoutes(request: RouteSetRequest) {
     setRouteError(undefined);
     setSelected(0);
     setDetail(false);

@@ -12,3 +12,4 @@ export * from './route-colors.ts';
 export * from './elevation-profile.tsx';
 export * from './route-thumbnail.tsx';
 export * from './surface-strip.tsx';
+export * from './slopes.ts';

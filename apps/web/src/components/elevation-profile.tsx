@@ -8,37 +8,15 @@ import {
   slopeClass,
   type Position,
   type Route,
-  type SlopeClass,
   type Units,
 } from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
+import { SLOPE_FILLS, SLOPE_STROKES } from './slopes.ts';
 
 const WIDTH = 300;
 const HEIGHT = 60;
 // Space kept above and below the profile, in viewBox units.
 const PAD = 8;
-
-// Whole class names, which Tailwind finds only when written out.
-const SLOPE_STROKES: Record<SlopeClass, string> = {
-  1: 'stroke-slope-1',
-  2: 'stroke-slope-2',
-  3: 'stroke-slope-3',
-  4: 'stroke-slope-4',
-};
-const SLOPE_FILLS: Record<SlopeClass, string> = {
-  1: 'fill-slope-1',
-  2: 'fill-slope-2',
-  3: 'fill-slope-3',
-  4: 'fill-slope-4',
-};
-/** The grade bounds of each class, as DESIGN.md gives them. */
-export const SLOPE_LABELS: Record<SlopeClass, string> = { 1: '< 3 %', 2: '3–6 %', 3: '6–10 %', 4: '> 10 %' };
-export const SLOPE_DOTS: Record<SlopeClass, string> = {
-  1: 'bg-slope-1',
-  2: 'bg-slope-2',
-  3: 'bg-slope-3',
-  4: 'bg-slope-4',
-};
 
 /**
  * The altitude along a route, coloured by uphill grade. Hovering or dragging along it gives the

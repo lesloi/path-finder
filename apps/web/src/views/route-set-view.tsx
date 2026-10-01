@@ -137,6 +137,7 @@ export function RouteSetView({
               selected={index === selected}
               language={language}
               units={units}
+              desktop={desktop}
               onOpen={() => {
                 onSelect(index);
                 onDetailChange(true);
@@ -157,6 +158,7 @@ function RouteRow({
   selected,
   language,
   units,
+  desktop,
   onOpen,
   onPreview,
 }: {
@@ -166,6 +168,7 @@ function RouteRow({
   selected: boolean;
   language: Language;
   units: Units;
+  desktop: boolean;
   onOpen: () => void;
   /** The pointer or the focus is on the row: its route is the one the map highlights. */
   onPreview: () => void;
@@ -193,7 +196,8 @@ function RouteRow({
       }
       aria-label={name}
       onClick={onOpen}
-      onMouseEnter={onPreview}
+      // Hovering is for desktops: a tap on a phone opens the route.
+      onMouseEnter={desktop ? onPreview : undefined}
       onFocus={onPreview}
     >
       <RouteThumbnail geometry={route.geometry} index={index} />

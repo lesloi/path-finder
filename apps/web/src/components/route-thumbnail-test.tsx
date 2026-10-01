@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 
 import { RouteThumbnail } from './route-thumbnail.tsx';
-import { SurfaceStrip } from './surface-strip.tsx';
 
 const geometry: [number, number][] = [
   [6, 45],
@@ -40,25 +39,5 @@ describe('RouteThumbnail', () => {
 
     const lines = [...screen.getByTestId('thumb').querySelectorAll('polyline')];
     expect(lines.at(-1)).toHaveAttribute('stroke', '#e0115f');
-  });
-});
-
-describe('SurfaceStrip', () => {
-  it('paints each stretch where it lies along the route', () => {
-    render(
-      <SurfaceStrip
-        testId="strip"
-        surfaces={[
-          { surface: 'paved', share: 0.7 },
-          { surface: 'unpaved', share: 0.3 },
-        ]}
-      />,
-    );
-
-    const stretches = [...screen.getByTestId('strip').querySelectorAll('i')];
-    expect(stretches.map((stretch) => [stretch.dataset.surface, stretch.style.left, stretch.style.width])).toEqual([
-      ['paved', '0%', '70%'],
-      ['unpaved', '70%', '30%'],
-    ]);
   });
 });

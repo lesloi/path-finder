@@ -158,6 +158,7 @@ describe('RouteSetView', () => {
     });
 
     it('selects the route of a row the pointer or the focus reaches', () => {
+      onDesktop();
       const onSelect = vi.fn();
       render(<View onSelect={onSelect} />);
 
@@ -167,7 +168,17 @@ describe('RouteSetView', () => {
       expect(onSelect.mock.calls).toEqual([[1], [2]]);
     });
 
+    it('leaves the selection to the focus on phones, where the pointer is a finger', () => {
+      const onSelect = vi.fn();
+      render(<View onSelect={onSelect} />);
+
+      fireEvent.mouseEnter(screen.getByTestId('routes-row-1'));
+
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
     it('highlights the selected row', () => {
+      onDesktop();
       render(<View />);
 
       fireEvent.mouseEnter(screen.getByTestId('routes-row-1'));
