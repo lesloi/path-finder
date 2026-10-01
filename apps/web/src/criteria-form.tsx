@@ -1,4 +1,13 @@
-import { Footprints, Mountain, Ruler, SlidersHorizontal, Timer, type LucideIcon } from 'lucide-react';
+import {
+  Footprints,
+  Layers,
+  Mountain,
+  Ruler,
+  SlidersHorizontal,
+  Timer,
+  TrendingUp,
+  type LucideIcon,
+} from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import {
@@ -361,10 +370,12 @@ export function CriteriaForm({
     elevation: {
       label:
         draft.level === 'target' ? `${gain} ${unit.gain}` : { any: t.any, flat: t.flat, hilly: t.hilly }[draft.level],
+      icon: <TrendingUp size={18} aria-hidden />,
       set: draft.level !== 'any',
     },
     surface: {
       label: { paved: t.paved, any: t.anySurface, unpaved: t.unpaved }[draft.surface],
+      icon: <Layers size={18} aria-hidden />,
       set: draft.surface !== 'any',
     },
   };
