@@ -32,25 +32,27 @@ export function Dialog({
       ref={dialog}
       aria-labelledby={headingId}
       className={
-        'fixed inset-x-0 top-auto bottom-0 m-0 w-full max-w-none rounded-t-lg bg-surface p-4 pb-safe-4 text-ink ' +
+        'fixed inset-x-0 top-auto bottom-0 m-0 w-full max-w-none rounded-t-lg bg-surface p-0 text-ink ' +
         'backdrop:bg-scrim'
       }
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
-      // A click outside the content lands on the dialog itself, over its scrim.
+      // A click outside the box lands on the dialog itself, over its scrim: the padding is on the child.
       onClick={(event) => event.target === event.currentTarget && onClose()}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <h2 id={headingId} className="text-lg font-bold">
-          {title}
-        </h2>
-        <button type="button" className={ICON_BUTTON} aria-label={closeLabel} onClick={onClose}>
-          <X aria-hidden />
-        </button>
+      <div className="p-4 pb-safe-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 id={headingId} className="text-lg font-bold">
+            {title}
+          </h2>
+          <button type="button" className={ICON_BUTTON} aria-label={closeLabel} onClick={onClose}>
+            <X aria-hidden />
+          </button>
+        </div>
+        {children}
       </div>
-      {children}
     </dialog>
   );
 }

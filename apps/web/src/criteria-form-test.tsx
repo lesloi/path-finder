@@ -276,22 +276,34 @@ describe('CriteriaForm', () => {
   });
 
   describe('pace hint', () => {
-    const hint = () => screen.queryByRole('link', { name: 'Adjust your pace' });
+    const info = () => screen.queryByRole('button', { name: 'Your pace' });
+    const link = () => screen.queryByRole('link', { name: 'Adjust your pace' });
 
-    it('links to the settings while the activity has no pace', () => {
+    it('is not offered for a distance, which does not need the pace', () => {
       setup();
 
-      expect(hint()).toHaveAttribute('href', '#/settings');
+      expect(info()).not.toBeInTheDocument();
+    });
+
+    it('links to the settings from the info button of a duration, while the activity has no pace', () => {
+      setup();
+      choose('Duration');
+      expect(link()).not.toBeInTheDocument();
+
+      fireEvent.click(info()!);
+
+      expect(link()).toHaveAttribute('href', '#/settings');
     });
 
     it('goes away for the activity whose pace is set, and stays for the others', () => {
       store({ pace: { run: 5.5 } });
       setup();
-      expect(hint()).not.toBeInTheDocument();
+      choose('Duration');
+      expect(info()).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'Hike' }));
 
-      expect(hint()).toBeInTheDocument();
+      expect(info()).toBeInTheDocument();
     });
   });
 
@@ -349,6 +361,21 @@ describe('CriteriaForm', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
       submit();
       expect(onSubmit.mock.calls[0][0].surface).toBe('paved');
+    });
+
+    it('shows the error inside the dialog, which covers the sheet', () => {
+      store({ lastActivity: 'run' });
+      setup({ compact: true });
+      fireEvent.click(screen.getByRole('button', { name: 'Elevation gain: Any' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Target' }));
+      fireEvent.change(screen.getByRole('slider', { name: 'Elevation gain' }), { target: { value: '2000' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Target: 10 km' }));
+
+      fireEvent.click(screen.getByRole('radio', { name: 'Duration' }));
+      fireEvent.change(screen.getByRole('slider', { name: 'Duration' }), { target: { value: '30' } });
+
+      expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('does not fit');
     });
 
     it('shows the target as a duration with its own chip', () => {

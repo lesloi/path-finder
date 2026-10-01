@@ -1,4 +1,4 @@
-import { Footprints, Layers, Mountain, Ruler, Timer, TrendingUp, type LucideIcon } from 'lucide-react';
+import { Footprints, Info, Layers, Mountain, Ruler, Timer, TrendingUp, type LucideIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import {
@@ -63,6 +63,7 @@ const text = {
     unpaved: 'Unpaved',
     close: 'Close',
     findRoutes: 'Find routes',
+    aboutPace: 'Your pace',
     adjustPace: 'Adjust your pace',
     adjustPaceHint: 'in the settings for better estimates.',
     hour: 'h',
@@ -92,6 +93,7 @@ const text = {
     unpaved: 'Non goudronné',
     close: 'Fermer',
     findRoutes: 'Trouver des parcours',
+    aboutPace: 'Votre allure',
     adjustPace: 'Ajustez votre allure',
     adjustPaceHint: 'dans les réglages pour de meilleures estimations.',
     hour: 'h',
@@ -206,6 +208,7 @@ export function CriteriaForm({
   const own = useCriteriaDraft();
   const [draft, setDraft] = kept ?? own;
   const [open, setOpen] = useState<Criterion>();
+  const [paceInfo, setPaceInfo] = useState(false);
   // The sheet expanded behind the dialog.
   if (open && !(compact && !desktop)) setOpen(undefined);
 
@@ -288,13 +291,27 @@ export function CriteriaForm({
               onChange={(value) => change({ duration: value })}
             />
           )}
-          {settings.pace[activity] === undefined && (
-            <p className="text-sm text-ink-2">
-              <a className="text-accent underline" href="#/settings">
-                {t.adjustPace}
-              </a>{' '}
-              {t.adjustPaceHint}
-            </p>
+          {/* The pace only turns a duration into a distance. */}
+          {draft.target === 'duration' && settings.pace[activity] === undefined && (
+            <div className="text-sm text-ink-2">
+              <button
+                type="button"
+                className="flex items-center gap-1 text-accent"
+                aria-expanded={paceInfo}
+                onClick={() => setPaceInfo(!paceInfo)}
+              >
+                <Info size={16} aria-hidden />
+                {t.aboutPace}
+              </button>
+              {paceInfo && (
+                <p className="mt-1">
+                  <a className="text-accent underline" href="#/settings">
+                    {t.adjustPace}
+                  </a>{' '}
+                  {t.adjustPaceHint}
+                </p>
+              )}
+            </div>
           )}
         </div>
       ),
@@ -406,6 +423,8 @@ export function CriteriaForm({
         {open && (
           <Dialog title={sections[open].title} closeLabel={t.close} onClose={() => setOpen(undefined)}>
             {sections[open].content}
+            {/* The sheet is behind the dialog, and changes apply as they are made. */}
+            {error && <div className="mt-2">{error}</div>}
           </Dialog>
         )}
       </>

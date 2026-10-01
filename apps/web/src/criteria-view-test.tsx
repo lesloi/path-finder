@@ -88,7 +88,6 @@ describe('CriteriaView', () => {
 
       expect(await screen.findByRole('radio', { name: 'Hilly' })).toBeInTheDocument();
       expect(fetchMock).toHaveBeenCalledWith('/api/v1/capabilities', expect.anything());
-      vi.unstubAllGlobals();
     });
 
     it('shows the full form in the desktop column and passes the criteria on', () => {

@@ -22,6 +22,7 @@ test.describe('the criteria form', () => {
     await expect(page.getByRole('slider', { name: 'Duration' })).toBeVisible();
     // The e2e server has no BD ALTI: the elevation gain is not offered.
     await expect(page.getByRole('radio', { name: 'Hilly' })).toBeHidden();
+    await page.getByRole('button', { name: 'Your pace' }).click();
     await expect(page.getByRole('link', { name: 'Adjust your pace' })).toHaveAttribute('href', '#/settings');
   });
 });

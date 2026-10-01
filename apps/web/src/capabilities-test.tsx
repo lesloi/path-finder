@@ -2,10 +2,6 @@ import { renderHook, waitFor } from '@testing-library/react';
 
 import { useElevation } from './capabilities.ts';
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
 describe('useElevation', () => {
   it('is false until the API answers', () => {
     vi.stubGlobal('fetch', () => new Promise(() => {}));

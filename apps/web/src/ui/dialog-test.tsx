@@ -39,6 +39,8 @@ describe('Dialog', () => {
     const onClose = setup();
 
     fireEvent.click(screen.getByText('Content'));
+    // The padding around the content is part of the box, not of the scrim.
+    fireEvent.click(screen.getByText('Content').parentElement!);
     expect(onClose).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('dialog'));
