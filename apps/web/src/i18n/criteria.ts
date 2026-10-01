@@ -34,8 +34,6 @@ export const criteriaText = {
     aboutPace: 'Your pace',
     adjustPace: 'Adjust your pace',
     adjustPaceHint: 'for better estimates.',
-    hour: 'h',
-    minute: 'min',
     distanceError: (min: number, max: number, unit: string) =>
       `The distance must be between ${min} and ${max} ${unit}.`,
     durationError: 'This duration does not fit the elevation gain and your pace.',
@@ -77,8 +75,6 @@ export const criteriaText = {
     aboutPace: 'Votre allure',
     adjustPace: 'Ajustez votre allure',
     adjustPaceHint: 'pour de meilleures estimations.',
-    hour: 'h',
-    minute: 'min',
     distanceError: (min: number, max: number, unit: string) =>
       `La distance doit être comprise entre ${min} et ${max} ${unit}.`,
     durationError: 'Cette durée ne convient pas au dénivelé et à votre allure.',

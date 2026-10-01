@@ -15,6 +15,7 @@ import { CHIP, CHIP_ROW, Dialog, PRIMARY_BUTTON, SegmentedControl, Slider, useDe
 import {
   ACTIVITY_PACES,
   DEFAULT_ACTIVITY,
+  formatDuration,
   KM_PER_MILE,
   METRES_PER_FOOT,
   type Activity,
@@ -95,12 +96,6 @@ function convert(draft: Draft, from: Units, to: Units): Draft {
 }
 
 const round = (value: number, decimals: number) => Math.round(value * 10 ** decimals) / 10 ** decimals;
-
-function formatDuration(minutes: number, t: (typeof criteriaText)[Language]): string {
-  const hours = Math.floor(minutes / 60);
-  if (hours === 0) return `${minutes} ${t.minute}`;
-  return `${hours} ${t.hour} ${`${minutes % 60}`.padStart(2, '0')}`;
-}
 
 /**
  * What the user has set in the form, in their units. It follows a change of units made in the
@@ -231,7 +226,7 @@ export function CriteriaForm({
               testId="criteria-duration"
               label={t.duration}
               value={draft.duration}
-              shown={formatDuration(draft.duration, t)}
+              shown={formatDuration(draft.duration, language)}
               aside={
                 showPaceHint && (
                   <button
@@ -323,7 +318,7 @@ export function CriteriaForm({
       set: activity !== DEFAULT_ACTIVITY,
     },
     target: {
-      label: draft.target === 'distance' ? `${distance} ${unit.distance}` : formatDuration(draft.duration, t),
+      label: draft.target === 'distance' ? `${distance} ${unit.distance}` : formatDuration(draft.duration, language),
       icon: <TargetIcon size={18} aria-hidden />,
       set:
         draft.target === 'duration' || distance !== clamp(defaults.distance, bounds.distance.min, bounds.distance.max),

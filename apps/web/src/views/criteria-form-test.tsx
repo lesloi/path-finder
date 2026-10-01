@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import { parseCriteria } from '../../../api/src/contract.ts';
 import { expectNamedControls } from '../accessible-names.ts';
-import { criteriaText } from '../i18n/index.ts';
+import { commonText, criteriaText } from '../i18n/index.ts';
 import { CriteriaForm } from './criteria-form.tsx';
 import { useSettings } from '../state/index.ts';
 import type { Position } from '../core/index.ts';
@@ -418,7 +418,9 @@ describe('CriteriaForm', () => {
       fireEvent.click(screen.getByTestId('criteria-chip-target'));
       choose('target', 'duration');
 
-      expect(screen.getByTestId('criteria-chip-target')).toHaveAccessibleName(`${en.target}: 1 ${en.hour} 00`);
+      expect(screen.getByTestId('criteria-chip-target')).toHaveAccessibleName(
+        `${en.target}: 1 ${commonText.en.hour} 00`,
+      );
       expect(screen.getByTestId('criteria-chip-target')).toHaveAttribute('data-set');
     });
 

@@ -2,6 +2,7 @@ import { commonText } from './common.ts';
 import { criteriaText } from './criteria.ts';
 import { errorText } from './errors.ts';
 import { legalText, type Paragraph, type Section } from './legal.ts';
+import { routesText } from './routes.ts';
 import { LINKS } from './links.ts';
 import { settingsText } from './settings.ts';
 
@@ -23,6 +24,7 @@ describe.each([
   ['criteria', criteriaText],
   ['errors', errorText],
   ['legal', legalText],
+  ['routes', routesText],
   ['settings', settingsText],
 ])('the %s dictionary', (_, dictionary) => {
   it('has the same keys in English and French', () => {
