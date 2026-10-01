@@ -201,12 +201,16 @@ describe('RouteSetView', () => {
       expect(screen.queryByTestId('routes-summary')).not.toBeInTheDocument();
     });
 
-    it('summarises the criteria on desktops, leaving the way back to the button above', () => {
+    it('summarises the criteria on desktops, with an icon to change them', () => {
       onDesktop();
-      render(<View />);
+      const onBack = vi.fn();
+      render(<View onBack={onBack} />);
 
       expect(screen.getByTestId('routes-summary')).toHaveTextContent('Run · 10.0 km · 400 m');
-      expect(within(screen.getByTestId('routes-summary')).queryByRole('button')).not.toBeInTheDocument();
+      expect(screen.getByTestId('routes-change')).toHaveAccessibleName('Change the criteria: Run · 10.0 km · 400 m');
+
+      fireEvent.click(screen.getByTestId('routes-change'));
+      expect(onBack).toHaveBeenCalled();
     });
 
     it('shows the figures in the units and the language of the settings', () => {

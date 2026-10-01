@@ -16,6 +16,15 @@ describe('RouteThumbnail', () => {
     expect(lines.map((line) => line.getAttribute('stroke'))).toEqual(['#ffffff', '#2563eb']);
   });
 
+  it('draws the route over the Plan IGN of the place it runs through', () => {
+    render(<RouteThumbnail testId="thumb" geometry={geometry} index={0} />);
+
+    const url = new URL(screen.getByTestId('thumb-map').getAttribute('href')!);
+    expect(url.origin).toBe('https://data.geopf.fr');
+    expect(url.searchParams.get('LAYERS')).toBe('GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2');
+    expect(url.searchParams.get('WIDTH')).toBe('160');
+  });
+
   it('draws the start point', () => {
     render(<RouteThumbnail testId="thumb" geometry={geometry} index={0} />);
 

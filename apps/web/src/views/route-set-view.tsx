@@ -96,6 +96,7 @@ export function RouteSetView({
   }
 
   const t = routesText[display.language];
+  const summary = criteriaSummary(request, display);
   return (
     <>
       <div className="flex items-center justify-between gap-2">
@@ -111,14 +112,19 @@ export function RouteSetView({
         <strong data-testid="routes-count">{t.routeCount(routes.length)}</strong>
       </div>
       {desktop && (
-        // What the routes were asked for: the way back to change it is the button above.
-        <p
-          data-testid="routes-summary"
-          className="m-0 flex items-center gap-2 rounded-md bg-surface-2 px-3 py-2 text-sm"
-        >
-          <SlidersHorizontal size={16} aria-hidden className="flex-none" />
-          <span className="min-w-0 flex-1 truncate">{criteriaSummary(request, display)}</span>
-        </p>
+        <div data-testid="routes-summary" className="flex items-center gap-1 rounded-md bg-surface-2 pr-3 text-sm">
+          {/* What the routes were asked for, with a way to change it. */}
+          <button
+            type="button"
+            data-testid="routes-change"
+            className={ICON_BUTTON}
+            aria-label={t.changeCriteria(summary)}
+            onClick={onBack}
+          >
+            <SlidersHorizontal size={16} aria-hidden />
+          </button>
+          <span className="min-w-0 flex-1 truncate">{summary}</span>
+        </div>
       )}
       <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
         {routes.map((route, index) => (

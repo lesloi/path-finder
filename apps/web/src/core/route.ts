@@ -166,25 +166,59 @@ export function missText({ criterion, gap }: Miss, route: Route, display: Displa
   return `${share} ${words}`;
 }
 
+// Radius of the sphere of Web Mercator (EPSG:3857), the projection of the map, in metres.
+const MERCATOR_RADIUS = 6_378_137;
+// Metres a box spans for a route of a single place.
+const MIN_SPAN = 1_000;
+
+/** The corners of a box in Web Mercator metres: west, south, east, north. */
+export type MercatorBounds = [number, number, number, number];
+
 /**
- * A route drawn in a `width` by `height` box, as screen points with north up: scaled to fit, centred,
- * and `margin` from the edges.
+ * A route drawn in a `width` by `height` box as it lies on the map, in Web Mercator with north up:
+ * scaled to fit, centred, and `margin` from the edges. Also returns the area the whole box covers
+ * on the map, to fetch a background that matches.
  */
 export function projectRoute(
   geometry: Route['geometry'],
   { width, height, margin }: { width: number; height: number; margin: number },
-): [number, number][] {
-  const cos = Math.cos((geometry[0][1] * Math.PI) / 180);
-  const xs = geometry.map(([lon]) => lon * cos);
-  const ys = geometry.map(([, lat]) => lat);
+): { points: [number, number][]; bounds: MercatorBounds } {
+  const xs = geometry.map(([lon]) => (lon * Math.PI * MERCATOR_RADIUS) / 180);
+  const ys = geometry.map(([, lat]) => MERCATOR_RADIUS * Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)));
   const [west, east, south, north] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   const [spanX, spanY] = [east - west, north - south];
-  // A route along one axis, or a single place, fits by the other axis alone.
-  const scale = Math.min(
-    spanX ? (width - 2 * margin) / spanX : Infinity,
-    spanY ? (height - 2 * margin) / spanY : Infinity,
-  );
-  if (!Number.isFinite(scale)) return geometry.map(() => [width / 2, height / 2]);
-  const [offsetX, offsetY] = [(width - spanX * scale) / 2, (height - spanY * scale) / 2];
-  return geometry.map((_, k) => [offsetX + (xs[k] - west) * scale, offsetY + (north - ys[k]) * scale]);
+  // A route along one axis fits by the other axis alone; a single place gets a fixed span.
+  const scale =
+    Math.min(spanX ? (width - 2 * margin) / spanX : Infinity, spanY ? (height - 2 * margin) / spanY : Infinity) ||
+    Infinity;
+  const pixelsPerMetre = Number.isFinite(scale) ? scale : (Math.min(width, height) - 2 * margin) / MIN_SPAN;
+  const [offsetX, offsetY] = [(width - spanX * pixelsPerMetre) / 2, (height - spanY * pixelsPerMetre) / 2];
+  const points = geometry.map((_, k): [number, number] => [
+    offsetX + (xs[k] - west) * pixelsPerMetre,
+    offsetY + (north - ys[k]) * pixelsPerMetre,
+  ]);
+  const bounds: MercatorBounds = [
+    west - offsetX / pixelsPerMetre,
+    south - (height - offsetY - spanY * pixelsPerMetre) / pixelsPerMetre,
+    east + (width - offsetX - spanX * pixelsPerMetre) / pixelsPerMetre,
+    north + offsetY / pixelsPerMetre,
+  ];
+  return { points, bounds };
+}
+
+/** The Plan IGN image of an area, at `width` by `height` pixels, from the IGN Géoplateforme (the map's own provider). */
+export function planImageUrl([west, south, east, north]: MercatorBounds, width: number, height: number): string {
+  const query = new URLSearchParams({
+    SERVICE: 'WMS',
+    VERSION: '1.3.0',
+    REQUEST: 'GetMap',
+    LAYERS: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
+    STYLES: '',
+    CRS: 'EPSG:3857',
+    BBOX: [west, south, east, north].map((metres) => metres.toFixed(1)).join(','),
+    WIDTH: String(width),
+    HEIGHT: String(height),
+    FORMAT: 'image/png',
+  });
+  return `https://data.geopf.fr/wms-r/wms?${query}`;
 }

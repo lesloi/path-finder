@@ -2,6 +2,7 @@ import {
   elevationProfile,
   missText,
   parseRoutes,
+  planImageUrl,
   positionAt,
   projectRoute,
   slopeClass,
@@ -157,18 +158,17 @@ describe('projectRoute', () => {
   const box = { width: 100, height: 100, margin: 10 };
 
   it('fits the route in the box with north up', () => {
-    // A square about as tall as wide, going north then east.
-    const points = projectRoute(
+    const { points } = projectRoute(
       [
         [6, 45],
         [6, 45.1],
-        [6.1 / Math.cos((45.05 * Math.PI) / 180) - 5.9, 45.1],
+        [6.1, 45.1],
       ],
       box,
     );
 
-    const [south, north] = [points[0], points[1]];
-    expect(south[1]).toBeGreaterThan(north[1]);
+    expect(points[0][1]).toBeGreaterThan(points[1][1]);
+    expect(points[2][0]).toBeGreaterThan(points[1][0]);
     for (const [x, y] of points) {
       expect(x).toBeGreaterThanOrEqual(10 - 1e-9);
       expect(x).toBeLessThanOrEqual(90 + 1e-9);
@@ -178,7 +178,7 @@ describe('projectRoute', () => {
   });
 
   it('centres a route that is wider than tall', () => {
-    const points = projectRoute(
+    const { points } = projectRoute(
       [
         [6, 45],
         [6.2, 45],
@@ -191,6 +191,33 @@ describe('projectRoute', () => {
   });
 
   it('puts a route of a single place in the middle', () => {
-    expect(projectRoute([[6, 45]], box)).toEqual([[50, 50]]);
+    expect(projectRoute([[6, 45]], box).points).toEqual([[50, 50]]);
+  });
+
+  it('gives the area the box covers on the map, in Web Mercator metres', () => {
+    const { bounds } = projectRoute(
+      [
+        [0, 0],
+        [0.1, 0.1],
+      ],
+      box,
+    );
+
+    const [west, south, east, north] = bounds;
+    // The route spans 11 132 m by 11 132 m inside a margin of an eighth of the box on each side.
+    expect(east - west).toBeCloseTo(11_132 * 1.25, -2);
+    expect(north - south).toBeCloseTo(11_132 * 1.25, -2);
+    expect((west + east) / 2).toBeCloseTo(5_566, -1);
+  });
+});
+
+describe('planImageUrl', () => {
+  it('asks the IGN Géoplateforme for the Plan IGN over an area', () => {
+    const url = new URL(planImageUrl([-10, -20, 30.04, 40], 200, 160));
+
+    expect(url.origin + url.pathname).toBe('https://data.geopf.fr/wms-r/wms');
+    expect(url.searchParams.get('CRS')).toBe('EPSG:3857');
+    expect(url.searchParams.get('BBOX')).toBe('-10.0,-20.0,30.0,40.0');
+    expect([url.searchParams.get('WIDTH'), url.searchParams.get('HEIGHT')]).toEqual(['200', '160']);
   });
 });
