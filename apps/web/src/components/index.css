@@ -7,17 +7,16 @@
 
   /* On the map, which stays light: the same in dark mode. */
   --color-route-1: #e0115f;
-  --color-route-2: #1d2433;
+  --color-route-2: #2563eb;
   --color-route-3: #7a3fc4;
+  --color-route-4: #0b7a75;
+  --color-route-5: #c25e00;
   --color-start: #6b4f33;
 
-  /* Uphill grade classes and road surfaces of a route (#9). */
-  --color-slope-1: #7cb342; /* < 3 % */
-  --color-slope-2: #f9a825; /* 3–6 % */
-  --color-slope-3: #ef6c00; /* 6–10 % */
-  --color-slope-4: #d32f2f; /* > 10 % */
-  --color-paved: #8d8f8a;
-  --color-unpaved: #a47148;
+  /* Road surfaces of a route (#9), and the icon of a criterion a suggestion misses. */
+  --color-miss: #ef6c00;
+  --color-paved: #c3c8d0;
+  --color-unpaved: #e0703a;
 
   /* Spacing keeps Tailwind's 4 px steps: 1, 2, 3, 4, 6 are 4, 8, 12, 16, 24 px. */
   --spacing-touch: 44px;
@@ -74,8 +73,10 @@
   --float-1: light-dark(rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.4));
   --float-2: light-dark(rgb(0 0 0 / 0.14), rgb(0 0 0 / 0.45));
   --float: 0 1px 3px var(--float-1), 0 4px 14px var(--float-2);
-  /* The horizontal centre of the map beside the desktop left column and its margin. */
-  --map-centre: calc(50% + (var(--spacing-column) + var(--spacing) * 3) / 2);
+  /* What the desktop left column and its margin cover from the left of the map. */
+  --column-inset: calc(var(--spacing-column) + var(--spacing) * 3);
+  /* The horizontal centre of the map beside it. */
+  --map-centre: calc(50% + var(--column-inset) / 2);
   /* The theme setting sets `data-theme` on <html>; without it the browser's scheme applies. */
   color-scheme: light dark;
 }

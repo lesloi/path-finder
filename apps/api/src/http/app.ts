@@ -6,6 +6,7 @@ import {
   buildRouteSet,
   CriteriaError,
   elevationGain,
+  elevationLoss,
   generateCandidates,
   parseCriteria,
   type HeightAt,
@@ -124,12 +125,13 @@ export function createApp({
         );
         const routeSet = buildRouteSet(criteria, candidates);
         if (!heightAt) return routeSet;
-        // Heights on every point, to the decimetre, so the web app builds the GPX export offline.
-        // Elevation gain only samples along a loop: a point with no height drops its route.
+        // Heights on every point, to the decimetre, so the web app builds the GPX export offline, and the
+        // elevation loss, sampled as the gain is. Elevation gain only samples along a loop: a point with no
+        // height drops its route.
         return routeSet.flatMap((route) => {
           try {
             const geometry = route.geometry.map(([lon, lat]) => [lon, lat, Math.round(heightAt(lon, lat) * 10) / 10]);
-            return [{ ...route, geometry }];
+            return [{ ...route, geometry, elevationLoss: elevationLoss(route.geometry, heightAt) }];
           } catch {
             return [];
           }

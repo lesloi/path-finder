@@ -60,7 +60,7 @@ export function BottomSheet({
       className={
         'fixed inset-x-0 bottom-0 z-4 flex flex-col rounded-t-lg bg-surface shadow-float ' +
         'pr-safe-4 pb-safe-4 pl-safe-4 transition-[max-height] duration-250 ease-[ease] desktop:hidden ' +
-        (expanded ? 'h-[88dvh] max-h-[88dvh]' : 'max-h-[40dvh]')
+        (expanded ? 'max-h-[88dvh]' : 'max-h-[40dvh]')
       }
     >
       <button

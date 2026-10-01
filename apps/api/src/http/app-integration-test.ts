@@ -155,7 +155,13 @@ describe('api', () => {
     expect(response.status).toBe(200);
     const { routes } = await response.json();
     expect(routes.length).toBeGreaterThanOrEqual(3);
-    expect(routes[0]).toMatchObject({ kind: 'match', distance: expect.closeTo(10), elevationGain: 0, unpavedShare: 1 });
+    expect(routes[0]).toMatchObject({
+      kind: 'match',
+      distance: expect.closeTo(10),
+      elevationGain: 0,
+      unpavedShare: 1,
+      surfaces: [{ surface: 'unpaved', share: 1 }],
+    });
   });
 
   it('asks the routing engine with the activity and measures elevation gain on BD ALTI', async () => {
@@ -171,6 +177,17 @@ describe('api', () => {
     );
     const { routes } = await response.json();
     expect(routes[0].elevationGain).toBeGreaterThan(0);
+  });
+
+  it('gives the elevation loss of a route next to its elevation gain, from BD ALTI', async () => {
+    let height = 1_000;
+    const descending = createApp({ webRoot, engine, heightAt: () => (height -= 1) });
+
+    const response = await postRouteSet(descending, criteria);
+
+    const { routes } = await response.json();
+    expect(routes[0].elevationGain).toBe(0);
+    expect(routes[0].elevationLoss).toBeGreaterThan(0);
   });
 
   it('gives every point of a route its BD ALTI height, for the GPX export', async () => {

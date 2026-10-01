@@ -148,7 +148,8 @@ Use numeric separators for large numbers: `15_000`, `2_500`.
 - Mock `fetch` and BRouter with `vi.fn`; unit tests never call the network.
 - End-to-end tests live in `e2e/`: Playwright drives the built app served by `pnpm start`.
   Import `test` and `expect` from `e2e/test.ts`, which answers the IGN Géoplateforme from
-  `e2e/fixtures/` and fails a test whose browser calls any other host. Run
+  `e2e/fixtures/` and fails a test whose browser calls any other host. `e2e/fake-brouter.ts`
+  stands in for BRouter, so a scenario can generate routes. Run
   `pnpm exec playwright install chromium` in `e2e/` once.
 
 ## Before opening a pull request

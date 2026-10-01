@@ -2,6 +2,7 @@ import { commonText } from './common.ts';
 import { criteriaText } from './criteria.ts';
 import { errorText } from './errors.ts';
 import { legalText, type Paragraph, type Section } from './legal.ts';
+import { routesText } from './routes.ts';
 import { LINKS } from './links.ts';
 import { settingsText } from './settings.ts';
 
@@ -23,6 +24,7 @@ describe.each([
   ['criteria', criteriaText],
   ['errors', errorText],
   ['legal', legalText],
+  ['routes', routesText],
   ['settings', settingsText],
 ])('the %s dictionary', (_, dictionary) => {
   it('has the same keys in English and French', () => {
@@ -31,6 +33,18 @@ describe.each([
 
   it('has no empty label', () => {
     expect([...strings(dictionary.en), ...strings(dictionary.fr)]).not.toContain('');
+  });
+});
+
+describe('the dictionaries a view spreads together', () => {
+  it.each([
+    ['criteria view', [commonText, criteriaText, routesText]],
+    ['route set view', [criteriaText, routesText]],
+    ['settings view', [commonText, settingsText]],
+  ] as const)('share no key in the %s, so none hides another', (_, dictionaries) => {
+    const keys = dictionaries.flatMap((dictionary) => Object.keys(dictionary.en));
+
+    expect(keys.filter((key, k) => keys.indexOf(key) !== k)).toEqual([]);
   });
 });
 

@@ -1,0 +1,45 @@
+import { projectOnSnapshot, projectRoute, type MapSnapshot, type Route } from '../core/index.ts';
+import { MAP_COLORS, routeColor } from './route-colors.ts';
+
+// Sizes in SVG user units: the drawing scales with the element that shows it.
+const HEIGHT = 100;
+const MARGIN = 10;
+
+/**
+ * A route's shape drawn over the part of the map it runs through, cut from the snapshot the map took
+ * on the device: nothing is fetched to draw it. Without a snapshot yet, the shape is on a plain
+ * background.
+ */
+export function RouteThumbnail({
+  geometry,
+  index,
+  snapshot,
+  testId,
+}: {
+  geometry: Route['geometry'];
+  /** The route's position in its route set, which gives its colour. */
+  index: number;
+  /** What the map showed for the route set this route is of. */
+  snapshot?: MapSnapshot;
+  testId?: string;
+}) {
+  const box = { width: HEIGHT, height: HEIGHT, margin: MARGIN };
+  // A route too big for the box gets a narrower one, so the map shown never has a blank edge.
+  const { points, image, width } = snapshot
+    ? projectOnSnapshot(geometry, snapshot, box)
+    : { points: projectRoute(geometry, box), image: undefined, width: box.width };
+  const line = points.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const [startX, startY] = points[0];
+  return (
+    <svg data-testid={testId} className="size-13 flex-none rounded-sm" viewBox={`0 0 ${width} ${HEIGHT}`} aria-hidden>
+      {/* The colour of the Plan IGN, under the snapshot while it is taken. */}
+      <rect width={width} height={HEIGHT} fill={MAP_COLORS.land} />
+      {snapshot && image && (
+        <image data-testid={testId && `${testId}-map`} href={snapshot.url} preserveAspectRatio="none" {...image} />
+      )}
+      <polyline points={line} fill="none" stroke={MAP_COLORS.white} strokeWidth={6} strokeLinejoin="round" />
+      <polyline points={line} fill="none" stroke={routeColor(index)} strokeWidth={3.5} strokeLinejoin="round" />
+      <circle cx={startX} cy={startY} r={5} fill={MAP_COLORS.white} stroke={MAP_COLORS.start} strokeWidth={3} />
+    </svg>
+  );
+}

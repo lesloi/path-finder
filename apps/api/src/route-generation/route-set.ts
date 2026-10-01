@@ -25,6 +25,9 @@ export type Criteria = {
   pace: number;
 };
 
+/** A part of a route on one surface, with its share of the route's length (0 to 1). */
+export type SurfaceStretch = { surface: 'paved' | 'unpaved'; share: number };
+
 /** A loop from the routing engine, with its elevation gain from BD ALTI. */
 export type Candidate = {
   geometry: Position[];
@@ -33,6 +36,8 @@ export type Candidate = {
   /** Metres. Without BD ALTI, unknown and not counted. */
   elevationGain?: number;
   unpavedShare: number;
+  /** Where the loop is paved or unpaved, from its start. */
+  surfaces: SurfaceStretch[];
 };
 
 /** `gap` is in the criterion's unit: kilometres, minutes, or metres. */

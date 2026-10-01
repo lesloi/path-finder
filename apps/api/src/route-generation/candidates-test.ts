@@ -1,5 +1,6 @@
 import {
   generateCandidates,
+  surfaceStretches,
   unpavedShare,
   type Criteria,
   type EngineLoop,
@@ -64,13 +65,18 @@ describe('generateCandidates', () => {
     candidates.forEach(({ distance }) => expect(distance).toBeCloseTo(11));
   });
 
-  it('fills in the elevation gain and the unpaved share of each candidate', async () => {
+  it('fills in the elevation gain and the surfaces of each candidate', async () => {
     const elevationGain = vi.fn(() => 120);
 
     const [candidate] = await generateCandidates(criteria, 'run', fakeEngine(), elevationGain, signal);
 
     expect(elevationGain).toHaveBeenCalledWith(candidate.geometry);
-    expect(candidate).toMatchObject({ distance: 10, elevationGain: 120, unpavedShare: 1 });
+    expect(candidate).toMatchObject({
+      distance: 10,
+      elevationGain: 120,
+      unpavedShare: 1,
+      surfaces: [{ surface: 'unpaved', share: 1 }],
+    });
   });
 
   it('leaves out the elevation gain without a way to measure it', async () => {
@@ -149,5 +155,45 @@ describe('unpavedShare', () => {
 
   it('is 0 for a loop without ways', () => {
     expect(unpavedShare([])).toBe(0);
+  });
+});
+
+describe('surfaceStretches', () => {
+  it('merges consecutive ways of the same surface, in the order of the loop', () => {
+    expect(
+      surfaceStretches([
+        { length: 200, surface: 'asphalt' },
+        { length: 200, highway: 'residential' },
+        { length: 300, surface: 'gravel' },
+        { length: 100, highway: 'path' },
+        { length: 200, surface: 'paved' },
+      ]),
+    ).toEqual([
+      { surface: 'paved', share: 0.4 },
+      { surface: 'unpaved', share: 0.4 },
+      { surface: 'paved', share: 0.2 },
+    ]);
+  });
+
+  it('gives shares of the length of the ways, which add up to 1', () => {
+    const stretches = surfaceStretches([
+      { length: 1, surface: 'gravel' },
+      { length: 2, surface: 'asphalt' },
+    ]);
+
+    expect(stretches.reduce((sum, { share }) => sum + share, 0)).toBeCloseTo(1);
+  });
+
+  it('leaves out ways without length', () => {
+    expect(
+      surfaceStretches([
+        { length: 0, surface: 'gravel' },
+        { length: 100, surface: 'asphalt' },
+      ]),
+    ).toEqual([{ surface: 'paved', share: 1 }]);
+  });
+
+  it('is empty for a loop without ways', () => {
+    expect(surfaceStretches([])).toEqual([]);
   });
 });
