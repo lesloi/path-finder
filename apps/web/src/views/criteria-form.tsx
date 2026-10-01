@@ -20,13 +20,14 @@ import {
   METRES_PER_FOOT,
   type Activity,
   type Position,
+  type RouteSetRequest,
   type Units,
 } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { paceFor, useSettings } from '../state/index.ts';
 
 /** What the form sends: the criteria and the activity, in the shape `parseCriteria` accepts. */
-export type CriteriaRequest = Criteria & { activity: Activity };
+export type CriteriaRequest = RouteSetRequest;
 
 const ACTIVITIES = Object.keys(ACTIVITY_PACES) as Activity[];
 const ACTIVITY_ICONS = { run: Footprints, hike: Mountain } satisfies Record<Activity, LucideIcon>;

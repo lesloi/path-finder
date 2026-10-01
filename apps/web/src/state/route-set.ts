@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { Criteria, ErrorCode } from '../../../api/src/contract.ts';
-import { parseRoutes, type Activity, type Route } from '../core/index.ts';
-
-/** The body of a route set request: the criteria and the activity, as `parseCriteria` accepts them. */
-export type RouteSetRequest = Criteria & { activity: Activity };
+import type { ErrorCode } from '../../../api/src/contract.ts';
+import { parseRoutes, type Route, type RouteSetRequest } from '../core/index.ts';
 
 /** Why there is no route set: an error code of the API, or the API cannot be reached. */
 export type RouteSetError = ErrorCode | 'unreachable';

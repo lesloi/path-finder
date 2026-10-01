@@ -3,6 +3,7 @@ import {
   missText,
   parseRoutes,
   positionAt,
+  projectRoute,
   slopeClass,
   type ProfilePoint,
   type Route,
@@ -148,5 +149,47 @@ describe('missText', () => {
     expect(missText(miss, { ...route, elevationGain: 90 }, { units: 'imperial', language: 'fr' })).toBe(
       '+262 ft de dénivelé',
     );
+  });
+});
+
+describe('projectRoute', () => {
+  const box = { width: 100, height: 100, margin: 10 };
+
+  it('fits the route in the box with north up', () => {
+    // A square about as tall as wide, going north then east.
+    const points = projectRoute(
+      [
+        [6, 45],
+        [6, 45.1],
+        [6.1 / Math.cos((45.05 * Math.PI) / 180) - 5.9, 45.1],
+      ],
+      box,
+    );
+
+    const [south, north] = [points[0], points[1]];
+    expect(south[1]).toBeGreaterThan(north[1]);
+    for (const [x, y] of points) {
+      expect(x).toBeGreaterThanOrEqual(10 - 1e-9);
+      expect(x).toBeLessThanOrEqual(90 + 1e-9);
+      expect(y).toBeGreaterThanOrEqual(10 - 1e-9);
+      expect(y).toBeLessThanOrEqual(90 + 1e-9);
+    }
+  });
+
+  it('centres a route that is wider than tall', () => {
+    const points = projectRoute(
+      [
+        [6, 45],
+        [6.2, 45],
+      ],
+      box,
+    );
+
+    expect(points.map(([, y]) => y)).toEqual([50, 50]);
+    expect(points.map(([x]) => x)).toEqual([expect.closeTo(10), expect.closeTo(90)]);
+  });
+
+  it('puts a route of a single place in the middle', () => {
+    expect(projectRoute([[6, 45]], box)).toEqual([[50, 50]]);
   });
 });

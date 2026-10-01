@@ -8,3 +8,7 @@ export * from './sub-page.tsx';
 export * from './use-desktop.ts';
 export * from './start-point-map.tsx';
 export * from './rich-text.tsx';
+export * from './route-colors.ts';
+export * from './elevation-profile.tsx';
+export * from './route-thumbnail.tsx';
+export * from './surface-strip.tsx';

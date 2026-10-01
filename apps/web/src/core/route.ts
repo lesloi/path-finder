@@ -1,7 +1,11 @@
-import type { Miss, SurfaceStretch } from '../../../api/src/contract.ts';
+import type { Criteria, Miss, SurfaceStretch } from '../../../api/src/contract.ts';
 import { routesText, type Language } from '../i18n/index.ts';
+import type { Activity } from './activity.ts';
 import type { Position } from './coordinates.ts';
 import { formatHeight, type Units } from './units.ts';
+
+/** The body of a route set request: the criteria and the activity, as `parseCriteria` accepts them. */
+export type RouteSetRequest = Criteria & { activity: Activity };
 
 /**
  * A route of a route set as the API sends it: longitude, latitude, and height in metres on every
@@ -163,4 +167,27 @@ export function missText(
   }
   const share = new Intl.NumberFormat(language, { style: 'percent', signDisplay: 'always' }).format(gap / target);
   return `${share} ${words}`;
+}
+
+/**
+ * A route drawn in a `width` by `height` box, as screen points with north up: scaled to fit, centred,
+ * and `margin` from the edges.
+ */
+export function projectRoute(
+  geometry: Route['geometry'],
+  { width, height, margin }: { width: number; height: number; margin: number },
+): [number, number][] {
+  const cos = Math.cos((geometry[0][1] * Math.PI) / 180);
+  const xs = geometry.map(([lon]) => lon * cos);
+  const ys = geometry.map(([, lat]) => lat);
+  const [west, east, south, north] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const [spanX, spanY] = [east - west, north - south];
+  // A route along one axis, or a single place, fits by the other axis alone.
+  const scale = Math.min(
+    spanX ? (width - 2 * margin) / spanX : Infinity,
+    spanY ? (height - 2 * margin) / spanY : Infinity,
+  );
+  if (!Number.isFinite(scale)) return geometry.map(() => [width / 2, height / 2]);
+  const [offsetX, offsetY] = [(width - spanX * scale) / 2, (height - spanY * scale) / 2];
+  return geometry.map((_, k) => [offsetX + (xs[k] - west) * scale, offsetY + (north - ys[k]) * scale]);
 }

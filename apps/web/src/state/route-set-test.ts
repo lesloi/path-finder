@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import type { Route } from '../core/index.ts';
-import { requestRouteSet, useRouteSet, type RouteSetRequest } from './route-set.ts';
+import type { Route, RouteSetRequest } from '../core/index.ts';
+import { requestRouteSet, useRouteSet } from './route-set.ts';
 
 const request: RouteSetRequest = {
   start: [6.1294, 45.8992],
