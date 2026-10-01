@@ -1,7 +1,15 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
 import { useState } from 'react';
 
-import { ACTIVITY_PACES, type Activity, formatPace, paceUnit, parsePace, type Units } from '../core/index.ts';
+import {
+  ACTIVITY_PACES,
+  type Activity,
+  formatPace,
+  paceUnit,
+  parsePace,
+  type Theme,
+  type Units,
+} from '../core/index.ts';
 import { commonText, settingsText, type Language } from '../i18n/index.ts';
 import { paceFor, useSettings } from '../state/index.ts';
 import { Dropdown, GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON } from '../components/index.ts';
@@ -15,6 +23,19 @@ export function SettingsView({ language }: { language: Language }) {
     <>
       <h2 className={GROUP_TITLE}>{t.display}</h2>
       <div className={LIST}>
+        <div className={LIST_ROW}>
+          <Dropdown
+            testId="settings-theme"
+            label={t.theme}
+            value={settings.theme}
+            options={[
+              { value: 'system', label: t.system, icon: <Monitor size={18} aria-hidden /> },
+              { value: 'light', label: t.light, icon: <Sun size={18} aria-hidden /> },
+              { value: 'dark', label: t.dark, icon: <Moon size={18} aria-hidden /> },
+            ]}
+            onChange={(theme: Theme) => update({ theme })}
+          />
+        </div>
         <div className={LIST_ROW}>
           <Dropdown
             testId="settings-language"

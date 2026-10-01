@@ -1,6 +1,13 @@
 import { useSyncExternalStore } from 'react';
 
-import { ACTIVITY_PACES, DEFAULT_ACTIVITY, type Activity, type Units } from '../core/index.ts';
+import {
+  ACTIVITY_PACES,
+  DEFAULT_ACTIVITY,
+  DEFAULT_THEME,
+  type Activity,
+  type Theme,
+  type Units,
+} from '../core/index.ts';
 import type { Language } from '../i18n/index.ts';
 
 /** What the user sets once and keeps on the device. Only the pace leaves it, with a route set request. */
@@ -10,6 +17,7 @@ export type Settings = {
   /** Absent until the user picks one: the app follows the browser. */
   language?: Language;
   units: Units;
+  theme: Theme;
   lastActivity: Activity;
 };
 
@@ -26,7 +34,7 @@ function parse(raw: string | null): Settings {
   } catch {
     stored = {};
   }
-  const { pace, language, units, lastActivity } = isObject(stored) ? stored : {};
+  const { pace, language, units, theme, lastActivity } = isObject(stored) ? stored : {};
   const paces = isObject(pace) ? pace : {};
   return {
     pace: Object.fromEntries(
@@ -37,6 +45,7 @@ function parse(raw: string | null): Settings {
     ),
     ...((language === 'fr' || language === 'en') && { language }),
     units: units === 'imperial' ? 'imperial' : 'metric',
+    theme: theme === 'light' || theme === 'dark' ? theme : DEFAULT_THEME,
     lastActivity: ACTIVITIES.includes(lastActivity as Activity) ? (lastActivity as Activity) : DEFAULT_ACTIVITY,
   };
 }
@@ -71,6 +80,13 @@ function updateSettings(change: Partial<Settings>) {
     return;
   }
   for (const listener of listeners) listener();
+}
+
+/** Calls `listener` with the current settings now and after every change, until the returned function is called. */
+export function watchSettings(listener: (settings: Settings) => void): () => void {
+  const notify = () => listener(getSettings());
+  notify();
+  return subscribe(notify);
 }
 
 /** The settings kept on the device, shared by every component that uses them. */

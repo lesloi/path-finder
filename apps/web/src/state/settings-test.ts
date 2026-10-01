@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 
-import { paceFor, useSettings } from './settings.ts';
+import { paceFor, useSettings, watchSettings } from './settings.ts';
 
 const KEY = 'path-finder.settings';
 
@@ -9,19 +9,33 @@ describe('useSettings', () => {
     const { result } = renderHook(() => useSettings());
     const [settings] = result.current;
 
-    expect(settings).toEqual({ pace: {}, units: 'metric', lastActivity: 'run' });
+    expect(settings).toEqual({ pace: {}, units: 'metric', theme: 'system', lastActivity: 'run' });
     expect(paceFor(settings, 'run')).toBe(6);
     expect(60 / paceFor(settings, 'hike')).toBeCloseTo(4.5);
   });
 
   it('keeps the settings across reloads', () => {
     const first = renderHook(() => useSettings());
-    act(() => first.result.current[1]({ pace: { hike: 12 }, language: 'fr', units: 'imperial', lastActivity: 'hike' }));
+    act(() =>
+      first.result.current[1]({
+        pace: { hike: 12 },
+        language: 'fr',
+        units: 'imperial',
+        theme: 'dark',
+        lastActivity: 'hike',
+      }),
+    );
     first.unmount();
 
     const { result } = renderHook(() => useSettings());
 
-    expect(result.current[0]).toEqual({ pace: { hike: 12 }, language: 'fr', units: 'imperial', lastActivity: 'hike' });
+    expect(result.current[0]).toEqual({
+      pace: { hike: 12 },
+      language: 'fr',
+      units: 'imperial',
+      theme: 'dark',
+      lastActivity: 'hike',
+    });
     expect(paceFor(result.current[0], 'hike')).toBe(12);
   });
 
@@ -39,14 +53,20 @@ describe('useSettings', () => {
     ['not an object', '42'],
     [
       'wrong types',
-      JSON.stringify({ pace: { run: -1, hike: 'fast' }, language: 'de', units: 'nautical', lastActivity: 'swim' }),
+      JSON.stringify({
+        pace: { run: -1, hike: 'fast' },
+        language: 'de',
+        units: 'nautical',
+        theme: 'sepia',
+        lastActivity: 'swim',
+      }),
     ],
   ])('falls back to the defaults on %s data', (_, raw) => {
     localStorage.setItem(KEY, raw);
 
     const { result } = renderHook(() => useSettings());
 
-    expect(result.current[0]).toEqual({ pace: {}, units: 'metric', lastActivity: 'run' });
+    expect(result.current[0]).toEqual({ pace: {}, units: 'metric', theme: 'system', lastActivity: 'run' });
   });
 
   it('keeps the valid fields of partial data', () => {
@@ -54,6 +74,20 @@ describe('useSettings', () => {
 
     const { result } = renderHook(() => useSettings());
 
-    expect(result.current[0]).toEqual({ pace: { run: 5 }, units: 'imperial', lastActivity: 'run' });
+    expect(result.current[0]).toEqual({ pace: { run: 5 }, units: 'imperial', theme: 'system', lastActivity: 'run' });
+  });
+});
+
+describe('watchSettings', () => {
+  it('reports the settings now and after each change, until stopped', () => {
+    const listener = vi.fn();
+    const writer = renderHook(() => useSettings());
+
+    const stop = watchSettings(listener);
+    act(() => writer.result.current[1]({ theme: 'dark' }));
+    stop();
+    act(() => writer.result.current[1]({ theme: 'light' }));
+
+    expect(listener.mock.calls.map(([settings]) => settings.theme)).toEqual(['system', 'dark']);
   });
 });

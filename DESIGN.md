@@ -56,8 +56,10 @@ written raw.
 toast, 11 and 12 for an open dropdown and its scrim. Sub-pages are in the top
 layer, above them all.
 
-**Dark mode** follows `prefers-color-scheme` for the UI only: UI colours are variables that
-switch with it, so markup names a role (`bg-surface`) and never uses `dark:`. The Plan IGN
+**Dark mode** follows the Theme setting (System, Light or Dark) for the UI only. System follows
+`prefers-color-scheme`; a forced theme sets `data-theme` on `<html>`, which `main.tsx` applies before
+the first render. UI colours are variables declared once with `light-dark()` and resolved by
+`color-scheme`, so markup names a role (`bg-surface`) and never uses `dark:`. The Plan IGN
 map stays light, so the colours drawn on it (routes, start point) do not change.
 
 MapLibre's stylesheet sits outside Tailwind's layers and beats any utility: the map's own
