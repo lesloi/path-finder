@@ -1,18 +1,12 @@
 import { Crosshair, LocateFixed, Settings } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
+import { useElevation } from './capabilities.ts';
+import { CriteriaForm, useCriteriaDraft, type CriteriaRequest } from './criteria-form.tsx';
 import { formatPosition, parsePosition } from './coordinates.ts';
 import type { Language } from './language.ts';
 import { StartPointMap, type Position } from './start-point-map.tsx';
-import {
-  BottomSheet,
-  FLOATING_BUTTON,
-  ICON_BUTTON,
-  SECONDARY_BUTTON,
-  SIDE_COLUMN,
-  TOAST,
-  useDesktop,
-} from './ui/index.ts';
+import { BottomSheet, FLOATING_BUTTON, ICON_BUTTON, SIDE_COLUMN, TOAST, useDesktop } from './ui/index.ts';
 
 const TOAST_MS = 6_000;
 
@@ -55,13 +49,19 @@ const text = {
 export function CriteriaView({
   language,
   pageOpen = false,
+  onSubmit = () => {},
 }: {
   language: Language;
+  /** The user asked for routes with these criteria. */
+  onSubmit?: (request: CriteriaRequest) => void;
   /** A sub-page is open over the view. */
   pageOpen?: boolean;
 }) {
   const t = text[language];
   const desktop = useDesktop();
+  // Kept here: the form is mounted in the column or in the sheet, whichever the screen shows.
+  const draft = useCriteriaDraft();
+  const elevation = useElevation();
   const [start, setStart] = useState<Position>();
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
@@ -174,6 +174,7 @@ export function CriteriaView({
                 <LocateFixed size={20} aria-hidden />
               </button>
             </StartPointField>
+            <CriteriaForm language={language} start={start} draft={draft} elevation={elevation} onSubmit={onSubmit} />
           </div>
         </aside>
       ) : (
@@ -185,12 +186,14 @@ export function CriteriaView({
             onStartChange={moveStart}
             onUnreadable={() => warn('unreadable')}
           />
-          {!start && (
-            <button type="button" className={SECONDARY_BUTTON} onClick={locate}>
-              <LocateFixed size={18} aria-hidden />
-              {t.myLocation}
-            </button>
-          )}
+          <CriteriaForm
+            language={language}
+            start={start}
+            draft={draft}
+            elevation={elevation}
+            compact={!sheetExpanded}
+            onSubmit={onSubmit}
+          />
         </BottomSheet>
       )}
       {toast && toast.start === start && (

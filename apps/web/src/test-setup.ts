@@ -17,4 +17,10 @@ HTMLDialogElement.prototype.close = function () {
   this.open = false;
 };
 
+// Unit tests never call the network: a test that needs an answer mocks `fetch` itself.
+beforeEach(() => {
+  vi.stubGlobal('fetch', () => Promise.reject(new Error('No network in unit tests')));
+});
+afterEach(() => vi.unstubAllGlobals());
+
 afterEach(() => localStorage.clear());

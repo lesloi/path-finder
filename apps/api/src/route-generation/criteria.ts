@@ -4,9 +4,23 @@ import { targetDistance, type Criteria } from './route-set.ts';
 
 const SURFACES: Criteria['surface'][] = ['paved', 'unpaved', 'any'];
 
+/** The criteria fields `parseCriteria` checks, so a form can say which one is wrong. */
+export type CriteriaField = 'start' | 'activity' | 'target' | 'elevationGain' | 'surface' | 'pace';
+
+/** A request body that is not valid criteria, with the field that failed. */
+export class CriteriaError extends RangeError {
+  readonly field: CriteriaField;
+
+  constructor(field: CriteriaField, message: string) {
+    super(message);
+    this.name = 'CriteriaError';
+    this.field = field;
+  }
+}
+
 // Messages name the field, never its value: the API logs no locations.
-function check(condition: boolean, message: string): asserts condition {
-  if (!condition) throw new RangeError(message);
+function check(condition: boolean, field: CriteriaField, message: string): asserts condition {
+  if (!condition) throw new CriteriaError(field, message);
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -15,8 +29,8 @@ const within = (value: unknown, min: number, max: number): value is number =>
   isNumber(value) && value >= min && value <= max;
 
 /**
- * Criteria and activity from a request body, within the #7 bounds. Throws a `RangeError`
- * on anything else, including a target duration too short for the target elevation gain
+ * Criteria and activity from a request body, within the #7 bounds. Throws a `CriteriaError`
+ * naming the field on anything else, including a target duration too short for the target elevation gain
  * or too long for the activity at the user's pace. Without `countElevationGain`, the target
  * elevation gain is checked but dropped.
  */
@@ -24,23 +38,24 @@ export function parseCriteria(
   body: unknown,
   { countElevationGain = true } = {},
 ): { criteria: Criteria; activity: Activity } {
-  check(isObject(body), 'Criteria must be an object');
+  check(isObject(body), 'start', 'Criteria must be an object');
   const { start, activity, target, elevationGain, surface, pace } = body;
 
   check(
     Array.isArray(start) && start.length === 2 && within(start[0], -180, 180) && within(start[1], -90, 90),
+    'start',
     'start must be a longitude and a latitude',
   );
-  check(typeof activity === 'string' && Object.hasOwn(MAX_TARGET_DISTANCE, activity), 'Unknown activity');
+  check(typeof activity === 'string' && Object.hasOwn(MAX_TARGET_DISTANCE, activity), 'activity', 'Unknown activity');
   const maxDistance = MAX_TARGET_DISTANCE[activity as Activity];
 
-  check(isObject(target) && Object.keys(target).length === 1, 'target must be a distance or a duration');
+  check(isObject(target) && Object.keys(target).length === 1, 'target', 'target must be a distance or a duration');
   let parsedTarget: Criteria['target'];
   if ('distance' in target) {
-    check(within(target.distance, MIN_TARGET_DISTANCE, maxDistance), 'Target distance out of bounds');
+    check(within(target.distance, MIN_TARGET_DISTANCE, maxDistance), 'target', 'Target distance out of bounds');
     parsedTarget = { distance: target.distance };
   } else {
-    check(within(target.duration, TARGET_DURATION.min, TARGET_DURATION.max), 'Target duration out of bounds');
+    check(within(target.duration, TARGET_DURATION.min, TARGET_DURATION.max), 'target', 'Target duration out of bounds');
     parsedTarget = { duration: target.duration };
   }
 
@@ -49,10 +64,11 @@ export function parseCriteria(
       elevationGain === 'flat' ||
       elevationGain === 'hilly' ||
       within(elevationGain, 0, MAX_TARGET_ELEVATION_GAIN),
+    'elevationGain',
     'Target elevation gain out of bounds',
   );
-  check(SURFACES.includes(surface as Criteria['surface']), 'Unknown surface preference');
-  check(isNumber(pace) && pace > 0, 'pace must be a positive number');
+  check(SURFACES.includes(surface as Criteria['surface']), 'surface', 'Unknown surface preference');
+  check(isNumber(pace) && pace > 0, 'pace', 'pace must be a positive number');
 
   const criteria: Criteria = {
     start: [start[0], start[1]],
@@ -63,6 +79,13 @@ export function parseCriteria(
     pace,
   };
   // With a target duration, bounds the distance it makes at this pace too.
-  check(targetDistance(criteria) <= maxDistance, 'Target duration makes too long a route at this pace');
+  let distance: number;
+  try {
+    distance = targetDistance(criteria);
+  } catch (error) {
+    // Too short for the target elevation gain.
+    throw new CriteriaError('target', (error as Error).message);
+  }
+  check(distance <= maxDistance, 'target', 'Target duration makes too long a route at this pace');
   return { criteria, activity: activity as Activity };
 }

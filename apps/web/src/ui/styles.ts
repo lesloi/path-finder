@@ -9,11 +9,6 @@ export const FLOATING_BUTTON =
 /** A round button with an icon alone, on a surface. */
 export const ICON_BUTTON = 'grid size-touch flex-none place-items-center rounded-full text-ink hover:bg-surface-2';
 
-/** An action beside the view's main one. */
-export const SECONDARY_BUTTON =
-  'flex min-h-touch w-full items-center justify-center gap-2 rounded-full bg-surface-2 px-4 font-semibold ' +
-  'text-ink no-underline';
-
 /** The desktop panel floating over the left of the map. */
 export const SIDE_COLUMN =
   // As tall as its content, within the screen.
@@ -47,3 +42,14 @@ export const PROSE =
   '[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 ' +
   // The same room above and below as a page of list rows.
   '[&>:first-child]:mt-2 [&>:last-child]:mb-0';
+
+/** The view's main action: one per view. */
+export const PRIMARY_BUTTON =
+  'flex min-h-touch w-full items-center justify-center gap-2 rounded-full bg-accent px-4 font-semibold ' +
+  'text-on-accent hover:bg-accent-hover';
+
+/** A row of chips that scrolls sideways; a chip is highlighted when `data-set`. */
+export const CHIP_ROW = 'flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]';
+export const CHIP =
+  'flex min-h-touch flex-none items-center gap-2 rounded-full bg-surface-2 px-4 text-sm font-semibold text-ink ' +
+  'data-set:bg-accent-soft data-set:text-accent';

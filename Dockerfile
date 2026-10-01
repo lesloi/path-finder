@@ -11,6 +11,8 @@ COPY apps/web/package.json apps/web/
 FROM base AS build
 RUN pnpm install --frozen-lockfile
 COPY apps/web apps/web
+# The web app imports the route generation's bounds and criteria checks.
+COPY apps/api/src/route-generation apps/api/src/route-generation
 RUN pnpm build
 
 FROM base

@@ -36,8 +36,8 @@ describe('CriteriaView', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Criteria' }));
 
-      // Only the sheet's own button is left: the floating one would cover the settings button.
-      expect(screen.getAllByRole('button', { name: 'My location' })).toHaveLength(1);
+      // The floating one would cover the settings button.
+      expect(screen.queryByRole('button', { name: 'My location' })).not.toBeInTheDocument();
     });
 
     it('invites a long press in the sheet until the start point is set', () => {
@@ -45,7 +45,7 @@ describe('CriteriaView', () => {
       render(<CriteriaView language="en" />);
       expect(screen.getByRole('button', { name: 'Criteria' })).toHaveAttribute('aria-expanded', 'false');
       expect(screen.getByText('Long-press the map to choose your start point')).toBeInTheDocument();
-      expect(screen.getAllByRole('button', { name: 'My location' })).toHaveLength(2);
+      expect(screen.getAllByRole('button', { name: 'My location' })).toHaveLength(1);
 
       act(() => {
         map().fire('touchstart', { lngLat: { lng: 6.2, lat: 45.8 }, originalEvent: { touches: [{}] } });
@@ -65,6 +65,54 @@ describe('CriteriaView', () => {
 
       expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
     });
+  });
+
+  describe('criteria', () => {
+    it('shows chips in the collapsed sheet, and the full form once it is expanded', () => {
+      render(<CriteriaView language="en" />);
+      expect(screen.getByRole('button', { name: 'Surface: Any' })).toBeInTheDocument();
+      expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Criteria' }));
+
+      expect(screen.getByRole('button', { name: 'Criteria' })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('slider', { name: 'Distance' })).toBeInTheDocument();
+    });
+
+    it('offers the elevation gain only when the API has elevation data', async () => {
+      onDesktop();
+      const fetchMock = vi.fn().mockResolvedValue(Response.json({ elevation: true }));
+      vi.stubGlobal('fetch', fetchMock);
+      render(<CriteriaView language="en" />);
+      expect(screen.queryByRole('radio', { name: 'Hilly' })).not.toBeInTheDocument();
+
+      expect(await screen.findByRole('radio', { name: 'Hilly' })).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledWith('/api/v1/capabilities', expect.anything());
+    });
+
+    it('shows the full form in the desktop column and passes the criteria on', () => {
+      onDesktop();
+      const onSubmit = vi.fn();
+      render(<CriteriaView language="en" onSubmit={onSubmit} />);
+      expect(screen.queryByRole('button', { name: 'Find routes' })).not.toBeInTheDocument();
+
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByRole('button', { name: 'Find routes' }));
+
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ start: [6.2, 45.8], activity: 'run' }));
+    });
+  });
+
+  it('keeps the criteria when the screen changes from a phone to a desktop', () => {
+    const { rerender } = render(<CriteriaView language="en" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Criteria' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Unpaved' }));
+
+    onDesktop();
+    rerender(<CriteriaView language="en" />);
+
+    expect(screen.getByRole('radio', { name: 'Unpaved' })).toBeChecked();
   });
 
   describe('on desktops', () => {
