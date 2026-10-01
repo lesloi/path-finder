@@ -131,6 +131,13 @@ describe('RouteSetView', () => {
       expect(screen.queryByTestId('routes-row-0-gain')).not.toBeInTheDocument();
     });
 
+    it('draws the elevation of a route in the width the row leaves, and nothing without elevation', () => {
+      render(<View list={[route(), withoutElevation()]} />);
+
+      expect(screen.getByTestId('routes-row-0-profile')).toBeInTheDocument();
+      expect(screen.queryByTestId('routes-row-1-profile')).not.toBeInTheDocument();
+    });
+
     it('marks a missed criterion on the suggestion, with its gap', () => {
       render(<View />);
 

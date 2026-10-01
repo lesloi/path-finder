@@ -19,6 +19,7 @@ import {
   ElevationProfile,
   ICON_BUTTON,
   PRIMARY_BUTTON,
+  ProfileSparkline,
   ROUTE_BORDERS,
   RouteThumbnail,
   SLOPE_DOTS,
@@ -209,7 +210,7 @@ function RouteRow({
       onFocus={onPreview}
     >
       <RouteThumbnail geometry={route.geometry} index={index} {...(snapshot && { snapshot })} />
-      <span className="flex min-w-0 flex-1 flex-col gap-1">
+      <span className="flex min-w-0 flex-none flex-col gap-1">
         <strong data-testid={`routes-row-${index}-distance`} className="text-lg">
           {distance}
         </strong>
@@ -229,7 +230,9 @@ function RouteRow({
           <MissMarker key={miss.criterion} miss={miss} text={misses[k]} testId={`routes-row-${index}-miss`} />
         ))}
       </span>
-      <ChevronRight size={18} aria-hidden className="flex-none text-ink-2" />
+      {/* The empty width of the row: where the route climbs, at a glance. */}
+      <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
+      <ChevronRight size={18} aria-hidden className="ml-auto flex-none text-ink-2" />
     </button>
   );
 }

@@ -13,3 +13,4 @@ export * from './elevation-profile.tsx';
 export * from './route-thumbnail.tsx';
 export * from './surface-strip.tsx';
 export * from './slopes.ts';
+export * from './profile-sparkline.tsx';
