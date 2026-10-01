@@ -32,10 +32,13 @@ implementing it, rather than opening an issue.
 
 ## Contributor guidelines
 
+- Run `pnpm install` after a pull, merge or rebase that changes dependencies.
 - After a change, run `pnpm format`, `pnpm lint` then `pnpm typecheck`.
-- Before committing, run `pnpm test`, `pnpm test:integration` and `pnpm test:e2e`.
-- Conventional Commits under 72 characters. Scopes: `routing`, `location`, `elevation`,
-  `ui`, `app`.
+- Before committing, run `pnpm test`, `pnpm test:integration` and `pnpm test:e2e`, unless already
+  run since the last change.
+- Name branches `type/short-description` (Conventional Branch), with a type like `feature`,
+  `bugfix`, `hotfix`, `release` or `chore`.
+- Write commit messages as Conventional Commits, under 72 characters.
 - Do not add `Co-authored-by:` in commit messages.
 - The privacy-first rules, coding conventions, and pull request expectations: @CONTRIBUTING.md
 
