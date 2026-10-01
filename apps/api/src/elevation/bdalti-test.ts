@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { lambert93, type Position } from '../route-generation/index.ts';
-import { bdAltiHeights, hasBdAltiTiles } from './bdalti.ts';
+import { bdAltiHeights } from './bdalti.ts';
 
 // Annecy, in tile 925_6550, and a point 30 km east, in tile 950_6550.
 const ANNECY: Position = [6.1294, 45.8992];
@@ -61,25 +61,5 @@ describe('bdAltiHeights', () => {
 
     heightAt(...EAST);
     expect(() => heightAt(...ANNECY)).toThrow(/No BD ALTI elevation data here/);
-  });
-});
-
-describe('hasBdAltiTiles', () => {
-  it('is false for an empty directory or one with other files', () => {
-    expect(hasBdAltiTiles(dir)).toBe(false);
-
-    writeFileSync(join(dir, 'notes.txt'), '');
-
-    expect(hasBdAltiTiles(dir)).toBe(false);
-  });
-
-  it('is false for a directory that does not exist', () => {
-    expect(hasBdAltiTiles(join(dir, 'missing'))).toBe(false);
-  });
-
-  it('is true once a tile is there', () => {
-    writeFileSync(join(dir, '925_6550.u16'), '');
-
-    expect(hasBdAltiTiles(dir)).toBe(true);
   });
 });

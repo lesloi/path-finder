@@ -22,7 +22,7 @@ implementing it, rather than opening an issue.
   imports) so it is unit tested without a server.
 - Elevation comes from IGN BD ALTI 25 m, never from BRouter (#30). The tile reader takes
   a directory converted by `apps/api/scripts/convert-bdalti.ts`; the API reads it from
-  `BDALTI_DIR`, which is optional: unset, empty, or without tiles, routes have no elevation gain and
+  `BDALTI_DIR`, which is optional: without it, routes have no elevation gain and
   the target elevation gain is ignored. `GET /api/v1/capabilities` says so (`{ elevation }`), and the
   criteria form then does not offer the elevation gain.
 - The web app sends `import.meta.env.VITE_BUILD_ID` in the `X-Build-Id` header; the API

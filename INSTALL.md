@@ -121,7 +121,7 @@ pnpm start   # http://localhost:3000
 | Variable           | Required | Default           | Description                                                                |
 | ------------------ | -------- | ----------------- | -------------------------------------------------------------------------- |
 | `BROUTER_URL`      | yes      |                   | The BRouter server, such as `http://localhost:17777`                       |
-| `BDALTI_DIR`       | no       |                   | Tiles written by `convert-bdalti.ts`; without any, no elevation gain       |
+| `BDALTI_DIR`       | no       |                   | Tiles written by `convert-bdalti.ts`                                       |
 | `HEALTH_ALLOWLIST` | no       | `0.0.0.0/0, ::/0` | Callers allowed on the healthcheck ([details](#health))                    |
 | `NODE_ENV`         | no       |                   | `development` turns off the rate and concurrency limits                    |
 | `PORT`             | no       | `3000`            | Port the API listens on                                                    |
