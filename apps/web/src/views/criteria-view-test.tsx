@@ -395,8 +395,12 @@ describe('CriteriaView', () => {
       fireEvent.keyDown(field(), { key: 'Enter' });
       fireEvent.click(screen.getByTestId('criteria-submit'));
     }
-    // The map settles on the routes it frames: it then draws them and takes its snapshot.
-    const settle = () => act(() => map().fire('idle'));
+    // The map settles on the routes it frames: it then draws them and takes its snapshot. The effects that listen
+    // for it run first: a route set that has just been found may not have committed them yet, on a busy machine.
+    const settle = async () => {
+      await act(async () => {});
+      act(() => map().fire('idle'));
+    };
     const routesSource = () => (map().sources.routes as unknown as { data: { features: unknown[] } }).data.features;
 
     it('shows a loading state while the API works, with no way back before it answers', async () => {
@@ -421,7 +425,7 @@ describe('CriteriaView', () => {
       await submit();
 
       expect(await screen.findByTestId('routes-count')).toHaveTextContent('2 routes');
-      settle();
+      await settle();
       expect(routesSource()).toHaveLength(2);
       expect(map().fitted).toBeDefined();
     });
@@ -434,7 +438,7 @@ describe('CriteriaView', () => {
       await submit();
 
       await screen.findByTestId('routes-count');
-      settle();
+      await settle();
       fireEvent.click(screen.getByTestId('routes-row-1'));
       expect(screen.getByTestId('route-position')).toHaveTextContent('2/2');
       expect(map().fitted?.bounds).toEqual([
@@ -485,7 +489,7 @@ describe('CriteriaView', () => {
       await screen.findByTestId('routes-count');
       expect(screen.queryByTestId('routes-row-0-thumbnail-map')).not.toBeInTheDocument();
 
-      settle();
+      await settle();
 
       expect(document.querySelector('image')).toHaveAttribute('href', expect.stringMatching(/^blob:/));
     });
@@ -498,7 +502,7 @@ describe('CriteriaView', () => {
       fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
       await submit();
       await screen.findByTestId('routes-count');
-      settle();
+      await settle();
 
       fireEvent.click(screen.getByTestId('routes-back'));
 
@@ -514,7 +518,7 @@ describe('CriteriaView', () => {
       act(() => map().fire('load'));
       await submit();
       fireEvent.click(await screen.findByTestId('routes-row-1'));
-      settle();
+      await settle();
       fireEvent.click(screen.getByTestId('route-back'));
       fireEvent.click(screen.getByTestId('routes-back'));
 
@@ -534,7 +538,7 @@ describe('CriteriaView', () => {
       act(() => map().fire('load'));
       await submit();
       await screen.findByTestId('routes-count');
-      settle();
+      await settle();
       fireEvent.click(screen.getByTestId('routes-back'));
 
       fireEvent.change(field(), { target: { value: '45.9, 6.3' } });
