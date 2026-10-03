@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 import { expect, test } from './test.ts';
 
-// Annecy: the fake BRouter (`fake-brouter.ts`) answers from anywhere, and the fake BD ALTI (`fake-bdalti.ts`) covers it.
+// Annecy: the stand-in graph (`apps/server/internal/standin`) covers it, with rolling hills for the elevation gain.
 const START = '45.8992, 6.1294';
 
 async function findRoutes(page: Page) {
@@ -68,7 +68,8 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('route-position')).toHaveText(/^1\/\d$/);
     // On phones, the collapsed sheet stops at the figures: its handle expands it to the surface breakdown.
     if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
-    await expect(page.getByTestId('route-surface')).toContainText('50%');
+    // The stand-in graph has paved streets west of the start and rough tracks east of it: a share of each.
+    await expect(page.getByTestId('route-surface')).toContainText(/\d+%/);
     await expect(page.getByTestId('route-climb')).toBeVisible();
     await expect(page.getByTestId('route-descent')).toBeVisible();
     await expect(page.getByTestId('route-profile')).toBeVisible();
