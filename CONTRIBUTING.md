@@ -34,7 +34,7 @@ From the root (the server's tests need Go, with `CGO_ENABLED=0`):
 A pull request that breaks these rules is not merged. If a feature seems to need an
 exception, open an issue before implementing it.
 
-- Routes and settings stay on the device. The API keeps no state and logs no locations or
+- Routes and settings stay on the device. The server keeps no state and logs no locations or
   IP addresses (chi's `Logger` is for development only); it may hold a salted IP hash, rotated at
   least daily, in memory for rate limiting.
 - The only runtime third party is the IGN Géoplateforme for map tiles. Any other runtime

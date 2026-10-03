@@ -9,7 +9,7 @@
     "start": "cd apps/server && CGO_ENABLED=0 go run .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:server": "apps/server/coverage.sh",
+    "test:server": "apps/server/test.sh",
     "test:e2e": "pnpm --filter @path-finder/e2e test",
     "lint": "eslint apps e2e",
     "lint:server": "cd apps/server && test -z \"$(gofmt -l .)\" && CGO_ENABLED=0 go vet ./...",

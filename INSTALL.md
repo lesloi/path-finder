@@ -51,17 +51,21 @@ The steps below put the data under `data/` in the repository. Any other director
 ## 3. Build the graph
 
 The server binary builds its own graph, and the landmarks that speed up searches, with two commands.
-Run them ahead of serving, never while it serves.
+Run them ahead of serving, never while it serves. They write into the **data directory**, set by
+`DATA_DIR` (`data` by default): `graph.bin`, then `hike.alt` and `run.alt`.
 
 ```sh
 cd apps/server
 CGO_ENABLED=0 go build -o server .
 
-./server build-graph -pbf ../../data/osm/rhone-alpes-latest.osm.pbf -dem ../../data/bdalti-asc \
-  -out ../../data/graph.bin
-./server build-alt -graph ../../data/graph.bin -profile hike -out ../../data/hike.alt
-./server build-alt -graph ../../data/graph.bin -profile run -out ../../data/run.alt
+export DATA_DIR=$PWD/../../data
+./server build-graph -pbf $DATA_DIR/osm/rhone-alpes-latest.osm.pbf -dem $DATA_DIR/bdalti-asc
+./server build-alt -profile hike
+./server build-alt -profile run
 ```
+
+A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
+a half-written one. The server maps the files when it starts: restart it after a rebuild.
 
 Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (16 by
 default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
@@ -71,9 +75,7 @@ profile and to one graph: build them again after each graph.
 ## 4. Run it locally
 
 ```sh
-export GRAPH_FILE=$PWD/data/graph.bin
-export LANDMARKS_HIKE=$PWD/data/hike.alt   # optional
-export LANDMARKS_RUN=$PWD/data/run.alt     # optional
+export DATA_DIR=$PWD/data   # holds graph.bin, and hike.alt and run.alt if you built them
 pnpm dev
 ```
 
@@ -90,19 +92,17 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable             | Required | Default       | Description                                                                        |
-| -------------------- | -------- | ------------- | ---------------------------------------------------------------------------------- |
-| `GRAPH_FILE`         | yes      |               | The graph written by `build-graph`                                                 |
-| `LANDMARKS_HIKE`     | no       |               | Landmarks of the hike profile, written by `build-alt`; routes are slower without   |
-| `LANDMARKS_RUN`      | no       |               | The same for the run profile                                                       |
-| `PORT`               | no       | `3000`        | Port the server listens on                                                         |
-| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                  |
-| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                           |
-| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))         |
-| `LOOP_LIMIT`         | no       | `1`           | Route sets generated at once; beyond it the answer is `429`                        |
-| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`       |
-| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                        |
-| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none |
+| Variable             | Required | Default       | Description                                                                                    |
+| -------------------- | -------- | ------------- | ---------------------------------------------------------------------------------------------- |
+| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin`, and the `hike.alt` and `run.alt` landmarks, which are optional |
+| `PORT`               | no       | `3000`        | Port the server listens on                                                                     |
+| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                              |
+| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                       |
+| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                     |
+| `LOOP_LIMIT`         | no       | `1`           | Route sets generated at once; beyond it the answer is `429`                                    |
+| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                   |
+| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                    |
+| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none             |
 
 A route set uses every CPU the server may use for its length, so `LOOP_LIMIT` is about how many
 users may generate at once on your machine: more CPUs allow more, and fewer need a longer
@@ -112,7 +112,12 @@ users may generate at once on your machine: more CPUs allow more, and fewer need
 
 The `Dockerfile` builds one image with the server and the web app, and no data. Build it with
 `docker build -t path-finder .`, or use the one CI publishes as `ghcr.io/lesloi/path-finder:latest`.
-Mount the graph and the landmarks read-only, and point the variables at them.
+
+The data is a volume: mount the directory holding `graph.bin`, `hike.alt` and `run.alt` on `/data`
+(the image sets `DATA_DIR=/data`), read-only. On Kubernetes that is a persistent volume, mounted the
+same way into every pod, and filled by the job that runs `build-graph` and `build-alt` with the same
+`DATA_DIR`. The files are mapped, not copied, so pods that share a volume share its page cache; restart
+them after a rebuild.
 
 A `compose.yaml`:
 
@@ -120,10 +125,6 @@ A `compose.yaml`:
 services:
   path-finder:
     image: ghcr.io/lesloi/path-finder:latest
-    environment:
-      GRAPH_FILE: /data/graph.bin
-      LANDMARKS_HIKE: /data/hike.alt
-      LANDMARKS_RUN: /data/run.alt
     volumes:
       - ./data:/data:ro
     ports:

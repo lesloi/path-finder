@@ -21,11 +21,11 @@ import (
 
 func newServer(t *testing.T) http.Handler {
 	t.Helper()
-	files, err := standin.Write(t.TempDir())
-	if err != nil {
+	dir := t.TempDir()
+	if _, err := standin.Write(dir); err != nil {
 		t.Fatal(err)
 	}
-	engines, err := engine.OpenAll(files.Graph, map[string]string{"hike": files.LandmarksHike, "run": files.LandmarksRun})
+	engines, err := engine.OpenDir(dir, "hike", "run")
 	if err != nil {
 		t.Fatal(err)
 	}

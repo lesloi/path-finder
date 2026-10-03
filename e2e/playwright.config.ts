@@ -32,9 +32,7 @@ export default defineConfig({
     env: {
       PORT: String(PORT),
       WEB_ROOT: join(import.meta.dirname, '../apps/web/dist'),
-      GRAPH_FILE: join(GRAPH_DIR, 'graph.bin'),
-      LANDMARKS_HIKE: join(GRAPH_DIR, 'hike.alt'),
-      LANDMARKS_RUN: join(GRAPH_DIR, 'run.alt'),
+      DATA_DIR: GRAPH_DIR,
       // Two projects run side by side: more than one generation at once must not get a 429.
       LOOP_LIMIT: '4',
     },

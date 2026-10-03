@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -38,18 +39,18 @@ func run(command string, args []string) error {
 		var pbfs stringList
 		fs.Var(&pbfs, "pbf", "OSM PBF file (repeatable)")
 		dem := fs.String("dem", "", "directory holding the BD ALTI .asc tiles")
-		out := fs.String("out", "graph.bin", "graph file to write")
+		out := fs.String("out", filepath.Join(dataDir(), engine.GraphFileName), "graph file to write")
 		_ = fs.Parse(args)
 		return graphbuild.Build(pbfs, *dem, *out, os.Stderr)
 	case "build-alt":
 		fs := flag.NewFlagSet(command, flag.ExitOnError)
-		graph := fs.String("graph", "graph.bin", "graph file")
-		out := fs.String("out", "", "landmark file to write")
+		graph := fs.String("graph", filepath.Join(dataDir(), engine.GraphFileName), "graph file")
+		out := fs.String("out", "", "landmark file to write (default: the profile's file in the data directory)")
 		profile := fs.String("profile", "hike", "activity profile: hike or run")
 		count := fs.Int("landmarks", 16, "number of landmarks")
 		_ = fs.Parse(args)
 		if *out == "" {
-			return errors.New("build-alt needs -out")
+			*out = filepath.Join(dataDir(), engine.LandmarksFileName(*profile))
 		}
 		return engine.WriteLandmarks(*graph, *out, *profile, *count)
 	}
@@ -67,14 +68,7 @@ func serve() {
 		log.Fatal(err)
 	}
 	// The graph and the landmarks of each activity are built ahead of serving, by build-graph and build-alt.
-	graph := os.Getenv("GRAPH_FILE")
-	if graph == "" {
-		log.Fatal("GRAPH_FILE is not set")
-	}
-	engines, err := engine.OpenAll(graph, map[string]string{
-		"hike": os.Getenv("LANDMARKS_HIKE"),
-		"run":  os.Getenv("LANDMARKS_RUN"),
-	})
+	engines, err := engine.OpenDir(dataDir(), "hike", "run")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -96,6 +90,9 @@ func serve() {
 		log.Fatal(err)
 	}
 }
+
+// dataDir is the directory holding the graph and the landmarks: a volume, when hosted.
+func dataDir() string { return envOr("DATA_DIR", "data") }
 
 func envOr(name, fallback string) string {
 	if v := os.Getenv(name); v != "" {

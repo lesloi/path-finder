@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"math"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -407,5 +409,59 @@ func TestLoopsStopWhenTheCallerHasEnough(t *testing.T) {
 	}
 	if took := time.Since(start); took > 5*time.Second {
 		t.Errorf("took %v to find 3 loops out of 100000 candidates", took)
+	}
+}
+
+func TestOpenDirOpensTheGraphAndTheLandmarksItHolds(t *testing.T) {
+	dir := t.TempDir()
+	var b Builder
+	for i := 0; i < 4; i++ {
+		b.AddNode(45+float64(i)*0.001, 6, 100)
+	}
+	for i := 0; i < 3; i++ {
+		b.Connect(i, i+1, KindPath, SurfaceCompact)
+	}
+	if err := b.WriteGraph(filepath.Join(dir, GraphFileName)); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteLandmarks(filepath.Join(dir, GraphFileName), filepath.Join(dir, LandmarksFileName("hike")), "hike", 2); err != nil {
+		t.Fatal(err)
+	}
+
+	engines, err := OpenDir(dir, "hike", "run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if engines["hike"].alt == nil || engines["run"].alt != nil {
+		t.Errorf("landmarks: hike %v, run %v; only hike has a file", engines["hike"].alt != nil, engines["run"].alt != nil)
+	}
+	if leftovers, _ := filepath.Glob(filepath.Join(dir, "*.tmp")); len(leftovers) != 0 {
+		t.Errorf("temporary files left behind: %v", leftovers)
+	}
+}
+
+func TestOpenDirFailsWithoutAGraph(t *testing.T) {
+	_, err := OpenDir(t.TempDir(), "hike")
+	if err == nil || !strings.Contains(err.Error(), "opening the data") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestAFailedWriteLeavesNoFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := WriteLandmarks(filepath.Join(dir, "missing.bin"), filepath.Join(dir, "x.alt"), "hike", 2); err == nil {
+		t.Error("landmarks of a graph that does not exist: err = nil")
+	}
+	if err := WriteLandmarks(filepath.Join(dir, "missing.bin"), filepath.Join(dir, "x.alt"), "teleport", 2); err == nil {
+		t.Error("unknown profile: err = nil")
+	}
+	if err := writeAtomic(filepath.Join(dir, "y"), func(tmp string) error {
+		_ = os.WriteFile(tmp, []byte("half"), 0o644)
+		return errors.New("disk full")
+	}); err == nil {
+		t.Error("failing write: err = nil")
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("files left behind: %v", entries)
 	}
 }

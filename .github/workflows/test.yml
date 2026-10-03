@@ -25,7 +25,7 @@ jobs:
           go-version-file: apps/server/go.mod
       - run: pnpm check
 
-  # The server's unit and integration tests; fails below the coverage threshold of apps/server/coverage.sh.
+  # The server's unit and integration tests; fails below the coverage threshold of apps/server/test.sh.
   server:
     runs-on: ubuntu-latest
     steps:

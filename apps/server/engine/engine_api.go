@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 )
 
 // maxSnapMeters is how far a requested point may be from the nearest graph node.
@@ -93,6 +96,33 @@ func OpenAll(graphPath string, landmarks map[string]string) (map[string]*Engine,
 			}
 		}
 		engines[name] = e
+	}
+	return engines, nil
+}
+
+// Names of the files a data directory holds: the graph, and for each activity its landmarks.
+const GraphFileName = "graph.bin"
+
+// LandmarksFileName is the name of an activity's landmark file in a data directory.
+func LandmarksFileName(activity string) string { return activity + ".alt" }
+
+// OpenDir opens the engines of the activities from a data directory: its graph, and the landmarks
+// of each activity when the directory holds them (a search is slower without).
+func OpenDir(dir string, activities ...string) (map[string]*Engine, error) {
+	landmarks := make(map[string]string, len(activities))
+	for _, activity := range activities {
+		path := filepath.Join(dir, LandmarksFileName(activity))
+		if _, err := os.Stat(path); err == nil {
+			landmarks[activity] = path
+		} else if errors.Is(err, fs.ErrNotExist) {
+			landmarks[activity] = ""
+		} else {
+			return nil, err
+		}
+	}
+	engines, err := OpenAll(filepath.Join(dir, GraphFileName), landmarks)
+	if err != nil {
+		return nil, fmt.Errorf("engine: opening the data in %s: %w", dir, err)
 	}
 	return engines, nil
 }

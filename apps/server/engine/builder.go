@@ -14,7 +14,18 @@ type (
 
 // WriteGraph writes a graph in CSR form to path: node i has the edges off[i] to off[i+1] of edges.
 func WriteGraph(path string, nodes []Node, off []uint32, edges []Edge) error {
-	return writeGraph(path, nodes, off, edges)
+	return writeAtomic(path, func(tmp string) error { return writeGraph(tmp, nodes, off, edges) })
+}
+
+// writeAtomic has write fill a temporary file beside path, then moves it into place, so a server that
+// starts, or a job that copies the directory, never sees a half-written file.
+func writeAtomic(path string, write func(tmp string) error) error {
+	tmp := path + ".tmp"
+	if err := write(tmp); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // Builder assembles a graph in memory and writes it as the file Open maps. It is meant for graphs
@@ -55,7 +66,7 @@ func (b *Builder) WriteGraph(path string) error {
 		all = append(all, es...)
 	}
 	off[len(b.nodes)] = uint32(len(all))
-	return writeGraph(path, b.nodes, off, all)
+	return WriteGraph(path, b.nodes, off, all)
 }
 
 // WriteLandmarks computes the landmarks of a graph file for an activity profile and writes them to
@@ -70,5 +81,5 @@ func WriteLandmarks(graphPath, path, profile string, count int) error {
 		return err
 	}
 	rows := buildLandmarks(g, newSpatial(g), p, count, p.UpPerMeter)
-	return writeLandmarks(path, count, uint32(g.n), p.UpPerMeter, rows)
+	return writeAtomic(path, func(tmp string) error { return writeLandmarks(tmp, count, uint32(g.n), p.UpPerMeter, rows) })
 }

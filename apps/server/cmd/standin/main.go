@@ -17,9 +17,8 @@ func main() {
 	if err := os.MkdirAll(os.Args[1], 0o755); err != nil {
 		log.Fatal(err)
 	}
-	f, err := standin.Write(os.Args[1])
-	if err != nil {
+	if _, err := standin.Write(os.Args[1]); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("GRAPH_FILE=%s\nLANDMARKS_HIKE=%s\nLANDMARKS_RUN=%s\n", f.Graph, f.LandmarksHike, f.LandmarksRun)
+	fmt.Printf("DATA_DIR=%s\n", os.Args[1])
 }

@@ -55,9 +55,9 @@ func Write(dir string) (Files, error) {
 		}
 	}
 	f := Files{
-		Graph:         filepath.Join(dir, "graph.bin"),
-		LandmarksHike: filepath.Join(dir, "hike.alt"),
-		LandmarksRun:  filepath.Join(dir, "run.alt"),
+		Graph:         filepath.Join(dir, engine.GraphFileName),
+		LandmarksHike: filepath.Join(dir, engine.LandmarksFileName("hike")),
+		LandmarksRun:  filepath.Join(dir, engine.LandmarksFileName("run")),
 	}
 	if err := b.WriteGraph(f.Graph); err != nil {
 		return Files{}, err

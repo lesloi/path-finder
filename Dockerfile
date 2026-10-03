@@ -1,5 +1,5 @@
-# The server, serving the built web app on the same origin. It needs the graph and landmark files
-# built ahead of serving: mount them and set GRAPH_FILE, LANDMARKS_HIKE and LANDMARKS_RUN.
+# The server, serving the built web app on the same origin. It needs the graph and landmark files built
+# ahead of serving: mount the directory that holds them (graph.bin, hike.alt, run.alt) on /data.
 
 FROM node:26-slim AS web
 RUN npm install --global pnpm@12.6.0
@@ -20,6 +20,7 @@ RUN CGO_ENABLED=0 go build -trimpath -o /server .
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=server /server /server
 COPY --from=web /app/apps/web/dist /web
-ENV WEB_ROOT=/web
+ENV WEB_ROOT=/web DATA_DIR=/data
+VOLUME /data
 EXPOSE 3000
 ENTRYPOINT ["/server"]

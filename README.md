@@ -47,7 +47,7 @@ and BD ALTI data (see [INSTALL.md](./INSTALL.md)).
 git clone https://github.com/lesloi/path-finder.git
 cd path-finder
 pnpm install
-GRAPH_FILE=$PWD/data/graph.bin pnpm dev
+DATA_DIR=$PWD/data pnpm dev
 ```
 
 Then open **http://localhost:5173**.

@@ -37,8 +37,7 @@ _Avoid_: Time
 
 **Target elevation gain**:
 The cumulative climb (D+) the user asks for, met within a tolerance. Optional: without one,
-elevation gain does not count. Ignored when the server has no BD ALTI tiles. The user can
-pick a shortcut instead of a target.
+elevation gain does not count. The user can pick a shortcut instead of a target.
 _Avoid_: Elevation, denivelé, climb
 
 **Flat** / **Hilly**:
@@ -52,7 +51,7 @@ generation and never excludes a route outright.
 _Avoid_: Road type, terrain filter
 
 **Error code**:
-The short key the API answers with when it refuses or fails a request (`invalid-criteria`,
+The short key the server answers with when it refuses or fails a request (`invalid-criteria`,
 `rate-limited`…), never a message. For invalid criteria it also names the field. The web
 app words each code in the user's language.
 _Avoid_: Error message
@@ -79,8 +78,7 @@ _Avoid_: Kilomètre-effort, adjusted distance
 ### Results
 
 **Route**:
-One generated loop, with its geometry, distance, elevation gain (unknown when the server
-has no BD ALTI tiles), surface breakdown, and estimated duration.
+One generated loop, with its geometry, distance, elevation gain, surface breakdown, and estimated duration.
 _Avoid_: Trace, track, itinerary, path
 
 **Route name**:
