@@ -201,20 +201,20 @@ describe('retrying while the server is busy', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.spyOn(Math, 'random').mockReturnValue(0.5); // a wait of exactly what the server asked for
+    vi.spyOn(Math, 'random').mockReturnValue(0); // a wait of exactly what the server asked for
   });
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
-  it('waits what the server asks, spread by half either way, and never more than five seconds', () => {
+  it('waits what the server asks or up to twice that, and never asks for more than five seconds', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
-    expect(retryDelay(1)).toBe(500);
+    expect(retryDelay(1)).toBe(1000);
     vi.spyOn(Math, 'random').mockReturnValue(1);
-    expect(retryDelay(1)).toBe(1500);
-    expect(retryDelay(undefined)).toBe(1500);
-    expect(retryDelay(60)).toBe(7500);
+    expect(retryDelay(1)).toBe(2000);
+    expect(retryDelay(undefined)).toBe(2000);
+    expect(retryDelay(60)).toBe(10_000);
   });
 
   it('asks again after the wait, and the user only sees the routes', async () => {
