@@ -25,6 +25,20 @@ updates:
         update-types: ['version-update:semver-major']
     schedule:
       interval: weekly
+  - package-ecosystem: gomod
+    directory: /apps/server
+    labels:
+      - dependencies
+      - api
+    cooldown:
+      default-days: 7
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    schedule:
+      interval: weekly
   - package-ecosystem: github-actions
     directory: /
     labels:

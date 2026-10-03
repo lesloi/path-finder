@@ -1,0 +1,49 @@
+{
+  "routes": [
+    {
+      "geometry": [
+        [6.1294, 45.8992, 450.5],
+        [6.13, 45.9, 455]
+      ],
+      "distance": 10.2,
+      "elevationGain": 250,
+      "elevationLoss": 240,
+      "estimatedDuration": 62,
+      "kind": "match",
+      "misses": [],
+      "unpavedShare": 0.4,
+      "surfaces": [
+        {
+          "surface": "paved",
+          "share": 0.6
+        },
+        {
+          "surface": "unpaved",
+          "share": 0.4
+        }
+      ]
+    },
+    {
+      "geometry": [
+        [6.1294, 45.8992],
+        [6.13, 45.9]
+      ],
+      "distance": 12.9,
+      "estimatedDuration": 80,
+      "kind": "suggestion",
+      "misses": [
+        {
+          "criterion": "distance",
+          "gap": 2.9
+        }
+      ],
+      "unpavedShare": 0,
+      "surfaces": [
+        {
+          "surface": "paved",
+          "share": 1
+        }
+      ]
+    }
+  ]
+}

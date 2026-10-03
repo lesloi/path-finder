@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useRef, type PointerEvent, type ReactNode } from 'react';
 
-import type { Miss } from '../../../api/src/contract.ts';
+import type { Miss } from '../contract/index.ts';
 import {
   ElevationProfile,
   ICON_BUTTON,

@@ -3,12 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const PORT = 4173;
-const BROUTER_PORT = 17_778;
 const CI = Boolean(process.env.CI);
-// Rolling hills written by `fake-bdalti.ts`, for the elevation gain.
-const BDALTI_DIR = join(tmpdir(), 'path-finder-e2e-bdalti');
+// The stand-in graph (rolling hills around Annecy, written by `cmd/standin`) and the server built beside it.
+const GRAPH_DIR = join(tmpdir(), 'path-finder-e2e');
 
-/** End-to-end tests (`pnpm test:e2e`): the built web app, served by the API as in production. */
+/** End-to-end tests (`pnpm test:e2e`): the built web app, served by the Go server as in production. */
 export default defineConfig({
   testMatch: '**/*-test.ts',
   forbidOnly: CI,
@@ -22,27 +21,20 @@ export default defineConfig({
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
-  webServer: [
-    {
-      // A stand-in for BRouter, so a scenario can generate routes without the real engine and its data.
-      command: 'node fake-brouter.ts',
-      url: `http://127.0.0.1:${BROUTER_PORT}/health`,
-      reuseExistingServer: !CI,
-      env: { FAKE_BROUTER_PORT: String(BROUTER_PORT) },
+  webServer: {
+    // The binary with the built web app, rather than the Vite dev server, so headers, static serving and `build-id`
+    // are the real ones. Not `pnpm start` itself: pnpm puts the server in its own process group, which outlives
+    // Playwright's stop and holds CI open.
+    command: `pnpm build && cd apps/server && CGO_ENABLED=0 go run ./cmd/standin "${GRAPH_DIR}" && CGO_ENABLED=0 go build -o "${GRAPH_DIR}/server" . && exec "${GRAPH_DIR}/server"`,
+    cwd: '..',
+    url: `http://localhost:${PORT}/healthz`,
+    reuseExistingServer: !CI,
+    env: {
+      PORT: String(PORT),
+      WEB_ROOT: join(import.meta.dirname, '../apps/web/dist'),
+      DATA_DIR: GRAPH_DIR,
+      // Two projects run side by side: more than one generation at once must not get a 429.
+      LOOP_LIMIT: '4',
     },
-    {
-      // What `pnpm start` runs, rather than the Vite dev server, so headers, static serving and `build-id` are
-      // the real ones. Not `pnpm start` itself: pnpm puts the server in its own process group, which outlives
-      // Playwright's stop and holds CI open.
-      command: `node e2e/fake-bdalti.ts "${BDALTI_DIR}" && pnpm build && exec node apps/api/src/main.ts`,
-      cwd: '..',
-      url: `http://localhost:${PORT}/health`,
-      reuseExistingServer: !CI,
-      env: {
-        PORT: String(PORT),
-        BROUTER_URL: `http://127.0.0.1:${BROUTER_PORT}`,
-        BDALTI_DIR,
-      },
-    },
-  ],
+  },
 });

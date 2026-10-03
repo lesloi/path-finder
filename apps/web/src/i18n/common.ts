@@ -1,4 +1,4 @@
-import type { Activity } from '../../../api/src/contract.ts';
+import type { Activity } from '../contract/index.ts';
 import type { Language } from './language.ts';
 
 /** Words several screens share: page titles, activity names, hemispheres, units of time, the GPX attribution. */

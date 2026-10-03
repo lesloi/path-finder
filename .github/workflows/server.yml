@@ -1,0 +1,26 @@
+name: Server
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels the run it replaces; runs on main all finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # The unit tests with their coverage threshold (apps/server/coverage.sh), then the integration tests with the race detector.
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/server/go.mod
+      - run: apps/server/coverage.sh
+      - run: apps/server/test.sh integration

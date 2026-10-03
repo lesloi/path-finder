@@ -1,15 +1,13 @@
 import { configDefaults, defineConfig } from 'vitest/config';
 
-// Unit tests only (`pnpm test`): fast, no network, BRouter mocked. They call functions and components
-// directly; tests through HTTP run in the integration suite (`vitest.integration.config.ts`, #88).
-export const INTEGRATION_TESTS = '**/*-integration-test.{ts,tsx}';
-const UNIT_TESTS = { include: ['**/*-test.{ts,tsx}'], exclude: [...configDefaults.exclude, INTEGRATION_TESTS] };
+// The web app's unit tests (`pnpm test`): fast, no network. They call functions and components directly.
+// The server's tests are Go's (`go test ./...` in `apps/server`).
+const UNIT_TESTS = { include: ['**/*-test.{ts,tsx}'], exclude: [...configDefaults.exclude] };
 
 export default defineConfig({
   test: {
     globals: true,
     projects: [
-      { extends: true, test: { ...UNIT_TESTS, name: 'api', root: './apps/api' } },
       {
         extends: true,
         test: {
@@ -27,11 +25,8 @@ export default defineConfig({
         '**/*-test.{ts,tsx}',
         '**/*.d.ts',
         '**/test-setup.ts',
-        // Entry points that only start the server or mount the app.
-        'apps/api/src/main.ts',
+        // The entry point that mounts the app.
         'apps/web/src/main.tsx',
-        // Only the integration suite, left out of this coverage, calls its routes (#88).
-        'apps/api/src/http/app.ts',
       ],
       reporter: [['text', { skipFull: false }], 'lcov'],
       thresholds: { statements: 90, branches: 90, functions: 90, lines: 90 },

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import { parseCriteria } from '../../../api/src/contract.ts';
+import { parseCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
 import { commonText, criteriaText } from '../i18n/index.ts';
 import { CriteriaForm } from './criteria-form.tsx';
@@ -21,7 +21,7 @@ const onDesktop = () =>
     );
 
 // The form is the full one, as on desktops, unless a test asks for the compact one.
-function setup(props: { start?: Position; compact?: boolean; elevation?: boolean; language?: 'en' | 'fr' } = {}) {
+function setup(props: { start?: Position; compact?: boolean; language?: 'en' | 'fr' } = {}) {
   const onSubmit = vi.fn();
   render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} {...props} />);
   const submit = () => fireEvent.click(screen.getByTestId('criteria-submit'));
@@ -197,36 +197,6 @@ describe('CriteriaForm', () => {
       submit();
 
       expect(onSubmit.mock.calls[0][0].elevationGain).toBe(2_499);
-    });
-  });
-
-  describe('without elevation data', () => {
-    it('does not offer the elevation gain, and sends none', () => {
-      const { onSubmit, submit } = setup({ elevation: false });
-      expect(screen.queryByTestId('criteria-elevation-hilly')).not.toBeInTheDocument();
-
-      submit();
-
-      expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('elevationGain');
-    });
-
-    it('drops the elevation gain chosen before the data went away', () => {
-      const onSubmit = vi.fn();
-      const { rerender } = render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} />);
-      choose('elevation', 'hilly');
-
-      rerender(<CriteriaForm language="en" start={START} elevation={false} onSubmit={onSubmit} />);
-      fireEvent.click(screen.getByTestId('criteria-submit'));
-
-      expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('elevationGain');
-    });
-
-    it('has no elevation chip on phones', () => {
-      vi.restoreAllMocks();
-      setup({ compact: true, elevation: false });
-
-      expect(screen.queryByTestId('criteria-chip-elevation')).not.toBeInTheDocument();
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName(`${en.surface}: ${en.anySurface}`);
     });
   });
 

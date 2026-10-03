@@ -1,0 +1,75 @@
+name: Web
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A new push to a pull request cancels the run it replaces; runs on main all finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # The unit tests with their coverage threshold, then the built app in Chromium served by the Go server; the IGN
+  # is answered from fixtures (e2e/test.ts).
+  web:
+    runs-on: ubuntu-latest
+    # A hang fails fast instead of running for hours; the tests take minutes.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/server/go.mod
+
+      - id: playwright
+        run: echo "version=$(pnpm --filter @path-finder/e2e exec playwright --version)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - if: ${{ steps.browsers.outputs.cache-hit != 'true' }}
+        run: pnpm --filter @path-finder/e2e exec playwright install --with-deps --only-shell chromium
+
+      # The cache holds the browser, not the system libraries it needs.
+      - if: ${{ steps.browsers.outputs.cache-hit == 'true' }}
+        run: pnpm --filter @path-finder/e2e exec playwright install-deps chromium
+
+      # Fails below the coverage threshold set in vitest.config.ts.
+      - run: pnpm coverage:web | tee "$RUNNER_TEMP/web.txt"
+        shell: bash
+
+      - name: Write coverage to the job summary
+        if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
+        run: |
+          {
+            echo '### Coverage'
+            echo '```'
+            # Keep the coverage table only, without ANSI colors.
+            sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/web.txt" | grep -E '^(-|.*\|)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
+        with:
+          name: coverage
+          path: coverage/
+
+      - run: pnpm test:e2e
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ failure() }}
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/

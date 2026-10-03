@@ -5,31 +5,39 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 
 ## Getting started
 
-- [INSTALL.md](./INSTALL.md) sets up BRouter and the elevation data.
+- [INSTALL.md](./INSTALL.md) builds the routing graph from OSM and the elevation data.
 - [CONTEXT.md](./CONTEXT.md) holds the domain vocabulary to use.
 - [DECISIONS.md](./DECISIONS.md) explains the lasting choices; you can question one with an issue.
 - [DESIGN.md](./DESIGN.md) guides the interface.
 
-| Command                 | What it does                                                   |
-| ----------------------- | -------------------------------------------------------------- |
-| `pnpm format`           | Format the code with Prettier                                  |
-| `pnpm lint`             | ESLint                                                         |
-| `pnpm typecheck`        | Type check the apps and the end-to-end tests                   |
-| `pnpm test`             | Unit tests                                                     |
-| `pnpm test:coverage`    | Unit tests with coverage, failing below 90%                    |
-| `pnpm test:integration` | API integration tests, through HTTP                            |
-| `pnpm test:e2e`         | End-to-end tests in Chromium, on the built app                 |
-| `pnpm dev`              | Web app on port 5173 and API on port 3000; needs `BROUTER_URL` |
-| `pnpm build`            | Build the web app                                              |
-| `pnpm start`            | Serve the built web app and the API on port 3000               |
+From the root (the server needs Go, built with `CGO_ENABLED=0`):
+
+| Command                 | What it does                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| `pnpm dev`              | Web app on port 5173 and server on port 3000, with logs; needs a graph                |
+| `pnpm build`            | Build the web app                                                                     |
+| `pnpm start`            | Serve the built web app and the routes on port 3000, as in production                 |
+| `pnpm format`           | Format every file with Prettier                                                       |
+| `pnpm check`            | Static checks, quick: Prettier, ESLint, types, `gofmt`, `go vet` (workflow `check`)   |
+| `pnpm check:web`        | ESLint and types, for the web app and the end-to-end tests                            |
+| `pnpm check:server`     | `gofmt` and `go vet`                                                                  |
+| `pnpm test`             | Unit tests, web then server                                                           |
+| `pnpm test:web`         | Web unit tests                                                                        |
+| `pnpm test:server`      | Go unit tests, with the race detector where it can run                                |
+| `pnpm test:integration` | Go tests through HTTP, on a graph built for the test                                  |
+| `pnpm test:e2e`         | End-to-end tests in Chromium, on the built app and the Go binary                      |
+| `pnpm coverage`         | Web then server coverage, each failing below 90 %                                     |
+| `pnpm coverage:web`     | Web unit tests with coverage (workflow `web`)                                         |
+| `pnpm coverage:server`  | Go unit tests with coverage, listing the weakly covered functions (workflow `server`) |
 
 ## Privacy-first rules
 
 A pull request that breaks these rules is not merged. If a feature seems to need an
 exception, open an issue before implementing it.
 
-- Routes and settings stay on the device. The API keeps no state and logs no locations or
-  IP addresses; it may hold a salted IP hash, rotated at least daily, in memory for rate limiting.
+- Routes and settings stay on the device. The server keeps no state and logs no locations or
+  IP addresses (chi's `Logger` is for development only); it may hold a salted IP hash, rotated at
+  least daily, in memory for rate limiting.
 - The only runtime third party is the IGN Géoplateforme for map tiles. Any other runtime
   network call needs the maintainer's approval.
 - Self-host every script, stylesheet, and font; only the map style and its fonts and icons
@@ -42,28 +50,35 @@ To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
 ## Conventions
 
-Prettier, ESLint and TypeScript enforce the style. Follow the neighbouring code for the rest. What
-they cannot check:
+Prettier, ESLint and TypeScript enforce the style of the web app; `gofmt` and `go vet` that of the
+server. Follow the neighbouring code for the rest. What they cannot check:
 
 - Never log locations, criteria, or client addresses. Logs are limited to startup.
-- Data from outside (request bodies, `localStorage`, files) is `unknown` until checked by small
-  type guards. Stored data is parsed field by field, each falling back to its default.
-- Invalid input throws a `RangeError` whose message names the field, never its value. Expected
-  failures (blocked storage, missing file) are caught where they happen and fall back to a default.
-- Every user-facing string exists in each lang, in `i18n/`. The API answers with error
+- Web: data from outside (`localStorage`, files) is `unknown` until checked by small type guards.
+  Stored data is parsed field by field, each falling back to its default.
+- Server: a request body is decoded into a typed struct and validated before use. Invalid input is
+  refused with an error code that names the field, never its value. Expected failures (blocked
+  storage, missing file) are caught where they happen and fall back to a default.
+- Every user-facing string exists in each lang, in `i18n/`. The server answers with error
   codes, never with a message.
-- Internally, distances are in km and paces in minutes per km; say any other unit in the name.
+- Web: distances are in km and paces in minutes per km. Server engine: metres, and elevation in
+  decimetres in the graph files. Say any other unit in the name.
+- Go: wrap errors with `%w` and add context, pass a `context.Context` first to anything that can run
+  long, and keep `CGO_ENABLED=0`.
 - Comments explain why. A lasting choice points to its section of [DECISIONS.md](./DECISIONS.md).
 - Styles follow [DESIGN.md](./DESIGN.md).
 
 ## Tests
 
-- Every change comes with unit tests that call functions and components directly. An API route is
-  tested through HTTP in an integration test (`<file>-integration-test.ts`), and a UI feature gets an
-  end-to-end scenario in `e2e/` for its main path; edge cases stay in unit tests.
+- Every change comes with unit tests that call functions and components directly. A server route is
+  tested through HTTP (`httptest` in Go), and a UI feature gets an end-to-end scenario in `e2e/` for
+  its main path; edge cases stay in unit tests.
 - Find an element by its `data-testid` in kebab-case, never by the text it shows (ESLint enforces it).
 - Assert what an element shows against the dictionary (`criteriaText.en.findRoutes`), not a literal.
-- Unit tests never call the network: mock `fetch` and BRouter with `vi.fn`.
+- Go tests are table-driven, with a readable name per case. The engine's tests build a graph of a few
+  dozen nodes in a temporary directory; none needs a downloaded file, and none calls the network.
+- A change to a search comes with a test that cancelling its context stops it.
+- Web unit tests never call the network: mock `fetch` with `vi.fn`.
 
 ## Licensing of contributions
 

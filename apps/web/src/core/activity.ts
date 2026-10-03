@@ -1,4 +1,4 @@
-import type { Activity } from '../../../api/src/contract.ts';
+import type { Activity } from '../contract/index.ts';
 import type { PaceDisplay } from './units.ts';
 
 export type { Activity };

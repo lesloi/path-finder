@@ -1,28 +1,26 @@
-# The API, serving the built web app on the same origin. Point BROUTER_URL at the BRouter
-# server. To count elevation gain, mount the converted BD ALTI tiles and set BDALTI_DIR.
+# The server, serving the built web app on the same origin. It needs the graph and landmark files built
+# ahead of serving: mount the directory that holds them (graph.bin, hike.alt, run.alt) on /data.
 
-FROM node:26-slim AS base
+FROM node:26-slim AS web
 RUN npm install --global pnpm@12.6.0
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
-
-FROM base AS build
 RUN pnpm install --frozen-lockfile
 COPY apps/web apps/web
-# The web app imports the route generation's bounds and criteria checks, and the error codes,
-# through the API's contract.
-COPY apps/api/src/contract.ts apps/api/src/contract.ts
-COPY apps/api/src/http/errors.ts apps/api/src/http/errors.ts
-COPY apps/api/src/route-generation apps/api/src/route-generation
+# The web app reads the bounds and error codes of the server's contract.
+COPY apps/server/contract apps/server/contract
 RUN pnpm build
 
-FROM base
-RUN pnpm install --frozen-lockfile --prod --filter @path-finder/api
-COPY apps/api/src apps/api/src
-COPY --from=build /app/apps/web/dist apps/web/dist
-ENV NODE_ENV=production
-USER node
+FROM golang:1.27 AS server
+WORKDIR /src
+COPY apps/server .
+RUN CGO_ENABLED=0 go build -trimpath -o /server .
+
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=server /server /server
+COPY --from=web /app/apps/web/dist /web
+ENV WEB_ROOT=/web DATA_DIR=/data
+VOLUME /data
 EXPOSE 3000
-CMD ["node", "apps/api/src/main.ts"]
+ENTRYPOINT ["/server"]
