@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/netip"
 	"os"
@@ -37,8 +38,13 @@ type Config struct {
 	LoopLimit int
 	// GenerationTimeout is how long a route set may take (default 15 s).
 	GenerationTimeout time.Duration
-	// TrustedProxies are the reverse proxies whose X-Forwarded-For counts; by default every connection.
+	// TrustedProxies are the reverse proxies whose X-Forwarded-For counts; by default none, and the
+	// client's address is the connection's.
 	TrustedProxies []netip.Prefix
+	// Log, in development only, writes each request with its address and query, and the errors a
+	// generation fails with. Production keeps no logs: requests hold the client address and the
+	// criteria hold the start point.
+	Log *log.Logger
 	// HealthAllowlist lists the callers allowed to check /health besides the loopback; by default every caller.
 	HealthAllowlist []netip.Prefix
 }
@@ -54,7 +60,19 @@ func New(cfg Config) http.Handler {
 	a := &app{cfg: cfg, buildID: readBuildID(cfg.WebRoot)}
 
 	r := chi.NewRouter()
-	r.Use(referrerPolicy, clientIP(cfg.TrustedProxies))
+	if cfg.Log != nil {
+		r.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: cfg.Log}))
+	}
+	r.Use(referrerPolicy, middleware.ClientIPFromRemoteAddr)
+	if len(cfg.TrustedProxies) > 0 {
+		// Skips the trusted proxies from the right of X-Forwarded-For: the first other address is the
+		// client. Without the header, the connection's address stays.
+		trusted := make([]string, len(cfg.TrustedProxies))
+		for i, p := range cfg.TrustedProxies {
+			trusted[i] = p.String()
+		}
+		r.Use(middleware.ClientIPFromXFF(trusted...))
+	}
 	r.Get("/health", a.health)
 	// What the server can do, for the web app to offer only that. Nothing about the caller.
 	r.Get("/api/v1/capabilities", func(w http.ResponseWriter, _ *http.Request) {
@@ -85,27 +103,6 @@ func referrerPolicy(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		next.ServeHTTP(w, r)
 	})
-}
-
-// clientIP stores the client's address: the connection's, or with a trusted proxy the one its
-// X-Forwarded-For names. From any other connection the whole header can be forged, so it is ignored.
-func clientIP(trusted []netip.Prefix) func(http.Handler) http.Handler {
-	forwarded := make([]string, len(trusted))
-	for i, p := range trusted {
-		forwarded[i] = p.String()
-	}
-	fromHeader := middleware.ClientIPFromXFF(forwarded...)
-	return func(next http.Handler) http.Handler {
-		viaProxy := fromHeader(next)
-		return middleware.ClientIPFromRemoteAddr(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			addr, err := netip.ParseAddr(middleware.GetClientIP(r.Context()))
-			if err == nil && (len(trusted) == 0 || inRanges(trusted, addr)) {
-				viaProxy.ServeHTTP(w, r)
-				return
-			}
-			next.ServeHTTP(w, r)
-		}))
-	}
 }
 
 // health answers a healthcheck. The loopback stays allowed for one run inside the container. Other
@@ -153,6 +150,9 @@ func (a *app) routeSets(w http.ResponseWriter, r *http.Request) {
 		// The client left: nobody reads an answer.
 	case err != nil:
 		// Any other error is a bug, not a slow generation, and its message could hold the start point.
+		if a.cfg.Log != nil {
+			a.cfg.Log.Printf("route-sets: generation failed: %v", err)
+		}
 		w.WriteHeader(http.StatusInternalServerError)
 	default:
 		writeJSON(w, http.StatusOK, map[string]any{"routes": routes})

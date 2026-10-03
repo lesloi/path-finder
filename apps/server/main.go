@@ -33,8 +33,11 @@ func main() {
 		// On unless explicitly in development, so forgetting APP_ENV keeps them on.
 		Limits: os.Getenv("APP_ENV") != "development",
 	}
+	if os.Getenv("APP_ENV") == "development" {
+		cfg.Log = log.New(os.Stdout, "", log.LstdFlags)
+	}
 	var err error
-	// Unset or empty, every connection is a trusted proxy.
+	// Unset or empty, X-Forwarded-For is ignored and the client is the connection.
 	if list := os.Getenv("TRUSTED_PROXIES"); strings.TrimSpace(list) != "" {
 		if cfg.TrustedProxies, err = server.ParseAddressRanges(list, "TRUSTED_PROXIES"); err != nil {
 			log.Fatal(err)

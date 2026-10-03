@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -245,17 +247,79 @@ func TestHealth(t *testing.T) {
 	}
 }
 
-func TestClientAddressFollowsTrustedProxiesOnly(t *testing.T) {
-	allowed, _ := ParseAddressRanges("192.0.2.5", "HEALTH_ALLOWLIST")
+func TestClientAddressIsTheConnectionUnlessAProxyIsTrusted(t *testing.T) {
 	proxies, _ := ParseAddressRanges("10.0.0.0/8", "TRUSTED_PROXIES")
-	h := newServer(t, func(c *Config) { c.HealthAllowlist = allowed; c.TrustedProxies = proxies })
-	forwarded := map[string]string{"X-Forwarded-For": "192.0.2.5"}
-
-	if r := do(h, http.MethodGet, "/health", "", "10.1.2.3:1", forwarded); r.Code != 200 {
-		t.Errorf("behind a trusted proxy: got %d", r.Code)
+	// Who the server takes the client for, seen through the health allowlist.
+	seenAs := func(client string, trusted []netip.Prefix) func(remote string, forwarded string) int {
+		allowed, _ := ParseAddressRanges(client, "HEALTH_ALLOWLIST")
+		h := newServer(t, func(c *Config) { c.HealthAllowlist = allowed; c.TrustedProxies = trusted })
+		return func(remote, forwarded string) int {
+			headers := map[string]string{}
+			if forwarded != "" {
+				headers["X-Forwarded-For"] = forwarded
+			}
+			return do(h, http.MethodGet, "/health", "", remote, headers).Code
+		}
 	}
-	if r := do(h, http.MethodGet, "/health", "", "203.0.113.9:1", forwarded); r.Code != 404 {
-		t.Errorf("forged header from another connection: got %d", r.Code)
+
+	t.Run("without trusted proxies the header is ignored", func(t *testing.T) {
+		get := seenAs("192.0.2.5", nil)
+		if got := get("10.1.2.3:1", "192.0.2.5"); got != 404 {
+			t.Errorf("forwarded address believed: got %d", got)
+		}
+		if got := get("192.0.2.5:1", ""); got != 200 {
+			t.Errorf("the connection's own address: got %d", got)
+		}
+	})
+	t.Run("a trusted proxy names the client", func(t *testing.T) {
+		get := seenAs("192.0.2.5", proxies)
+		if got := get("10.1.2.3:1", "192.0.2.5"); got != 200 {
+			t.Errorf("one proxy: got %d", got)
+		}
+		if got := get("10.1.2.3:1", "192.0.2.5, 10.9.9.9"); got != 200 {
+			t.Errorf("two proxies: got %d", got)
+		}
+		if got := get("10.1.2.3:1", "198.51.100.1, 192.0.2.5"); got != 200 {
+			t.Errorf("an entry forged by the client is believed over the proxy's: got %d", got)
+		}
+		if got := get("10.1.2.3:1", "192.0.2.5, 198.51.100.1"); got != 404 {
+			t.Errorf("the first address after the proxies is not the client: got %d", got)
+		}
+	})
+	t.Run("a trusted proxy without the header stays the client", func(t *testing.T) {
+		get := seenAs("10.1.2.3", proxies)
+		if got := get("10.1.2.3:1", ""); got != 200 {
+			t.Errorf("fallback to the connection: got %d", got)
+		}
+	})
+}
+
+func TestDevelopmentLogShowsRequestsAndFailures(t *testing.T) {
+	var out strings.Builder
+	h := newServer(t, func(c *Config) {
+		c.Log = log.New(&out, "", 0)
+		c.Generator = generatorFunc(func(context.Context, json.RawMessage) (any, error) { return nil, errors.New("graph is corrupt") })
+	})
+	post(h, `{}`)
+	do(h, http.MethodGet, "/api/v1/capabilities?x=1", "", "", nil)
+
+	for _, want := range []string{"POST http://example.com/api/v1/route-sets", "500", "route-sets: generation failed: graph is corrupt", "capabilities?x=1"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("log lacks %q:\n%s", want, out.String())
+		}
+	}
+}
+
+func TestNoLogByDefault(t *testing.T) {
+	var out strings.Builder
+	log.SetOutput(&out)
+	defer log.SetOutput(os.Stderr)
+	h := newServer(t, func(c *Config) {
+		c.Generator = generatorFunc(func(context.Context, json.RawMessage) (any, error) { return nil, errors.New("boom") })
+	})
+	post(h, `{}`)
+	if out.Len() != 0 {
+		t.Errorf("production wrote a log: %s", out.String())
 	}
 }
 
