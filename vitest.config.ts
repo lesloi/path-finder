@@ -27,6 +27,8 @@ export default defineConfig({
         '**/test-setup.ts',
         // The entry point that mounts the app.
         'apps/web/src/main.tsx',
+        // The service worker's listeners, which only a browser runs; its logic is in strategy.ts and cache.ts.
+        'apps/web/src/sw/sw.ts',
       ],
       reporter: [['text', { skipFull: false }], 'lcov'],
       thresholds: { statements: 90, branches: 90, functions: 90, lines: 90 },
