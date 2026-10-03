@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Lint, types, the unit tests, then the built app in Chromium served by the Go server; the IGN is answered
-  # from fixtures (e2e/test.ts).
+  # The unit tests with their coverage threshold, then the built app in Chromium served by the Go server; the IGN
+  # is answered from fixtures (e2e/test.ts).
   web:
     runs-on: ubuntu-latest
     # A hang fails fast instead of running for hours; the tests take minutes.
@@ -44,7 +44,7 @@ jobs:
         run: pnpm --filter @path-finder/e2e exec playwright install-deps chromium
 
       # Fails below the coverage threshold set in vitest.config.ts.
-      - run: pnpm check:web | tee "$RUNNER_TEMP/web.txt"
+      - run: pnpm coverage:web | tee "$RUNNER_TEMP/web.txt"
         shell: bash
 
       - name: Write coverage to the job summary
@@ -63,6 +63,8 @@ jobs:
         with:
           name: coverage
           path: coverage/
+
+      - run: pnpm test:e2e
 
       - uses: actions/upload-artifact@v7
         if: ${{ failure() }}

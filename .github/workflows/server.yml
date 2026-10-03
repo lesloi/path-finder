@@ -14,8 +14,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Formatting, static checks, the race detector, and the unit and integration tests; fails below the
-  # coverage threshold of apps/server/check.sh.
+  # The unit and integration tests, with the race detector, then the coverage threshold of apps/server/coverage.sh.
   server:
     runs-on: ubuntu-latest
     steps:
@@ -23,4 +22,6 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: apps/server/go.mod
-      - run: apps/server/check.sh
+      - run: apps/server/test.sh unit
+      - run: apps/server/test.sh integration
+      - run: apps/server/coverage.sh

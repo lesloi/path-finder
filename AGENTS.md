@@ -33,10 +33,10 @@ choice that is costly to reverse and whose reason the code does not show.
 
 ## Working
 
-- After a change: `pnpm format`. Before committing: `pnpm check:web` and `pnpm check:server` for what you touched
-  (lint, types and tests with coverage, end-to-end for the web; `gofmt`, `go vet`, the race detector and tests with
-  coverage for the server), and `pnpm check:format` for the docs and config, unless already run since the last
-  change. `pnpm check` runs all three; CI runs one workflow each.
+- After a change: `pnpm format`, then `pnpm check` (static and quick: formatting, lint, types, `gofmt`, `go vet`).
+- Before committing: the tests of what you touched, unless already run since the last change: `pnpm test`
+  (unit, web and server), `pnpm test:integration` (server, through HTTP), `pnpm test:e2e`, and `pnpm coverage`
+  (90 % for the web app and for the server). CI runs `check`, `web` and `server`, one workflow each.
 - Run `pnpm install` after a pull, merge or rebase that changes dependencies.
 - A benchmark or a long build is never started without the owner's go-ahead.
 - Branches: `type/short-description` (`feature`, `bugfix`, `hotfix`, `release`, `chore`). Commits:

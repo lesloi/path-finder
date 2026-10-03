@@ -14,10 +14,14 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # What belongs to the whole project rather than to the web app or the server: the format of every file.
+  # The static checks of the whole project, which are quick: formatting of every file, lint and types of
+  # the web app, `gofmt` and `go vet` of the server.
   check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-      - run: pnpm check:format
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/server/go.mod
+      - run: pnpm check

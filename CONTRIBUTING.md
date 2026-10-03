@@ -12,18 +12,23 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 
 From the root (the server needs Go, built with `CGO_ENABLED=0`):
 
-| Command             | What it does                                                                  |
-| ------------------- | ----------------------------------------------------------------------------- |
-| `pnpm dev`          | Web app on port 5173 and server on port 3000; needs a graph                   |
-| `pnpm build`        | Build the web app                                                             |
-| `pnpm start`        | Serve the built web app and the routes on port 3000                           |
-| `pnpm format`       | Format every file with Prettier                                               |
-| `pnpm test`         | Web unit tests                                                                |
-| `pnpm test:e2e`     | End-to-end tests in Chromium, on the built app and the Go binary              |
-| `pnpm check:format` | Prettier on every file (workflow `check`)                                     |
-| `pnpm check:web`    | ESLint, types, unit tests with 90% coverage, end-to-end (workflow `web`)      |
-| `pnpm check:server` | `gofmt`, `go vet`, race detector, tests with 90% coverage (workflow `server`) |
-| `pnpm check`        | The three `check:*` above                                                     |
+| Command                 | What it does                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `pnpm dev`              | Web app on port 5173 and server on port 3000, with logs; needs a graph              |
+| `pnpm build`            | Build the web app                                                                   |
+| `pnpm start`            | Serve the built web app and the routes on port 3000, as in production               |
+| `pnpm format`           | Format every file with Prettier                                                     |
+| `pnpm check`            | Static checks, quick: Prettier, ESLint, types, `gofmt`, `go vet` (workflow `check`) |
+| `pnpm check:web`        | ESLint and types, for the web app and the end-to-end tests                          |
+| `pnpm check:server`     | `gofmt` and `go vet`                                                                |
+| `pnpm test`             | Unit tests, web then server                                                         |
+| `pnpm test:web`         | Web unit tests                                                                      |
+| `pnpm test:server`      | Go unit tests, with the race detector where it can run                              |
+| `pnpm test:integration` | Go tests through HTTP, on a graph built for the test                                |
+| `pnpm test:e2e`         | End-to-end tests in Chromium, on the built app and the Go binary                    |
+| `pnpm coverage`         | Web then server coverage, each failing below 90 %                                   |
+| `pnpm coverage:web`     | Web unit tests with coverage (workflow `web`)                                       |
+| `pnpm coverage:server`  | Go tests with coverage, listing the weakly covered functions (workflow `server`)    |
 
 One tool, one file: run a single test with `pnpm vitest run path/to/file-test.ts`, or from `apps/server`
 with `go test ./engine -run TestName`.
