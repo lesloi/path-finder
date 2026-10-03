@@ -320,3 +320,45 @@ func TestAGraphOfAnotherVersionIsRefused(t *testing.T) {
 		t.Errorf("err = %v, want it to say to build the graph again", err)
 	}
 }
+
+func TestASteepWayUpIsNotRefusedForItsClimb(t *testing.T) {
+	g := &testGraph{}
+	for i := 0; i <= 10; i++ { // 1 km on the ground, 1,500 m up: about 19,000 equivalent metres for a runner
+		g.addNode(float64(i)*100, 0, 500+150*float64(i))
+		if i > 0 {
+			g.connect(i-1, i, KindPath)
+		}
+	}
+	e, err := Open(g.write(t), "", "run")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := e.Route(context.Background(), pointOf(g, 0), pointOf(g, 10))
+	if err != nil {
+		t.Fatalf("a steep way up was refused: %v", err)
+	}
+	near(t, r.Ascent, 1500, 5, "ascent")
+}
+
+func TestLandmarksStayALowerBoundWhenTheSearchClimbsLessThanTheyDo(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(9, 9, func(x, y int) float64 { return 100 + 40*math.Sin(float64(x)) + 30*math.Cos(float64(y)*1.3) })
+	plain, boosted := openTest(t, g, false), openTest(t, g, true) // landmarks built with a climb of 8
+	if boosted.alt.climb != 8 {
+		t.Fatalf("landmarks climb = %v, want 8", boosted.alt.climb)
+	}
+	sp, sb := newSearcher(), newSearcher()
+	ctx := context.Background()
+	for _, climb := range []float32{0, 1, 3, 8, 16} {
+		for _, pair := range [][2]int{{at(0, 0), at(8, 8)}, {at(8, 0), at(0, 8)}, {at(4, 0), at(4, 8)}, {at(0, 4), at(8, 4)}} {
+			a := sp.route(ctx, plain, climb, nil, 0, uint32(pair[0]), uint32(pair[1]))
+			b := sb.route(ctx, boosted, climb, nil, 0, uint32(pair[0]), uint32(pair[1]))
+			if a == nil || b == nil {
+				t.Fatalf("climb %v: no route (%v, %v)", climb, a, b)
+			}
+			if math.Abs(float64(a.cost-b.cost)) > 0.01 {
+				t.Errorf("climb %v, %v: cost %v with landmarks, %v without", climb, pair, b.cost, a.cost)
+			}
+		}
+	}
+}

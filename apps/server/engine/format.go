@@ -49,55 +49,63 @@ func bytesOf[T any](s []T) []byte {
 	return unsafe.Slice((*byte)(unsafe.Pointer(&s[0])), len(s)*int(unsafe.Sizeof(zero)))
 }
 
-// writeGraph writes a graph in the format above.
-func writeGraph(path string, nodes []node, off []uint32, edges []edge) error {
+// writeFile creates path, has fill write it, and syncs and closes it: the file is on disk before a
+// caller moves it into place, and is closed whatever happens.
+func writeFile(path string, fill func(w *bufio.Writer) error) (err error) {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}()
 	w := bufio.NewWriterSize(f, 1<<20)
-	if _, err := io.WriteString(w, graphMagic); err != nil {
+	if err := fill(w); err != nil {
 		return err
-	}
-	if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(len(nodes)), uint32(len(edges))}); err != nil {
-		return err
-	}
-	pos := int64(16)
-	for _, b := range [][]byte{bytesOf(nodes), bytesOf(off), bytesOf(edges)} {
-		if _, err := w.Write(b); err != nil {
-			return err
-		}
-		pos += int64(len(b))
-		p := pad16(pos)
-		if _, err := w.Write(make([]byte, p)); err != nil {
-			return err
-		}
-		pos += p
 	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	return f.Close()
+	return f.Sync()
+}
+
+// writeGraph writes a graph in the format above.
+func writeGraph(path string, nodes []node, off []uint32, edges []edge) error {
+	return writeFile(path, func(w *bufio.Writer) error {
+		if _, err := io.WriteString(w, graphMagic); err != nil {
+			return err
+		}
+		if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(len(nodes)), uint32(len(edges))}); err != nil {
+			return err
+		}
+		pos := int64(16)
+		for _, b := range [][]byte{bytesOf(nodes), bytesOf(off), bytesOf(edges)} {
+			if _, err := w.Write(b); err != nil {
+				return err
+			}
+			pos += int64(len(b))
+			p := pad16(pos)
+			if _, err := w.Write(make([]byte, p)); err != nil {
+				return err
+			}
+			pos += p
+		}
+		return nil
+	})
 }
 
 // writeLandmarks writes landmark rows in the format above.
 func writeLandmarks(path string, landmarks int, nodes uint32, climb float32, rows []uint16) error {
-	f, err := os.Create(path)
-	if err != nil {
+	return writeFile(path, func(w *bufio.Writer) error {
+		if _, err := io.WriteString(w, altMagicV2); err != nil {
+			return err
+		}
+		if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(landmarks), nodes, math.Float32bits(climb), math.Float32bits(altUnitMeters)}); err != nil {
+			return err
+		}
+		_, err := w.Write(bytesOf(rows))
 		return err
-	}
-	w := bufio.NewWriterSize(f, 1<<20)
-	if _, err := io.WriteString(w, altMagicV2); err != nil {
-		return err
-	}
-	if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(landmarks), nodes, math.Float32bits(climb), math.Float32bits(altUnitMeters)}); err != nil {
-		return err
-	}
-	if _, err := w.Write(bytesOf(rows)); err != nil {
-		return err
-	}
-	if err := w.Flush(); err != nil {
-		return err
-	}
-	return f.Close()
+	})
 }

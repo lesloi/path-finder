@@ -434,6 +434,13 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 	ky := kx * float32(cosl)
 	zt := float32(t.Elev) * 0.1
 	directional := cx.alt != nil && cx.alt.climb > 0
+	// The landmark bound includes the climb it was built with. A search that penalises climbing less
+	// has costs of at least climb/alt.climb times it (cost = flat + climb*ascent, and flat >= flat*ratio),
+	// so scaling keeps the bound a lower bound.
+	scale := float32(1)
+	if directional && climb < cx.alt.climb {
+		scale = climb / cx.alt.climb
+	}
 	h := func(v uint32) float32 {
 		nv := &nodes[v]
 		dy := float32(nv.Lat-t.Lat) * kx
@@ -446,7 +453,7 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 		switch {
 		case directional:
 			// The landmark bound already includes climbing: keep the larger bound.
-			return max(est+climbTerm, cx.alt.bound(cx.alt.rows[int(v)*cx.alt.rowLen:int(v)*cx.alt.rowLen+cx.alt.rowLen], &tg))
+			return max(est+climbTerm, scale*cx.alt.bound(cx.alt.rows[int(v)*cx.alt.rowLen:int(v)*cx.alt.rowLen+cx.alt.rowLen], &tg))
 		case cx.alt != nil:
 			return max(est, cx.alt.bound(cx.alt.rows[int(v)*cx.alt.rowLen:int(v)*cx.alt.rowLen+cx.alt.rowLen], &tg)) + climbTerm
 		}
@@ -454,7 +461,9 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 	}
 	sn := nodes[src]
 	dsrc := float32(math.Hypot(float64(sn.Lat-t.Lat)*1e-7*metersPerDegree, float64(sn.Lon-t.Lon)*1e-7*metersPerDegree*cosl))
-	maxCost := 10*dsrc + 5000
+	// Beyond ten times the crow-flies distance plus the climb to the target, and 5 km, a route is not worth
+	// finding. The climb counts, or a short but steep way up would be refused.
+	maxCost := 10*(dsrc+climb*max(0, zt-float32(sn.Elev)*0.1)) + 5000
 
 	s.slots[s.find(src)] = slot{key: src, epoch: s.epoch, cost: 0, edge: noEdge}
 	s.used++
