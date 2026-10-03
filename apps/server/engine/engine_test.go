@@ -1,0 +1,288 @@
+package engine
+
+import (
+	"context"
+	"errors"
+	"math"
+	"path/filepath"
+	"testing"
+)
+
+// testGraph builds a graph in memory and writes it as the graph file the engine opens.
+type testGraph struct {
+	nodes []node
+	edges [][]edge
+}
+
+const (
+	baseLat = 45.0
+	baseLon = 6.0
+	stepM   = 100.0
+)
+
+func (t *testGraph) addNode(latM, lonM float64, elevM float64) int {
+	lat := baseLat + latM/metersPerDegree
+	lon := baseLon + lonM/(metersPerDegree*math.Cos(baseLat*rad))
+	t.nodes = append(t.nodes, node{Lat: int32(lat * 1e7), Lon: int32(lon * 1e7), Elev: int16(elevM * 10)})
+	t.edges = append(t.edges, nil)
+	return len(t.nodes) - 1
+}
+
+func (t *testGraph) dist(a, b int) float32 {
+	dy := float64(t.nodes[a].Lat-t.nodes[b].Lat) * 1e-7 * metersPerDegree
+	dx := float64(t.nodes[a].Lon-t.nodes[b].Lon) * 1e-7 * metersPerDegree * math.Cos(baseLat*rad)
+	return float32(math.Hypot(dx, dy))
+}
+
+func (t *testGraph) connect(a, b int, kind uint8) {
+	l := t.dist(a, b)
+	t.edges[a] = append(t.edges[a], edge{To: uint32(b), Len: l, Kind: kind, Surf: sCompact})
+	t.edges[b] = append(t.edges[b], edge{To: uint32(a), Len: l, Kind: kind, Surf: sCompact})
+}
+
+// grid adds a w by h lattice of paths and returns the node index of cell (x, y).
+func (t *testGraph) grid(w, h int, elev func(x, y int) float64) func(x, y int) int {
+	first := len(t.nodes)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			t.addNode(float64(y)*stepM, float64(x)*stepM, elev(x, y))
+		}
+	}
+	at := func(x, y int) int { return first + y*w + x }
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			if x+1 < w {
+				t.connect(at(x, y), at(x+1, y), kPath)
+			}
+			if y+1 < h {
+				t.connect(at(x, y), at(x, y+1), kPath)
+			}
+		}
+	}
+	return at
+}
+
+func (t *testGraph) write(tb testing.TB) string {
+	tb.Helper()
+	off := make([]uint32, len(t.nodes)+1)
+	var all []edge
+	for i, es := range t.edges {
+		off[i] = uint32(len(all))
+		all = append(all, es...)
+	}
+	off[len(t.nodes)] = uint32(len(all))
+	path := filepath.Join(tb.TempDir(), "graph.bin")
+	if err := writeGraph(path, t.nodes, off, all); err != nil {
+		tb.Fatal(err)
+	}
+	return path
+}
+
+func flat(x, y int) float64 { return 100 }
+
+func openTest(tb testing.TB, t *testGraph, withLandmarks bool) *Engine {
+	tb.Helper()
+	path := t.write(tb)
+	alt := ""
+	if withLandmarks {
+		e, err := Open(path, "", "hike")
+		if err != nil {
+			tb.Fatal(err)
+		}
+		alt = filepath.Join(tb.TempDir(), "graph.alt")
+		rows := buildLandmarks(e.g, e.sp, e.prof, 4, 8)
+		if err := writeLandmarks(alt, 4, uint32(e.g.n), 8, rows); err != nil {
+			tb.Fatal(err)
+		}
+	}
+	e, err := Open(path, alt, "hike")
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return e
+}
+
+func pointOf(t *testGraph, n int) Point {
+	return Point{float64(t.nodes[n].Lat) * 1e-7, float64(t.nodes[n].Lon) * 1e-7}
+}
+
+func near(tb testing.TB, got, want, tol float64, what string) {
+	tb.Helper()
+	if math.Abs(got-want) > tol {
+		tb.Errorf("%s = %.1f, want %.1f ± %.1f", what, got, want, tol)
+	}
+}
+
+func TestRouteFollowsTheLattice(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(6, 6, flat)
+	e := openTest(t, g, false)
+
+	r, err := e.Route(context.Background(), pointOf(g, at(0, 0)), pointOf(g, at(5, 5)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	near(t, r.Distance, 10*stepM, 5, "distance")
+	near(t, r.Ascent, 0, 0.01, "ascent")
+	near(t, r.TrailShare, 1, 1e-6, "trail share")
+	if first, last := r.Points[0], r.Points[len(r.Points)-1]; first.Point != pointOf(g, at(0, 0)) || last.Point != pointOf(g, at(5, 5)) {
+		t.Errorf("route runs from %v to %v", first, last)
+	}
+}
+
+func TestRoutePrefersAPathToAShorterRoad(t *testing.T) {
+	g := &testGraph{}
+	a, b := g.addNode(0, 0, 100), g.addNode(0, 1000, 100)
+	g.connect(a, b, kPrimary) // 1000 m, but 6 times the cost per metre
+	m1, m2 := g.addNode(150, 250, 100), g.addNode(150, 750, 100)
+	g.connect(a, m1, kPath)
+	g.connect(m1, m2, kPath)
+	g.connect(m2, b, kPath) // about 1100 m
+	e := openTest(t, g, false)
+
+	r, err := e.Route(context.Background(), pointOf(g, a), pointOf(g, b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Distance < 1050 || r.TrailShare < 0.99 {
+		t.Errorf("took the road: %.0f m, trail share %.2f", r.Distance, r.TrailShare)
+	}
+}
+
+func TestRouteMeasuresAscentWithADeadBand(t *testing.T) {
+	g := &testGraph{}
+	// A straight line climbing 30 m over 10 steps, with a 1 m wobble that must not count.
+	var prev int
+	for i := 0; i <= 10; i++ {
+		wobble := 0.0
+		if i%2 == 1 {
+			wobble = 1
+		}
+		n := g.addNode(0, float64(i)*stepM, 100+3*float64(i)+wobble)
+		if i > 0 {
+			g.connect(prev, n, kPath)
+		}
+		prev = n
+	}
+	e := openTest(t, g, false)
+
+	r, err := e.Route(context.Background(), pointOf(g, 0), pointOf(g, 10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	near(t, r.Ascent, 30, 3, "ascent")
+}
+
+func TestRouteErrors(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(3, 3, flat)
+	island := g.addNode(0, 5000, 100)
+	g.connect(island, g.addNode(100, 5000, 100), kPath)
+	e := openTest(t, g, false)
+	ctx := context.Background()
+
+	if _, err := e.Route(ctx, Point{46, 7}, pointOf(g, at(1, 1))); !errors.Is(err, ErrOffGraph) {
+		t.Errorf("start far from the graph: err = %v, want ErrOffGraph", err)
+	}
+	if _, err := e.Route(ctx, pointOf(g, at(0, 0)), pointOf(g, island)); !errors.Is(err, ErrNoRoute) {
+		t.Errorf("disconnected points: err = %v, want ErrNoRoute", err)
+	}
+	done, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := e.Route(done, pointOf(g, at(0, 0)), pointOf(g, at(2, 2))); !errors.Is(err, context.Canceled) {
+		t.Errorf("cancelled context: err = %v, want context.Canceled", err)
+	}
+}
+
+func TestLandmarksDoNotChangeTheRoute(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(8, 8, func(x, y int) float64 { return 100 + 5*float64(x) })
+	plain, boosted := openTest(t, g, false), openTest(t, g, true)
+	from, to := pointOf(g, at(0, 7)), pointOf(g, at(7, 0))
+
+	a, err := plain.Route(context.Background(), from, to)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := boosted.Route(context.Background(), from, to)
+	if err != nil {
+		t.Fatal(err)
+	}
+	near(t, b.Distance, a.Distance, 1, "distance with landmarks")
+	near(t, b.Ascent, a.Ascent, 1, "ascent with landmarks")
+}
+
+func loopRequest(g *testGraph, at func(x, y int) int) LoopRequest {
+	return LoopRequest{Start: pointOf(g, at(10, 10)), Distance: 3000, Ascent: 0, Candidates: 12, Seed: 7}
+}
+
+func TestLoopComesBackAndIsClose(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+
+	l, err := e.Loop(context.Background(), loopRequest(g, at))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first, last := l.Points[0], l.Points[len(l.Points)-1]; first != last {
+		t.Errorf("loop is open: %v to %v", first, last)
+	}
+	near(t, l.Distance, 3000, 600, "distance")
+}
+
+func TestLoopIsDeterministicForASeed(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+
+	a, err := e.Loop(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := e.Loop(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Distance != b.Distance || len(a.Points) != len(b.Points) {
+		t.Errorf("same seed, different loops: %.0f m (%d points) and %.0f m (%d points)",
+			a.Distance, len(a.Points), b.Distance, len(b.Points))
+	}
+}
+
+func TestLoopErrors(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+
+	done, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := e.Loop(done, req); !errors.Is(err, context.Canceled) {
+		t.Errorf("cancelled context: err = %v, want context.Canceled", err)
+	}
+	if _, err := e.Loop(context.Background(), LoopRequest{Start: req.Start}); err == nil {
+		t.Error("loop without a distance: err = nil")
+	}
+	req.Start = Point{46, 7}
+	if _, err := e.Loop(context.Background(), req); !errors.Is(err, ErrNoLoop) {
+		t.Errorf("start off the graph: err = %v, want ErrNoLoop", err)
+	}
+}
+
+func TestOpenRejectsBadInput(t *testing.T) {
+	g := &testGraph{}
+	g.grid(3, 3, flat)
+	path := g.write(t)
+
+	if _, err := Open(path, "", "teleport"); err == nil {
+		t.Error("unknown profile: err = nil")
+	}
+	if _, err := Open(filepath.Join(t.TempDir(), "missing.bin"), "", "hike"); err == nil {
+		t.Error("missing graph: err = nil")
+	}
+	if _, err := Open(path, path, "hike"); err == nil {
+		t.Error("graph file given as landmarks: err = nil")
+	}
+}
