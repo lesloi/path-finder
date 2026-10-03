@@ -362,3 +362,23 @@ func TestOpenRejectsBadInput(t *testing.T) {
 		t.Error("graph file given as landmarks: err = nil")
 	}
 }
+
+func TestOpenAllSharesTheGraphBetweenActivities(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(6, 6, flat)
+	engines, err := OpenAll(g.write(t), map[string]string{"hike": "", "run": ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if engines["hike"].g != engines["run"].g || engines["hike"].sp != engines["run"].sp {
+		t.Error("engines map the graph twice")
+	}
+	for name, e := range engines {
+		if _, err := e.Route(context.Background(), pointOf(g, at(0, 0)), pointOf(g, at(5, 5))); err != nil {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if _, err := OpenAll(g.write(t), map[string]string{"teleport": ""}); err == nil {
+		t.Error("unknown profile: err = nil")
+	}
+}

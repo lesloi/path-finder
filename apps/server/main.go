@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -12,22 +11,29 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lesloi/path-finder/apps/server/engine"
+	"github.com/lesloi/path-finder/apps/server/generator"
 	"github.com/lesloi/path-finder/apps/server/server"
 )
-
-// unported stands in until the route-set generation moves to Go.
-type unported struct{}
-
-func (unported) Generate(context.Context, json.RawMessage) (any, error) {
-	return nil, errors.New("route sets are not generated yet")
-}
 
 func main() {
 	cfg, err := server.ConfigFromEnv(os.Getenv)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cfg.Generator = unported{}
+	// The graph and the landmarks of each activity are built ahead of serving (see ../../poc/go-router).
+	graph := os.Getenv("GRAPH_FILE")
+	if graph == "" {
+		log.Fatal("GRAPH_FILE is not set")
+	}
+	engines, err := engine.OpenAll(graph, map[string]string{
+		"hike": os.Getenv("LANDMARKS_HIKE"),
+		"run":  os.Getenv("LANDMARKS_RUN"),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	cfg.Generator = &generator.Generator{Engines: map[string]generator.Looper{"hike": engines["hike"], "run": engines["run"]}}
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 

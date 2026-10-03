@@ -184,3 +184,9 @@ func contains(list []string, s string) bool {
 	}
 	return false
 }
+
+// ClimbPerEffortKm is the metres of elevation gain that count as 1 km of effort distance.
+func ClimbPerEffortKm() float64 { return bounds.ClimbPerEffortKm }
+
+// HillyMatchPerKm is the metres of elevation gain per km from which a route is hilly.
+func HillyMatchPerKm() float64 { return bounds.HillyMatchPerKm }
