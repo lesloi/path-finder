@@ -12,18 +12,17 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 
 Web app, from the root:
 
-| Command                 | What it does                                                |
-| ----------------------- | ----------------------------------------------------------- |
-| `pnpm format`           | Format the code with Prettier                               |
-| `pnpm lint`             | ESLint                                                      |
-| `pnpm typecheck`        | Type check the web app and the end-to-end tests             |
-| `pnpm test`             | Unit tests                                                  |
-| `pnpm test:coverage`    | Unit tests with coverage, failing below 90%                 |
-| `pnpm test:integration` | Server integration tests, through HTTP                      |
-| `pnpm test:e2e`         | End-to-end tests in Chromium, on the built app              |
-| `pnpm dev`              | Web app on port 5173 and server on port 3000; needs a graph |
-| `pnpm build`            | Build the web app                                           |
-| `pnpm start`            | Serve the built web app and the routes on port 3000         |
+| Command              | What it does                                                |
+| -------------------- | ----------------------------------------------------------- |
+| `pnpm format`        | Format the code with Prettier                               |
+| `pnpm lint`          | ESLint                                                      |
+| `pnpm typecheck`     | Type check the web app and the end-to-end tests             |
+| `pnpm test`          | Unit tests                                                  |
+| `pnpm test:coverage` | Unit tests with coverage, failing below 90%                 |
+| `pnpm test:e2e`      | End-to-end tests in Chromium, on the built app              |
+| `pnpm dev`           | Web app on port 5173 and server on port 3000; needs a graph |
+| `pnpm build`         | Build the web app                                           |
+| `pnpm start`         | Serve the built web app and the routes on port 3000         |
 
 Server, from `apps/server`, with `CGO_ENABLED=0`:
 

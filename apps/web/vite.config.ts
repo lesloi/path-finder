@@ -22,6 +22,6 @@ export default defineConfig({
   // In dev, keep one copy of maplibre-gl-shared for the page and its worker.
   optimizeDeps: { exclude: ['maplibre-gl'] },
   worker: { format: 'es' },
-  // The API (`apps/api`, port 3000) serves the built app on the same origin in production.
+  // The server (`apps/server`, port 3000) serves the built app on the same origin in production.
   server: { proxy: { '/api': 'http://localhost:3000' } },
 });

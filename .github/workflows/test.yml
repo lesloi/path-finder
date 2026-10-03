@@ -41,16 +41,25 @@ jobs:
           name: coverage
           path: coverage/
 
-  # Integration and end-to-end tests run in parallel, only once the unit tests pass.
-  integration:
+  # The server's tests and the end-to-end tests run in parallel, only once the unit tests pass.
+  server:
     needs: unit
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/server
+    env:
+      CGO_ENABLED: 0
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-      - run: pnpm test:integration
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/server/go.mod
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test ./...
 
-  # The built web app in Chromium, served by the API; the IGN is answered from fixtures (e2e/test.ts).
+  # The built web app in Chromium, served by the Go server; the IGN is answered from fixtures (e2e/test.ts).
   e2e:
     needs: unit
     runs-on: ubuntu-latest
@@ -59,6 +68,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/server/go.mod
 
       - id: playwright
         run: echo "version=$(pnpm --filter @path-finder/e2e exec playwright --version)" >> "$GITHUB_OUTPUT"
