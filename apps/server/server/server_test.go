@@ -211,7 +211,7 @@ func TestConcurrentGenerationsAreCappedNotQueued(t *testing.T) {
 	<-started
 
 	r := post(h, `{}`)
-	if r.Code != 429 || r.errorCode(t) != "overloaded" || r.Header().Get("Retry-After") != "5" {
+	if r.Code != 429 || r.errorCode(t) != "overloaded" || r.Header().Get("Retry-After") != "1" {
 		t.Errorf("second request: got %d %s, Retry-After %q", r.Code, r.Body.String(), r.Header().Get("Retry-After"))
 	}
 	if got := r.Header().Get("Content-Type"); got != "application/json" {

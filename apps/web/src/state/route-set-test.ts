@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import type { Route, RouteSetRequest } from '../core/index.ts';
-import { requestRouteSet, useRouteSet } from './route-set.ts';
+import { requestRouteSet, retryDelay, useRouteSet } from './route-set.ts';
 
 const request: RouteSetRequest = {
   start: [6.1294, 45.8992],
@@ -62,6 +62,18 @@ describe('requestRouteSet', () => {
 
     const [, { headers }] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(new Headers(headers).has('X-Build-Id')).toBe(false);
+  });
+
+  it('returns how long the API asks to wait', async () => {
+    answer(Response.json({ error: 'overloaded' }, { status: 429, headers: { 'Retry-After': '2' } }));
+
+    expect(await requestRouteSet(request)).toEqual({ error: 'overloaded', retryAfter: 2 });
+  });
+
+  it('ignores a wait that is not a number of seconds', async () => {
+    answer(Response.json({ error: 'overloaded' }, { status: 429, headers: { 'Retry-After': 'soon' } }));
+
+    expect(await requestRouteSet(request)).toEqual({ error: 'overloaded' });
   });
 
   it('returns the error code the API answers with', async () => {
@@ -129,13 +141,13 @@ describe('useRouteSet', () => {
   });
 
   it('reports an error and keeps no route set', async () => {
-    answer(Response.json({ error: 'overloaded' }, { status: 503 }));
+    answer(Response.json({ error: 'rate-limited' }, { status: 429 }));
     const onError = vi.fn();
     const { result } = renderHook(() => useRouteSet(onError));
 
     act(() => result.current.find(request));
 
-    await waitFor(() => expect(onError).toHaveBeenCalledWith('overloaded'));
+    await waitFor(() => expect(onError).toHaveBeenCalledWith('rate-limited'));
     expect(result.current).toMatchObject({ loading: false, routeSet: undefined });
   });
 
@@ -173,5 +185,130 @@ describe('useRouteSet', () => {
 
     expect(result.current).toMatchObject({ loading: false, routeSet: undefined });
     expect(onError).not.toHaveBeenCalled();
+  });
+});
+
+describe('retrying while the server is busy', () => {
+  const busy = () => Response.json({ error: 'overloaded' }, { status: 429, headers: { 'Retry-After': '1' } });
+  const routes = () => Response.json({ routes: [route] });
+  const answers = (...responses: (() => Response)[]) => {
+    const queue = [...responses];
+    const fetchMock = vi.fn(() => Promise.resolve(queue.shift()!()));
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
+  };
+  const wait = (milliseconds: number) => act(() => vi.advanceTimersByTimeAsync(milliseconds));
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0); // a wait of exactly what the server asked for
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('waits what the server asks plus up to a second, and never asks for more than five seconds', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    expect(retryDelay(1)).toBe(1000);
+    vi.spyOn(Math, 'random').mockReturnValue(1);
+    expect(retryDelay(1)).toBe(2000);
+    expect(retryDelay(undefined)).toBe(2000);
+    expect(retryDelay(60)).toBe(6000);
+  });
+
+  it('asks again after the wait, and the user only sees the routes', async () => {
+    const fetchMock = answers(busy, routes);
+    const onError = vi.fn();
+    const { result } = renderHook(() => useRouteSet(onError));
+
+    act(() => result.current.find(request));
+    await wait(0);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.current.loading).toBe(true);
+
+    await wait(999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await wait(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.current).toMatchObject({ loading: false, routeSet: { routes: [route] } });
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('gives up after two more tries and says the service is busy', async () => {
+    const fetchMock = answers(busy, busy, busy);
+    const onError = vi.fn();
+    const { result } = renderHook(() => useRouteSet(onError));
+
+    act(() => result.current.find(request));
+    await wait(5000);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(onError).toHaveBeenCalledExactlyOnceWith('overloaded');
+    expect(result.current.loading).toBe(false);
+  });
+
+  it.each([
+    [
+      'rate-limited',
+      () => Response.json({ error: 'rate-limited' }, { status: 429, headers: { 'Retry-After': '300' } }),
+    ],
+    ['invalid-criteria', () => Response.json({ error: 'invalid-criteria', field: 'pace' }, { status: 400 })],
+    ['generation-timeout', () => Response.json({ error: 'generation-timeout' }, { status: 504 })],
+  ])('does not ask again after %s', async (code, refusal) => {
+    const fetchMock = answers(refusal, routes);
+    const onError = vi.fn();
+    const { result } = renderHook(() => useRouteSet(onError));
+
+    act(() => result.current.find(request));
+    await wait(10_000);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith(code);
+  });
+
+  it('stops waiting when cleared, or when a newer request replaces it', async () => {
+    const fetchMock = answers(busy, routes, routes);
+    const { result } = renderHook(() => useRouteSet(vi.fn()));
+    act(() => result.current.find(request));
+    await wait(0);
+
+    act(() => result.current.clear());
+    await wait(5000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.find(request));
+    await wait(0);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.current.routeSet).toBeDefined();
+  });
+
+  it('gives back the routes shown before when the new request gets none', async () => {
+    answers(routes, () => Response.json({ error: 'rate-limited' }, { status: 429 }));
+    const onError = vi.fn();
+    const { result } = renderHook(() => useRouteSet(onError));
+    act(() => result.current.find(request));
+    await wait(0);
+    const shown = result.current.routeSet;
+    expect(shown).toBeDefined();
+
+    act(() => result.current.find({ ...request, target: { distance: 20 } }));
+    expect(result.current.routeSet).toBeUndefined(); // the search panel shows while it runs
+    await wait(0);
+
+    expect(result.current.routeSet).toBe(shown);
+    expect(onError).toHaveBeenCalledWith('rate-limited');
+  });
+
+  it('does not give back old routes when the new request found none at all', async () => {
+    answers(routes, () => Response.json({ routes: [] }));
+    const { result } = renderHook(() => useRouteSet(vi.fn()));
+    act(() => result.current.find(request));
+    await wait(0);
+
+    act(() => result.current.find({ ...request, target: { distance: 20 } }));
+    await wait(0);
+
+    expect(result.current.routeSet).toBeUndefined();
   });
 });
