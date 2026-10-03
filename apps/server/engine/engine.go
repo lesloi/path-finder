@@ -1,6 +1,6 @@
 package engine
 
-// The v2 engine: packed node and edge records, 16-bit landmark rows, a flat open-addressing
+// The engine: packed node and edge records, 16-bit landmark rows, a flat open-addressing
 // table for search state, an avoid set for loops, and a small seeded random generator so that a
 // seed always produces the same loops.
 
@@ -289,9 +289,9 @@ type searcher struct {
 }
 
 const (
-	noEdge       = math.MaxUint32
-	maxRetained2 = 1 << 23
-	avoidMult2   = 6
+	noEdge           = math.MaxUint32
+	maxRetainedSlots = 1 << 23
+	avoidMult        = 6
 )
 
 func newSearcher() *searcher { return &searcher{slots: make([]slot, 1<<14)} }
@@ -301,7 +301,7 @@ func newSearcher() *searcher { return &searcher{slots: make([]slot, 1<<14)} }
 var searcherPool = sync.Pool{New: func() any { return newSearcher() }}
 
 func (s *searcher) reset() {
-	if len(s.slots) > maxRetained2 {
+	if len(s.slots) > maxRetainedSlots {
 		s.slots = make([]slot, 1<<14)
 	}
 	s.epoch++
@@ -464,7 +464,7 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 				c += dz * climb
 			}
 			if avoid != nil && avoid.contains(pairKey(u, ed.To)) {
-				c *= avoidMult2
+				c *= avoidMult
 			}
 			ng := it.g + c
 			i := s.find(ed.To)

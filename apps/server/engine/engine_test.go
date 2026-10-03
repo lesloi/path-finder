@@ -6,6 +6,7 @@ import (
 	"math"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // testGraph builds a graph in memory and writes it as the graph file the engine opens.
@@ -284,5 +285,23 @@ func TestOpenRejectsBadInput(t *testing.T) {
 	}
 	if _, err := Open(path, path, "hike"); err == nil {
 		t.Error("graph file given as landmarks: err = nil")
+	}
+}
+
+func TestCancellationStopsALoopInFlight(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(80, 80, flat)
+	e := openTest(t, g, false)
+	req := LoopRequest{Start: pointOf(g, at(40, 40)), Distance: 20000, Candidates: 100000, Seed: 1}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := e.Loop(ctx, req)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
+	}
+	if took := time.Since(start); took > time.Second {
+		t.Errorf("loop kept working %v after a 50ms deadline", took)
 	}
 }
