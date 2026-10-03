@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/lesloi/path-finder/apps/server/contract"
 )
 
 // rateLimiter counts requests per address in fixed windows. Addresses are kept only as hashes
@@ -67,7 +68,7 @@ func rateLimit(l *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if retry, ok := l.admit(rateKey(middleware.GetClientIP(r.Context()))); !ok {
-				refuseLater(w, http.StatusTooManyRequests, codeRateLimited, retry)
+				refuseLater(w, http.StatusTooManyRequests, contract.CodeRateLimited, retry)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -107,7 +108,7 @@ func (w *overloadedWriter) WriteHeader(status int) {
 
 func (w *overloadedWriter) Write(b []byte) (int, error) {
 	if w.refused {
-		if _, err := w.ResponseWriter.Write([]byte(`{"error":"` + codeOverloaded + `"}` + "\n")); err != nil {
+		if _, err := w.ResponseWriter.Write([]byte(`{"error":"` + contract.CodeOverloaded + `"}` + "\n")); err != nil {
 			return 0, err
 		}
 		return len(b), nil

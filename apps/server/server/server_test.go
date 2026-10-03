@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/lesloi/path-finder/apps/server/contract"
 )
 
 // generatorFunc adapts a function to a RouteSetGenerator.
@@ -123,7 +124,7 @@ func TestRouteSetsRefusals(t *testing.T) {
 		}
 	})
 	t.Run("invalid criteria names the field", func(t *testing.T) {
-		r := post(newServer(t, failing(&CriteriaError{Field: "pace"})), `{}`)
+		r := post(newServer(t, failing(&contract.CriteriaError{Field: "pace"})), `{}`)
 		if r.Code != 400 || strings.TrimSpace(r.Body.String()) != `{"error":"invalid-criteria","field":"pace"}` {
 			t.Errorf("got %d %s", r.Code, r.Body.String())
 		}

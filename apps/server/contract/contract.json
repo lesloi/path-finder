@@ -1,0 +1,13 @@
+{
+  "activities": {
+    "run": { "maxDistanceKm": 50 },
+    "hike": { "maxDistanceKm": 40 }
+  },
+  "minDistanceKm": 2,
+  "durationMinutes": { "min": 15, "max": 360 },
+  "maxElevationGainMetres": 2500,
+  "climbPerEffortKm": 100,
+  "hillyMatchPerKm": 10,
+  "surfaces": ["paved", "unpaved", "any"],
+  "errorCodes": ["invalid-json", "invalid-criteria", "stale-build", "rate-limited", "overloaded", "generation-timeout"]
+}

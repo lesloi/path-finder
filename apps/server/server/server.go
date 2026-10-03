@@ -17,10 +17,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/lesloi/path-finder/apps/server/contract"
 )
 
 // RouteSetGenerator turns a request body into the routes of a route set. It must return once ctx
-// ends. It reports a body that is not valid criteria as a *CriteriaError.
+// ends. It reports a body that is not valid criteria as a *contract.CriteriaError.
 type RouteSetGenerator interface {
 	Generate(ctx context.Context, body json.RawMessage) (routes any, err error)
 }
@@ -115,7 +116,7 @@ func referrerPolicy(next http.Handler) http.Handler {
 func (a *app) checkBuild(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if id := r.Header.Get("X-Build-Id"); a.buildID != "" && id != "" && id != a.buildID {
-			refuse(w, http.StatusUpgradeRequired, codeStaleBuild)
+			refuse(w, http.StatusUpgradeRequired, contract.CodeStaleBuild)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -126,18 +127,18 @@ func (a *app) routeSets(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<16))
 	// Never the error's message: a JSON syntax error quotes the body, which holds the start point.
 	if err != nil || !json.Valid(body) {
-		refuse(w, http.StatusBadRequest, codeInvalidJSON)
+		refuse(w, http.StatusBadRequest, contract.CodeInvalidJSON)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), a.cfg.GenerationTimeout)
 	defer cancel()
 	routes, err := a.cfg.Generator.Generate(ctx, body)
-	var criteria *CriteriaError
+	var criteria *contract.CriteriaError
 	switch {
 	case errors.As(err, &criteria):
-		writeJSON(w, http.StatusBadRequest, refusal{Error: codeInvalidCriteria, Field: criteria.Field})
+		writeJSON(w, http.StatusBadRequest, refusal{Error: contract.CodeInvalidCriteria, Field: criteria.Field})
 	case errors.Is(err, context.DeadlineExceeded):
-		refuse(w, http.StatusGatewayTimeout, codeGenerationTimeout)
+		refuse(w, http.StatusGatewayTimeout, contract.CodeGenerationTimeout)
 	case r.Context().Err() != nil:
 		// The client left: nobody reads an answer.
 	case err != nil:
