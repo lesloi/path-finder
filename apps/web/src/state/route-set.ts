@@ -71,11 +71,11 @@ const MAX_RETRIES = 2;
 const MAX_RETRY_AFTER = 5;
 
 /**
- * Milliseconds to wait before asking again: what the server asked for (a second by default), spread between
- * half and one and a half times that, so the users it refused together do not all come back together.
+ * Milliseconds to wait before asking again: at least what the server asked for (a second by default), and up to
+ * twice that, so the users it refused together do not all come back together.
  */
 export function retryDelay(retryAfter = 1): number {
-  return Math.min(retryAfter, MAX_RETRY_AFTER) * 1000 * (0.5 + Math.random());
+  return Math.min(retryAfter, MAX_RETRY_AFTER) * 1000 * (1 + Math.random());
 }
 
 function pause(milliseconds: number, signal: AbortSignal): Promise<void> {
