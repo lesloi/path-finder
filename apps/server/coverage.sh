@@ -9,8 +9,14 @@ profile="$(mktemp)"
 trap 'rm -f "$profile" "$profile.kept"' EXIT
 
 packages="$(go list ./... | grep -v '/integration$')"
+# The output of the tests is shown only when they fail: a passing run prints a line per package, which hides the summary.
+log="$(mktemp)"
+trap 'rm -f "$profile" "$profile.kept" "$log"' EXIT
 # shellcheck disable=SC2086
-go test -coverpkg=./... -coverprofile="$profile" $packages > /dev/null
+if ! go test -coverpkg=./... -coverprofile="$profile" $packages > "$log" 2>&1; then
+  cat "$log" >&2
+  exit 1
+fi
 # Leave out what only starts the server or writes the stand-in graph.
 grep -v -e '/main\.go:' -e '/cmd/' -e '/internal/standin/' "$profile" > "$profile.kept"
 echo "Functions under 80%:"

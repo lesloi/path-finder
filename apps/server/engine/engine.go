@@ -7,6 +7,7 @@ package engine
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -62,6 +63,23 @@ func mapFile(path string) ([]byte, error) {
 	return syscall.Mmap(int(f.Fd()), 0, int(st.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
 }
 
+// maxLandmarkValues is how many landmark distances a search keeps for its target: the landmarks, twice
+// over when the metric includes climbing.
+const maxLandmarkValues = 64
+
+// view reads count records of type T at an offset of a mapped file, or fails when the file is too short:
+// a truncated copy would otherwise fault on the first access.
+func view[T any](data []byte, at, count int) ([]T, error) {
+	var zero T
+	if count == 0 {
+		return nil, nil
+	}
+	if at < 0 || count < 0 || at > len(data) || count > (len(data)-at)/int(unsafe.Sizeof(zero)) {
+		return nil, errors.New("file is shorter than its header says")
+	}
+	return unsafe.Slice((*T)(unsafe.Pointer(&data[at])), count), nil
+}
+
 func openGraph(path string) (*graph, error) {
 	data, err := mapFile(path)
 	if err != nil {
@@ -74,12 +92,17 @@ func openGraph(path string) (*graph, error) {
 	nodesAt := 16
 	offAt := align16(nodesAt + 12*n)
 	edgesAt := align16(offAt + 4*(n+1))
-	return &graph{
-		n: n, e: e,
-		nodes: unsafe.Slice((*node)(unsafe.Pointer(&data[nodesAt])), n),
-		off:   unsafe.Slice((*uint32)(unsafe.Pointer(&data[offAt])), n+1),
-		edges: unsafe.Slice((*edge)(unsafe.Pointer(&data[edgesAt])), e),
-	}, nil
+	g := &graph{n: n, e: e}
+	if g.nodes, err = view[node](data, nodesAt, n); err != nil {
+		return nil, fmt.Errorf("%s: nodes: %w", path, err)
+	}
+	if g.off, err = view[uint32](data, offAt, n+1); err != nil {
+		return nil, fmt.Errorf("%s: offsets: %w", path, err)
+	}
+	if g.edges, err = view[edge](data, edgesAt, e); err != nil {
+		return nil, fmt.Errorf("%s: edges: %w", path, err)
+	}
+	return g, nil
 }
 
 func (g *graph) edgeSource(e uint32) uint32 {
@@ -111,12 +134,17 @@ func openLandmarks(path string, g *graph) (*landmarks, error) {
 	if a.climb > 0 {
 		a.rowLen = 2 * l
 	}
-	a.rows = unsafe.Slice((*uint16)(unsafe.Pointer(&data[24])), n*a.rowLen)
+	if l < 1 || a.rowLen > maxLandmarkValues {
+		return nil, fmt.Errorf("%s holds %d landmarks, which a search cannot use (1 to %d values per node)", path, l, maxLandmarkValues)
+	}
+	if a.rows, err = view[uint16](data, 24, n*a.rowLen); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
 	return a, nil
 }
 
 // bound is a lower bound, in cost units, on the cost from the node with row rv to the target with row tg.
-func (a *landmarks) bound(rv []uint16, tg *[64]uint16) float32 {
+func (a *landmarks) bound(rv []uint16, tg *[maxLandmarkValues]uint16) float32 {
 	best := int32(0)
 	l := a.l
 	if a.climb > 0 {
@@ -394,7 +422,7 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 	}
 	g := cx.g
 	nodes, edges := g.nodes, g.edges
-	var tg [64]uint16
+	var tg [maxLandmarkValues]uint16
 	var rows []uint16
 	if cx.alt != nil {
 		rows = cx.alt.rows
@@ -655,8 +683,9 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 // generate runs lp.candidates candidates on the workers, and returns them in no particular order.
 // After each one, enough sees every loop found so far, one call at a time, and returns true to
 // stop the search: the candidates still running are dropped. When ctx ends it returns the
-// candidates finished so far.
-func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams, start uint32, enough func([]*loopResult) bool) []*loopResult {
+// candidates finished so far. A panic in a worker, which would take the whole process down since
+// nothing above it can recover, stops the search and comes back as an error.
+func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams, start uint32, enough func([]*loopResult) bool) ([]*loopResult, error) {
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
 	// GOMAXPROCS follows the container's CPU limit (Go 1.25+); NumCPU would not.
@@ -664,12 +693,33 @@ func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams, star
 	var next atomic.Int64
 	var mu sync.Mutex
 	var found []*loopResult
+	var failure error
 	done := false
+	report := func(l *loopResult) {
+		mu.Lock()
+		defer mu.Unlock()
+		if done {
+			return
+		}
+		found = append(found, l)
+		if enough != nil && enough(found) {
+			done = true
+			stop()
+		}
+	}
 	var wg sync.WaitGroup
 	for range workers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					mu.Lock()
+					failure, done = fmt.Errorf("engine: a loop search panicked: %v", r), true
+					mu.Unlock()
+					stop()
+				}
+			}()
 			s := searcherPool.Get().(*searcher)
 			defer searcherPool.Put(s)
 			for {
@@ -677,22 +727,12 @@ func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams, star
 				if i >= lp.candidates || ctx.Err() != nil {
 					return
 				}
-				l := candidate(ctx, cx, sp, s, lp, start, i)
-				if l == nil {
-					continue
+				if l := candidate(ctx, cx, sp, s, lp, start, i); l != nil {
+					report(l)
 				}
-				mu.Lock()
-				if !done {
-					found = append(found, l)
-					if enough != nil && enough(found) {
-						done = true
-						stop()
-					}
-				}
-				mu.Unlock()
 			}
 		}()
 	}
 	wg.Wait()
-	return found
+	return found, failure
 }

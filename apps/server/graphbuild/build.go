@@ -183,6 +183,9 @@ func Build(pbfPaths []string, demDir, outPath string, log io.Writer) error {
 
 	nodes, off, edges := assemble(ways, lat, lon, elev)
 	p.step("graph: %d nodes, %d directed edges", len(nodes), len(edges))
+	if len(edges) == 0 {
+		return fmt.Errorf("no walkable way has elevation: check that %s holds the BD ALTI tiles of the area the extracts cover", demDir)
+	}
 
 	if err := engine.WriteGraph(outPath, nodes, off, edges); err != nil {
 		return err

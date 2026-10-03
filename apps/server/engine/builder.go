@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"math"
 	"os"
 )
@@ -79,6 +80,13 @@ func WriteLandmarks(graphPath, path, profile string, count int) error {
 	g, err := openGraph(graphPath)
 	if err != nil {
 		return err
+	}
+	perNode := 1 // landmark distances a node keeps per landmark: twice with climb, for both directions
+	if p.UpPerMeter > 0 {
+		perNode = 2
+	}
+	if most := maxLandmarkValues / perNode; count < 1 || count > most {
+		return fmt.Errorf("engine: %d landmarks is out of range for the %s profile (1 to %d)", count, profile, most)
 	}
 	rows := buildLandmarks(g, newSpatial(g), p, count, p.UpPerMeter)
 	return writeAtomic(path, func(tmp string) error { return writeLandmarks(tmp, count, uint32(g.n), p.UpPerMeter, rows) })

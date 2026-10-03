@@ -56,12 +56,12 @@ Run them ahead of serving, never while it serves. They write into the **data dir
 
 ```sh
 cd apps/server
-CGO_ENABLED=0 go build -o server .
+CGO_ENABLED=0 go build -o path-finder .
 
 export DATA_DIR=$PWD/../../data
-./server build-graph -pbf $DATA_DIR/osm/rhone-alpes-latest.osm.pbf -dem $DATA_DIR/bdalti-asc
-./server build-alt -profile hike
-./server build-alt -profile run
+./path-finder build-graph -pbf $DATA_DIR/osm/rhone-alpes-latest.osm.pbf -dem $DATA_DIR/bdalti-asc
+./path-finder build-alt -profile hike
+./path-finder build-alt -profile run
 ```
 
 A file appears in its place only once it is complete, so a directory that is being rebuilt never holds

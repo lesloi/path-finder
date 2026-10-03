@@ -9,7 +9,7 @@ e2e
 # Server tests, and what only they read.
 **/*_test.go
 **/testdata
-apps/server/server
+apps/server/path-finder
 # Tests sit next to the code but are not needed to build or run the image.
 **/*-test.ts
 **/*-test.tsx

@@ -3,6 +3,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -69,15 +70,10 @@ func New(cfg Config) http.Handler {
 	if cfg.Log != nil {
 		r.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: cfg.Log}))
 	}
-	r.Use(referrerPolicy, middleware.Heartbeat("/healthz"), middleware.ClientIPFromRemoteAddr)
+	// A panic answers 500 here, rather than in net/http, which would log the client's address.
+	r.Use(middleware.Recoverer, referrerPolicy, middleware.Heartbeat("/healthz"), middleware.ClientIPFromRemoteAddr)
 	if len(cfg.TrustedProxies) > 0 {
-		// Skips the trusted proxies from the right of X-Forwarded-For: the first other address is the
-		// client. Without the header, the connection's address stays.
-		trusted := make([]string, len(cfg.TrustedProxies))
-		for i, p := range cfg.TrustedProxies {
-			trusted[i] = p.String()
-		}
-		r.Use(middleware.ClientIPFromXFF(trusted...))
+		r.Use(forwardedFor(cfg.TrustedProxies))
 	}
 	// No logs here: criteria hold the start point, and requests hold the client address.
 	routeSets := r.With()
@@ -85,7 +81,8 @@ func New(cfg Config) http.Handler {
 		// Generous, since mobile carriers put many users behind one address (CGNAT).
 		routeSets = routeSets.With(rateLimit(newRateLimiter(cfg.RateLimit, cfg.RateWindow)))
 	}
-	routeSets = routeSets.With(a.checkBuild)
+	// The body is read before a generation slot is taken: a slow upload must not hold one.
+	routeSets = routeSets.With(a.checkBuild, readBody)
 	if cfg.Limits {
 		routeSets = routeSets.With(throttle(cfg.LoopLimit))
 	}
@@ -117,10 +114,54 @@ func (a *app) checkBuild(next http.Handler) http.Handler {
 	})
 }
 
+// readBody reads the request body, whole, and refuses what is not JSON. The handler then reads it from memory.
+func readBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<16))
+		// Never the error's message: a JSON syntax error quotes the body, which holds the start point.
+		if err != nil || !json.Valid(body) {
+			refuse(w, http.StatusBadRequest, contract.CodeInvalidJSON)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		next.ServeHTTP(w, r)
+	})
+}
+
+// forwardedFor takes the client's address from X-Forwarded-For when the connection comes from one of the
+// trusted proxies: skipping those from the right, the first other address is the client. From any other
+// connection the header can be forged, so the connection's address stays. Without the header it stays too.
+func forwardedFor(trusted []netip.Prefix) func(http.Handler) http.Handler {
+	prefixes := make([]string, len(trusted))
+	for i, p := range trusted {
+		prefixes[i] = p.String()
+	}
+	fromHeader := middleware.ClientIPFromXFF(prefixes...)
+	return func(next http.Handler) http.Handler {
+		viaProxy := fromHeader(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if addr, err := netip.ParseAddr(middleware.GetClientIP(r.Context())); err == nil && inRanges(trusted, addr) {
+				viaProxy.ServeHTTP(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func inRanges(ranges []netip.Prefix, addr netip.Addr) bool {
+	addr = addr.Unmap()
+	for _, p := range ranges {
+		if p.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *app) routeSets(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<16))
-	// Never the error's message: a JSON syntax error quotes the body, which holds the start point.
-	if err != nil || !json.Valid(body) {
+	body, err := io.ReadAll(r.Body) // already read, and checked, by readBody
+	if err != nil {
 		refuse(w, http.StatusBadRequest, contract.CodeInvalidJSON)
 		return
 	}

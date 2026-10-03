@@ -13,8 +13,8 @@ prototypes/
 # build
 dist/
 
-# server binary, from `go build -o server .`
-/apps/server/server
+# server binary, from `go build -o path-finder .`
+/apps/server/path-finder
 
 # dependencies
 node_modules/

@@ -3,10 +3,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -76,17 +76,19 @@ func serve() {
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 
-	srv := &http.Server{Addr: ":" + port, Handler: server.New(cfg), ReadHeaderTimeout: 10 * time.Second}
+	// A request is read in seconds (its body is a few hundred bytes), so a slow one is cut rather than kept.
+	srv := &http.Server{
+		Handler:           server.New(cfg),
+		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 2 * time.Minute,
+	}
+	ln, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go func() {
-		<-ctx.Done()
-		shutdown, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(shutdown)
-	}()
 	log.Printf("server listening on port %s", port)
-	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+	if err := server.Serve(ctx, srv, ln, 20*time.Second); err != nil {
 		log.Fatal(err)
 	}
 }

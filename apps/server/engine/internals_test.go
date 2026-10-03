@@ -1,8 +1,12 @@
 package engine
 
 import (
+	"context"
+	"fmt"
 	"math"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -152,5 +156,88 @@ func TestFileWritersFailOnAnUnwritablePath(t *testing.T) {
 	}
 	if got := bytesOf([]uint16(nil)); got != nil {
 		t.Errorf("bytesOf(nil) = %v", got)
+	}
+}
+
+func TestLandmarkCountMustFitASearch(t *testing.T) {
+	g := &testGraph{}
+	g.grid(4, 4, flat)
+	path := g.write(t)
+	dir := t.TempDir()
+	for _, count := range []int{0, -1, 33, 40} {
+		if err := WriteLandmarks(path, filepath.Join(dir, "x.alt"), "hike", count); err == nil {
+			t.Errorf("%d landmarks: err = nil, but a search keeps %d values per node", count, maxLandmarkValues)
+		}
+	}
+	if err := WriteLandmarks(path, filepath.Join(dir, "ok.alt"), "hike", 32); err != nil {
+		t.Errorf("32 landmarks fit: %v", err)
+	}
+}
+
+func TestOpenRefusesFilesThatAreShorterThanTheirHeader(t *testing.T) {
+	dir := t.TempDir()
+	g := &testGraph{}
+	g.grid(6, 6, flat)
+	graph := g.write(t)
+	alt := filepath.Join(dir, "a.alt")
+	if err := WriteLandmarks(graph, alt, "hike", 4); err != nil {
+		t.Fatal(err)
+	}
+	truncate := func(from string, size int64) string {
+		data, err := os.ReadFile(from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := filepath.Join(dir, fmt.Sprintf("%s.%d", filepath.Base(from), size))
+		if err := os.WriteFile(out, data[:size], 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	info, _ := os.Stat(graph)
+	for _, size := range []int64{20, info.Size() / 2, info.Size() - 16} {
+		if _, err := Open(truncate(graph, size), "", "hike"); err == nil {
+			t.Errorf("graph cut to %d of %d bytes: err = nil", size, info.Size())
+		}
+	}
+	info, _ = os.Stat(alt)
+	for _, size := range []int64{30, info.Size() - 2} {
+		if _, err := Open(graph, truncate(alt, size), "hike"); err == nil {
+			t.Errorf("landmarks cut to %d of %d bytes: err = nil", size, info.Size())
+		}
+	}
+}
+
+func TestAGraphWithoutEdgesOpensWithoutPanicking(t *testing.T) {
+	var b Builder
+	b.AddNode(45, 6, 100)
+	path := filepath.Join(t.TempDir(), "g.bin")
+	if err := b.WriteGraph(path); err != nil {
+		t.Fatal(err)
+	}
+	e, err := Open(path, "", "hike")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.Route(context.Background(), Point{45, 6}, Point{45, 6}); err == nil {
+		t.Log("a route from a node to itself needs no edge")
+	}
+}
+
+func TestAPanicInAWorkerBecomesAnError(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+	req.Enough = func([]*Route) bool { panic("boom") }
+
+	loops, err := e.Loops(context.Background(), req)
+	if err == nil || !strings.Contains(err.Error(), "panicked") || loops != nil {
+		t.Errorf("loops = %v, err = %v", loops, err)
+	}
+	// The engine still works afterwards: no lock was left held, no searcher lost.
+	req.Enough = nil
+	if _, err := e.Loops(context.Background(), req); err != nil {
+		t.Errorf("after the panic: %v", err)
 	}
 }

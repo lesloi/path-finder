@@ -172,9 +172,12 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 			return req.Enough(loops)
 		}
 	}
-	found := generate(ctx, e, e.sp, &loopParams{
+	found, failure := generate(ctx, e, e.sp, &loopParams{
 		distM: req.Distance, ascentM: req.Ascent, candidates: req.Candidates, seed: req.Seed,
 	}, start, enough)
+	if failure != nil {
+		return nil, failure
+	}
 	for len(loops) < len(found) {
 		l := found[len(loops)]
 		loops = append(loops, e.describe(l.nodes, l.edges))

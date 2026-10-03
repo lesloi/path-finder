@@ -205,3 +205,21 @@ func TestBuildFailsOnMissingInput(t *testing.T) {
 		t.Error("a file that is no PBF: err = nil")
 	}
 }
+
+func TestBuildFailsWhenNoWayHasElevation(t *testing.T) {
+	dir := t.TempDir()
+	// Elevation tiles near Annecy, and a way far away in Paris: every node is dropped.
+	writeHills(t, dir, 45.9, 6.1)
+	writePBF(t, filepath.Join(dir, "paris.pbf"),
+		[]pbfNode{{1, 48.85, 2.35}, {2, 48.86, 2.35}},
+		[]pbfWay{{id: 10, refs: []int64{1, 2}, tags: [][2]string{{"highway", "path"}}}})
+
+	out := filepath.Join(dir, "graph.bin")
+	err := Build([]string{filepath.Join(dir, "paris.pbf")}, dir, out, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "BD ALTI") {
+		t.Errorf("err = %v, want it to name the elevation tiles", err)
+	}
+	if _, statErr := os.Stat(out); statErr == nil {
+		t.Error("a graph with no edge was written")
+	}
+}

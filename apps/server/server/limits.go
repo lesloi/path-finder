@@ -11,6 +11,11 @@ import (
 	"github.com/lesloi/path-finder/apps/server/contract"
 )
 
+// maxTrackedAddresses bounds the memory of a window; addresses beyond it share one counter.
+const maxTrackedAddresses = 100_000
+
+var overflowKey = sha256.Sum256([]byte("overflow"))
+
 // rateLimiter counts requests per address in fixed windows. Addresses are kept only as hashes
 // salted with a random salt that changes with each window, and all of them are forgotten when it
 // ends, on a timer rather than on the next request so an idle server forgets them too.
@@ -55,6 +60,10 @@ func (l *rateLimiter) admit(key string) (retryAfter int, admitted bool) {
 	h.Write([]byte(key))
 	var sum [sha256.Size]byte
 	h.Sum(sum[:0])
+	if _, known := l.counts[sum]; !known && len(l.counts) >= maxTrackedAddresses {
+		// A flood of distinct addresses must not grow the table: the newcomers share one counter.
+		sum = overflowKey
+	}
 	l.counts[sum]++
 	if l.counts[sum] <= l.limit {
 		return 0, true

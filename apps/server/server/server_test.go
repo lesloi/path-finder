@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -275,6 +277,12 @@ func TestClientAddressIsTheConnectionUnlessAProxyIsTrusted(t *testing.T) {
 			}
 		}
 	})
+	t.Run("a connection that is not a trusted proxy cannot name the client", func(t *testing.T) {
+		client := clientSeenBy(proxies)
+		if got := client("203.0.113.9:1", "192.0.2.5"); got != "203.0.113.9" {
+			t.Errorf("client = %s, want the connection's 203.0.113.9: the header is forged", got)
+		}
+	})
 	t.Run("a trusted proxy without the header stays the client", func(t *testing.T) {
 		if got := clientSeenBy(proxies)("10.1.2.3:1", ""); got != "10.1.2.3" {
 			t.Errorf("client = %s", got)
@@ -386,5 +394,65 @@ func TestRateLimitForgetsAddressesOnItsOwnTimer(t *testing.T) {
 			t.Fatal("the window never ended")
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestAPanicAnswers500AndTheServerLivesOn(t *testing.T) {
+	calls := 0
+	h := newServer(t, func(c *Config) {
+		c.Generator = generatorFunc(func(context.Context, json.RawMessage) (any, error) {
+			calls++
+			if calls == 1 {
+				panic("boom")
+			}
+			return []string{}, nil
+		})
+	})
+	if r := post(h, `{}`); r.Code != 500 || r.Body.Len() != 0 {
+		t.Errorf("panic: got %d %q", r.Code, r.Body.String())
+	}
+	if r := post(h, `{}`); r.Code != 200 {
+		t.Errorf("after the panic: got %d", r.Code)
+	}
+}
+
+func TestASlowUploadDoesNotHoldAGenerationSlot(t *testing.T) {
+	h := newServer(t, func(c *Config) { c.Limits = true; c.LoopLimit = 1 })
+	pipe, writer := io.Pipe()
+	slow := httptest.NewRequest(http.MethodPost, "/api/v1/route-sets", pipe)
+	done := make(chan struct{})
+	go func() {
+		h.ServeHTTP(httptest.NewRecorder(), slow)
+		close(done)
+	}()
+	_, _ = writer.Write([]byte(`{"sta`)) // the body is on its way, and stays unfinished
+	time.Sleep(50 * time.Millisecond)
+
+	if r := post(h, `{}`); r.Code != 200 {
+		t.Errorf("another user while an upload is slow: got %d, want 200 (the slot is free)", r.Code)
+	}
+	_, _ = writer.Write([]byte(`rt":1}`))
+	writer.Close()
+	<-done
+}
+
+func TestRateLimitTableHasABound(t *testing.T) {
+	l := newRateLimiter(1, time.Hour)
+	for i := 0; i < maxTrackedAddresses; i++ {
+		if _, ok := l.admit(fmt.Sprint("address-", i)); !ok {
+			t.Fatalf("address %d refused", i)
+		}
+	}
+	if _, ok := l.admit("newcomer-1"); !ok {
+		t.Error("the first newcomer shares an empty overflow counter")
+	}
+	if _, ok := l.admit("newcomer-2"); ok {
+		t.Error("newcomers beyond the bound must share one counter")
+	}
+	if _, ok := l.admit("address-0"); ok {
+		t.Error("a known address keeps its own counter: its second request is over the limit")
+	}
+	if len(l.counts) > maxTrackedAddresses+1 {
+		t.Errorf("table has %d entries", len(l.counts))
 	}
 }

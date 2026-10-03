@@ -4,7 +4,7 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
-    "dev": "(cd apps/server && APP_ENV=development CGO_ENABLED=0 go run .) & pnpm --filter @path-finder/web dev; wait",
+    "dev": "scripts/dev.sh",
     "build": "pnpm --filter @path-finder/web build",
     "start": "cd apps/server && CGO_ENABLED=0 go run .",
     "format": "prettier --write .",
