@@ -17,7 +17,8 @@ const STATIC_FILES = new Set([
 export function strategyFor(url: URL, origin: string, method: string, mode: string): Strategy {
   if (method !== 'GET' || url.origin !== origin) return 'ignore';
   if (url.pathname.startsWith('/api/')) return 'ignore';
-  if (mode === 'navigate') return 'network-first';
+  // Only the app's own page: any other 200 answer (/healthz, /build-id) must never take the shell's place.
+  if (mode === 'navigate') return url.pathname === '/' ? 'network-first' : 'ignore';
   // Vite fingerprints what it emits under /assets, so a cached copy is never stale.
   if (url.pathname.startsWith('/assets/') || STATIC_FILES.has(url.pathname)) return 'cache-first';
   return 'ignore';

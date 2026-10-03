@@ -7,8 +7,11 @@ export interface CacheDeps {
   keepAlive: (work: Promise<unknown>) => void;
 }
 
-/** Every navigation falls back to this one entry: they all get the same shell. */
+/** The one page of the app, and the only entry a navigation falls back to. */
 const SHELL = '/';
+
+/** On a weak signal the network may answer after a long time or never: past this, the cached shell is used. */
+export const NETWORK_TIMEOUT_MS = 4000;
 
 export function createCacheHandlers({ caches, cacheName, fetch, keepAlive }: CacheDeps) {
   // Only a plain 200 is kept: a 206 makes `put` throw, and a redirected answer is refused for a navigation.
@@ -25,16 +28,33 @@ export function createCacheHandlers({ caches, cacheName, fetch, keepAlive }: Cac
   };
 
   return {
-    /** The network first, so the reload that follows a `426` fetches the new build; the cache is the way out offline. */
+    /**
+     * The network first, so the reload that follows a `426` fetches the new build. The cached shell is the way
+     * out when the network fails, is too slow or answers with a server error; with no shell, the network is awaited.
+     */
     async networkFirst(request: Request): Promise<Response> {
-      try {
-        const response = await fetch(request);
+      const shell = async () => (await caches.open(cacheName)).match(SHELL);
+      const network = fetch(request).then((response) => {
         store(SHELL, response);
         return response;
+      });
+      // A late answer still refreshes the cache, and must not be an unhandled rejection once we stopped waiting.
+      keepAlive(network.catch(() => undefined));
+      let stopTimer = () => {};
+      const timeout = new Promise<undefined>((resolve) => {
+        const timer = setTimeout(resolve, NETWORK_TIMEOUT_MS);
+        stopTimer = () => clearTimeout(timer);
+      });
+      try {
+        const response = await Promise.race([network, timeout]);
+        if (response && response.status < 500) return response;
+        return (await shell()) ?? response ?? network;
       } catch (error) {
-        const cached = await (await caches.open(cacheName)).match(SHELL);
+        const cached = await shell();
         if (cached) return cached;
         throw error;
+      } finally {
+        stopTimer();
       }
     },
 

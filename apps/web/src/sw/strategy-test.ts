@@ -5,8 +5,15 @@ const strategy = (path: string, method = 'GET', mode = 'no-cors', origin = ORIGI
   strategyFor(new URL(path, origin), ORIGIN, method, mode);
 
 describe('strategyFor', () => {
-  it('asks the network first for a page, so a reload after a deploy gets the new build', () => {
+  it('asks the network first for the page, so a reload after a deploy gets the new build', () => {
     expect(strategy('/', 'GET', 'navigate')).toBe('network-first');
+    expect(strategy('/?lat=45&lng=5', 'GET', 'navigate')).toBe('network-first');
+  });
+
+  it('leaves other pages alone, so they never replace the cached shell', () => {
+    expect(strategy('/healthz', 'GET', 'navigate')).toBe('ignore');
+    expect(strategy('/build-id', 'GET', 'navigate')).toBe('ignore');
+    expect(strategy('/api', 'GET', 'navigate')).toBe('ignore');
   });
 
   it('keeps fingerprinted assets and static files for good', () => {

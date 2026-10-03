@@ -1,4 +1,4 @@
-import { createCacheHandlers } from './cache.ts';
+import { createCacheHandlers, NETWORK_TIMEOUT_MS } from './cache.ts';
 
 const key = (request: Request | string) =>
   typeof request === 'string' ? new URL(request, 'https://app.test').href : request.url;
@@ -90,6 +90,85 @@ describe('networkFirst', () => {
     });
     expect(await text(await handlers.networkFirst(page))).toBe('shell');
     await expect(Promise.all(pending)).resolves.toBeDefined();
+  });
+});
+
+describe('networkFirst on a weak connection', () => {
+  const deferred = () => {
+    let resolve!: (response: Response) => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<Response>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('uses the cached shell when the network is too slow, and the late answer refreshes it', async () => {
+    const network = deferred();
+    const { handlers, stores, settled } = setup(() => network.promise, { 'build-2': { '/': 'old shell' } });
+    const answer = handlers.networkFirst(page);
+    await vi.advanceTimersByTimeAsync(NETWORK_TIMEOUT_MS);
+    expect(await text(await answer)).toBe('old shell');
+    network.resolve(new Response('new shell'));
+    await settled();
+    expect(await text(stores.get('build-2')?.get('https://app.test/'))).toBe('new shell');
+  });
+
+  it('does not leave an unhandled rejection when the slow network fails after the shell was used', async () => {
+    const network = deferred();
+    const { handlers, settled } = setup(() => network.promise, { 'build-2': { '/': 'old shell' } });
+    const answer = handlers.networkFirst(page);
+    await vi.advanceTimersByTimeAsync(NETWORK_TIMEOUT_MS);
+    expect(await text(await answer)).toBe('old shell');
+    network.reject(new TypeError('offline'));
+    await expect(settled()).resolves.toBeDefined();
+  });
+
+  it('keeps waiting for the network when nothing is cached', async () => {
+    const network = deferred();
+    const { handlers } = setup(() => network.promise);
+    const answer = handlers.networkFirst(page);
+    await vi.advanceTimersByTimeAsync(NETWORK_TIMEOUT_MS * 3);
+    network.resolve(new Response('slow shell'));
+    expect(await text(await answer)).toBe('slow shell');
+  });
+
+  it('rethrows a failure that comes after the timeout when nothing is cached', async () => {
+    const network = deferred();
+    const { handlers } = setup(() => network.promise);
+    const answer = handlers.networkFirst(page);
+    const failure = expect(answer).rejects.toThrow('offline');
+    await vi.advanceTimersByTimeAsync(NETWORK_TIMEOUT_MS);
+    network.reject(new TypeError('offline'));
+    await failure;
+  });
+
+  it('uses the cached shell when the server answers with an error', async () => {
+    const { handlers } = setup(() => Promise.resolve(new Response('bad gateway', { status: 502 })), {
+      'build-2': { '/': 'old shell' },
+    });
+    expect(await text(await handlers.networkFirst(page))).toBe('old shell');
+  });
+
+  it('shows the server error when there is no shell to use', async () => {
+    const { handlers } = setup(() => Promise.resolve(new Response('bad gateway', { status: 502 })));
+    expect((await handlers.networkFirst(page)).status).toBe(502);
+  });
+
+  it('does not use the shell for a client error, which the app has to see', async () => {
+    const { handlers } = setup(() => Promise.resolve(new Response('upgrade', { status: 426 })), {
+      'build-2': { '/': 'old shell' },
+    });
+    expect((await handlers.networkFirst(page)).status).toBe(426);
+  });
+
+  it('stops the timer once the network has answered', async () => {
+    const { handlers } = setup(() => Promise.resolve(new Response('shell')));
+    await handlers.networkFirst(page);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
