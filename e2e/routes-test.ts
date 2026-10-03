@@ -36,6 +36,23 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('routes-row-0-distance')).toHaveText(/^\d+\.\d km$/);
   });
 
+  test('asks again by itself when the server is busy, and shows the routes', async ({ page }) => {
+    let requests = 0;
+    await page.route('**/api/v1/route-sets', (route) => {
+      requests++;
+      // The first answer is a refusal for lack of a free slot; the retry reaches the real server.
+      return requests === 1
+        ? route.fulfill({ status: 429, headers: { 'Retry-After': '1' }, json: { error: 'overloaded' } })
+        : route.continue();
+    });
+
+    await findRoutes(page);
+
+    await expect(page.getByTestId('routes-row-0')).toBeVisible();
+    await expect(page.getByTestId('routes-toast')).toHaveCount(0);
+    expect(requests).toBe(2);
+  });
+
   test('shows the elevation gain of each route', async ({ page }) => {
     await findRoutes(page);
 

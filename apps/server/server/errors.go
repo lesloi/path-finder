@@ -6,8 +6,9 @@ import (
 	"strconv"
 )
 
-// busyRetryAfter is a wait in seconds: about one generation, given the < 5 s p95 target.
-const busyRetryAfter = 5
+// busyRetryAfter is the wait in seconds asked of a user who found every generation slot taken: a generation
+// lasts well under a second, so a slot frees almost at once. The web app spreads its retries around it.
+const busyRetryAfter = 1
 
 type refusal struct {
 	Error string `json:"error"`
