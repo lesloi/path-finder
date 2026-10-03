@@ -142,8 +142,8 @@ func (a *landmarks) bound(rv []uint16, tg *[64]uint16) float32 {
 	return float32(best) * a.unit
 }
 
-// Engine routes and generates loops on one graph for one activity profile. It is safe for
-// concurrent use: the graph and landmarks are read-only.
+// Engine routes and generates loops on a graph for one activity profile. It is safe for
+// concurrent use: the graph and landmarks are read-only, and engines of other profiles share them.
 type Engine struct {
 	g       *graph
 	alt     *landmarks
@@ -519,6 +519,15 @@ func ascent(g *graph, nodes []uint32) float64 {
 	return up
 }
 
+// descent is the elevation loss along nodes, counted as ascent is.
+func descent(g *graph, nodes []uint32) float64 {
+	back := make([]uint32, len(nodes))
+	for i, n := range nodes {
+		back[len(nodes)-1-i] = n
+	}
+	return ascent(g, back)
+}
+
 // splitmix is a small seeded random generator: the same seed always yields the same loops.
 type splitmix struct{ s uint64 }
 
@@ -538,14 +547,13 @@ func (r *splitmix) f64() float64          { return float64(r.next()>>11) / float
 func (r *splitmix) below(n uint64) uint64 { return r.next() % n }
 
 type loopParams struct {
-	lat, lon       float64
 	distM, ascentM float64
 	candidates     int
 	seed           uint64
 }
 
 type loopResult struct {
-	nodes                               []uint32
+	nodes, edges                        []uint32
 	dist, ascent, trail, overlap, score float64
 }
 
@@ -634,7 +642,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 		asc := ascent(g, nodes)
 		sc := lp.score(dist, asc, overlap)
 		if best == nil || sc < best.score {
-			best = &loopResult{nodes, dist, asc, trail, overlap, sc}
+			best = &loopResult{nodes, edges, dist, asc, trail, overlap, sc}
 		}
 		if math.Abs(dist-lp.distM) < 0.03*lp.distM {
 			break
@@ -644,17 +652,14 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 	return best
 }
 
-// generate returns nil when no loop is found or ctx is cancelled.
-func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams) *loopResult {
-	start, d, ok := sp.nearest(cx.g, lp.lat, lp.lon)
-	if !ok || d > 400 {
-		return nil
-	}
+// generate returns the best candidate of each worker's share of lp.candidates, in no particular
+// order. When ctx ends it returns the candidates finished so far.
+func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams, start uint32) []*loopResult {
 	// GOMAXPROCS follows the container's CPU limit (Go 1.25+); NumCPU would not.
 	workers := min(runtime.GOMAXPROCS(0), 8)
 	var next atomic.Int64
 	var mu sync.Mutex
-	var winners []*loopResult
+	var found []*loopResult
 	var wg sync.WaitGroup
 	for range workers {
 		wg.Add(1)
@@ -662,32 +667,19 @@ func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams) *loo
 			defer wg.Done()
 			s := searcherPool.Get().(*searcher)
 			defer searcherPool.Put(s)
-			var best *loopResult
 			for {
 				i := int(next.Add(1) - 1)
 				if i >= lp.candidates || ctx.Err() != nil {
-					break
+					return
 				}
-				if l := candidate(ctx, cx, sp, s, lp, start, i); l != nil && (best == nil || l.score < best.score) {
-					best = l
+				if l := candidate(ctx, cx, sp, s, lp, start, i); l != nil {
+					mu.Lock()
+					found = append(found, l)
+					mu.Unlock()
 				}
-			}
-			if best != nil {
-				mu.Lock()
-				winners = append(winners, best)
-				mu.Unlock()
 			}
 		}()
 	}
 	wg.Wait()
-	if ctx.Err() != nil {
-		return nil
-	}
-	var best *loopResult
-	for _, w := range winners {
-		if best == nil || w.score < best.score {
-			best = w
-		}
-	}
-	return best
+	return found
 }

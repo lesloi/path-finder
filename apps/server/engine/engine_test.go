@@ -217,42 +217,91 @@ func loopRequest(g *testGraph, at func(x, y int) int) LoopRequest {
 	return LoopRequest{Start: pointOf(g, at(10, 10)), Distance: 3000, Ascent: 0, Candidates: 12, Seed: 7}
 }
 
-func TestLoopComesBackAndIsClose(t *testing.T) {
+func TestLoopsComeBackAndAreClose(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(21, 21, flat)
 	e := openTest(t, g, false)
 
-	l, err := e.Loop(context.Background(), loopRequest(g, at))
+	loops, err := e.Loops(context.Background(), loopRequest(g, at))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first, last := l.Points[0], l.Points[len(l.Points)-1]; first != last {
-		t.Errorf("loop is open: %v to %v", first, last)
+	if len(loops) < 6 {
+		t.Fatalf("%d loops out of 12 candidates", len(loops))
 	}
-	near(t, l.Distance, 3000, 600, "distance")
+	for _, l := range loops {
+		if first, last := l.Points[0], l.Points[len(l.Points)-1]; first != last {
+			t.Errorf("loop is open: %v to %v", first, last)
+		}
+		near(t, l.Distance, 3000, 1200, "distance")
+		var sum float64
+		for _, s := range l.Stretches {
+			sum += s.Meters
+		}
+		near(t, sum, l.Distance, 1, "stretches")
+	}
+	distinct := map[float64]bool{}
+	for _, l := range loops {
+		distinct[l.Distance] = true
+	}
+	if len(distinct) < 3 {
+		t.Errorf("only %d different loops", len(distinct))
+	}
 }
 
-func TestLoopIsDeterministicForASeed(t *testing.T) {
+func TestLoopsAreDeterministicForASeed(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(21, 21, flat)
 	e := openTest(t, g, false)
 	req := loopRequest(g, at)
 
-	a, err := e.Loop(context.Background(), req)
-	if err != nil {
-		t.Fatal(err)
+	total := func() (sum float64) {
+		loops, err := e.Loops(context.Background(), req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, l := range loops {
+			sum += l.Distance
+		}
+		return
 	}
-	b, err := e.Loop(context.Background(), req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if a.Distance != b.Distance || len(a.Points) != len(b.Points) {
-		t.Errorf("same seed, different loops: %.0f m (%d points) and %.0f m (%d points)",
-			a.Distance, len(a.Points), b.Distance, len(b.Points))
+	if a, b := total(), total(); a != b {
+		t.Errorf("same seed, different loops: %.0f m then %.0f m in total", a, b)
 	}
 }
 
-func TestLoopErrors(t *testing.T) {
+func TestLoopsMeasureDescentAndSurfaces(t *testing.T) {
+	g := &testGraph{}
+	// A hill the loops must cross, with a rough path on the right and a paved road on the left.
+	at := g.grid(21, 21, func(x, y int) float64 { return 100 + float64(x)*3 })
+	for from := range g.edges {
+		for i := range g.edges[from] {
+			if g.nodes[from].Lon > g.nodes[at(10, 10)].Lon {
+				g.edges[from][i].Kind, g.edges[from][i].Surf = kTrack, sRough
+			} else {
+				g.edges[from][i].Kind, g.edges[from][i].Surf = kResidential, sPaved
+			}
+		}
+	}
+	e := openTest(t, g, false)
+
+	loops, err := e.Loops(context.Background(), loopRequest(g, at))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paved, unpaved bool
+	for _, l := range loops {
+		near(t, l.Descent, l.Ascent, 6, "descent of a loop")
+		for _, s := range l.Stretches {
+			paved, unpaved = paved || !s.Unpaved, unpaved || s.Unpaved
+		}
+	}
+	if !paved || !unpaved {
+		t.Errorf("loops around the middle cover both surfaces: paved %v, unpaved %v", paved, unpaved)
+	}
+}
+
+func TestLoopsErrors(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(21, 21, flat)
 	e := openTest(t, g, false)
@@ -260,15 +309,41 @@ func TestLoopErrors(t *testing.T) {
 
 	done, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, err := e.Loop(done, req); !errors.Is(err, context.Canceled) {
+	if _, err := e.Loops(done, req); !errors.Is(err, context.Canceled) {
 		t.Errorf("cancelled context: err = %v, want context.Canceled", err)
 	}
-	if _, err := e.Loop(context.Background(), LoopRequest{Start: req.Start}); err == nil {
-		t.Error("loop without a distance: err = nil")
+	if _, err := e.Loops(context.Background(), LoopRequest{Start: req.Start}); err == nil {
+		t.Error("loops without a distance: err = nil")
 	}
 	req.Start = Point{46, 7}
-	if _, err := e.Loop(context.Background(), req); !errors.Is(err, ErrNoLoop) {
-		t.Errorf("start off the graph: err = %v, want ErrNoLoop", err)
+	if _, err := e.Loops(context.Background(), req); !errors.Is(err, ErrOffGraph) {
+		t.Errorf("start off the graph: err = %v, want ErrOffGraph", err)
+	}
+	req = loopRequest(g, at)
+	req.Distance = 500_000 // nothing a lattice of 2 km can close
+	if _, err := e.Loops(context.Background(), req); !errors.Is(err, ErrNoLoop) {
+		t.Errorf("impossible distance: err = %v, want ErrNoLoop", err)
+	}
+}
+
+func TestCancellationKeepsTheLoopsFinishedSoFar(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(80, 80, flat)
+	e := openTest(t, g, false)
+	req := LoopRequest{Start: pointOf(g, at(40, 40)), Distance: 20000, Candidates: 100000, Seed: 1}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	loops, err := e.Loops(ctx, req)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
+	}
+	if took := time.Since(start); took > time.Second {
+		t.Errorf("kept working %v after a 150ms deadline", took)
+	}
+	if len(loops) == 0 {
+		t.Error("no loop kept: the ones finished before the deadline are lost")
 	}
 }
 
@@ -285,23 +360,5 @@ func TestOpenRejectsBadInput(t *testing.T) {
 	}
 	if _, err := Open(path, path, "hike"); err == nil {
 		t.Error("graph file given as landmarks: err = nil")
-	}
-}
-
-func TestCancellationStopsALoopInFlight(t *testing.T) {
-	g := &testGraph{}
-	at := g.grid(80, 80, flat)
-	e := openTest(t, g, false)
-	req := LoopRequest{Start: pointOf(g, at(40, 40)), Distance: 20000, Candidates: 100000, Seed: 1}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	start := time.Now()
-	_, err := e.Loop(ctx, req)
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
-	}
-	if took := time.Since(start); took > time.Second {
-		t.Errorf("loop kept working %v after a 50ms deadline", took)
 	}
 }

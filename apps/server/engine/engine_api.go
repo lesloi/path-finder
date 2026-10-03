@@ -27,16 +27,24 @@ type Position struct {
 	Elevation float64
 }
 
+// Stretch is a part of a route on one kind of surface.
+type Stretch struct {
+	Unpaved bool
+	Meters  float64
+}
+
 // Route is a generated route: its geometry and its measures, in metres.
 type Route struct {
 	Points     []Position
 	Distance   float64
 	Ascent     float64
-	TrailShare float64 // share of the distance on trails, 0 to 1
+	Descent    float64
+	TrailShare float64   // share of the distance on trails, 0 to 1
+	Stretches  []Stretch // the surface along the route, consecutive stretches of one kind merged
 }
 
-// LoopRequest asks for a loop from Start. Distance is the target length in metres and Ascent the
-// target elevation gain in metres (0 for none). The same Seed always yields the same loop.
+// LoopRequest asks for loops from Start. Distance is the target length in metres and Ascent the
+// target elevation gain in metres (0 for none). The same Seed always yields the same loops.
 type LoopRequest struct {
 	Start      Point
 	Distance   float64
@@ -48,27 +56,41 @@ type LoopRequest struct {
 // Open maps a graph file, and its landmark file when landmarksPath is not empty, for the named
 // activity profile. The landmarks must have been built for the same profile.
 func Open(graphPath, landmarksPath, profile string) (*Engine, error) {
-	p := profiles[profile]
-	if p == nil {
-		return nil, fmt.Errorf("engine: unknown profile %q", profile)
+	engines, err := OpenAll(graphPath, map[string]string{profile: landmarksPath})
+	if err != nil {
+		return nil, err
 	}
+	return engines[profile], nil
+}
+
+// OpenAll maps a graph file once and returns an engine per activity profile, keyed by name. The
+// value is the profile's landmark file, or empty for none. Engines share the graph and its index.
+func OpenAll(graphPath string, landmarks map[string]string) (map[string]*Engine, error) {
 	g, err := openGraph(graphPath)
 	if err != nil {
 		return nil, err
 	}
-	e := &Engine{g: g, prof: p, minMult: p.minMult()}
-	for k := range e.mult {
-		for s := range e.mult[k] {
-			e.mult[k][s] = p.Kind[k] * p.Surf[s]
+	sp := newSpatial(g)
+	engines := make(map[string]*Engine, len(landmarks))
+	for name, path := range landmarks {
+		p := profiles[name]
+		if p == nil {
+			return nil, fmt.Errorf("engine: unknown profile %q", name)
 		}
-	}
-	if landmarksPath != "" {
-		if e.alt, err = openLandmarks(landmarksPath, g); err != nil {
-			return nil, err
+		e := &Engine{g: g, sp: sp, prof: p, minMult: p.minMult()}
+		for k := range e.mult {
+			for s := range e.mult[k] {
+				e.mult[k][s] = p.Kind[k] * p.Surf[s]
+			}
 		}
+		if path != "" {
+			if e.alt, err = openLandmarks(path, g); err != nil {
+				return nil, err
+			}
+		}
+		engines[name] = e
 	}
-	e.sp = newSpatial(g)
-	return e, nil
+	return engines, nil
 }
 
 // Route finds the cheapest route from one point to another. It returns ctx's error when ctx ends first.
@@ -90,37 +112,75 @@ func (e *Engine) Route(ctx context.Context, from, to Point) (*Route, error) {
 	if r == nil {
 		return nil, ErrNoRoute
 	}
-	dist, trail, _ := measure(e.g, r.nodes, r.edges)
-	out := &Route{Points: e.positions(r.nodes), Distance: dist, Ascent: ascent(e.g, r.nodes)}
-	if dist > 0 {
-		out.TrailShare = trail / dist
-	}
-	return out, nil
+	return e.describe(r.nodes, r.edges), nil
 }
 
-// Loop generates the best of req.Candidates loops. It returns ctx's error when ctx ends first.
-func (e *Engine) Loop(ctx context.Context, req LoopRequest) (*Route, error) {
+// Loops generates req.Candidates loops that differ by their waypoints, each close to the target
+// distance, in no particular order. When ctx ends first it returns the loops finished so far,
+// possibly none, with ctx's error: the caller decides whether they are enough.
+func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if req.Distance <= 0 || req.Candidates <= 0 {
-		return nil, errors.New("engine: loop needs a positive distance and candidate count")
+		return nil, errors.New("engine: loops need a positive distance and candidate count")
 	}
-	l := generate(ctx, e, e.sp, &loopParams{
-		lat: req.Start.Lat, lon: req.Start.Lon, distM: req.Distance, ascentM: req.Ascent,
-		candidates: req.Candidates, seed: req.Seed,
-	})
+	start, d, ok := e.sp.nearest(e.g, req.Start.Lat, req.Start.Lon)
+	if !ok || d > maxSnapMeters {
+		return nil, ErrOffGraph
+	}
+	found := generate(ctx, e, e.sp, &loopParams{
+		distM: req.Distance, ascentM: req.Ascent, candidates: req.Candidates, seed: req.Seed,
+	}, start)
+	loops := make([]*Route, len(found))
+	for i, l := range found {
+		loops[i] = e.describe(l.nodes, l.edges)
+	}
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return loops, err
 	}
-	if l == nil {
+	if len(loops) == 0 {
 		return nil, ErrNoLoop
 	}
-	return &Route{Points: e.positions(l.nodes), Distance: l.dist, Ascent: l.ascent, TrailShare: l.trail / l.dist}, nil
+	return loops, nil
 }
 
-func (e *Engine) positions(nodes []uint32) []Position {
-	out := make([]Position, len(nodes))
+// describe measures a path of nodes joined by edges.
+func (e *Engine) describe(nodes, edges []uint32) *Route {
+	dist, trail, _ := measure(e.g, nodes, edges)
+	r := &Route{
+		Points:    make([]Position, len(nodes)),
+		Distance:  dist,
+		Ascent:    ascent(e.g, nodes),
+		Descent:   descent(e.g, nodes),
+		Stretches: e.stretches(edges),
+	}
+	if dist > 0 {
+		r.TrailShare = trail / dist
+	}
 	for i, n := range nodes {
 		nd := e.g.nodes[n]
-		out[i] = Position{Point{float64(nd.Lat) * 1e-7, float64(nd.Lon) * 1e-7}, float64(nd.Elev) * 0.1}
+		r.Points[i] = Position{Point{float64(nd.Lat) * 1e-7, float64(nd.Lon) * 1e-7}, float64(nd.Elev) * 0.1}
+	}
+	return r
+}
+
+// isUnpaved tells whether a way is unpaved, from its surface group, or from its kind when the
+// surface is unknown.
+func isUnpaved(kind, surf uint8) bool {
+	if surf == sUnknown {
+		return kind == kPath || kind == kTrack || kind == kBridleway
+	}
+	return surf == sCompact || surf == sRough
+}
+
+func (e *Engine) stretches(edges []uint32) []Stretch {
+	var out []Stretch
+	for _, id := range edges {
+		ed := e.g.edges[id]
+		unpaved := isUnpaved(ed.Kind, ed.Surf)
+		if n := len(out); n > 0 && out[n-1].Unpaved == unpaved {
+			out[n-1].Meters += float64(ed.Len)
+		} else {
+			out = append(out, Stretch{unpaved, float64(ed.Len)})
+		}
 	}
 	return out
 }
