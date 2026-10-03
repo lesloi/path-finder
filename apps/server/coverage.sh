@@ -1,13 +1,16 @@
 #!/bin/sh
-# Coverage of the whole server, which unit and integration tests share (`-coverpkg`): it fails under 90%
-# like `pnpm coverage:web` does for the web app, and lists the functions that are poorly covered.
+# Coverage of the whole server by its unit tests (`-coverpkg`, so a test counts for the packages it goes
+# through): it fails under 90% like `pnpm coverage:web` does for the web app, and lists the functions that
+# are poorly covered. The integration tests are not counted: they check that the parts fit together.
 set -eu
 cd "$(dirname "$0")"
 export CGO_ENABLED=0
 profile="$(mktemp)"
 trap 'rm -f "$profile" "$profile.kept"' EXIT
 
-go test -coverpkg=./... -coverprofile="$profile" ./... > /dev/null
+packages="$(go list ./... | grep -v '/integration$')"
+# shellcheck disable=SC2086
+go test -coverpkg=./... -coverprofile="$profile" $packages > /dev/null
 # Leave out what only starts the server or writes the stand-in graph.
 grep -v -e '/main\.go:' -e '/cmd/' -e '/internal/standin/' "$profile" > "$profile.kept"
 echo "Functions under 80%:"
