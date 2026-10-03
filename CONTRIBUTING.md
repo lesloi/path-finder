@@ -30,9 +30,6 @@ From the root (the server needs Go, built with `CGO_ENABLED=0`):
 | `pnpm coverage:web`     | Web unit tests with coverage (workflow `web`)                                         |
 | `pnpm coverage:server`  | Go unit tests with coverage, listing the weakly covered functions (workflow `server`) |
 
-One tool, one file: run a single test with `pnpm vitest run path/to/file-test.ts`, or from `apps/server`
-with `go test ./engine -run TestName`.
-
 ## Privacy-first rules
 
 A pull request that breaks these rules is not merged. If a feature seems to need an

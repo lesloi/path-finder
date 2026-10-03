@@ -18,16 +18,6 @@ nothing to install for them.
 - [Go 1.27](https://go.dev/dl/) (the server is built with `CGO_ENABLED=0`)
 - [Node.js 26](https://nodejs.org/) and [pnpm](https://pnpm.io/installation), for the web app
 
-As a rough guide, measured on Auvergne-Rhône-Alpes:
-
-- Building the graph takes about 15 seconds and 3 GB of RAM. Metropolitan France is estimated at about
-  25 GB of RAM (not measured). It runs apart from the server, as a job.
-- Serving maps the files read-only: about 650 MB of graph and 1 GB of landmarks for the region (16
-  landmarks), which the operating system keeps in its page cache and counts in a container's memory.
-  Metropolitan France is estimated at 5 GB and 8 GB.
-- A loop route set takes a few CPU-milliseconds to a few CPU-seconds, depending on the criteria, so
-  the server follows the CPUs it may use (`GOMAXPROCS` follows a container's CPU limit).
-
 ## 1. Get the code
 
 ```sh
@@ -94,15 +84,15 @@ pnpm start   # http://localhost:3000
 
 | Variable             | Required | Default       | Description                                                                                    |
 | -------------------- | -------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin`, and the `hike.alt` and `run.alt` landmarks, which are optional |
+| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                       |
 | `PORT`               | no       | `3000`        | Port the server listens on                                                                     |
 | `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                              |
-| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                       |
+| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin`, and the `hike.alt` and `run.alt` landmarks, which are optional |
 | `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                     |
 | `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))     |
+| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none             |
 | `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                   |
 | `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                    |
-| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none             |
 
 ### How many at once
 
@@ -112,22 +102,8 @@ instance. Beyond it a request is not queued: it is answered `429` at once with `
 web app tells the user the service is busy. The server keeps nothing between requests, so another
 instance never needs to know about this one's.
 
-By default the server allows 4 at once per 8 CPUs (4 up to 8 CPUs, 8 up to 16). Measured on a real graph
-with 30 % of hard requests (a high elevation gain target), with random arrivals:
-
-| Machine | Arrivals | 1 at once    | 2 at once    | 4 at once    |
-| ------- | -------- | ------------ | ------------ | ------------ |
-| 2 CPU   | 4 / s    | 40 % refused | 26 % refused | 10 % refused |
-| 8 CPU   | 10 / s   | 41 % refused | 21 % refused | 5 % refused  |
-
-A slot is cheap to give: searches share the CPUs, so with more at once each takes longer, but a hard
-request went from about 0.2 s to 0.35 s on 8 CPUs, and to about 1 s on 2 CPUs. What a slot costs is
-memory, a few hundred MB for each on a region as large as Auvergne-Rhône-Alpes.
-
 Lower the limit when a small machine runs short of memory or when users see `504` (nothing found in
-time); raise it when they see `429` while the CPUs are idle. To serve more users overall, add
-instances: each has its own limit. `RATE_LIMIT` is another matter: it limits one client address, not the
-machine.
+time); raise it when they see `429` while the CPUs are idle.
 
 ## 5. Host it
 

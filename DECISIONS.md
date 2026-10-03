@@ -20,14 +20,8 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
 
 ## Backend
 
-- **One Go binary, with chi, instead of an API plus BRouter.** One service less to run, and routing,
-  loops and elevation share one graph. Rust was measured on the same algorithm: 7–12 % more throughput
-  and about a third of the working memory on loops, not enough to leave Go's ecosystem and tooling.
-  WebAssembly was not wanted. chi gives `Heartbeat`, `Timeout`, `Throttle` and `ClientIPFromXFF`
-  from the standard `net/http` types, with no framework to learn.
 - **The graph is built ahead of serving and mapped read-only.** The server only reads it, so it holds
-  no copy of the graph in its own memory and the operating system's page cache is the only cache. The build needs far more
-  RAM than serving (about 3 GB for Auvergne-Rhône-Alpes), so it runs apart, as a job.
+  no copy of the graph in its own memory and the operating system's page cache is the only cache.
 - **A search never waits in a queue.** A loop costs about 11 CPU-seconds, an A→B route a few
   milliseconds, so concurrent searches are capped per kind (chi `Throttle`) and the answer is `429`
   beyond it. A search watches its `context.Context`, so a departed client frees its CPU.
@@ -59,8 +53,7 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   weighs climbs with the same values it reports. Revisit if coverage extends beyond France (Copernicus
   DEM overstated gain in cities and forests).
 - **A node with no elevation is left out of the graph.** Every route has an elevation gain, so the web
-  app has no mode without it; where BD ALTI has no tile there are no routes. Overseas France needs its
-  own projections first (#81).
+  app has no mode without it; where BD ALTI has no tile there are no routes.
 
 ## Naming
 

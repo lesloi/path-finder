@@ -7,9 +7,9 @@ and an elevation gain. Vocabulary: [CONTEXT.md](./CONTEXT.md).
 
 - `apps/web`: Vite + React PWA, MapLibre with Plan IGN tiles.
 - `apps/server`: one stateless Go binary (chi). It generates routes and loops in process on a graph
-  built ahead of serving, and it serves the built web app on the same origin. No BRouter, no second service.
+  built ahead of serving, and it serves the built web app on the same origin.
 - The graph is built from OSM PBF files and BD ALTI by the binary's own `build-graph` and `build-alt`
-  commands, never while serving. The server maps the files read-only.
+  commands, never while serving.
 - pnpm for the web app, Go for the server (`CGO_ENABLED=0`); the scripts are in the root `package.json`.
 
 By default:
