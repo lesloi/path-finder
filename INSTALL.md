@@ -101,7 +101,7 @@ pnpm start   # http://localhost:3000
 Generating a route set is the one costly request: it searches many loops in parallel, on every CPU the
 server may use, up to 8. `LOOP_LIMIT` is how many such requests may run at the same time on one
 instance. Beyond it a request is not queued: it is answered `429` at once with `Retry-After: 1`. The web
-app then asks again by itself, twice at most, after that long or up to twice as long (at random, so refused users do
+app then asks again by itself, twice at most, after that long plus up to a second at random (so refused users do
 not return together), and tells the user the service is busy only if it still is. Other refusals, such as
 `rate-limited`, are shown at once. The server keeps nothing between requests, so another instance never
 needs to know about this one's.

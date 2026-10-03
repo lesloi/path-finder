@@ -208,13 +208,13 @@ describe('retrying while the server is busy', () => {
     vi.restoreAllMocks();
   });
 
-  it('waits what the server asks or up to twice that, and never asks for more than five seconds', () => {
+  it('waits what the server asks plus up to a second, and never asks for more than five seconds', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     expect(retryDelay(1)).toBe(1000);
     vi.spyOn(Math, 'random').mockReturnValue(1);
     expect(retryDelay(1)).toBe(2000);
     expect(retryDelay(undefined)).toBe(2000);
-    expect(retryDelay(60)).toBe(10_000);
+    expect(retryDelay(60)).toBe(6000);
   });
 
   it('asks again after the wait, and the user only sees the routes', async () => {
