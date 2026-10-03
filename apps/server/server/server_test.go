@@ -366,3 +366,36 @@ func TestStaticFilesAreCachedByKind(t *testing.T) {
 		t.Errorf("POST to a static path: got %d", r.Code)
 	}
 }
+
+func TestWithoutABuiltWebAppAnyBuildIsAccepted(t *testing.T) {
+	h := New(Config{WebRoot: t.TempDir(), Generator: generatorFunc(okGenerator)})
+	r := do(h, http.MethodPost, "/api/v1/route-sets", `{}`, "", map[string]string{"X-Build-Id": "build-0"})
+	if r.Code != 200 {
+		t.Errorf("no build-id file: got %d", r.Code)
+	}
+}
+
+func TestWrappedWritersExposeTheirResponseWriter(t *testing.T) {
+	rec := httptest.NewRecorder()
+	if (&cacheWriter{ResponseWriter: rec}).Unwrap() != rec || (&overloadedWriter{ResponseWriter: rec}).Unwrap() != rec {
+		t.Error("Unwrap must return the writer it wraps, for http.ResponseController")
+	}
+}
+
+func TestRateLimitForgetsAddressesOnItsOwnTimer(t *testing.T) {
+	l := newRateLimiter(1, 20*time.Millisecond)
+	l.admit("a")
+	if _, ok := l.admit("a"); ok {
+		t.Fatal("second request admitted")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, ok := l.admit("a"); ok {
+			return // the timer rotated the window, and the address is forgotten
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the window never ended")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}

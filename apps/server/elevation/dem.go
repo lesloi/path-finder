@@ -1,4 +1,6 @@
-package graphbuild
+// Package elevation reads IGN BD ALTI 25 m tiles and samples the height at a point. It is plain Go, so the
+// race detector can cover its concurrent loading and sampling.
+package elevation
 
 import (
 	"bufio"
@@ -6,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -118,8 +121,8 @@ func readASC(path string) (*ascFile, error) {
 	return &ascFile{xll: hdr["xllcorner"], yll: hdr["yllcorner"], cs: hdr["cellsize"], tile: t}, nil
 }
 
-// loadDEM reads every .asc file below dir.
-func loadDEM(dir string) (*DEM, error) {
+// Load reads every .asc file below dir.
+func Load(dir string) (*DEM, error) {
 	var paths []string
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() && strings.HasSuffix(strings.ToLower(p), ".asc") {
@@ -196,8 +199,43 @@ func (d *DEM) elevationL93(x, y float64) float32 {
 	return bottom + (top-bottom)*ty
 }
 
-// elevation samples the elevation in metres at a WGS84 point, NaN outside the tiles.
-func (d *DEM) elevation(latDeg, lonDeg float64) float32 {
+// At samples the elevation in metres at a WGS84 point, NaN outside the tiles.
+func (d *DEM) At(latDeg, lonDeg float64) float32 {
 	x, y := l93.forward(latDeg, lonDeg)
 	return d.elevationL93(x, y)
+}
+
+// Tiles is the number of tiles loaded.
+func (d *DEM) Tiles() int { return len(d.tiles) }
+
+// Lambert93 converts a WGS84 point in degrees to Lambert-93 metres, the projection of BD ALTI.
+func Lambert93(latDeg, lonDeg float64) (x, y float64) { return l93.forward(latDeg, lonDeg) }
+
+// Unknown marks a node with no elevation: the point is outside the tiles, or its position is unknown.
+const Unknown = math.MinInt16
+
+// Sample returns the elevation of each point, in decimetres, or Unknown. Positions are in 1e-7 degrees;
+// a latitude of math.MinInt32 marks a point whose position was never read. It samples on every CPU.
+func (d *DEM) Sample(lat, lon []int32) []int16 {
+	elev := make([]int16, len(lat))
+	chunk := (len(lat) + runtime.NumCPU() - 1) / runtime.NumCPU()
+	var wg sync.WaitGroup
+	for lo := 0; lo < len(lat); lo += chunk {
+		hi := min(lo+chunk, len(lat))
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := lo; i < hi; i++ {
+				elev[i] = Unknown
+				if lat[i] == math.MinInt32 {
+					continue
+				}
+				if z := d.At(float64(lat[i])*1e-7, float64(lon[i])*1e-7); !math.IsNaN(float64(z)) {
+					elev[i] = int16(math.Round(float64(z) * 10))
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	return elev
 }

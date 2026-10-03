@@ -115,3 +115,11 @@ func TestTargetDistanceFromADuration(t *testing.T) {
 		t.Error("a duration too short for 2 km: err = nil")
 	}
 }
+
+func TestCriteriaErrorSaysWhatIsWrong(t *testing.T) {
+	_, _, err := ParseCriteria([]byte(`{"start":[200,45]}`), true)
+	var ce *CriteriaError
+	if !errors.As(err, &ce) || ce.Field != "start" || ce.Error() == "" || ce.Error() != ce.Message {
+		t.Errorf("err = %#v", err)
+	}
+}

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lesloi/path-finder/apps/server/elevation"
 	"github.com/lesloi/path-finder/apps/server/engine"
 )
 
@@ -120,7 +121,7 @@ func writePBF(t *testing.T, path string, nodes []pbfNode, ways []pbfWay) {
 // writeHills writes one ASC tile of 2 km around the centre, rising 0.1 m per metre towards the north.
 func writeHills(t *testing.T, dir string, lat, lon float64) {
 	t.Helper()
-	x, y := l93.forward(lat, lon)
+	x, y := elevation.Lambert93(lat, lon)
 	const cells, size = 80, 25
 	xll, yll := math.Floor(x/size)*size-cells/2*size, math.Floor(y/size)*size-cells/2*size
 	var b strings.Builder

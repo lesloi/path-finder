@@ -189,3 +189,11 @@ func TestGenerateKeepsSearchingWhileTheSetIsNotFull(t *testing.T) {
 		t.Error("enough on six copies of one loop")
 	}
 }
+
+func TestCmpOrFallsBackOnlyForANonPositiveValue(t *testing.T) {
+	for _, tc := range []struct{ v, fallback, want int }{{0, 40, 40}, {-3, 40, 40}, {7, 40, 7}} {
+		if got := cmpOr(tc.v, tc.fallback); got != tc.want {
+			t.Errorf("cmpOr(%d, %d) = %d, want %d", tc.v, tc.fallback, got, tc.want)
+		}
+	}
+}

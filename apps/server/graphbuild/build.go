@@ -9,12 +9,12 @@ import (
 	"math"
 	"os"
 	"runtime"
-	"sync"
 	"time"
 
 	"github.com/paulmach/osm"
 	"github.com/paulmach/osm/osmpbf"
 
+	"github.com/lesloi/path-finder/apps/server/elevation"
 	"github.com/lesloi/path-finder/apps/server/engine"
 )
 
@@ -132,11 +132,11 @@ func (p progress) step(format string, args ...any) {
 // on every node, and reports its steps to log.
 func Build(pbfPaths []string, demDir, outPath string, log io.Writer) error {
 	p := progress{log, time.Now()}
-	dem, err := loadDEM(demDir)
+	dem, err := elevation.Load(demDir)
 	if err != nil {
 		return err
 	}
-	p.step("BD ALTI: %d tiles", len(dem.tiles))
+	p.step("BD ALTI: %d tiles", dem.Tiles())
 
 	var ways []rawWay
 	for _, path := range pbfPaths {
@@ -178,26 +178,7 @@ func Build(pbfPaths []string, demDir, outPath string, log io.Writer) error {
 	runtime.GC()
 	p.step("pass 2: node coordinates read")
 
-	elev := make([]int16, n)
-	var wg sync.WaitGroup
-	chunk := (n + runtime.NumCPU() - 1) / runtime.NumCPU()
-	for lo := 0; lo < n; lo += chunk {
-		hi := min(lo+chunk, n)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := lo; i < hi; i++ {
-				elev[i] = elevUnknown
-				if lat[i] == math.MinInt32 {
-					continue
-				}
-				if z := dem.elevation(float64(lat[i])*1e-7, float64(lon[i])*1e-7); !math.IsNaN(float64(z)) {
-					elev[i] = int16(math.Round(float64(z) * 10))
-				}
-			}
-		}()
-	}
-	wg.Wait()
+	elev := dem.Sample(lat, lon)
 	p.step("elevation sampled")
 
 	nodes, off, edges := assemble(ways, lat, lon, elev)
@@ -220,7 +201,7 @@ func assemble(ways []rawWay, lat, lon []int32, elev []int16) ([]engine.Node, []u
 	for _, w := range ways {
 		for i := 1; i < len(w.idx); i++ {
 			a, b := w.idx[i-1], w.idx[i]
-			if a != b && elev[a] != elevUnknown && elev[b] != elevUnknown {
+			if a != b && elev[a] != elevation.Unknown && elev[b] != elevation.Unknown {
 				deg[a]++
 				deg[b]++
 			}
@@ -258,7 +239,7 @@ func assemble(ways []rawWay, lat, lon []int32, elev []int16) ([]engine.Node, []u
 	for _, w := range ways {
 		for i := 1; i < len(w.idx); i++ {
 			a, b := w.idx[i-1], w.idx[i]
-			if a == b || elev[a] == elevUnknown || elev[b] == elevUnknown {
+			if a == b || elev[a] == elevation.Unknown || elev[b] == elevation.Unknown {
 				continue
 			}
 			ra, rb := remap[a], remap[b]
@@ -271,8 +252,8 @@ func assemble(ways []rawWay, lat, lon []int32, elev []int16) ([]engine.Node, []u
 }
 
 const (
-	elevUnknown  = math.MinInt16
 	earthRadiusM = 6371008.8
+	rad          = math.Pi / 180
 )
 
 // haversineM returns the great-circle distance in metres between two 1e-7 degree points.
