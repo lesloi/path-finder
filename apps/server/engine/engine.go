@@ -149,7 +149,7 @@ type Engine struct {
 	alt     *landmarks
 	sp      *spatial
 	prof    *Profile
-	mult    [numKinds][numSurfs]float32
+	mult    [NumKinds][NumSurfaces]float32
 	minMult float32
 }
 

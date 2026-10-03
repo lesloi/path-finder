@@ -181,10 +181,10 @@ func (e *Engine) describe(nodes, edges []uint32) *Route {
 // isUnpaved tells whether a way is unpaved, from its surface group, or from its kind when the
 // surface is unknown.
 func isUnpaved(kind, surf uint8) bool {
-	if surf == sUnknown {
-		return kind == kPath || kind == kTrack || kind == kBridleway
+	if surf == SurfaceUnknown {
+		return kind == KindPath || kind == KindTrack || kind == KindBridleway
 	}
-	return surf == sCompact || surf == sRough
+	return surf == SurfaceCompact || surf == SurfaceRough
 }
 
 func (e *Engine) stretches(edges []uint32) []Stretch {

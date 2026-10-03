@@ -22,7 +22,7 @@
 - **Three to five loops** from a start point, a target distance or duration, an optional
   target elevation gain, and a surface preference (paved or trails)
 - **Routes on a map**, with elevation profile and estimated duration from your pace
-  (elevation gain, its target, and the profile need the server's BD ALTI tiles)
+  (from IGN BD ALTI elevation stored in the server's graph)
 - **GPX export** for your watch (Garmin, Coros, Polar…)
 - **Supported languages**: English and French
 - **Running and hiking** first (road and trail), cycling/MTB later
@@ -39,22 +39,20 @@
 
 ## Getting started
 
-**Requirements:** [Node.js 26](https://nodejs.org/) and [pnpm](https://pnpm.io/installation).
+**Requirements:** [Go 1.27](https://go.dev/dl/), [Node.js 26](https://nodejs.org/) and
+[pnpm](https://pnpm.io/installation), plus the routing graph, which you build once from OpenStreetMap
+and BD ALTI data (see [INSTALL.md](./INSTALL.md)).
 
 ```sh
 git clone https://github.com/lesloi/path-finder.git
 cd path-finder
 pnpm install
-BROUTER_URL=https://brouter.de pnpm dev
+GRAPH_FILE=$PWD/data/graph.bin pnpm dev
 ```
 
 Then open **http://localhost:5173**.
 
-> [!NOTE]
-> The public [BRouter](https://brouter.de) server receives every start point you pick: use
-> it to try the app, not for real use.
-
-To run your own BRouter, add elevation, or host the app, see [INSTALL.md](./INSTALL.md).
+To build the graph, tune the server, or host the app, see [INSTALL.md](./INSTALL.md).
 
 ## Contributing
 
@@ -69,7 +67,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 
-[AGPL-3.0-or-later](./LICENSE). The API is covered too: if you run a modified version as a
+[AGPL-3.0-or-later](./LICENSE). The server is covered too: if you run a modified version as a
 network service, you must offer its source code to its users.
 
 The license covers the code, not the name. If you distribute a fork, give it a different

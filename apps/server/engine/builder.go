@@ -5,16 +5,17 @@ import (
 	"os"
 )
 
-// Way kinds and surface groups a graph can carry, for Builder.Connect.
-const (
-	KindPath        = kPath
-	KindTrack       = kTrack
-	KindResidential = kResidential
-	SurfaceUnknown  = sUnknown
-	SurfacePaved    = sPaved
-	SurfaceCompact  = sCompact
-	SurfaceRough    = sRough
+// Node and Edge are the records of a graph file: a position with its elevation, and a way from
+// a node, with its length in metres, kind (Kind*) and surface group (Surface*).
+type (
+	Node = node
+	Edge = edge
 )
+
+// WriteGraph writes a graph in CSR form to path: node i has the edges off[i] to off[i+1] of edges.
+func WriteGraph(path string, nodes []Node, off []uint32, edges []Edge) error {
+	return writeGraph(path, nodes, off, edges)
+}
 
 // Builder assembles a graph in memory and writes it as the file Open maps. It is meant for graphs
 // small enough to hold in memory, such as the stand-in graph of the end-to-end tests.

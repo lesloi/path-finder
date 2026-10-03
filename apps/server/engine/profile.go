@@ -6,42 +6,42 @@ const rad = math.Pi / 180
 
 // Way kinds the router distinguishes; the profile tables below are indexed by them.
 const (
-	kPath uint8 = iota
-	kFootway
-	kPedestrian
-	kBridleway
-	kTrack
-	kCycleway
-	kSteps
-	kLivingStreet
-	kResidential
-	kService
-	kUnclassified
-	kTertiary
-	kSecondary
-	kPrimary
-	kTrunk
-	numKinds
+	KindPath uint8 = iota
+	KindFootway
+	KindPedestrian
+	KindBridleway
+	KindTrack
+	KindCycleway
+	KindSteps
+	KindLivingStreet
+	KindResidential
+	KindService
+	KindUnclassified
+	KindTertiary
+	KindSecondary
+	KindPrimary
+	KindTrunk
+	NumKinds
 )
 
-var kindNames = [numKinds]string{
+var kindNames = [NumKinds]string{
 	"path", "footway", "pedestrian", "bridleway", "track", "cycleway", "steps", "living_street",
 	"residential", "service", "unclassified", "tertiary", "secondary", "primary", "trunk",
 }
 
 // Surface groups, from the best to the roughest.
 const (
-	sUnknown uint8 = iota
-	sPaved
-	sCompact
-	sRough
-	numSurfs
+	SurfaceUnknown uint8 = iota
+	SurfacePaved
+	SurfaceCompact
+	SurfaceRough
+	NumSurfaces
 )
 
 // isTrail tells whether a way kind counts as off-road for the trail share.
 func isTrail(kind uint8) bool {
 	switch kind {
-	case kPath, kTrack, kBridleway, kFootway, kSteps:
+	case KindPath, KindTrack, KindBridleway, KindFootway, KindSteps:
 		return true
 	}
 	return false
@@ -51,30 +51,30 @@ func isTrail(kind uint8) bool {
 // plus the extra cost of climbing. Costs are in equivalent metres.
 type Profile struct {
 	Name       string
-	Kind       [numKinds]float32
-	Surf       [numSurfs]float32
+	Kind       [NumKinds]float32
+	Surf       [NumSurfaces]float32
 	UpPerMeter float32 // equivalent metres added per metre of ascent
 }
 
 var profiles = map[string]*Profile{
 	"hike": {
 		Name: "hike",
-		Kind: [numKinds]float32{
-			kPath: 1.0, kFootway: 1.0, kPedestrian: 1.0, kBridleway: 1.05, kTrack: 1.0, kCycleway: 1.3,
-			kSteps: 1.6, kLivingStreet: 1.3, kResidential: 1.5, kService: 1.6, kUnclassified: 1.7,
-			kTertiary: 2.2, kSecondary: 3.5, kPrimary: 6, kTrunk: 12,
+		Kind: [NumKinds]float32{
+			KindPath: 1.0, KindFootway: 1.0, KindPedestrian: 1.0, KindBridleway: 1.05, KindTrack: 1.0, KindCycleway: 1.3,
+			KindSteps: 1.6, KindLivingStreet: 1.3, KindResidential: 1.5, KindService: 1.6, KindUnclassified: 1.7,
+			KindTertiary: 2.2, KindSecondary: 3.5, KindPrimary: 6, KindTrunk: 12,
 		},
-		Surf:       [numSurfs]float32{sUnknown: 1.0, sPaved: 1.1, sCompact: 1.0, sRough: 1.15},
+		Surf:       [NumSurfaces]float32{SurfaceUnknown: 1.0, SurfacePaved: 1.1, SurfaceCompact: 1.0, SurfaceRough: 1.15},
 		UpPerMeter: 8,
 	},
 	"run": {
 		Name: "run",
-		Kind: [numKinds]float32{
-			kPath: 1.05, kFootway: 1.0, kPedestrian: 1.0, kBridleway: 1.1, kTrack: 1.0, kCycleway: 1.1,
-			kSteps: 3, kLivingStreet: 1.3, kResidential: 1.5, kService: 1.6, kUnclassified: 1.7,
-			kTertiary: 2.2, kSecondary: 3.5, kPrimary: 6, kTrunk: 12,
+		Kind: [NumKinds]float32{
+			KindPath: 1.05, KindFootway: 1.0, KindPedestrian: 1.0, KindBridleway: 1.1, KindTrack: 1.0, KindCycleway: 1.1,
+			KindSteps: 3, KindLivingStreet: 1.3, KindResidential: 1.5, KindService: 1.6, KindUnclassified: 1.7,
+			KindTertiary: 2.2, KindSecondary: 3.5, KindPrimary: 6, KindTrunk: 12,
 		},
-		Surf:       [numSurfs]float32{sUnknown: 1.0, sPaved: 1.0, sCompact: 1.0, sRough: 1.5},
+		Surf:       [NumSurfaces]float32{SurfaceUnknown: 1.0, SurfacePaved: 1.0, SurfaceCompact: 1.0, SurfaceRough: 1.5},
 		UpPerMeter: 12,
 	},
 }

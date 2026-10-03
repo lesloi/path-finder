@@ -37,8 +37,8 @@ func (t *testGraph) dist(a, b int) float32 {
 
 func (t *testGraph) connect(a, b int, kind uint8) {
 	l := t.dist(a, b)
-	t.edges[a] = append(t.edges[a], edge{To: uint32(b), Len: l, Kind: kind, Surf: sCompact})
-	t.edges[b] = append(t.edges[b], edge{To: uint32(a), Len: l, Kind: kind, Surf: sCompact})
+	t.edges[a] = append(t.edges[a], edge{To: uint32(b), Len: l, Kind: kind, Surf: SurfaceCompact})
+	t.edges[b] = append(t.edges[b], edge{To: uint32(a), Len: l, Kind: kind, Surf: SurfaceCompact})
 }
 
 // grid adds a w by h lattice of paths and returns the node index of cell (x, y).
@@ -53,10 +53,10 @@ func (t *testGraph) grid(w, h int, elev func(x, y int) float64) func(x, y int) i
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			if x+1 < w {
-				t.connect(at(x, y), at(x+1, y), kPath)
+				t.connect(at(x, y), at(x+1, y), KindPath)
 			}
 			if y+1 < h {
-				t.connect(at(x, y), at(x, y+1), kPath)
+				t.connect(at(x, y), at(x, y+1), KindPath)
 			}
 		}
 	}
@@ -134,11 +134,11 @@ func TestRouteFollowsTheLattice(t *testing.T) {
 func TestRoutePrefersAPathToAShorterRoad(t *testing.T) {
 	g := &testGraph{}
 	a, b := g.addNode(0, 0, 100), g.addNode(0, 1000, 100)
-	g.connect(a, b, kPrimary) // 1000 m, but 6 times the cost per metre
+	g.connect(a, b, KindPrimary) // 1000 m, but 6 times the cost per metre
 	m1, m2 := g.addNode(150, 250, 100), g.addNode(150, 750, 100)
-	g.connect(a, m1, kPath)
-	g.connect(m1, m2, kPath)
-	g.connect(m2, b, kPath) // about 1100 m
+	g.connect(a, m1, KindPath)
+	g.connect(m1, m2, KindPath)
+	g.connect(m2, b, KindPath) // about 1100 m
 	e := openTest(t, g, false)
 
 	r, err := e.Route(context.Background(), pointOf(g, a), pointOf(g, b))
@@ -161,7 +161,7 @@ func TestRouteMeasuresAscentWithADeadBand(t *testing.T) {
 		}
 		n := g.addNode(0, float64(i)*stepM, 100+3*float64(i)+wobble)
 		if i > 0 {
-			g.connect(prev, n, kPath)
+			g.connect(prev, n, KindPath)
 		}
 		prev = n
 	}
@@ -178,7 +178,7 @@ func TestRouteErrors(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(3, 3, flat)
 	island := g.addNode(0, 5000, 100)
-	g.connect(island, g.addNode(100, 5000, 100), kPath)
+	g.connect(island, g.addNode(100, 5000, 100), KindPath)
 	e := openTest(t, g, false)
 	ctx := context.Background()
 
@@ -277,9 +277,9 @@ func TestLoopsMeasureDescentAndSurfaces(t *testing.T) {
 	for from := range g.edges {
 		for i := range g.edges[from] {
 			if g.nodes[from].Lon > g.nodes[at(10, 10)].Lon {
-				g.edges[from][i].Kind, g.edges[from][i].Surf = kTrack, sRough
+				g.edges[from][i].Kind, g.edges[from][i].Surf = KindTrack, SurfaceRough
 			} else {
-				g.edges[from][i].Kind, g.edges[from][i].Surf = kResidential, sPaved
+				g.edges[from][i].Kind, g.edges[from][i].Surf = KindResidential, SurfacePaved
 			}
 		}
 	}

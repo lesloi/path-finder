@@ -2,28 +2,31 @@
 
 How to run Path finder on your own machine, for development or to host it yourself.
 
-Path finder needs these next to its code:
+Path finder is one Go server that also serves the web app. It routes on a graph built ahead of
+serving from these data, next to the code:
 
-| Piece                                                 | What for                        | Where it comes from                                                       |
-| ----------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------- |
-| [BRouter](https://github.com/abrensch/brouter) server | Routing on OpenStreetMap data   | Official Docker image or release zip                                      |
-| BRouter segments (`.rd5`)                             | The OpenStreetMap routing graph | [brouter.de/brouter/segments4](https://brouter.de/brouter/segments4/)     |
-| IGN BD ALTI 25 m (optional)                           | Elevation gain                  | [IGN Géoplateforme](https://data.geopf.fr/telechargement/resource/BDALTI) |
+| Piece                               | What for                                  | Where it comes from                                                       |
+| ----------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------- |
+| OpenStreetMap extracts (`.osm.pbf`) | The ways routes follow, and their surface | [download.geofabrik.de](https://download.geofabrik.de/europe/france.html) |
+| IGN BD ALTI 25 m (`.asc`)           | Elevation of every node of the graph      | [IGN Géoplateforme](https://data.geopf.fr/telechargement/resource/BDALTI) |
 
 Map tiles (Plan IGN) are loaded by the browser from the IGN Géoplateforme: there is
 nothing to install for them.
 
 ## Requirements
 
-- [Node.js 26](https://nodejs.org/)
-- [pnpm](https://pnpm.io/installation)
-- A BRouter server (see [BRouter](#2-brouter))
+- [Go 1.27](https://go.dev/dl/) (the server is built with `CGO_ENABLED=0`)
+- [Node.js 26](https://nodejs.org/) and [pnpm](https://pnpm.io/installation), for the web app
 
-As a rough guide:
+As a rough guide, measured on Auvergne-Rhône-Alpes:
 
-- Path finder: about 512 MB of RAM (it keeps up to 64 elevation tiles of 2 MB in memory),
-  and ~2 MB of disk per converted 25 km elevation tile, about 2 GB for metropolitan France
-- BRouter: about 2 GB of RAM, and up to ~200 MB of disk per segment
+- Building the graph takes about 15 seconds and 3 GB of RAM. Metropolitan France is estimated at about
+  25 GB of RAM (not measured). It runs apart from the server, as a job.
+- Serving maps the files read-only: about 650 MB of graph and 1 GB of landmarks for the region (16
+  landmarks), which the operating system keeps in its page cache and counts in a container's memory.
+  Metropolitan France is estimated at 5 GB and 8 GB.
+- A loop route set takes a few CPU-milliseconds to a few CPU-seconds, depending on the criteria, so
+  the server follows the CPUs it may use (`GOMAXPROCS` follows a container's CPU limit).
 
 ## 1. Get the code
 
@@ -35,79 +38,48 @@ pnpm install
 
 The steps below put the data under `data/` in the repository. Any other directory works.
 
-## 2. BRouter
+## 2. Get the data
 
-### Segments
+1. Download the OpenStreetMap extracts covering your area, such as `rhone-alpes-latest.osm.pbf`
+   from [Geofabrik](https://download.geofabrik.de/europe/france.html), into `data/osm`. Extracts
+   are rebuilt daily; download them again to update the map.
+2. Download the BD ALTI 25 m **ASC** archive of each department you need (about 30 MB each, about
+   3 GB for metropolitan France) from
+   [data.geopf.fr/telechargement/resource/BDALTI](https://data.geopf.fr/telechargement/resource/BDALTI),
+   and extract them all below `data/bdalti-asc`. Tiles on a department border are merged.
 
-BRouter reads its graph from 5° × 5° segment files named after their south-west corner
-(`E5_N45.rd5` covers 5–10° E, 45–50° N). Download the ones covering your area from
-[brouter.de/brouter/segments4](https://brouter.de/brouter/segments4/) (the page has a map).
-Metropolitan France takes `W5_N40`, `W5_N45`, `E0_N40`, `E0_N45`, `E0_N50`, `E5_N40`, and
-`E5_N45`.
+## 3. Build the graph
 
-```sh
-mkdir -p data/segments4
-curl -o data/segments4/E0_N45.rd5 https://brouter.de/brouter/segments4/E0_N45.rd5
-```
-
-Segments are rebuilt from OpenStreetMap regularly; download them again to update the map data.
-
-### Server
-
-Run a BRouter server with these segments by following the
-[BRouter documentation](https://github.com/abrensch/brouter#readme) (official Docker image
-or release zip). Path finder uses the stock `hiking-mountain` profile, which ships with
-BRouter. The default port is 17777.
-
-To run it with Java 17 or later, without Docker, get the
-[latest release](https://github.com/abrensch/brouter/releases) zip, which holds the server
-jar and the profiles:
+The server binary builds its own graph, and the landmarks that speed up searches, with two commands.
+Run them ahead of serving, never while it serves.
 
 ```sh
-curl -LO https://github.com/abrensch/brouter/releases/download/v1.7.10/brouter-1.7.10.zip
-unzip brouter-1.7.10.zip -d data
-java -Xmx1g -DmaxRunningTime=300 -cp data/brouter-1.7.10/brouter-1.7.10-all.jar \
-  btools.server.RouteServer data/segments4 data/brouter-1.7.10/profiles2 \
-  data/brouter-1.7.10/customprofiles 17777 4 127.0.0.1
+cd apps/server
+CGO_ENABLED=0 go build -o server .
+
+./server build-graph -pbf ../../data/osm/rhone-alpes-latest.osm.pbf -dem ../../data/bdalti-asc \
+  -out ../../data/graph.bin
+./server build-alt -graph ../../data/graph.bin -profile hike -out ../../data/hike.alt
+./server build-alt -graph ../../data/graph.bin -profile run -out ../../data/run.alt
 ```
 
-The arguments after the class are the segments, the profiles, a directory for custom
-profiles (unused), the port, the number of threads (the API makes up to 4 calls at once),
-and the address to listen on. BRouter prints each request, start point included: don't keep
-its output where you host it.
-
-## 3. Elevation: BD ALTI 25 m (optional)
-
-Without these tiles, routes have no elevation gain: a target elevation gain is ignored, and
-the estimated duration comes from the distance alone.
-
-1. Download the BD ALTI 25 m **ASC** archive of each department you need (~30 MB each,
-   ~3 GB for metropolitan France) from
-   [data.geopf.fr/telechargement/resource/BDALTI](https://data.geopf.fr/telechargement/resource/BDALTI).
-2. Extract them all into one directory, for example `data/bdalti-asc`.
-3. Convert them:
-
-   ```sh
-   node apps/api/scripts/convert-bdalti.ts data/bdalti-asc data/bdalti
-   ```
-
-Tiles on a department border are merged, so run the conversion again after adding
-departments. Routes outside the converted departments get no elevation.
+Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (16 by
+default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
+it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one activity
+profile and to one graph: build them again after each graph.
 
 ## 4. Run it locally
 
-Point `BROUTER_URL` at the BRouter server from [2. BRouter](#2-brouter), or, for quick
-tests, at the public [brouter.de](https://brouter.de) server. brouter.de receives every
-start point, so don't use it in production.
-
 ```sh
-export BROUTER_URL=http://localhost:17777   # or https://brouter.de
-export BDALTI_DIR=$PWD/data/bdalti   # optional
+export GRAPH_FILE=$PWD/data/graph.bin
+export LANDMARKS_HIKE=$PWD/data/hike.alt   # optional
+export LANDMARKS_RUN=$PWD/data/run.alt     # optional
 pnpm dev
 ```
 
-Open http://localhost:5173. The web app proxies `/api` to the API on port 3000. `pnpm dev`
-sets `NODE_ENV=development`, which turns off the rate and concurrency limits.
+Open http://localhost:5173. The web app proxies `/api` to the server on port 3000. `pnpm dev` sets
+`APP_ENV=development`, which turns off the rate and concurrency limits, and logs each request and the
+errors of a generation.
 
 To run it as in production, on one origin:
 
@@ -118,74 +90,64 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable           | Required | Default           | Description                                                                |
-| ------------------ | -------- | ----------------- | -------------------------------------------------------------------------- |
-| `BROUTER_URL`      | yes      |                   | The BRouter server, such as `http://localhost:17777`                       |
-| `BDALTI_DIR`       | no       |                   | Tiles written by `convert-bdalti.ts`                                       |
-| `HEALTH_ALLOWLIST` | no       | `0.0.0.0/0, ::/0` | Callers allowed on the healthcheck ([details](#health))                    |
-| `NODE_ENV`         | no       |                   | `development` turns off the rate and concurrency limits                    |
-| `PORT`             | no       | `3000`            | Port the API listens on                                                    |
-| `TRUSTED_PROXIES`  | no       | `0.0.0.0/0, ::/0` | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy)) |
+| Variable             | Required | Default       | Description                                                                        |
+| -------------------- | -------- | ------------- | ---------------------------------------------------------------------------------- |
+| `GRAPH_FILE`         | yes      |               | The graph written by `build-graph`                                                 |
+| `LANDMARKS_HIKE`     | no       |               | Landmarks of the hike profile, written by `build-alt`; routes are slower without   |
+| `LANDMARKS_RUN`      | no       |               | The same for the run profile                                                       |
+| `PORT`               | no       | `3000`        | Port the server listens on                                                         |
+| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                  |
+| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                           |
+| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))         |
+| `LOOP_LIMIT`         | no       | `1`           | Route sets generated at once; beyond it the answer is `429`                        |
+| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`       |
+| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                        |
+| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none |
+
+A route set uses every CPU the server may use for its length, so `LOOP_LIMIT` is about how many
+users may generate at once on your machine: more CPUs allow more, and fewer need a longer
+`GENERATION_TIMEOUT`. Go's own `GOMAXPROCS` and `GOMEMLIMIT` apply too.
 
 ## 5. Host it
 
-The `Dockerfile` builds one image with the API and the web app. Build it with
-`docker build -t path-finder .`, or use the one CI publishes as
-`ghcr.io/lesloi/path-finder:latest`.
+The `Dockerfile` builds one image with the server and the web app, and no data. Build it with
+`docker build -t path-finder .`, or use the one CI publishes as `ghcr.io/lesloi/path-finder:latest`.
+Mount the graph and the landmarks read-only, and point the variables at them.
 
-To try the image without hosting BRouter, point it at the public
-[brouter.de](https://brouter.de) server. It receives every start point, so don't use it in
-production:
-
-```sh
-docker run --rm -p 127.0.0.1:3000:3000 -e BROUTER_URL=https://brouter.de \
-  ghcr.io/lesloi/path-finder:latest
-```
-
-A `compose.yaml` for Path finder with a self-hosted BRouter:
+A `compose.yaml`:
 
 ```yaml
 services:
-  brouter:
-    image: ghcr.io/abrensch/brouter:latest
-    volumes:
-      - ./data/segments4:/segments4:ro
-    restart: unless-stopped
-
   path-finder:
     image: ghcr.io/lesloi/path-finder:latest
-    depends_on: [brouter]
     environment:
-      BROUTER_URL: http://brouter:17777
-      BDALTI_DIR: /data/bdalti # optional
+      GRAPH_FILE: /data/graph.bin
+      LANDMARKS_HIKE: /data/hike.alt
+      LANDMARKS_RUN: /data/run.alt
     volumes:
-      - ./data/bdalti:/data/bdalti:ro
+      - ./data:/data:ro
     ports:
       - '127.0.0.1:3000:3000'
     restart: unless-stopped
 ```
 
+The image has no shell: check its health with an HTTP probe on `/healthz` (see [Health](#health)).
+
 ### Behind a reverse proxy
 
-The rate limit counts each client by the address the proxy appends to `X-Forwarded-For`.
-Clients can forge that header, so list your proxies in `TRUSTED_PROXIES`: the API then reads
-it only from them, and otherwise counts the connection's address. Unset or empty, it takes the
-default.
+The rate limit counts each client by its address. Behind a reverse proxy, that address is the proxy's
+unless you list the proxy in `TRUSTED_PROXIES`: the server then reads the client's address from
+`X-Forwarded-For`, skipping the listed proxies from the right. Unset or empty, the header is ignored,
+so one proxy makes every user count as one client.
 
-| `TRUSTED_PROXIES`        | Trusted proxies                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------- |
-| `0.0.0.0/0, ::/0`        | Every connection, the default: clients reaching the API directly can forge the header |
-| `172.18.0.3, 10.0.0.0/8` | These IP addresses and CIDR ranges, such as a Docker subnet                           |
+| `TRUSTED_PROXIES`        | Trusted proxies                                               |
+| ------------------------ | ------------------------------------------------------------- |
+| unset                    | None: the client is the connection, and the header is ignored |
+| `172.18.0.3, 10.0.0.0/8` | These IP addresses and CIDR ranges, such as a Docker subnet   |
+
+Only proxies can reach the server in that setup: a client that connects to it directly can forge the
+header.
 
 ### Health
 
-`GET /health` answers `ok` when the API is up.
-
-By default, it answers every caller. To restrict it, list IP addresses and CIDR ranges in
-`HEALTH_ALLOWLIST`, such as `198.51.100.7, 10.0.0.0/8`:
-
-- listed callers and the loopback get `ok`, so a healthcheck inside the container still works;
-- other callers get `404`.
-
-Behind a [trusted proxy](#behind-a-reverse-proxy), the client's address is checked, not the
-proxy's.
+`GET /healthz` answers `.` to every caller while the server is up.

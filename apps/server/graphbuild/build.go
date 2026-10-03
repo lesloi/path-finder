@@ -1,8 +1,11 @@
-package main
+// Package graphbuild turns OSM PBF files and BD ALTI tiles into the graph file the engine maps. It runs
+// ahead of serving, as a job: it needs far more memory than serving does.
+package graphbuild
 
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"runtime"
@@ -11,6 +14,8 @@ import (
 
 	"github.com/paulmach/osm"
 	"github.com/paulmach/osm/osmpbf"
+
+	"github.com/lesloi/path-finder/apps/server/engine"
 )
 
 type rawWay struct {
@@ -20,19 +25,19 @@ type rawWay struct {
 }
 
 var highwayKinds = map[string]uint8{
-	"path": kPath, "footway": kFootway, "pedestrian": kPedestrian, "bridleway": kBridleway, "track": kTrack,
-	"cycleway": kCycleway, "steps": kSteps, "living_street": kLivingStreet, "residential": kResidential,
-	"service": kService, "unclassified": kUnclassified, "tertiary": kTertiary, "tertiary_link": kTertiary,
-	"secondary": kSecondary, "secondary_link": kSecondary, "primary": kPrimary, "primary_link": kPrimary,
-	"trunk": kTrunk, "trunk_link": kTrunk,
+	"path": engine.KindPath, "footway": engine.KindFootway, "pedestrian": engine.KindPedestrian, "bridleway": engine.KindBridleway, "track": engine.KindTrack,
+	"cycleway": engine.KindCycleway, "steps": engine.KindSteps, "living_street": engine.KindLivingStreet, "residential": engine.KindResidential,
+	"service": engine.KindService, "unclassified": engine.KindUnclassified, "tertiary": engine.KindTertiary, "tertiary_link": engine.KindTertiary,
+	"secondary": engine.KindSecondary, "secondary_link": engine.KindSecondary, "primary": engine.KindPrimary, "primary_link": engine.KindPrimary,
+	"trunk": engine.KindTrunk, "trunk_link": engine.KindTrunk,
 }
 
 var surfaceGroups = map[string]uint8{
-	"asphalt": sPaved, "paved": sPaved, "concrete": sPaved, "concrete:plates": sPaved, "concrete:lanes": sPaved,
-	"paving_stones": sPaved, "metal": sPaved, "wood": sPaved, "sett": sPaved,
-	"compacted": sCompact, "fine_gravel": sCompact, "gravel": sCompact, "unpaved": sCompact,
-	"dirt": sRough, "earth": sRough, "ground": sRough, "grass": sRough, "sand": sRough, "mud": sRough,
-	"rock": sRough, "pebblestone": sRough, "cobblestone": sRough, "grass_paver": sRough, "woodchips": sRough,
+	"asphalt": engine.SurfacePaved, "paved": engine.SurfacePaved, "concrete": engine.SurfacePaved, "concrete:plates": engine.SurfacePaved, "concrete:lanes": engine.SurfacePaved,
+	"paving_stones": engine.SurfacePaved, "metal": engine.SurfacePaved, "wood": engine.SurfacePaved, "sett": engine.SurfacePaved,
+	"compacted": engine.SurfaceCompact, "fine_gravel": engine.SurfaceCompact, "gravel": engine.SurfaceCompact, "unpaved": engine.SurfaceCompact,
+	"dirt": engine.SurfaceRough, "earth": engine.SurfaceRough, "ground": engine.SurfaceRough, "grass": engine.SurfaceRough, "sand": engine.SurfaceRough, "mud": engine.SurfaceRough,
+	"rock": engine.SurfaceRough, "pebblestone": engine.SurfaceRough, "cobblestone": engine.SurfaceRough, "grass_paver": engine.SurfaceRough, "woodchips": engine.SurfaceRough,
 }
 
 // classifyWay decides whether a pedestrian can use a way, and under which kind and surface group.
@@ -53,10 +58,10 @@ func classifyWay(tags osm.Tags) (kind, surf uint8, ok bool) {
 			return 0, 0, false
 		}
 	}
-	if kind == kTrunk && !explicit {
+	if kind == engine.KindTrunk && !explicit {
 		return 0, 0, false
 	}
-	if kind == kCycleway && !explicit && foot != "" {
+	if kind == engine.KindCycleway && !explicit && foot != "" {
 		return 0, 0, false
 	}
 	return kind, surfaceGroups[tags.Find("surface")], true
@@ -111,20 +116,27 @@ func readNodes(path string, idx map[int64]uint32, lat, lon []int32) error {
 	return sc.Err()
 }
 
-func logStep(start time.Time, format string, args ...any) {
-	var ms runtime.MemStats
-	runtime.ReadMemStats(&ms)
-	fmt.Fprintf(os.Stderr, "[%6.1fs heap=%4dMB] %s\n", time.Since(start).Seconds(), ms.HeapAlloc>>20, fmt.Sprintf(format, args...))
+// progress writes a line per step with the time and the heap, for the person watching a long build.
+type progress struct {
+	w     io.Writer
+	start time.Time
 }
 
-// buildGraph turns an OSM PBF and BD ALTI tiles into a graph file with elevation on every node.
-func buildGraph(pbfPaths []string, demDir, outPath string) error {
-	start := time.Now()
+func (p progress) step(format string, args ...any) {
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	fmt.Fprintf(p.w, "[%6.1fs heap=%4dMB] %s\n", time.Since(p.start).Seconds(), ms.HeapAlloc>>20, fmt.Sprintf(format, args...))
+}
+
+// Build turns OSM PBF files and the BD ALTI ASC tiles below demDir into a graph file with elevation
+// on every node, and reports its steps to log.
+func Build(pbfPaths []string, demDir, outPath string, log io.Writer) error {
+	p := progress{log, time.Now()}
 	dem, err := loadDEM(demDir)
 	if err != nil {
 		return err
 	}
-	logStep(start, "BD ALTI: %d tiles", len(dem.tiles))
+	p.step("BD ALTI: %d tiles", len(dem.tiles))
 
 	var ways []rawWay
 	for _, path := range pbfPaths {
@@ -134,7 +146,7 @@ func buildGraph(pbfPaths []string, demDir, outPath string) error {
 		}
 		ways = append(ways, w...)
 	}
-	logStep(start, "pass 1: %d walkable ways", len(ways))
+	p.step("pass 1: %d walkable ways", len(ways))
 
 	idx := make(map[int64]uint32, 1<<22)
 	for wi := range ways {
@@ -151,7 +163,7 @@ func buildGraph(pbfPaths []string, demDir, outPath string) error {
 		w.ids = nil
 	}
 	n := len(idx)
-	logStep(start, "%d candidate nodes", n)
+	p.step("%d candidate nodes", n)
 
 	lat, lon := make([]int32, n), make([]int32, n)
 	for i := range lat {
@@ -164,7 +176,7 @@ func buildGraph(pbfPaths []string, demDir, outPath string) error {
 	}
 	idx = nil
 	runtime.GC()
-	logStep(start, "pass 2: node coordinates read")
+	p.step("pass 2: node coordinates read")
 
 	elev := make([]int16, n)
 	var wg sync.WaitGroup
@@ -186,8 +198,24 @@ func buildGraph(pbfPaths []string, demDir, outPath string) error {
 		}()
 	}
 	wg.Wait()
-	logStep(start, "elevation sampled")
+	p.step("elevation sampled")
 
+	nodes, off, edges := assemble(ways, lat, lon, elev)
+	p.step("graph: %d nodes, %d directed edges", len(nodes), len(edges))
+
+	if err := engine.WriteGraph(outPath, nodes, off, edges); err != nil {
+		return err
+	}
+	st, _ := os.Stat(outPath)
+	p.step("written %s (%d MB)", outPath, st.Size()>>20)
+	return nil
+}
+
+// assemble builds the graph from the ways, each a run of candidate nodes, their coordinates in 1e-7
+// degrees and their elevations. A way is cut into one pair of edges per step, and a node with no edge,
+// or no elevation, is left out.
+func assemble(ways []rawWay, lat, lon []int32, elev []int16) ([]engine.Node, []uint32, []engine.Edge) {
+	n := len(lat)
 	deg := make([]uint32, n)
 	for _, w := range ways {
 		for i := 1; i < len(w.idx); i++ {
@@ -208,11 +236,11 @@ func buildGraph(pbfPaths []string, demDir, outPath string) error {
 			remap[i] = math.MaxUint32
 		}
 	}
-	nodes := make([]nodeV2, kept)
+	nodes := make([]engine.Node, kept)
 	off := make([]uint32, kept+1)
 	for i, d := range deg {
 		if r := remap[i]; r != math.MaxUint32 {
-			nodes[r] = nodeV2{Lat: lat[i], Lon: lon[i], Elev: elev[i]}
+			nodes[r] = engine.Node{Lat: lat[i], Lon: lon[i], Elev: elev[i]}
 			off[r+1] = d
 		}
 	}
@@ -220,12 +248,12 @@ func buildGraph(pbfPaths []string, demDir, outPath string) error {
 		off[i+1] += off[i]
 	}
 	edgeCount := off[kept]
-	edges := make([]edgeV2, edgeCount)
+	edges := make([]engine.Edge, edgeCount)
 	fill := make([]uint32, kept)
 	add := func(a, b uint32, l float32, kind, surf uint8) {
 		e := off[a] + fill[a]
 		fill[a]++
-		edges[e] = edgeV2{To: b, Len: l, Kind: kind, Surf: surf}
+		edges[e] = engine.Edge{To: b, Len: l, Kind: kind, Surf: surf}
 	}
 	for _, w := range ways {
 		for i := 1; i < len(w.idx); i++ {
@@ -239,14 +267,7 @@ func buildGraph(pbfPaths []string, demDir, outPath string) error {
 			add(rb, ra, l, w.kind, w.surf)
 		}
 	}
-	logStep(start, "graph: %d nodes, %d directed edges", kept, edgeCount)
-
-	if err := writeGraphV2(outPath, nodes, off, edges); err != nil {
-		return err
-	}
-	st, _ := os.Stat(outPath)
-	logStep(start, "written %s (%d MB)", outPath, st.Size()>>20)
-	return nil
+	return nodes, off, edges
 }
 
 const (
