@@ -10,24 +10,23 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 - [DECISIONS.md](./DECISIONS.md) explains the lasting choices; you can question one with an issue.
 - [DESIGN.md](./DESIGN.md) guides the interface.
 
-From the root (the server's tests need Go, with `CGO_ENABLED=0`):
+From the root (the server needs Go, built with `CGO_ENABLED=0`):
 
-| Command              | What it does                                                   |
-| -------------------- | -------------------------------------------------------------- |
-| `pnpm check`         | Formatting and lint, web and server (CI job `check`)           |
-| `pnpm check:web`     | Types, unit tests with 90% coverage, end-to-end (CI job `web`) |
-| `pnpm check:server`  | Go unit and integration tests, 90% coverage (CI job `server`)  |
-| `pnpm format`        | Format the code with Prettier                                  |
-| `pnpm lint`          | ESLint                                                         |
-| `pnpm lint:server`   | `gofmt` and `go vet`                                           |
-| `pnpm typecheck`     | Type check the web app and the end-to-end tests                |
-| `pnpm test`          | Web unit tests                                                 |
-| `pnpm test:coverage` | Web unit tests with coverage, failing below 90%                |
-| `pnpm test:server`   | Go tests with coverage, failing below 90%                      |
-| `pnpm test:e2e`      | End-to-end tests in Chromium, on the built app and Go binary   |
-| `pnpm dev`           | Web app on port 5173 and server on port 3000; needs a graph    |
-| `pnpm build`         | Build the web app                                              |
-| `pnpm start`         | Serve the built web app and the routes on port 3000            |
+| Command             | What it does                                                                  |
+| ------------------- | ----------------------------------------------------------------------------- |
+| `pnpm dev`          | Web app on port 5173 and server on port 3000; needs a graph                   |
+| `pnpm build`        | Build the web app                                                             |
+| `pnpm start`        | Serve the built web app and the routes on port 3000                           |
+| `pnpm format`       | Format every file with Prettier                                               |
+| `pnpm test`         | Web unit tests                                                                |
+| `pnpm test:e2e`     | End-to-end tests in Chromium, on the built app and the Go binary              |
+| `pnpm check:format` | Prettier on every file (workflow `check`)                                     |
+| `pnpm check:web`    | ESLint, types, unit tests with 90% coverage, end-to-end (workflow `web`)      |
+| `pnpm check:server` | `gofmt`, `go vet`, race detector, tests with 90% coverage (workflow `server`) |
+| `pnpm check`        | The three `check:*` above                                                     |
+
+One tool, one file: run a single test with `pnpm vitest run path/to/file-test.ts`, or from `apps/server`
+with `go test ./engine -run TestName`.
 
 ## Privacy-first rules
 

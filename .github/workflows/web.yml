@@ -1,4 +1,4 @@
-name: Test
+name: Web
 
 on:
   push:
@@ -14,29 +14,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Formatting and lint of the whole project: the quick checks that need no test.
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: apps/server/go.mod
-      - run: pnpm check
-
-  # The server's unit and integration tests; fails below the coverage threshold of apps/server/test.sh.
-  server:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: apps/server/go.mod
-      - run: pnpm check:server
-
-  # Types, the web app's unit tests, then the built app in Chromium served by the Go server; the IGN is
-  # answered from fixtures (e2e/test.ts).
+  # Lint, types, the unit tests, then the built app in Chromium served by the Go server; the IGN is answered
+  # from fixtures (e2e/test.ts).
   web:
     runs-on: ubuntu-latest
     # A hang fails fast instead of running for hours; the tests take minutes.

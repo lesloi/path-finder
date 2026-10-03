@@ -1,8 +1,12 @@
 #!/bin/sh
-# The server's tests: the race detector, then coverage of the whole server, failing under 90% like
-# `pnpm test:coverage` does for the web app.
+# Everything CI checks of the server: formatting, static checks, the race detector, then coverage of the
+# whole server, failing under 90% like `pnpm check:web` does for the web app.
 set -eu
 cd "$(dirname "$0")"
+export CGO_ENABLED=0
+test -z "$(gofmt -l .)" || { echo "not formatted: $(gofmt -l .)" >&2; exit 1; }
+go vet ./...
+
 profile="$(mktemp)"
 trap 'rm -f "$profile" "$profile.kept"' EXIT
 
@@ -13,7 +17,6 @@ raceable="$(CGO_ENABLED=1 go list -f '{{.ImportPath}} {{join .Deps " "}}' ./... 
 CGO_ENABLED=1 go test -race $raceable
 
 # Coverage counts what the whole server runs (`-coverpkg`), so the integration tests cover the packages they go through.
-export CGO_ENABLED=0
 go test -coverpkg=./... -coverprofile="$profile" ./...
 # Leave out what only starts the server or writes the stand-in graph.
 grep -v -e '/main\.go:' -e '/cmd/' -e '/internal/standin/' "$profile" > "$profile.kept"

@@ -12,7 +12,9 @@ prototypes/
 
 # build
 dist/
-*.tsbuildinfo
+
+# server binary, from `go build -o server .`
+/apps/server/server
 
 # dependencies
 node_modules/
@@ -20,11 +22,7 @@ node_modules/
 # tests
 coverage/
 test-results/
-.vitest/
 playwright-report/
-
-# debug logs
-pnpm-debug.log*
 
 # local data
 /data/

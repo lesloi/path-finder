@@ -1,4 +1,4 @@
-name: Check
+name: Server
 
 on:
   push:
@@ -14,10 +14,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # What belongs to the whole project rather than to the web app or the server: the format of every file.
-  check:
+  # Formatting, static checks, the race detector, and the unit and integration tests; fails below the
+  # coverage threshold of apps/server/check.sh.
+  server:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-      - run: pnpm check:format
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: apps/server/go.mod
+      - run: apps/server/check.sh
