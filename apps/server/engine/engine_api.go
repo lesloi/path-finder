@@ -51,6 +51,10 @@ type LoopRequest struct {
 	Ascent     float64
 	Candidates int
 	Seed       uint64
+	// Enough, when set, is called with the loops found so far after each new one, one call at a time
+	// and without retaining the slice. Returning true ends the search: the loops still being
+	// searched are dropped, so a caller that has what it needs spares the CPU.
+	Enough func(found []*Route) bool
 }
 
 // Open maps a graph file, and its landmark file when landmarksPath is not empty, for the named
@@ -126,12 +130,24 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if !ok || d > maxSnapMeters {
 		return nil, ErrOffGraph
 	}
+	// Loops are described as they are found, for Enough, which sees the finished form.
+	var loops []*Route
+	var enough func([]*loopResult) bool
+	if req.Enough != nil {
+		enough = func(found []*loopResult) bool {
+			for len(loops) < len(found) {
+				l := found[len(loops)]
+				loops = append(loops, e.describe(l.nodes, l.edges))
+			}
+			return req.Enough(loops)
+		}
+	}
 	found := generate(ctx, e, e.sp, &loopParams{
 		distM: req.Distance, ascentM: req.Ascent, candidates: req.Candidates, seed: req.Seed,
-	}, start)
-	loops := make([]*Route, len(found))
-	for i, l := range found {
-		loops[i] = e.describe(l.nodes, l.edges)
+	}, start, enough)
+	for len(loops) < len(found) {
+		l := found[len(loops)]
+		loops = append(loops, e.describe(l.nodes, l.edges))
 	}
 	if err := ctx.Err(); err != nil {
 		return loops, err

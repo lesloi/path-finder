@@ -652,14 +652,19 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 	return best
 }
 
-// generate returns the best candidate of each worker's share of lp.candidates, in no particular
-// order. When ctx ends it returns the candidates finished so far.
-func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams, start uint32) []*loopResult {
+// generate runs lp.candidates candidates on the workers, and returns them in no particular order.
+// After each one, enough sees every loop found so far, one call at a time, and returns true to
+// stop the search: the candidates still running are dropped. When ctx ends it returns the
+// candidates finished so far.
+func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams, start uint32, enough func([]*loopResult) bool) []*loopResult {
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
 	// GOMAXPROCS follows the container's CPU limit (Go 1.25+); NumCPU would not.
 	workers := min(runtime.GOMAXPROCS(0), 8)
 	var next atomic.Int64
 	var mu sync.Mutex
 	var found []*loopResult
+	done := false
 	var wg sync.WaitGroup
 	for range workers {
 		wg.Add(1)
@@ -672,11 +677,19 @@ func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams, star
 				if i >= lp.candidates || ctx.Err() != nil {
 					return
 				}
-				if l := candidate(ctx, cx, sp, s, lp, start, i); l != nil {
-					mu.Lock()
-					found = append(found, l)
-					mu.Unlock()
+				l := candidate(ctx, cx, sp, s, lp, start, i)
+				if l == nil {
+					continue
 				}
+				mu.Lock()
+				if !done {
+					found = append(found, l)
+					if enough != nil && enough(found) {
+						done = true
+						stop()
+					}
+				}
+				mu.Unlock()
 			}
 		}()
 	}

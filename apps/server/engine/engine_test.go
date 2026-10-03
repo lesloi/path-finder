@@ -382,3 +382,30 @@ func TestOpenAllSharesTheGraphBetweenActivities(t *testing.T) {
 		t.Error("unknown profile: err = nil")
 	}
 }
+
+func TestLoopsStopWhenTheCallerHasEnough(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(80, 80, flat)
+	e := openTest(t, g, false)
+	req := LoopRequest{Start: pointOf(g, at(40, 40)), Distance: 20000, Candidates: 100000, Seed: 1}
+	calls := 0
+	req.Enough = func(found []*Route) bool {
+		calls++
+		if len(found) != calls {
+			t.Errorf("call %d saw %d loops: Enough must see every new loop, once", calls, len(found))
+		}
+		return len(found) >= 3
+	}
+
+	start := time.Now()
+	loops, err := e.Loops(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loops) != 3 {
+		t.Errorf("%d loops, want exactly the 3 that were enough", len(loops))
+	}
+	if took := time.Since(start); took > 5*time.Second {
+		t.Errorf("took %v to find 3 loops out of 100000 candidates", took)
+	}
+}

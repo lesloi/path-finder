@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/lesloi/path-finder/apps/server/contract"
@@ -51,8 +52,13 @@ func TestGenerateAsksTheEngineForLoopsFromTheCriteria(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := engine.LoopRequest{Start: engine.Point{Lat: 45.8992, Lon: 6.1294}, Distance: 10_000, Ascent: 300, Candidates: 40, Seed: 42}
-	if looper.got != want {
-		t.Errorf("request = %+v, want %+v", looper.got, want)
+	got := looper.got
+	if got.Enough == nil {
+		t.Error("the engine is not told when to stop")
+	}
+	got.Enough = nil
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("request = %+v, want %+v", got, want)
 	}
 }
 
@@ -149,5 +155,37 @@ func TestGenerateUsesTheEngineOfTheActivity(t *testing.T) {
 	}
 	if _, err := (&Generator{}).Generate(context.Background(), json.RawMessage(body)); err == nil {
 		t.Error("an activity without an engine: err = nil")
+	}
+}
+
+func TestGenerateStopsTheSearchOnceTheSetIsFull(t *testing.T) {
+	looper := &fakeLooper{}
+	if _, err := generate(t, looper, context.Background(), body); err != nil {
+		t.Fatal(err)
+	}
+	enough := looper.got.Enough
+
+	// Loops that do not overlap, each a match, as the engine would deliver them one by one.
+	var found []*engine.Route
+	for i, heading := range []float64{0, 70, 140, 210, 280} {
+		found = append(found, engineLoop(heading))
+		if got, want := enough(found), i == 4; got != want {
+			t.Errorf("after %d matches: enough = %v, want %v", i+1, got, want)
+		}
+	}
+}
+
+func TestGenerateKeepsSearchingWhileTheSetIsNotFull(t *testing.T) {
+	looper := &fakeLooper{}
+	if _, err := generate(t, looper, context.Background(), body); err != nil {
+		t.Fatal(err)
+	}
+	// Five loops, but all the same: one route, and suggestions or duplicates do not fill the set.
+	var found []*engine.Route
+	for range 6 {
+		found = append(found, engineLoop(0))
+	}
+	if looper.got.Enough(found) {
+		t.Error("enough on six copies of one loop")
 	}
 }

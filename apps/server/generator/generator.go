@@ -56,6 +56,23 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	if criteria.ElevationGain != nil && criteria.ElevationGain.Shortcut == "" {
 		req.Ascent = criteria.ElevationGain.Metres
 	}
+	// Stops searching once the route set cannot get any bigger: more loops would only cost CPU.
+	var seen []*candidate
+	var converted int
+	req.Enough = func(found []*engine.Route) bool {
+		for ; converted < len(found); converted++ {
+			if c := toCandidate(found[converted]); c != nil {
+				seen = append(seen, c)
+			}
+		}
+		matches := 0
+		for _, r := range buildRouteSet(criteria, km, seen) {
+			if r.Kind == "match" {
+				matches++
+			}
+		}
+		return matches >= maxRoutes
+	}
 
 	loops, err := looper.Loops(ctx, req)
 	switch {
