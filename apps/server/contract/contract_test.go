@@ -77,7 +77,7 @@ func TestRouteSetMatchesTheWebAppsSample(t *testing.T) {
 			Surfaces: []SurfaceStretch{{"paved", 1}},
 		},
 	}
-	got, err := json.MarshalIndent(map[string]any{"routes": routes}, "", "  ")
+	got, err := json.Marshal(map[string]any{"routes": routes})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,14 @@ func TestRouteSetMatchesTheWebAppsSample(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got)+"\n" != string(want) {
+	var gotAny, wantAny any
+	if err := json.Unmarshal(got, &gotAny); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(want, &wantAny); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gotAny, wantAny) {
 		t.Errorf("route set JSON changed; testdata/route-set.json is what the web app reads:\n%s", got)
 	}
 }

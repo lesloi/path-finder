@@ -1,4 +1,4 @@
-import type { Miss } from '../../../api/src/contract.ts';
+import type { Miss } from '../contract/index.ts';
 import type { Language } from './language.ts';
 
 /**

@@ -1,4 +1,4 @@
-import type { ErrorCode } from '../../../api/src/contract.ts';
+import type { ErrorCode } from '../contract/index.ts';
 import type { Language } from './language.ts';
 
 /** What the user reads for each error code the API answers with. */

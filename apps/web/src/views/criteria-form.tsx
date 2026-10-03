@@ -10,7 +10,7 @@ import {
   TARGET_DURATION,
   type Criteria,
   type CriteriaField,
-} from '../../../api/src/contract.ts';
+} from '../contract/index.ts';
 import { CHIP, CHIP_ROW, Dialog, PRIMARY_BUTTON, SegmentedControl, Slider, useDesktop } from '../components/index.ts';
 import {
   ACTIVITY_PACES,

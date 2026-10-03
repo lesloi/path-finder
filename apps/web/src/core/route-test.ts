@@ -1,4 +1,4 @@
-import type { SurfaceStretch } from '../../../api/src/contract.ts';
+import type { SurfaceStretch } from '../contract/index.ts';
 import {
   elevationProfile,
   missText,

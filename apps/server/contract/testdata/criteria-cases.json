@@ -2,10 +2,7 @@
   {
     "name": "returns the criteria and the activity",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -16,10 +13,7 @@
     },
     "expect": {
       "criteria": {
-        "start": [
-          6.1294,
-          45.8992
-        ],
+        "start": [6.1294, 45.8992],
         "target": {
           "distance": 10
         },
@@ -33,10 +27,7 @@
   {
     "name": "accepts a target duration and the hilly shortcut",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "duration": 90
@@ -47,10 +38,7 @@
     },
     "expect": {
       "criteria": {
-        "start": [
-          6.1294,
-          45.8992
-        ],
+        "start": [6.1294, 45.8992],
         "target": {
           "duration": 90
         },
@@ -64,10 +52,7 @@
   {
     "name": "accepts the flat shortcut",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -78,10 +63,7 @@
     },
     "expect": {
       "criteria": {
-        "start": [
-          6.1294,
-          45.8992
-        ],
+        "start": [6.1294, 45.8992],
         "target": {
           "distance": 10
         },
@@ -95,10 +77,7 @@
   {
     "name": "leaves out fields it does not know",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -109,10 +88,7 @@
     },
     "expect": {
       "criteria": {
-        "start": [
-          6.1294,
-          45.8992
-        ],
+        "start": [6.1294, 45.8992],
         "target": {
           "distance": 10
         },
@@ -125,10 +101,7 @@
   {
     "name": "accepts no elevation gain",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -138,10 +111,7 @@
     },
     "expect": {
       "criteria": {
-        "start": [
-          6.1294,
-          45.8992
-        ],
+        "start": [6.1294, 45.8992],
         "target": {
           "distance": 10
         },
@@ -175,9 +145,7 @@
   {
     "name": "a start point that is not a longitude and a latitude",
     "body": {
-      "start": [
-        6.1294
-      ],
+      "start": [6.1294],
       "activity": "run",
       "target": {
         "distance": 10
@@ -192,10 +160,7 @@
   {
     "name": "a latitude out of range",
     "body": {
-      "start": [
-        6.1294,
-        91
-      ],
+      "start": [6.1294, 91],
       "activity": "run",
       "target": {
         "distance": 10
@@ -210,10 +175,7 @@
   {
     "name": "an unknown activity",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "ride",
       "target": {
         "distance": 10
@@ -228,10 +190,7 @@
   {
     "name": "no target",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {},
       "surface": "any",
@@ -244,10 +203,7 @@
   {
     "name": "both a target distance and a target duration",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10,
@@ -263,10 +219,7 @@
   {
     "name": "a target distance under 2 km",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 1.9
@@ -281,10 +234,7 @@
   {
     "name": "a run over 50 km",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 51
@@ -299,10 +249,7 @@
   {
     "name": "a hike over 40 km",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "hike",
       "target": {
         "distance": 41
@@ -317,10 +264,7 @@
   {
     "name": "a target duration under 15 min",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "duration": 14
@@ -335,10 +279,7 @@
   {
     "name": "a target duration over 6 h",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "duration": 361
@@ -353,10 +294,7 @@
   {
     "name": "a negative target elevation gain",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -372,10 +310,7 @@
   {
     "name": "a target elevation gain over 2,500 m",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -391,10 +326,7 @@
   {
     "name": "an unknown elevation gain shortcut",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -410,10 +342,7 @@
   {
     "name": "an unknown surface preference",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -428,10 +357,7 @@
   {
     "name": "a pace that is not a positive number",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -446,10 +372,7 @@
   {
     "name": "a number given as a string",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -464,10 +387,7 @@
   {
     "name": "accepts the longest run and the largest gain",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 50
@@ -478,10 +398,7 @@
     },
     "expect": {
       "criteria": {
-        "start": [
-          6.1294,
-          45.8992
-        ],
+        "start": [6.1294, 45.8992],
         "target": {
           "distance": 50
         },
@@ -495,10 +412,7 @@
   {
     "name": "accepts the longest hike and no gain",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "hike",
       "target": {
         "distance": 40
@@ -509,10 +423,7 @@
     },
     "expect": {
       "criteria": {
-        "start": [
-          6.1294,
-          45.8992
-        ],
+        "start": [6.1294, 45.8992],
         "target": {
           "distance": 40
         },
@@ -526,10 +437,7 @@
   {
     "name": "accepts 6 h at a pace that stays within the run limit",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "duration": 360
@@ -539,10 +447,7 @@
     },
     "expect": {
       "criteria": {
-        "start": [
-          6.1294,
-          45.8992
-        ],
+        "start": [6.1294, 45.8992],
         "target": {
           "duration": 360
         },
@@ -555,10 +460,7 @@
   {
     "name": "a target duration too short for the target elevation gain",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "duration": 30
@@ -574,10 +476,7 @@
   {
     "name": "drops the elevation gain when it is not counted",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "duration": 30
@@ -589,10 +488,7 @@
     "countElevationGain": false,
     "expect": {
       "criteria": {
-        "start": [
-          6.1294,
-          45.8992
-        ],
+        "start": [6.1294, 45.8992],
         "target": {
           "duration": 30
         },
@@ -605,10 +501,7 @@
   {
     "name": "still rejects a gain out of bounds when it is not counted",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "distance": 10
@@ -625,10 +518,7 @@
   {
     "name": "a duration that makes too long a run at this pace",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "run",
       "target": {
         "duration": 360
@@ -643,10 +533,7 @@
   {
     "name": "a duration that suits a hike at a slower pace",
     "body": {
-      "start": [
-        6.1294,
-        45.8992
-      ],
+      "start": [6.1294, 45.8992],
       "activity": "hike",
       "target": {
         "duration": 360
@@ -656,10 +543,7 @@
     },
     "expect": {
       "criteria": {
-        "start": [
-          6.1294,
-          45.8992
-        ],
+        "start": [6.1294, 45.8992],
         "target": {
           "duration": 360
         },

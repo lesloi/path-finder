@@ -1,4 +1,4 @@
-import type { Criteria, Miss, SurfaceStretch } from '../../../api/src/contract.ts';
+import type { Criteria, Miss, SurfaceStretch } from '../contract/index.ts';
 import { routesText } from '../i18n/index.ts';
 import type { Activity } from './activity.ts';
 import type { Position } from './coordinates.ts';

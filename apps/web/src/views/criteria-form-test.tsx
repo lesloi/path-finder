@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import { parseCriteria } from '../../../api/src/contract.ts';
+import { parseCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
 import { commonText, criteriaText } from '../i18n/index.ts';
 import { CriteriaForm } from './criteria-form.tsx';

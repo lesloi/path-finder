@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { ErrorCode } from '../../../api/src/contract.ts';
+import type { ErrorCode } from '../contract/index.ts';
 import { parseRoutes, type Route, type RouteSetRequest } from '../core/index.ts';
 
 /**
