@@ -1,51 +1,48 @@
-# Path finder project guidelines
+# Path finder
 
-## Mission
-
-**Nothing about the user leaves the device unless a route needs it.** Path finder is a
-privacy-first web app that generates running and trail routes from a start point, a
-distance, and an elevation gain.
-
-If a feature seems to need an exception to a privacy-first rule, ask the owner before
-implementing it, rather than opening an issue.
+Path finder is a web app that generates running and trail routes from a start point, a distance
+and an elevation gain. Vocabulary: [CONTEXT.md](./CONTEXT.md).
 
 ## Architecture
 
-- `apps/web`: Vite + React PWA (manifest, no service worker), MapLibre with Plan IGN tiles.
-- `apps/api`: stateless Hono API calling a self-hosted BRouter. It also serves the built
-  web app on the same origin.
-- Use **pnpm**; scripts are in the root `package.json`.
+- `apps/web`: Vite + React PWA, MapLibre with Plan IGN tiles.
+- `apps/api`: stateless Hono API calling a self-hosted BRouter; it also serves the built web app.
+- pnpm; the scripts are in the root `package.json`.
 
-### Project rules
+By default:
 
-- `apps/api/src/route-generation` stays plain TypeScript (no browser, Node, or Hono
-  imports) so it is unit tested without a server.
-- Elevation comes from IGN BD ALTI 25 m, never from BRouter (#30). The tile reader takes
-  a directory converted by `apps/api/scripts/convert-bdalti.ts`; the API reads it from
-  `BDALTI_DIR`, which is optional: without it, routes have no elevation gain and the target
-  elevation gain is ignored.
-- The web app sends `import.meta.env.VITE_BUILD_ID` in the `X-Build-Id` header; the API
-  answers `426` when it differs from `apps/web/dist/build-id`, so stale tabs reload.
-- Model activity type (run / hike / ride) as data, not as branches through the UI.
-- Keep the in-app credits page accurate (OSM, Plan IGN, BD ALTI, source code link).
-  Every GPX export carries the OSM attribution.
+- `apps/api/src/route-generation` stays plain TypeScript (no browser, Node or Hono imports), so it is
+  tested without a server.
+- Activity type (run / hike / ride) is data, not branches through the UI.
+- The web app sends `VITE_BUILD_ID` in `X-Build-Id`; the API answers `426` on a mismatch so stale tabs reload.
+- The credits page stays accurate, and every GPX export carries the OSM attribution.
+- Elevation comes from BD ALTI through `BDALTI_DIR`, which is optional: without it routes have no elevation gain.
 
-## Contributor guidelines
+## Decisions
 
+[DECISIONS.md](./DECISIONS.md) holds the lasting choices and their reasons, by theme. Read the section
+of the subject you touch. A decision can be questioned: if it no longer holds, say so, propose an
+alternative with your arguments, and rewrite its entry once the owner agrees. Add an entry only for a
+choice that is costly to reverse and whose reason the code does not show.
+
+## Working
+
+- After a change: `pnpm format`, `pnpm lint`, `pnpm typecheck`. Before committing: the tests
+  (`pnpm test`, `pnpm test:integration`, `pnpm test:e2e`), unless already run since the last change.
 - Run `pnpm install` after a pull, merge or rebase that changes dependencies.
-- After a change, run `pnpm format`, `pnpm lint` then `pnpm typecheck`.
-- Before committing, run `pnpm test`, `pnpm test:integration` and `pnpm test:e2e`, unless already
-  run since the last change.
-- Name branches `type/short-description` (Conventional Branch), with a type like `feature`,
-  `bugfix`, `hotfix`, `release` or `chore`.
-- Write commit messages as Conventional Commits, under 72 characters.
-- Do not add `Co-authored-by:` in commit messages.
-- The privacy-first rules, coding conventions, and pull request expectations: @CONTRIBUTING.md
+- Branches: `type/short-description` (`feature`, `bugfix`, `hotfix`, `release`, `chore`). Commits:
+  Conventional Commits under 72 characters, without `Co-authored-by:`.
+- Update the docs only when a rule, a convention or a command changes, not for a new feature or component.
 
-## Issues and decisions
+## Privacy
 
-- Issues: GitHub Issues on `lesloi/path-finder` via `gh`. Triage labels: `needs-triage`,
-  `needs-info`, `ready-for-agent`, `ready-for-human`, `web` (`apps/web`), `api` (`apps/api`), or
-  `infra` (deployment, Docker, CI).
-- Check the closed issues labeled `decision` before changing the architecture, and record
-  new architecture decisions the same way.
+**Nothing about the user leaves the device unless a route needs it.** The rules are in
+[CONTRIBUTING.md](./CONTRIBUTING.md#privacy-first-rules). If a feature seems to need an
+exception, ask the owner before implementing it.
+
+## Issues
+
+- GitHub Issues on `lesloi/path-finder`. Labels: `needs-triage`, `needs-info`,
+  `ready-for-agent`, `ready-for-human`, `web`, `api`, `infra`.
+- To change an issue, edit its description rather than adding a comment; keep comments for a discussion.
+- Declare a dependency with GitHub's relations (`--blocked-by`, `--blocking`, `--parent`), not in the text.
