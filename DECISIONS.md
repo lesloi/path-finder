@@ -18,19 +18,36 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   reveals only a ~30 km area and is cacheable; a `bbox` endpoint or Overpass would reveal exactly what
   the user looks at.
 
+## Backend
+
+- **One Go binary, with chi, instead of an API plus BRouter.** One service less to run, and routing,
+  loops and elevation share one graph. Rust was measured on the same algorithm: 7–12 % more throughput
+  and about a third of the working memory on loops, not enough to leave Go's ecosystem and tooling.
+  WebAssembly was not wanted. chi gives `Heartbeat`, `Timeout`, `Throttle` and `ClientIPFromXFF`
+  from the standard `net/http` types, with no framework to learn.
+- **The graph is built ahead of serving and mapped read-only.** The server only reads it, so it holds
+  no copy of the graph in its own memory and the operating system's page cache is the only cache. The build needs far more
+  RAM than serving (about 3 GB for Auvergne-Rhône-Alpes), so it runs apart, as a job.
+- **A search never waits in a queue.** A loop costs about 11 CPU-seconds, an A→B route a few
+  milliseconds, so concurrent searches are capped per kind (chi `Throttle`) and the answer is `429`
+  beyond it. A search watches its `context.Context`, so a departed client frees its CPU.
+
 ## Routing
 
-- **Loops through waypoints use BRouter's normal routing**, with one detour point per heading, and
-  criteria whose waypoints alone exceed the target are refused. It controls the catching range and
-  tells which point failed, which round-trip mode does not. A waypoint is moved to the nearest way
+- **The engine is our own A\* with landmark lower bounds (ALT)** on a pedestrian graph from OSM, not
+  BRouter. ALT made routes about 25 times faster, and a search only allocates in proportion to the
+  nodes it reaches. The landmarks' metric includes the climb penalty, so the bound stays valid.
+- **Loops go through 2–4 waypoints on a circle through the start point**, each leg avoiding what the
+  earlier ones used, resized up to four times, then ranked on distance, overlap and elevation gain.
+  Criteria whose waypoints alone exceed the target are refused. A waypoint is moved to the nearest way
   within 250 m, beyond which the criteria are refused.
 
 ## Elevation
 
-- **Elevation comes from IGN BD ALTI 25 m, not from BRouter.** BRouter's SRTM (about 90 m) gives an
-  elevation gain 5–76 % too low, BD ALTI stays within 8 % of IGN RGE ALTI. BRouter still uses SRTM to
-  weight climbs. Revisit if coverage extends beyond France (Copernicus DEM overstated gain in cities
-  and forests).
+- **Elevation comes from IGN BD ALTI 25 m, stored on every graph node at build time.** SRTM (about
+  90 m) gives an elevation gain 5–76 % too low, BD ALTI stays within 8 % of IGN RGE ALTI. The engine
+  weighs climbs with the same values it reports. Revisit if coverage extends beyond France (Copernicus
+  DEM overstated gain in cities and forests).
 
 ## Naming
 
