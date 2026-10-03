@@ -680,6 +680,21 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 	return best
 }
 
+// maxSearchWorkers is how many CPUs one loop search uses at most: beyond it, more workers find nothing
+// faster, since the candidates run out.
+const maxSearchWorkers = 8
+
+func searchWorkers(procs int) int { return min(procs, maxSearchWorkers) }
+
+// DefaultConcurrentSearches is how many loop searches to let run at once on this machine. One search
+// already uses every CPU it may, up to maxSearchWorkers, so more than one only helps on a machine with
+// more CPUs than that: two searches share the CPUs of a small machine and each takes twice as long.
+func DefaultConcurrentSearches() int { return concurrentSearches(runtime.GOMAXPROCS(0)) }
+
+func concurrentSearches(procs int) int {
+	return max(1, (procs+maxSearchWorkers-1)/maxSearchWorkers)
+}
+
 // generate runs lp.candidates candidates on the workers, and returns them in no particular order.
 // After each one, enough sees every loop found so far, one call at a time, and returns true to
 // stop the search: the candidates still running are dropped. When ctx ends it returns the
@@ -689,7 +704,7 @@ func generate(ctx context.Context, cx *Engine, sp *spatial, lp *loopParams, star
 	ctx, stop := context.WithCancel(ctx)
 	defer stop()
 	// GOMAXPROCS follows the container's CPU limit (Go 1.25+); NumCPU would not.
-	workers := min(runtime.GOMAXPROCS(0), 8)
+	workers := searchWorkers(runtime.GOMAXPROCS(0))
 	var next atomic.Int64
 	var mu sync.Mutex
 	var found []*loopResult

@@ -241,3 +241,17 @@ func TestAPanicInAWorkerBecomesAnError(t *testing.T) {
 		t.Errorf("after the panic: %v", err)
 	}
 }
+
+func TestConcurrentSearchesFollowTheCPUsBeyondWhatOneSearchUses(t *testing.T) {
+	for procs, want := range map[int]int{1: 1, 2: 1, 4: 1, 8: 1, 9: 2, 16: 2, 17: 3, 64: 8} {
+		if got := concurrentSearches(procs); got != want {
+			t.Errorf("%d CPUs: %d searches, want %d", procs, got, want)
+		}
+		if got := searchWorkers(procs); got != min(procs, 8) {
+			t.Errorf("%d CPUs: %d workers", procs, got)
+		}
+	}
+	if DefaultConcurrentSearches() < 1 {
+		t.Error("the default must allow at least one search")
+	}
+}

@@ -99,14 +99,34 @@ pnpm start   # http://localhost:3000
 | `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                              |
 | `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                       |
 | `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                     |
-| `LOOP_LIMIT`         | no       | `1`           | Route sets generated at once; beyond it the answer is `429`                                    |
+| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))     |
 | `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                   |
 | `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                    |
 | `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none             |
 
-A route set uses every CPU the server may use for its length, so `LOOP_LIMIT` is about how many
-users may generate at once on your machine: more CPUs allow more, and fewer need a longer
-`GENERATION_TIMEOUT`. Go's own `GOMAXPROCS` and `GOMEMLIMIT` apply too.
+### How many at once
+
+Generating a route set is the one costly request: it searches many loops in parallel, on every CPU the
+server may use, up to 8. `LOOP_LIMIT` is how many such requests may run at the same time on one
+instance. Beyond it a request is not queued: it is answered `429` at once with `Retry-After: 5`, and the
+web app tells the user the service is busy.
+
+By default the server picks it from its CPUs: 1 up to 8 CPUs, then one more per 8 (2 for 16 CPUs). One
+request already uses all the CPUs of a small machine, so a second would only make both slower.
+
+Examples, with a request that takes 1 s of the whole machine:
+
+| Machine | `LOOP_LIMIT` | Two users ask at the same time                                                      |
+| ------- | ------------ | ----------------------------------------------------------------------------------- |
+| 2 vCPU  | 1 (default)  | The first gets its routes in 1 s; the second gets `429` and succeeds on its retry   |
+| 2 vCPU  | 2            | Both are served, each in about 2 s: no one is refused, and each waits twice as long |
+| 16 vCPU | 2 (default)  | Both are served in 1 s: one search uses only 8 CPUs, so two fit side by side        |
+| 16 vCPU | 1            | The second gets `429`, while 8 CPUs sit idle                                        |
+
+A hard request (a high elevation gain target) can take ten times that. Lower the limit, or raise
+`GENERATION_TIMEOUT`, when users see `504` (nothing found in time) on a small machine; raise the limit
+when they see `429` while the CPUs are idle. To serve more users overall, add instances: each has its own
+limit. `RATE_LIMIT` is another matter: it limits one client address, not the machine.
 
 ## 5. Host it
 

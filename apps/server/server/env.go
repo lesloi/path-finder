@@ -15,13 +15,15 @@ import (
 //	WEB_ROOT            built web app (default ../web/dist)
 //	APP_ENV             "development" turns the limits off and the logs on
 //	TRUSTED_PROXIES     reverse proxies whose X-Forwarded-For counts (default none)
-//	LOOP_LIMIT          generations running at once, beyond which the answer is 429 (default 1)
+//	LOOP_LIMIT          generations running at once, beyond which the answer is 429 (default: follows the CPUs, see
+//	                    engine.DefaultConcurrentSearches)
 //	RATE_LIMIT          requests per address per RATE_WINDOW (default 60)
 //	RATE_WINDOW         a duration such as 10m (default 10m)
 //	GENERATION_TIMEOUT  a duration such as 15s (default 15s)
 //
-// The caps depend on the machine: a generation runs on every CPU it may use, so more CPUs allow
-// more at once, and each takes about 11 CPU-seconds, so fewer CPUs need a longer timeout.
+// The caps depend on the machine: a generation runs on every CPU it may use (up to 8), so a machine
+// with 8 CPUs or fewer runs one at a time and a larger one runs one more per 8 CPUs, and fewer CPUs
+// need a longer timeout.
 func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	cfg := Config{
 		WebRoot: "../web/dist",

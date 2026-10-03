@@ -72,6 +72,9 @@ func serve() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if cfg.LoopLimit == 0 {
+		cfg.LoopLimit = engine.DefaultConcurrentSearches() // LOOP_LIMIT forces another
+	}
 	cfg.Generator = &generator.Generator{Engines: map[string]generator.Looper{"hike": engines["hike"], "run": engines["run"]}}
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")

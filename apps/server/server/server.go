@@ -34,7 +34,8 @@ type Config struct {
 	Generator RouteSetGenerator
 	// Limits turns on the rate limit and the cap on concurrent generations; off in development.
 	Limits bool
-	// LoopLimit caps the generations running at once (default 1); beyond it the answer is 429.
+	// LoopLimit caps the generations running at once (default 1, which main replaces with one that follows
+	// the CPUs); beyond it the answer is 429.
 	LoopLimit int
 	// RateLimit is the requests an address may send per RateWindow (default 60 per 10 minutes).
 	RateLimit  int
