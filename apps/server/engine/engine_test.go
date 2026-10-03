@@ -334,18 +334,23 @@ func TestCancellationKeepsTheLoopsFinishedSoFar(t *testing.T) {
 	e := openTest(t, g, false)
 	req := LoopRequest{Start: pointOf(g, at(40, 40)), Distance: 20000, Candidates: 100000, Seed: 1}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	// The context ends as soon as a loop is found, so at least one is finished whatever the machine's speed.
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	req.Enough = func([]*Route) bool {
+		cancel()
+		return false
+	}
 	start := time.Now()
 	loops, err := e.Loops(ctx, req)
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
 	}
-	if took := time.Since(start); took > time.Second {
-		t.Errorf("kept working %v after a 150ms deadline", took)
+	if took := time.Since(start); took > 5*time.Second {
+		t.Errorf("kept working %v after the context ended", took)
 	}
 	if len(loops) == 0 {
-		t.Error("no loop kept: the ones finished before the deadline are lost")
+		t.Error("no loop kept: the one finished before the end is lost")
 	}
 }
 

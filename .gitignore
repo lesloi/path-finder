@@ -24,5 +24,6 @@ coverage/
 test-results/
 playwright-report/
 
-# local data
+# local data, also where a command run from apps/server writes by default
 /data/
+/apps/server/data/

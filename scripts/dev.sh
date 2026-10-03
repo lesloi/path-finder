@@ -4,6 +4,8 @@
 # non-interactive shell ignores Ctrl-C, and would keep port 3000 after the web app is gone.
 set -eu
 cd "$(dirname "$0")/.."
+# The server runs from apps/server: a relative default would look there, not in the repository's data/.
+export DATA_DIR="${DATA_DIR:-$PWD/data}"
 
 (cd apps/server && CGO_ENABLED=0 go build -o path-finder . && APP_ENV=development exec ./path-finder) &
 server=$!

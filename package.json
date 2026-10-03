@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "scripts/dev.sh",
     "build": "pnpm --filter @path-finder/web build",
-    "start": "cd apps/server && CGO_ENABLED=0 go run .",
+    "start": "cd apps/server && DATA_DIR=${DATA_DIR:-../../data} CGO_ENABLED=0 go run .",
     "format": "prettier --write .",
     "check": "prettier --check . && pnpm check:web && pnpm check:server",
     "check:web": "eslint apps e2e && pnpm -r typecheck",

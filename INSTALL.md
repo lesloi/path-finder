@@ -69,6 +69,8 @@ export DATA_DIR=$PWD/data   # holds graph.bin, and hike.alt and run.alt if you b
 pnpm dev
 ```
 
+Without `DATA_DIR`, `pnpm dev` and `pnpm start` use the repository's `data/`.
+
 Open http://localhost:5173. The web app proxies `/api` to the server on port 3000. `pnpm dev` sets
 `APP_ENV=development`, which turns off the rate and concurrency limits, and logs each request and the
 errors of a generation.
