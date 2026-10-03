@@ -24,8 +24,7 @@ import (
 // more at once, and each takes about 11 CPU-seconds, so fewer CPUs need a longer timeout.
 func ConfigFromEnv(getenv func(string) string) (Config, error) {
 	cfg := Config{
-		WebRoot:   "../web/dist",
-		Elevation: true,
+		WebRoot: "../web/dist",
 		// On unless explicitly in development, so forgetting APP_ENV keeps them on.
 		Limits: getenv("APP_ENV") != "development",
 	}

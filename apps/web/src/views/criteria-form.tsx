@@ -122,7 +122,6 @@ export function CriteriaForm({
   start,
   draft: kept,
   compact = false,
-  elevation = true,
   onSubmit,
 }: {
   language: Language;
@@ -130,8 +129,6 @@ export function CriteriaForm({
   /** From `useCriteriaDraft`, for a view that mounts the form in more than one place and keeps what was set. */
   draft?: ReturnType<typeof useCriteriaDraft>;
   compact?: boolean;
-  /** Whether the API has elevation data: without it, the target elevation gain is ignored, so it is not offered. */
-  elevation?: boolean;
   onSubmit: (request: RouteSetRequest) => void;
 }) {
   const t = { ...commonText[language], ...criteriaText[language] };
@@ -153,7 +150,7 @@ export function CriteriaForm({
   const gain = clamp(draft.gain, 0, bounds.gain.max);
   // The pace only turns a duration into a distance.
   const showPaceHint = draft.target === 'duration' && settings.pace[activity] === undefined;
-  const level = elevation ? draft.level : 'any';
+  const level = draft.level;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
   const request: RouteSetRequest | undefined = start && {
@@ -305,7 +302,7 @@ export function CriteriaForm({
     },
   };
 
-  const criteria = CRITERIA.filter((criterion) => elevation || criterion !== 'elevation');
+  const criteria = CRITERIA;
   const defaults = defaultDraft(units);
   const TargetIcon = draft.target === 'distance' ? Ruler : Timer;
   // `name` stands for the value on a chip that is the default, so two "Any" chips are told apart.

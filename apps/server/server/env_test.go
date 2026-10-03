@@ -13,7 +13,7 @@ func TestConfigFromEnvDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.Limits || cfg.Log != nil || cfg.WebRoot != "../web/dist" || !cfg.Elevation {
+	if !cfg.Limits || cfg.Log != nil || cfg.WebRoot != "../web/dist" {
 		t.Errorf("defaults = %+v", cfg)
 	}
 	if cfg.LoopLimit != 0 || cfg.RateLimit != 0 || cfg.RateWindow != 0 || cfg.GenerationTimeout != 0 {

@@ -47,7 +47,7 @@ func webRoot(t *testing.T) string {
 
 func newServer(t *testing.T, mutate func(*Config)) http.Handler {
 	t.Helper()
-	cfg := Config{WebRoot: webRoot(t), Generator: generatorFunc(okGenerator), Elevation: true}
+	cfg := Config{WebRoot: webRoot(t), Generator: generatorFunc(okGenerator)}
 	if mutate != nil {
 		mutate(&cfg)
 	}
@@ -86,20 +86,9 @@ func post(h http.Handler, body string) reply {
 
 func TestEveryAnswerSendsNoReferrer(t *testing.T) {
 	h := newServer(t, nil)
-	for _, path := range []string{"/", "/healthz", "/api/v1/capabilities", "/missing"} {
+	for _, path := range []string{"/", "/healthz", "/missing"} {
 		if got := do(h, http.MethodGet, path, "", "", nil).Header().Get("Referrer-Policy"); got != "no-referrer" {
 			t.Errorf("%s: Referrer-Policy = %q", path, got)
-		}
-	}
-}
-
-func TestCapabilities(t *testing.T) {
-	for _, elevation := range []bool{true, false} {
-		h := newServer(t, func(c *Config) { c.Elevation = elevation })
-		r := do(h, http.MethodGet, "/api/v1/capabilities", "", "", nil)
-		want := `{"elevation":` + map[bool]string{true: "true", false: "false"}[elevation] + `}`
-		if got := strings.TrimSpace(r.Body.String()); got != want {
-			t.Errorf("capabilities = %s, want %s", got, want)
 		}
 	}
 }
@@ -300,9 +289,9 @@ func TestDevelopmentLogShowsRequestsAndFailures(t *testing.T) {
 		c.Generator = generatorFunc(func(context.Context, json.RawMessage) (any, error) { return nil, errors.New("graph is corrupt") })
 	})
 	post(h, `{}`)
-	do(h, http.MethodGet, "/api/v1/capabilities?x=1", "", "", nil)
+	do(h, http.MethodGet, "/healthz?x=1", "", "", nil)
 
-	for _, want := range []string{"POST http://example.com/api/v1/route-sets", "500", "route-sets: generation failed: graph is corrupt", "capabilities?x=1"} {
+	for _, want := range []string{"POST http://example.com/api/v1/route-sets", "500", "route-sets: generation failed: graph is corrupt", "healthz?x=1"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("log lacks %q:\n%s", want, out.String())
 		}

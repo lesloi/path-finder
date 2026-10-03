@@ -31,8 +31,6 @@ type Config struct {
 	// WebRoot holds the built web app, with the `build-id` file its build writes.
 	WebRoot   string
 	Generator RouteSetGenerator
-	// Elevation tells the web app that routes have an elevation gain.
-	Elevation bool
 	// Limits turns on the rate limit and the cap on concurrent generations; off in development.
 	Limits bool
 	// LoopLimit caps the generations running at once (default 1); beyond it the answer is 429.
@@ -81,10 +79,6 @@ func New(cfg Config) http.Handler {
 		}
 		r.Use(middleware.ClientIPFromXFF(trusted...))
 	}
-	// What the server can do, for the web app to offer only that. Nothing about the caller.
-	r.Get("/api/v1/capabilities", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]bool{"elevation": cfg.Elevation})
-	})
 	// No logs here: criteria hold the start point, and requests hold the client address.
 	routeSets := r.With()
 	if cfg.Limits {

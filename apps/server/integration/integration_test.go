@@ -35,7 +35,6 @@ func newServer(t *testing.T) http.Handler {
 	}
 	return server.New(server.Config{
 		WebRoot:   web,
-		Elevation: true,
 		Generator: &generator.Generator{Engines: map[string]generator.Looper{"hike": engines["hike"], "run": engines["run"]}},
 	})
 }
@@ -137,9 +136,9 @@ func TestRefusals(t *testing.T) {
 	}
 }
 
-func TestCapabilitiesAndHealth(t *testing.T) {
+func TestHealth(t *testing.T) {
 	h := newServer(t)
-	for path, want := range map[string]string{"/api/v1/capabilities": `{"elevation":true}`, "/healthz": "."} {
+	for path, want := range map[string]string{"/healthz": "."} {
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
 		if rec.Code != 200 || strings.TrimSpace(rec.Body.String()) != want {

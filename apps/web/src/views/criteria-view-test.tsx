@@ -103,17 +103,6 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('criteria-distance')).toHaveAccessibleName(en.distance);
     });
 
-    it('offers the elevation gain only when the API has elevation data', async () => {
-      onDesktop();
-      const fetchMock = vi.fn().mockResolvedValue(Response.json({ elevation: true }));
-      vi.stubGlobal('fetch', fetchMock);
-      render(<CriteriaView language="en" />);
-      expect(screen.queryByTestId('criteria-elevation-hilly')).not.toBeInTheDocument();
-
-      expect(await screen.findByTestId('criteria-elevation-hilly')).toBeInTheDocument();
-      expect(fetchMock).toHaveBeenCalledWith('/api/v1/capabilities', expect.anything());
-    });
-
     it('shows the full form in the desktop column and passes the criteria on', () => {
       onDesktop();
       const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => new Promise(() => {}));
@@ -385,9 +374,7 @@ describe('CriteriaView', () => {
 
     function ask(response: Promise<Response> | Response) {
       const routeSets = vi.fn(() => Promise.resolve(response));
-      vi.stubGlobal('fetch', (url: string) =>
-        url === '/api/v1/route-sets' ? routeSets() : Promise.resolve(Response.json({ elevation: false })),
-      );
+      vi.stubGlobal('fetch', () => routeSets());
       return routeSets;
     }
     async function submit() {
