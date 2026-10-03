@@ -109,24 +109,25 @@ pnpm start   # http://localhost:3000
 Generating a route set is the one costly request: it searches many loops in parallel, on every CPU the
 server may use, up to 8. `LOOP_LIMIT` is how many such requests may run at the same time on one
 instance. Beyond it a request is not queued: it is answered `429` at once with `Retry-After: 5`, and the
-web app tells the user the service is busy.
+web app tells the user the service is busy. The server keeps nothing between requests, so another
+instance never needs to know about this one's.
 
-By default the server picks it from its CPUs: 1 up to 8 CPUs, then one more per 8 (2 for 16 CPUs). One
-request already uses all the CPUs of a small machine, so a second would only make both slower.
+By default the server allows 4 at once per 8 CPUs (4 up to 8 CPUs, 8 up to 16). Measured on a real graph
+with 30 % of hard requests (a high elevation gain target), with random arrivals:
 
-Examples, with a request that takes 1 s of the whole machine:
+| Machine | Arrivals | 1 at once    | 2 at once    | 4 at once    |
+| ------- | -------- | ------------ | ------------ | ------------ |
+| 2 CPU   | 4 / s    | 40 % refused | 26 % refused | 10 % refused |
+| 8 CPU   | 10 / s   | 41 % refused | 21 % refused | 5 % refused  |
 
-| Machine | `LOOP_LIMIT` | Two users ask at the same time                                                      |
-| ------- | ------------ | ----------------------------------------------------------------------------------- |
-| 2 vCPU  | 1 (default)  | The first gets its routes in 1 s; the second gets `429` and succeeds on its retry   |
-| 2 vCPU  | 2            | Both are served, each in about 2 s: no one is refused, and each waits twice as long |
-| 16 vCPU | 2 (default)  | Both are served in 1 s: one search uses only 8 CPUs, so two fit side by side        |
-| 16 vCPU | 1            | The second gets `429`, while 8 CPUs sit idle                                        |
+A slot is cheap to give: searches share the CPUs, so with more at once each takes longer, but a hard
+request went from about 0.2 s to 0.35 s on 8 CPUs, and to about 1 s on 2 CPUs. What a slot costs is
+memory, a few hundred MB for each on a region as large as Auvergne-Rhône-Alpes.
 
-A hard request (a high elevation gain target) can take ten times that. Lower the limit, or raise
-`GENERATION_TIMEOUT`, when users see `504` (nothing found in time) on a small machine; raise the limit
-when they see `429` while the CPUs are idle. To serve more users overall, add instances: each has its own
-limit. `RATE_LIMIT` is another matter: it limits one client address, not the machine.
+Lower the limit when a small machine runs short of memory or when users see `504` (nothing found in
+time); raise it when they see `429` while the CPUs are idle. To serve more users overall, add
+instances: each has its own limit. `RATE_LIMIT` is another matter: it limits one client address, not the
+machine.
 
 ## 5. Host it
 

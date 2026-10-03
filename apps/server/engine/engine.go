@@ -686,13 +686,19 @@ const maxSearchWorkers = 8
 
 func searchWorkers(procs int) int { return min(procs, maxSearchWorkers) }
 
-// DefaultConcurrentSearches is how many loop searches to let run at once on this machine. One search
-// already uses every CPU it may, up to maxSearchWorkers, so more than one only helps on a machine with
-// more CPUs than that: two searches share the CPUs of a small machine and each takes twice as long.
+// searchesPerBatch is how many loop searches to allow at once per maxSearchWorkers CPUs. Measured on a real
+// graph, one at a time refused a third to a half of the requests at a fraction of the machine's capacity,
+// since a request that finds the slot taken is refused rather than queued, while four at once refused
+// 5-10 % and slowed the hard requests by well under a second on 8 CPUs, and to about 2 s on 2 CPUs.
+const searchesPerBatch = 4
+
+// DefaultConcurrentSearches is how many loop searches to let run at once on this machine: searchesPerBatch
+// per maxSearchWorkers CPUs, and at least that many on a smaller one. Searches share the CPUs, so each
+// takes longer the more run at once; a deployment that measures its own limits sets LOOP_LIMIT.
 func DefaultConcurrentSearches() int { return concurrentSearches(runtime.GOMAXPROCS(0)) }
 
 func concurrentSearches(procs int) int {
-	return max(1, (procs+maxSearchWorkers-1)/maxSearchWorkers)
+	return searchesPerBatch * max(1, (procs+maxSearchWorkers-1)/maxSearchWorkers)
 }
 
 // generate runs lp.candidates candidates on the workers, and returns them in no particular order.
