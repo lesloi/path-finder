@@ -43,12 +43,6 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	// Unset or empty, every caller may check the server's health.
-	if list := os.Getenv("HEALTH_ALLOWLIST"); strings.TrimSpace(list) != "" {
-		if cfg.HealthAllowlist, err = server.ParseAddressRanges(list, "HEALTH_ALLOWLIST"); err != nil {
-			log.Fatal(err)
-		}
-	}
 
 	srv := &http.Server{Addr: ":" + port, Handler: server.New(cfg), ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 // generatorFunc adapts a function to a RouteSetGenerator.
@@ -83,7 +85,7 @@ func post(h http.Handler, body string) reply {
 
 func TestEveryAnswerSendsNoReferrer(t *testing.T) {
 	h := newServer(t, nil)
-	for _, path := range []string{"/", "/health", "/api/v1/capabilities", "/missing"} {
+	for _, path := range []string{"/", "/healthz", "/api/v1/capabilities", "/missing"} {
 		if got := do(h, http.MethodGet, path, "", "", nil).Header().Get("Referrer-Policy"); got != "no-referrer" {
 			t.Errorf("%s: Referrer-Policy = %q", path, got)
 		}
@@ -229,67 +231,63 @@ func TestConcurrentGenerationsAreCappedNotQueued(t *testing.T) {
 	}
 }
 
-func TestHealth(t *testing.T) {
-	open := newServer(t, nil)
-	if r := do(open, http.MethodGet, "/health", "", "203.0.113.9:1", nil); r.Code != 200 || r.Body.String() != "ok" {
-		t.Errorf("without an allowlist: got %d %q", r.Code, r.Body.String())
-	}
-
-	allowed, err := ParseAddressRanges("192.0.2.0/24", "HEALTH_ALLOWLIST")
-	if err != nil {
-		t.Fatal(err)
-	}
-	restricted := newServer(t, func(c *Config) { c.HealthAllowlist = allowed })
-	for remote, want := range map[string]int{"127.0.0.1:1": 200, "[::1]:1": 200, "192.0.2.7:1": 200, "203.0.113.9:1": 404} {
-		if r := do(restricted, http.MethodGet, "/health", "", remote, nil); r.Code != want {
-			t.Errorf("%s: got %d, want %d", remote, r.Code, want)
+func TestHealthzAnswersEveryone(t *testing.T) {
+	h := newServer(t, func(c *Config) { c.Limits = true })
+	for _, method := range []string{http.MethodGet, http.MethodHead} {
+		if r := do(h, method, "/healthz", "", "203.0.113.9:1", nil); r.Code != 200 {
+			t.Errorf("%s /healthz: got %d", method, r.Code)
 		}
+	}
+	if r := do(h, http.MethodGet, "/healthz", "", "", nil); r.Body.String() != "." {
+		t.Errorf("body = %q", r.Body.String())
 	}
 }
 
 func TestClientAddressIsTheConnectionUnlessAProxyIsTrusted(t *testing.T) {
 	proxies, _ := ParseAddressRanges("10.0.0.0/8", "TRUSTED_PROXIES")
-	// Who the server takes the client for, seen through the health allowlist.
-	seenAs := func(client string, trusted []netip.Prefix) func(remote string, forwarded string) int {
-		allowed, _ := ParseAddressRanges(client, "HEALTH_ALLOWLIST")
-		h := newServer(t, func(c *Config) { c.HealthAllowlist = allowed; c.TrustedProxies = trusted })
-		return func(remote, forwarded string) int {
+	// The address the server takes the client for, as a generation sees it.
+	clientSeenBy := func(trusted []netip.Prefix) func(remote, forwarded string) string {
+		var seen string
+		h := newServer(t, func(c *Config) {
+			c.TrustedProxies = trusted
+			c.Generator = generatorFunc(func(ctx context.Context, _ json.RawMessage) (any, error) {
+				seen = middleware.GetClientIP(ctx)
+				return nil, nil
+			})
+		})
+		return func(remote, forwarded string) string {
 			headers := map[string]string{}
 			if forwarded != "" {
 				headers["X-Forwarded-For"] = forwarded
 			}
-			return do(h, http.MethodGet, "/health", "", remote, headers).Code
+			do(h, http.MethodPost, "/api/v1/route-sets", `{}`, remote, headers)
+			return seen
 		}
 	}
 
 	t.Run("without trusted proxies the header is ignored", func(t *testing.T) {
-		get := seenAs("192.0.2.5", nil)
-		if got := get("10.1.2.3:1", "192.0.2.5"); got != 404 {
-			t.Errorf("forwarded address believed: got %d", got)
-		}
-		if got := get("192.0.2.5:1", ""); got != 200 {
-			t.Errorf("the connection's own address: got %d", got)
+		client := clientSeenBy(nil)
+		if got := client("10.1.2.3:1", "192.0.2.5"); got != "10.1.2.3" {
+			t.Errorf("client = %s, want the connection's 10.1.2.3", got)
 		}
 	})
 	t.Run("a trusted proxy names the client", func(t *testing.T) {
-		get := seenAs("192.0.2.5", proxies)
-		if got := get("10.1.2.3:1", "192.0.2.5"); got != 200 {
-			t.Errorf("one proxy: got %d", got)
-		}
-		if got := get("10.1.2.3:1", "192.0.2.5, 10.9.9.9"); got != 200 {
-			t.Errorf("two proxies: got %d", got)
-		}
-		if got := get("10.1.2.3:1", "198.51.100.1, 192.0.2.5"); got != 200 {
-			t.Errorf("an entry forged by the client is believed over the proxy's: got %d", got)
-		}
-		if got := get("10.1.2.3:1", "192.0.2.5, 198.51.100.1"); got != 404 {
-			t.Errorf("the first address after the proxies is not the client: got %d", got)
+		client := clientSeenBy(proxies)
+		for forwarded, want := range map[string]string{
+			"192.0.2.5":               "192.0.2.5",
+			"192.0.2.5, 10.9.9.9":     "192.0.2.5", // two proxies
+			"198.51.100.1, 192.0.2.5": "192.0.2.5", // an entry forged by the client comes first
+			"192.0.2.5, 198.51.100.1": "198.51.100.1",
+			"not-an-address":          "10.1.2.3", // fails closed, the connection stays
+		} {
+			if got := client("10.1.2.3:1", forwarded); got != want {
+				t.Errorf("X-Forwarded-For %q: client = %s, want %s", forwarded, got, want)
+			}
 		}
 	})
 	t.Run("a trusted proxy without the header stays the client", func(t *testing.T) {
-		get := seenAs("10.1.2.3", proxies)
-		if got := get("10.1.2.3:1", ""); got != 200 {
-			t.Errorf("fallback to the connection: got %d", got)
+		if got := clientSeenBy(proxies)("10.1.2.3:1", ""); got != "10.1.2.3" {
+			t.Errorf("client = %s", got)
 		}
 	})
 }
@@ -328,12 +326,13 @@ func TestParseAddressRanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for addr, want := range map[string]bool{
-		"10.9.9.9": true, "2001:db8::1": true, "198.51.100.1": true, "::ffff:10.0.0.1": true,
-		"198.51.100.2": false, "11.0.0.1": false, "2001:db9::1": false,
-	} {
-		if got := inRanges(ranges, netip.MustParseAddr(addr)); got != want {
-			t.Errorf("%s in ranges = %v, want %v", addr, got, want)
+	want := []string{"10.0.0.0/8", "2001:db8::/32", "198.51.100.1/32"}
+	if len(ranges) != len(want) {
+		t.Fatalf("ranges = %v", ranges)
+	}
+	for i, r := range ranges {
+		if r.String() != want[i] {
+			t.Errorf("range %d = %s, want %s", i, r, want[i])
 		}
 	}
 	for _, bad := range []string{"10.0.0.0/33", "not-an-ip", "10.0.0.0/8/1"} {

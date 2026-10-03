@@ -45,8 +45,6 @@ type Config struct {
 	// generation fails with. Production keeps no logs: requests hold the client address and the
 	// criteria hold the start point.
 	Log *log.Logger
-	// HealthAllowlist lists the callers allowed to check /health besides the loopback; by default every caller.
-	HealthAllowlist []netip.Prefix
 }
 
 // New returns the server's handler.
@@ -63,7 +61,7 @@ func New(cfg Config) http.Handler {
 	if cfg.Log != nil {
 		r.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: cfg.Log}))
 	}
-	r.Use(referrerPolicy, middleware.ClientIPFromRemoteAddr)
+	r.Use(referrerPolicy, middleware.Heartbeat("/healthz"), middleware.ClientIPFromRemoteAddr)
 	if len(cfg.TrustedProxies) > 0 {
 		// Skips the trusted proxies from the right of X-Forwarded-For: the first other address is the
 		// client. Without the header, the connection's address stays.
@@ -73,7 +71,6 @@ func New(cfg Config) http.Handler {
 		}
 		r.Use(middleware.ClientIPFromXFF(trusted...))
 	}
-	r.Get("/health", a.health)
 	// What the server can do, for the web app to offer only that. Nothing about the caller.
 	r.Get("/api/v1/capabilities", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]bool{"elevation": cfg.Elevation})
@@ -103,20 +100,6 @@ func referrerPolicy(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		next.ServeHTTP(w, r)
 	})
-}
-
-// health answers a healthcheck. The loopback stays allowed for one run inside the container. Other
-// callers get 404, as if the route did not exist, and are not logged.
-func (a *app) health(w http.ResponseWriter, r *http.Request) {
-	if a.cfg.HealthAllowlist != nil {
-		addr, err := netip.ParseAddr(middleware.GetClientIP(r.Context()))
-		if err != nil || !(inRanges(loopbacks, addr) || inRanges(a.cfg.HealthAllowlist, addr)) {
-			http.NotFound(w, r)
-			return
-		}
-	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = io.WriteString(w, "ok")
 }
 
 // checkBuild answers 426 to a tab left open across a deploy, which sends the ID of the previous build.

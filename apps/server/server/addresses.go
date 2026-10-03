@@ -28,18 +28,6 @@ func ParseAddressRanges(list, variable string) ([]netip.Prefix, error) {
 	return ranges, nil
 }
 
-func inRanges(ranges []netip.Prefix, addr netip.Addr) bool {
-	addr = addr.Unmap()
-	for _, p := range ranges {
-		if p.Contains(addr) {
-			return true
-		}
-	}
-	return false
-}
-
-var loopbacks = []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("::1/128")}
-
 // rateKey is the address a rate limit counts: hosts usually get a whole IPv6 /64, so it counts as one.
 func rateKey(address string) string {
 	addr, err := netip.ParseAddr(address)
