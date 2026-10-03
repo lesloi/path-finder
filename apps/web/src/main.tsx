@@ -14,6 +14,11 @@ setWorkerUrl(workerUrl);
 // Before the first render, so a forced theme never flashes the system one.
 watchSettings(({ theme }) => applyTheme(theme));
 
+// Production only: the dev server serves modules that the worker would cache.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  void navigator.serviceWorker.register('/sw.js');
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
