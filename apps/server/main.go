@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -24,25 +23,13 @@ func (unported) Generate(context.Context, json.RawMessage) (any, error) {
 }
 
 func main() {
+	cfg, err := server.ConfigFromEnv(os.Getenv)
+	if err != nil {
+		log.Fatal(err)
+	}
+	cfg.Generator = unported{}
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
-	cfg := server.Config{
-		WebRoot:   envOr("WEB_ROOT", "../web/dist"),
-		Generator: unported{},
-		Elevation: true,
-		// On unless explicitly in development, so forgetting APP_ENV keeps them on.
-		Limits: os.Getenv("APP_ENV") != "development",
-	}
-	if os.Getenv("APP_ENV") == "development" {
-		cfg.Log = log.New(os.Stdout, "", log.LstdFlags)
-	}
-	var err error
-	// Unset or empty, X-Forwarded-For is ignored and the client is the connection.
-	if list := os.Getenv("TRUSTED_PROXIES"); strings.TrimSpace(list) != "" {
-		if cfg.TrustedProxies, err = server.ParseAddressRanges(list, "TRUSTED_PROXIES"); err != nil {
-			log.Fatal(err)
-		}
-	}
 
 	srv := &http.Server{Addr: ":" + port, Handler: server.New(cfg), ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

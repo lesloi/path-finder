@@ -36,6 +36,9 @@ type Config struct {
 	Limits bool
 	// LoopLimit caps the generations running at once (default 1); beyond it the answer is 429.
 	LoopLimit int
+	// RateLimit is the requests an address may send per RateWindow (default 60 per 10 minutes).
+	RateLimit  int
+	RateWindow time.Duration
 	// GenerationTimeout is how long a route set may take (default 15 s).
 	GenerationTimeout time.Duration
 	// TrustedProxies are the reverse proxies whose X-Forwarded-For counts; by default none, and the
@@ -51,6 +54,12 @@ type Config struct {
 func New(cfg Config) http.Handler {
 	if cfg.LoopLimit <= 0 {
 		cfg.LoopLimit = 1
+	}
+	if cfg.RateLimit <= 0 {
+		cfg.RateLimit = 60
+	}
+	if cfg.RateWindow <= 0 {
+		cfg.RateWindow = 10 * time.Minute
 	}
 	if cfg.GenerationTimeout <= 0 {
 		cfg.GenerationTimeout = 15 * time.Second
@@ -79,7 +88,7 @@ func New(cfg Config) http.Handler {
 	routeSets := r.With()
 	if cfg.Limits {
 		// Generous, since mobile carriers put many users behind one address (CGNAT).
-		routeSets = routeSets.With(rateLimit(newRateLimiter(60, 10*time.Minute)))
+		routeSets = routeSets.With(rateLimit(newRateLimiter(cfg.RateLimit, cfg.RateWindow)))
 	}
 	routeSets = routeSets.With(a.checkBuild)
 	if cfg.Limits {
