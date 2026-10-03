@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"unsafe"
 )
 
 func TestQuantizeRoundsDownAndSaturates(t *testing.T) {
@@ -253,5 +254,69 @@ func TestConcurrentSearchesGrowWithEachBatchOfCPUs(t *testing.T) {
 	}
 	if DefaultConcurrentSearches() < 1 {
 		t.Error("the default must allow at least one search")
+	}
+}
+
+func TestRecordsHaveTheSizeTheFileFormatSays(t *testing.T) {
+	if got := unsafe.Sizeof(node{}); got != 12 {
+		t.Errorf("a node takes %d bytes, the format says 12", got)
+	}
+	if got := unsafe.Sizeof(edge{}); got != 12 {
+		t.Errorf("an edge takes %d bytes, the format says 12", got)
+	}
+}
+
+func TestRoutesAcrossHighGroundAndBelowSeaLevelAreMeasuredRight(t *testing.T) {
+	for name, heights := range map[string][2]float64{
+		"a climb past 3276.7 m": {3900, 4100},
+		"the top of France":     {4700, 4807.8},
+		"a climb below the sea": {-5, 15},
+		"across the sea level":  {-2, 18},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var b Builder
+			for i := 0; i <= 10; i++ {
+				b.AddNode(45+float64(i)*0.001, 6, heights[0]+(heights[1]-heights[0])*float64(i)/10)
+			}
+			for i := 0; i < 10; i++ {
+				b.Connect(i, i+1, KindPath, SurfaceCompact)
+			}
+			path := filepath.Join(t.TempDir(), "g.bin")
+			if err := b.WriteGraph(path); err != nil {
+				t.Fatal(err)
+			}
+			e, err := Open(path, "", "hike")
+			if err != nil {
+				t.Fatal(err)
+			}
+			r, err := e.Route(context.Background(), Point{45, 6}, Point{45.01, 6})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := heights[1] - heights[0]
+			if math.Abs(r.Ascent-want) > 3 || r.Descent > 3 {
+				t.Errorf("ascent %.1f m, descent %.1f m, want %.0f m up", r.Ascent, r.Descent, want)
+			}
+			if got := r.Points[len(r.Points)-1].Elevation; math.Abs(got-heights[1]) > 0.06 {
+				t.Errorf("last point at %.1f m, want %.1f", got, heights[1])
+			}
+		})
+	}
+}
+
+func TestAGraphOfAnotherVersionIsRefused(t *testing.T) {
+	g := &testGraph{}
+	g.grid(3, 3, flat)
+	path := g.write(t)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	copy(data, "PFGRAPH2") // the version that stored elevations on 16 bits
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(path, "", "hike"); err == nil || !strings.Contains(err.Error(), "build-graph") {
+		t.Errorf("err = %v, want it to say to build the graph again", err)
 	}
 }

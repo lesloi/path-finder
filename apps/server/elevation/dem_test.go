@@ -96,6 +96,20 @@ func TestLambertOfKnownPoints(t *testing.T) {
 	}
 }
 
+func TestSampleKeepsHighElevations(t *testing.T) {
+	dir := t.TempDir()
+	writeTile(t, dir, "a.asc", 800_000, 6_500_000, func(c, r int) float64 { return 4000 })
+	dem, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lat, lon := lambertToWGS(t, 800_050, 6_500_050)
+	got := dem.Sample([]int32{int32(lat * 1e7)}, []int32{int32(lon * 1e7)})[0]
+	if math.Abs(float64(got)-40000) > 3 {
+		t.Errorf("4000 m = %d decimetres, want about 40000: a height above 3276.7 m must not wrap", got)
+	}
+}
+
 func TestSampleReadsEveryPointOnEveryCPU(t *testing.T) {
 	dir := t.TempDir()
 	writeTile(t, dir, "a.asc", 800_000, 6_500_000, func(c, r int) float64 { return float64(100 + 10*c) })

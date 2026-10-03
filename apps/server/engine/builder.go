@@ -38,7 +38,7 @@ type Builder struct {
 
 // AddNode adds a node and returns its index. Elevation is in metres.
 func (b *Builder) AddNode(lat, lon, elevation float64) int {
-	b.nodes = append(b.nodes, node{Lat: int32(math.Round(lat * 1e7)), Lon: int32(math.Round(lon * 1e7)), Elev: int16(math.Round(elevation * 10))})
+	b.nodes = append(b.nodes, node{Lat: int32(math.Round(lat * 1e7)), Lon: int32(math.Round(lon * 1e7)), Elev: int32(math.Round(elevation * 10))})
 	b.edges = append(b.edges, nil)
 	return len(b.nodes) - 1
 }

@@ -26,7 +26,7 @@ const (
 func (t *testGraph) addNode(latM, lonM float64, elevM float64) int {
 	lat := baseLat + latM/metersPerDegree
 	lon := baseLon + lonM/(metersPerDegree*math.Cos(baseLat*rad))
-	t.nodes = append(t.nodes, node{Lat: int32(lat * 1e7), Lon: int32(lon * 1e7), Elev: int16(elevM * 10)})
+	t.nodes = append(t.nodes, node{Lat: int32(lat * 1e7), Lon: int32(lon * 1e7), Elev: int32(elevM * 10)})
 	t.edges = append(t.edges, nil)
 	return len(t.nodes) - 1
 }

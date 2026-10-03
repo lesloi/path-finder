@@ -14,13 +14,13 @@ import (
 // node or an edge touches one cache line instead of four arrays. Landmark distances are
 // quantized to 16 bits.
 //
-//	graph:     "PFGRAPH2" | N u32 | E u32 | nodes N*12 | pad16 | offsets (N+1)*4 | pad16 | edges E*12
+//	graph:     "PFGRAPH3" | N u32 | E u32 | nodes N*12 | pad16 | offsets (N+1)*4 | pad16 | edges E*12
 //	landmarks: "PFALT002" | L u32 | N u32 | climb f32 | unit f32 | rows N*rowLen u16
 //
 // A landmark row holds L distances from the landmarks, then L towards them when the metric
 // includes climbing. A distance is floor(cost / unit); 0xFFFF means unreachable or too far.
 const (
-	graphMagicV2   = "PFGRAPH2"
+	graphMagic     = "PFGRAPH3"
 	altMagicV2     = "PFALT002"
 	altUnitMeters  = 16
 	altUnreachable = 0xFFFF
@@ -28,8 +28,7 @@ const (
 
 type node struct {
 	Lat, Lon int32 // 1e-7 degrees
-	Elev     int16 // decimetres
-	_        int16
+	Elev     int32 // decimetres: signed, and wide enough for any height on Earth and any depth below the sea
 }
 
 type edge struct {
@@ -57,7 +56,7 @@ func writeGraph(path string, nodes []node, off []uint32, edges []edge) error {
 		return err
 	}
 	w := bufio.NewWriterSize(f, 1<<20)
-	if _, err := io.WriteString(w, graphMagicV2); err != nil {
+	if _, err := io.WriteString(w, graphMagic); err != nil {
 		return err
 	}
 	if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(len(nodes)), uint32(len(edges))}); err != nil {

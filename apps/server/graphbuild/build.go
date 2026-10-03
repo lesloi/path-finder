@@ -198,7 +198,7 @@ func Build(pbfPaths []string, demDir, outPath string, log io.Writer) error {
 // assemble builds the graph from the ways, each a run of candidate nodes, their coordinates in 1e-7
 // degrees and their elevations. A way is cut into one pair of edges per step, and a node with no edge,
 // or no elevation, is left out.
-func assemble(ways []rawWay, lat, lon []int32, elev []int16) ([]engine.Node, []uint32, []engine.Edge) {
+func assemble(ways []rawWay, lat, lon []int32, elev []int32) ([]engine.Node, []uint32, []engine.Edge) {
 	n := len(lat)
 	deg := make([]uint32, n)
 	for _, w := range ways {

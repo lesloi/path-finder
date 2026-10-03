@@ -212,12 +212,12 @@ func (d *DEM) Tiles() int { return len(d.tiles) }
 func Lambert93(latDeg, lonDeg float64) (x, y float64) { return l93.forward(latDeg, lonDeg) }
 
 // Unknown marks a node with no elevation: the point is outside the tiles, or its position is unknown.
-const Unknown = math.MinInt16
+const Unknown = math.MinInt32
 
 // Sample returns the elevation of each point, in decimetres, or Unknown. Positions are in 1e-7 degrees;
 // a latitude of math.MinInt32 marks a point whose position was never read. It samples on every CPU.
-func (d *DEM) Sample(lat, lon []int32) []int16 {
-	elev := make([]int16, len(lat))
+func (d *DEM) Sample(lat, lon []int32) []int32 {
+	elev := make([]int32, len(lat))
 	chunk := (len(lat) + runtime.NumCPU() - 1) / runtime.NumCPU()
 	var wg sync.WaitGroup
 	for lo := 0; lo < len(lat); lo += chunk {
@@ -231,7 +231,7 @@ func (d *DEM) Sample(lat, lon []int32) []int16 {
 					continue
 				}
 				if z := d.At(float64(lat[i])*1e-7, float64(lon[i])*1e-7); !math.IsNaN(float64(z)) {
-					elev[i] = int16(math.Round(float64(z) * 10))
+					elev[i] = int32(math.Round(float64(z) * 10))
 				}
 			}
 		}()

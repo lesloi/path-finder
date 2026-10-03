@@ -85,8 +85,8 @@ func openGraph(path string) (*graph, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(data) < 16 || string(data[:8]) != graphMagicV2 {
-		return nil, fmt.Errorf("%s is not a v2 graph file", path)
+	if len(data) < 16 || string(data[:8]) != graphMagic {
+		return nil, fmt.Errorf("%s is not a graph file of this version: build it again with build-graph", path)
 	}
 	n, e := int(binary.LittleEndian.Uint32(data[8:])), int(binary.LittleEndian.Uint32(data[12:]))
 	nodesAt := 16

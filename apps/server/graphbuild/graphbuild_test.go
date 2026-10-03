@@ -69,7 +69,7 @@ func TestAssembleCutsWaysIntoEdgesAndDropsWhatHasNoElevation(t *testing.T) {
 	// Nodes 0-1-2 form a path; node 3 has no elevation and node 4 belongs to no way.
 	lat := []int32{450_000_000, 450_010_000, 450_020_000, 450_030_000, 460_000_000}
 	lon := []int32{60_000_000, 60_000_000, 60_000_000, 60_000_000, 60_000_000}
-	elev := []int16{1000, 1100, 1200, elevation.Unknown, 1000}
+	elev := []int32{1000, 1100, 1200, elevation.Unknown, 1000}
 	ways := []rawWay{
 		{kind: engine.KindPath, surf: engine.SurfaceRough, idx: []uint32{0, 1, 2, 3}},
 		{kind: engine.KindTrack, surf: engine.SurfacePaved, idx: []uint32{1, 1}}, // a way that stays on a node
