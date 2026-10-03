@@ -33,10 +33,10 @@ choice that is costly to reverse and whose reason the code does not show.
 
 ## Working
 
-- After a change to the web app: `pnpm format`, `pnpm lint`, `pnpm typecheck`. After a change to the
-  server, from `apps/server`: `gofmt -l .`, `go vet ./...`.
-- Before committing: the tests (`pnpm test`, `pnpm test:e2e`, and
-  `go test ./...` for the server), unless already run since the last change.
+- After a change: `pnpm format`, then `pnpm check` (formatting and lint, web and server).
+- Before committing: `pnpm check:web` (types, unit tests with coverage, end-to-end) and `pnpm check:server`
+  (Go unit and integration tests, with coverage) for what you touched, unless already run since the last
+  change. CI runs the same three commands, one job each.
 - Run `pnpm install` after a pull, merge or rebase that changes dependencies.
 - A benchmark or a long build is never started without the owner's go-ahead.
 - Branches: `type/short-description` (`feature`, `bugfix`, `hotfix`, `release`, `chore`). Commits:

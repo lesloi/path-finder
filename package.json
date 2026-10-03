@@ -9,11 +9,16 @@
     "start": "cd apps/server && CGO_ENABLED=0 go run .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:server": "apps/server/coverage.sh",
     "test:e2e": "pnpm --filter @path-finder/e2e test",
     "lint": "eslint apps e2e",
+    "lint:server": "cd apps/server && test -z \"$(gofmt -l .)\" && CGO_ENABLED=0 go vet ./...",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "check": "pnpm format:check && pnpm lint && pnpm lint:server",
+    "check:web": "pnpm typecheck && pnpm test:coverage && pnpm test:e2e",
+    "check:server": "pnpm test:server"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^5.0.0",

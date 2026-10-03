@@ -14,57 +14,33 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  unit:
+  # Formatting and lint of the whole project: the quick checks that need no test.
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
-
-      # Fails below the coverage threshold set in vitest.config.ts.
-      - run: pnpm test:coverage | tee "$RUNNER_TEMP/coverage.txt"
-        shell: bash
-
-      - name: Write coverage to the job summary
-        if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
-        run: |
-          {
-            echo '### Coverage'
-            echo '```'
-            # Keep the coverage table only, without ANSI colors.
-            sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/coverage.txt" | grep -E '^(-|.*\|)'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - uses: actions/upload-artifact@v7
-        if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
+      - uses: actions/setup-go@v6
         with:
-          name: coverage
-          path: coverage/
+          go-version-file: apps/server/go.mod
+      - run: pnpm check
 
-  # The server's tests and the end-to-end tests run in parallel, only once the unit tests pass.
+  # The server's unit and integration tests; fails below the coverage threshold of apps/server/coverage.sh.
   server:
-    needs: unit
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/server
-    env:
-      CGO_ENABLED: 0
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
         with:
           go-version-file: apps/server/go.mod
-      - run: test -z "$(gofmt -l .)"
-      - run: go vet ./...
-      - run: go test ./...
+      - run: pnpm check:server
 
-  # The built web app in Chromium, served by the Go server; the IGN is answered from fixtures (e2e/test.ts).
-  e2e:
-    needs: unit
+  # Types, the web app's unit tests, then the built app in Chromium served by the Go server; the IGN is
+  # answered from fixtures (e2e/test.ts).
+  web:
     runs-on: ubuntu-latest
-    # A hang fails fast instead of running for hours; the tests take seconds.
-    timeout-minutes: 10
+    # A hang fails fast instead of running for hours; the tests take minutes.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
@@ -88,7 +64,26 @@ jobs:
       - if: ${{ steps.browsers.outputs.cache-hit == 'true' }}
         run: pnpm --filter @path-finder/e2e exec playwright install-deps chromium
 
-      - run: pnpm test:e2e
+      # Fails below the coverage threshold set in vitest.config.ts.
+      - run: pnpm check:web | tee "$RUNNER_TEMP/web.txt"
+        shell: bash
+
+      - name: Write coverage to the job summary
+        if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
+        run: |
+          {
+            echo '### Coverage'
+            echo '```'
+            # Keep the coverage table only, without ANSI colors.
+            sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/web.txt" | grep -E '^(-|.*\|)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() && hashFiles('coverage/lcov.info') != '' }}
+        with:
+          name: coverage
+          path: coverage/
 
       - uses: actions/upload-artifact@v7
         if: ${{ failure() }}
