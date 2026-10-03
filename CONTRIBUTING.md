@@ -6,7 +6,9 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 ## Getting started
 
 - [INSTALL.md](./INSTALL.md) sets up BRouter and the elevation data.
-- [CONTEXT.md](./CONTEXT.md) holds the domain vocabulary to use in code, tests, and issues.
+- [CONTEXT.md](./CONTEXT.md) holds the domain vocabulary to use.
+- [DECISIONS.md](./DECISIONS.md) explains the lasting choices; you can question one with an issue.
+- [DESIGN.md](./DESIGN.md) guides the interface.
 
 | Command                 | What it does                                                   |
 | ----------------------- | -------------------------------------------------------------- |
@@ -21,7 +23,7 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 | `pnpm build`            | Build the web app                                              |
 | `pnpm start`            | Serve the built web app and the API on port 3000               |
 
-## Privacy-first rules (non-negotiable)
+## Privacy-first rules
 
 A pull request that breaks these rules is not merged. If a feature seems to need an
 exception, open an issue before implementing it.
@@ -38,131 +40,30 @@ exception, open an issue before implementing it.
 
 To report a vulnerability, see [SECURITY.md](./SECURITY.md).
 
-## Coding conventions
+## Conventions
 
-### Files and modules
+Prettier, ESLint and TypeScript enforce the style. Follow the neighbouring code for the rest. What
+they cannot check:
 
-- `apps/web/src` is grouped by role: `components/` (shared UI and its styles), `views/` (screens,
-  with `views/legal/`), `core/` (logic without React: activities, units, coordinates, GPX),
-  `state/` (device state and the API's capabilities), `i18n/` (the language and every user-facing label).
-  `App.tsx` and `main.tsx` stay at the root.
-- `apps/api/src` is grouped as `http/` (the Hono app, rate limits, client addresses, build id),
-  `adapters/` (BRouter and BD ALTI) and `route-generation/` (plain TypeScript). `main.ts` starts the
-  server and `contract.ts` lists what the web app may import from the API.
-- File names are kebab-case: `route-set.ts`, `start-point-map.tsx`.
-- Tests sit next to the code they test, named `<file>-test.ts` or `<file>-test.tsx`.
-- Import local files with their extension (`./settings.ts`), as Node runs the API's
-  TypeScript directly.
-- Import types with `import type` or an inline `type` (`verbatimModuleSyntax`).
-- External imports come first, then a blank line, then local imports.
-- Named exports only; no default exports.
-- A folder exposes its public API through an `index.ts` that re-exports its modules, and
-  files of other folders import it through that `index.ts`. The web app imports the API only
-  through `apps/api/src/contract.ts`.
-- Use `type` aliases, plain objects, and functions: no `class`, `interface`, or `enum`.
-  Factories are named `create*` and return functions or objects that close over their
-  state (`createApp`, `createRateLimiter`, `createBRouter`).
-
-### Formatting
-
-Prettier applies the formatting (`pnpm format`), and CI checks it:
-
-- 2-space indentation, single quotes, semicolons, trailing commas.
-- Lines up to about 120 characters.
-
-Use numeric separators for large numbers: `15_000`, `2_500`.
-
-### Naming
-
-- Module constants are `SCREAMING_SNAKE_CASE`; functions and variables `camelCase`;
-  components and types `PascalCase`.
-- Say the unit when the type does not: in the name (`LONG_PRESS_MS`, `windowMs`) or in a
-  comment. Internally, distances are in km and paces in minutes per km.
-
-### Types and data
-
-- `strict` TypeScript. Model variants as unions (`'run' | 'hike'`,
-  `{ admitted: true } | { admitted: false; retryAfter: number }`).
-- Type lookup tables with `Record<Key, …>` or `satisfies`, so a missing activity or
-  language fails the typecheck.
-- Data from outside (request bodies, `localStorage`, files) is `unknown` until checked by
-  small type guards (`isObject`, `isNumber`).
-- Stored data is parsed field by field, each falling back to its default, so old or
-  damaged data never breaks the app.
-- Optional fields are left out rather than set to `undefined`:
-  `...(condition && { field })`.
-
-### Errors and logs
-
-- Invalid input throws a `RangeError` whose message names the field, never its value.
-- Expected failures (blocked storage, missing file) are caught where they happen and
-  fall back to a default.
 - Never log locations, criteria, or client addresses. Logs are limited to startup.
+- Data from outside (request bodies, `localStorage`, files) is `unknown` until checked by small
+  type guards. Stored data is parsed field by field, each falling back to its default.
+- Invalid input throws a `RangeError` whose message names the field, never its value. Expected
+  failures (blocked storage, missing file) are caught where they happen and fall back to a default.
+- Every user-facing string exists in each lang, in `i18n/`. The API answers with error
+  codes, never with a message.
+- Internally, distances are in km and paces in minutes per km; say any other unit in the name.
+- Comments explain why. A lasting choice points to its section of [DECISIONS.md](./DECISIONS.md).
+- Styles follow [DESIGN.md](./DESIGN.md).
 
-### Comments
+## Tests
 
-- Explain why, not what. A comment states a constraint, a unit, or a reason in one
-  plain sentence.
-- Exported functions and types get a `/** … */` comment that says what they return or
-  hold, in domain terms.
-- Reference the issue behind a rule or a bound: `within the #7 bounds`.
-
-### React
-
-- The app is multilingual and supports English and French: every user-facing string
-  exists in both.
-- Function components with inline props types; one exported component per file, with
-  small private helpers below it.
-- User-facing strings live in `i18n/`, one dictionary per domain (`criteriaText`, `settingsText`,
-  `errorText`), typed `satisfies Record<Language, unknown>` and read through
-  `const t = criteriaText[language]`. A test checks that English and French have the same keys.
-  The API answers with error codes, never with a message: `errorText` maps each `ErrorCode` to
-  its wording. The legal pages are data too (`legalText`): sections of paragraphs, where `{id}` in a
-  paragraph stands for a link whose address is in `i18n/links.ts`. No i18n library.
-- Shared device state goes through `useSyncExternalStore` (see `state/settings.ts`), not a
-  state library.
-- Styles follow [DESIGN.md](./DESIGN.md): Tailwind classes limited to its tokens, shared
-  class strings in `components/styles.ts`, and lucide-react icons.
-
-### Tests
-
-- Every change comes with unit tests, which call functions and components directly. An API
-  route is tested through HTTP in an integration test, and a UI feature gets an end-to-end
-  scenario in `e2e/` for its main path, while its edge cases stay in unit tests.
-- Integration tests are named `<file>-integration-test.ts` and run in `pnpm test:integration`,
-  never in `pnpm test`.
-- Vitest with globals (`describe`, `it`, `expect`, `vi`), no imports needed.
-- One `describe` per exported function or component. Each `it` is a present-tense
-  sentence about behavior: `it('rejects a target duration too short for …')`.
-- Use `it.each` for tables of cases, with a readable label as the first column.
-- Separate arrange, act, and assert with blank lines.
-- Build test inputs by spreading a valid base: `{ ...valid, pace: 0 }`.
-- Tests find an element by its `data-testid` (`getByTestId`), written as a literal in kebab-case:
-  `criteria-submit`, `settings-units`. Never by the text, label, or accessible name it shows, so
-  a test finds its element whatever the wording or the language; ESLint enforces it. A role without a name
-  (`alert`, `listbox`) is fine for an element that is unique. A component that appears more than
-  once takes a `testId` prop that prefixes the ids of its parts (`units`, `units-list`).
-- What an element shows is asserted after finding it, against the dictionary
-  (`toHaveTextContent(criteriaText.en.findRoutes)`), never against a literal (a proper name such as `Scaleway` is fine). Each view and legal page has a test that every
-  control has an accessible name in both languages (`expectNamedControls`).
-- Mock `fetch` and BRouter with `vi.fn`; unit tests never call the network.
-- End-to-end tests live in `e2e/`: Playwright drives the built app served by `pnpm start`.
-  Import `test` and `expect` from `e2e/test.ts`, which answers the IGN Géoplateforme from
-  `e2e/fixtures/` and fails a test whose browser calls any other host. `e2e/fake-brouter.ts`
-  stands in for BRouter, so a scenario can generate routes, and `e2e/fake-bdalti.ts` writes BD ALTI tiles
-  of rolling hills around Annecy, so those routes have an elevation gain. Run
-  `pnpm exec playwright install chromium` in `e2e/` once.
-
-## Before opening a pull request
-
-A pull request is ready when:
-
-- new behavior is tested at each level the [Tests](#tests) conventions ask for;
-- `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:integration`,
-  and `pnpm test:e2e` pass;
-- coverage stays at or above 90% (`pnpm test:coverage`) and `pnpm build` succeeds, as in CI;
-- `README.md` and `AGENTS.md` match reality;
-- it follows the [project rules](./AGENTS.md#project-rules) and the coding conventions above.
+- Every change comes with unit tests that call functions and components directly. An API route is
+  tested through HTTP in an integration test (`<file>-integration-test.ts`), and a UI feature gets an
+  end-to-end scenario in `e2e/` for its main path; edge cases stay in unit tests.
+- Find an element by its `data-testid` in kebab-case, never by the text it shows (ESLint enforces it).
+- Assert what an element shows against the dictionary (`criteriaText.en.findRoutes`), not a literal.
+- Unit tests never call the network: mock `fetch` and BRouter with `vi.fn`.
 
 ## Licensing of contributions
 
