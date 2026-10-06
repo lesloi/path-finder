@@ -9,7 +9,8 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
-import type { MapSnapshot, Position } from '../core/index.ts';
+import { DEFAULT_BASEMAP, type Basemap, type MapSnapshot, type Position } from '../core/index.ts';
+import { basemapStyle } from './basemap-style.ts';
 import { MAP_COLORS, routeColor } from './route-colors.ts';
 import { useDesktop } from './use-desktop.ts';
 import { useRouteSnapshot } from './use-route-snapshot.ts';
@@ -52,6 +53,7 @@ function boundsOf(geometries: Position[][]): [Position, Position] {
  * no longer sets the start point.
  */
 export function StartPointMap({
+  basemap = DEFAULT_BASEMAP,
   start,
   focus,
   pickOnClick = false,
@@ -63,7 +65,10 @@ export function StartPointMap({
   onRouteSelect,
   onSnapshot,
   onStartChange,
+  onBasemapFail,
 }: {
+  /** The map background: changing it swaps the style, and the map keeps its view and routes. */
+  basemap?: Basemap;
   /** The geometry of each route of the route set, in order. */
   routes?: Position[][];
   selectedRoute?: number;
@@ -89,10 +94,17 @@ export function StartPointMap({
   /** Desktops arm a click once the user asks to pick the start point. */
   pickOnClick?: boolean;
   onStartChange: (start: Position) => void;
+  /** The style of a new basemap could not be loaded: the map went back to this one, which the app should show. */
+  onBasemapFail?: (basemap: Basemap) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map>(null);
   const [loaded, setLoaded] = useState(false);
+  // Counts the styles loaded: a new style drops the routes' source and layers, which are made again.
+  const [styleVersion, setStyleVersion] = useState(0);
+  const shownBasemap = useRef(basemap);
+  // The basemap a style swap is going back to if the new style fails to load; unset once it has loaded.
+  const swappedFrom = useRef<Basemap>(undefined);
   const desktop = useDesktop();
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
@@ -102,6 +114,7 @@ export function StartPointMap({
     if (interactive) return;
     if (how === 'long-press' || pickOnClick) onStartChange([lng, lat]);
   });
+  const basemapFailed = useEffectEvent((previous: Basemap) => onBasemapFail?.(previous));
   const selectRoute = useEffectEvent((index: number) => {
     if (interactive) onRouteSelect?.(index);
   });
@@ -109,7 +122,7 @@ export function StartPointMap({
   useEffect(() => {
     const map = new Map({
       container: container.current!,
-      style: 'https://data.geopf.fr/annexes/ressources/vectorTiles/styles/PLAN.IGN/standard.json',
+      style: basemapStyle(shownBasemap.current),
       center: [2.5, 46.6],
       zoom: 5,
       attributionControl: false,
@@ -127,9 +140,11 @@ export function StartPointMap({
       'bottom-left',
     );
     mapRef.current = map;
-    // The IGN style paints its background from the tiles, so tiles still loading would show
+    // A style drops what the app added to the map, so this runs for the first style and each one after it.
+    // The Plan IGN vector style paints its background from the tiles, so tiles still loading would show
     // whatever is behind the canvas (black in dark mode).
-    map.on('load', () => {
+    map.on('style.load', () => {
+      swappedFrom.current = undefined;
       map.addLayer(
         { id: 'background', type: 'background', paint: { 'background-color': MAP_COLORS.white } },
         map.getStyle().layers[0].id,
@@ -165,11 +180,23 @@ export function StartPointMap({
         source: 'routes',
         paint: { 'line-color': MAP_COLORS.white, 'line-width': HIT_WIDTH, 'line-opacity': 0 },
       });
-      map.on('click', 'routes-hit', ({ features }) => selectRoute(features![0].properties.index as number));
-      map.on('mouseenter', 'routes-hit', () => (map.getCanvas().style.cursor = 'pointer'));
-      map.on('mouseleave', 'routes-hit', () => (map.getCanvas().style.cursor = ''));
       setLoaded(true);
+      setStyleVersion((version) => version + 1);
     });
+    // A style that fails to load leaves an empty map, with no routes: go back to the one that worked. Tiles
+    // only fail once their style has loaded, so an error before that is the style's.
+    map.on('error', () => {
+      const previous = swappedFrom.current;
+      if (!previous) return;
+      swappedFrom.current = undefined;
+      shownBasemap.current = previous;
+      map.setStyle(basemapStyle(previous), { diff: false });
+      basemapFailed(previous);
+    });
+    // Once, not per style: the listeners belong to the map and look the layer up when they fire.
+    map.on('click', 'routes-hit', ({ features }) => selectRoute(features![0].properties.index as number));
+    map.on('mouseenter', 'routes-hit', () => (map.getCanvas().style.cursor = 'pointer'));
+    map.on('mouseleave', 'routes-hit', () => (map.getCanvas().style.cursor = ''));
 
     map.on('click', ({ lngLat }) => pick('click', lngLat));
 
@@ -195,6 +222,14 @@ export function StartPointMap({
     };
   }, []);
 
+  // A full reload (no diff): the routes' layers are not in the new style, and `style.load` makes them again.
+  useEffect(() => {
+    if (shownBasemap.current === basemap) return;
+    swappedFrom.current = shownBasemap.current;
+    shownBasemap.current = basemap;
+    mapRef.current!.setStyle(basemapStyle(basemap), { diff: false });
+  }, [basemap]);
+
   useEffect(() => {
     if (!start) return;
     const element = document.createElement('div');
@@ -210,9 +245,11 @@ export function StartPointMap({
     if (focus) mapRef.current!.easeTo({ center: focus, zoom: 14 });
   }, [focus]);
 
-  // Once the style has loaded, which holds the layers the routes are drawn in.
+  // Once the style has loaded, which holds the layers the routes are drawn in: a new style has none until
+  // it loads, and the routes are drawn again then.
   useEffect(() => {
-    if (!loaded) return;
+    const source = mapRef.current?.getSource('routes') as GeoJSONSource | undefined;
+    if (!loaded || !source) return;
     const features = (drawnFor === routes ? (routes ?? []) : []).map((geometry, index) => ({
       type: 'Feature' as const,
       geometry: { type: 'LineString' as const, coordinates: geometry },
@@ -220,8 +257,8 @@ export function StartPointMap({
     }));
     // The selected route last, so it is drawn on top.
     features.sort((a, b) => Number(a.properties.selected) - Number(b.properties.selected));
-    (mapRef.current!.getSource('routes') as GeoJSONSource).setData({ type: 'FeatureCollection', features });
-  }, [loaded, routes, selectedRoute, drawnFor]);
+    source.setData({ type: 'FeatureCollection', features });
+  }, [loaded, routes, selectedRoute, drawnFor, styleVersion]);
 
   // The routes, or the selected one, in the part of the map the panel leaves free.
   const framed = framing === 'selected' ? selectedRoute : undefined;
@@ -258,7 +295,7 @@ export function StartPointMap({
     };
   }, [hover]);
 
-  // The Plan IGN map stays light in dark mode. MapLibre makes its container `position: relative`
+  // The basemap stays light in dark mode. MapLibre makes its container `position: relative`
   // from outside Tailwind's layers, so a wrapper pins it to the screen.
   return (
     <div className={`fixed inset-0 bg-white [color-scheme:light] ${pickOnClick ? 'map-picking' : ''}`}>

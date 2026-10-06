@@ -8,10 +8,11 @@ import { RoutesFoundButton } from './routes-found-button.tsx';
 import { SearchingPanel } from './searching-panel.tsx';
 import { useRouteBrowser } from './use-route-browser.ts';
 import { RouteSetView } from './route-set-view.tsx';
-import { formatPosition, parsePosition, type Position } from '../core/index.ts';
+import { BASEMAPS, formatPosition, parsePosition, type Position } from '../core/index.ts';
 import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
   StartPointMap,
+  BasemapPicker,
   BottomSheet,
   FLOATING_BUTTON,
   ICON_BUTTON,
@@ -39,9 +40,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const [toast, setToast] = useState<{ problem: 'unavailable' | 'unreadable'; start?: Position }>();
   const settingsLink = useRef<HTMLAnchorElement>(null);
   const pageWasOpen = useRef(pageOpen);
-  const [{ units }] = useSettings();
+  const [{ units, basemap }, update] = useSettings();
   const browser = useRouteBrowser();
   const { routeSet, loading } = browser;
+  const locateShown = !browser.showing && !loading && (desktop || !sheetExpanded);
 
   // Keyboard users go on from the button that opened the page.
   useEffect(() => {
@@ -111,6 +113,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   return (
     <>
       <StartPointMap
+        basemap={basemap}
         start={start}
         focus={focus}
         // On desktops, the start point block also arms a click.
@@ -123,23 +126,37 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         onRouteSelect={browser.select}
         onSnapshot={browser.setSnapshot}
         onStartChange={changeStart}
+        onBasemapFail={(previous) => update({ basemap: previous })}
       />
-      {/* The settings are open, or another page with a way back to them. */}
-      {!pageOpen && (
-        <a
-          ref={settingsLink}
-          data-testid="criteria-settings"
-          className={`${FLOATING_BUTTON} fixed top-safe-3 right-safe-3 z-5`}
-          href="#/settings"
-          aria-label={t.settings}
-          // Back from the settings, a crosshair armed before them would come as a surprise.
-          onClick={() => setPicking(false)}
-        >
-          <Settings size={20} aria-hidden />
-        </a>
+      <a
+        ref={settingsLink}
+        data-testid="criteria-settings"
+        className={`${FLOATING_BUTTON} fixed top-safe-3 right-safe-3 z-5`}
+        href="#/settings"
+        aria-label={t.settings}
+        // Back from the settings, a crosshair armed before them would come as a surprise.
+        onClick={() => setPicking(false)}
+      >
+        <Settings size={20} aria-hidden />
+      </a>
+      {(desktop || !sheetExpanded) && (
+        <BasemapPicker
+          // Over the location button, or in its place while that one is hidden.
+          className={
+            (locateShown
+              ? 'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2))] ' +
+                'desktop:bottom-[calc(env(safe-area-inset-bottom)+--spacing(6)+var(--spacing-touch)+--spacing(2))] '
+              : 'bottom-[calc(var(--sheet-height,0px)+--spacing(3))] desktop:bottom-safe-6 ') +
+            'right-safe-3 transition-[bottom] duration-250 ease-[ease]'
+          }
+          label={t.basemap}
+          value={basemap}
+          options={BASEMAPS.map((value) => ({ value, label: t[value] }))}
+          onChange={(picked) => update({ basemap: picked })}
+        />
       )}
       {/* Above the sheet on phones, whatever its height; an expanded sheet leaves it no room. */}
-      {!browser.showing && !loading && (desktop || !sheetExpanded) && (
+      {locateShown && (
         <button
           type="button"
           data-testid="criteria-locate"

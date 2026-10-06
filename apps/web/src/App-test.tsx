@@ -90,14 +90,13 @@ describe('App', () => {
     expect(await screen.findByTestId('criteria-settings')).toHaveFocus();
   });
 
-  it('opens a page as a modal dialog, without the settings button behind it', async () => {
+  it('opens a page as a modal dialog', async () => {
     render(<App />);
 
     fireEvent.click(screen.getByTestId('criteria-settings'));
 
     expect(await screen.findByTestId('sub-page')).toHaveAttribute('open');
     expect(screen.getByTestId('sub-page')).toHaveAccessibleName(commonText.en.settings);
-    expect(screen.queryByTestId('criteria-settings')).not.toBeInTheDocument();
   });
 
   it('goes back a level from a page on Escape', async () => {

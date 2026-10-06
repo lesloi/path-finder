@@ -5,6 +5,10 @@ export const criteriaText = {
   en: {
     criteria: 'Criteria',
     myLocation: 'My location',
+    basemap: 'Map background',
+    plan: 'Plan IGN',
+    minimal: 'Minimal',
+    aerial: 'Aerial photo',
     longPress: 'Long-press the map to choose your start point',
     startPoint: 'Start point',
     chooseOnMap: 'Choose on the map',
@@ -46,6 +50,10 @@ export const criteriaText = {
   fr: {
     criteria: 'Critères',
     myLocation: 'Ma position',
+    basemap: 'Fond de carte',
+    plan: 'Plan IGN',
+    minimal: 'Épuré',
+    aerial: 'Photo aérienne',
     longPress: 'Appuyez longuement sur la carte pour choisir votre point de départ',
     startPoint: 'Point de départ',
     chooseOnMap: 'Choisir sur la carte',
