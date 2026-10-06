@@ -124,7 +124,9 @@ them after a rebuild. The server only opens the files for reading and writes not
 Before it listens, the server reads every page of the mapped files, so that the first searches do not wait
 for the volume: it takes about as long as reading the files once (seconds for a region, longer for a
 network volume). Until then `/healthz` does not answer, so a readiness probe on it keeps the pod out of
-rotation; give the probe a delay that covers it.
+rotation; give the probe a delay that covers it. On Kubernetes, use a `startupProbe` (or a long
+`initialDelaySeconds`) rather than a liveness probe with a short timeout, which would restart the pod
+in a loop while it warms. The server logs how long the warm-up took, to size that delay.
 
 A `compose.yaml`:
 
