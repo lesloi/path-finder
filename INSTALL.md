@@ -57,6 +57,14 @@ export DATA_DIR=$PWD/../../data
 A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
 a half-written one. The server maps the files when it starts: restart it after a rebuild.
 
+To build one zone of a large extract, such as a department from the France extract, add
+`-bbox minLon,minLat,maxLon,maxLat` (one sorted `-pbf`, as Geofabrik's are, and only the BD ALTI tiles of the
+zone in `-dem`): the build reads the extract once and its memory follows the zone, not the extract. A way that
+leaves the box is cut there, so give the box a margin around the zone. Without `-bbox`, the build keeps every
+walkable way of the extracts in memory, which is fine for a region and far too much for a country. In a job
+with a memory limit, set `GOMEMLIMIT` to about 80 % of it (`1600MiB` for 2 GiB): the Go runtime then collects
+garbage harder as it nears the limit, at the price of a slower build.
+
 Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (16 by
 default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
 it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one activity

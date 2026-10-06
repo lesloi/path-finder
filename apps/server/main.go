@@ -40,8 +40,19 @@ func run(command string, args []string) error {
 		fs.Var(&pbfs, "pbf", "OSM PBF file (repeatable)")
 		dem := fs.String("dem", "", "directory holding the BD ALTI .asc tiles")
 		out := fs.String("out", filepath.Join(dataDir(), engine.GraphFileName), "graph file to write")
+		bbox := fs.String("bbox", "", "keep only this zone, as minLon,minLat,maxLon,maxLat: the memory then follows the zone, not the extract (one sorted -pbf)")
 		_ = fs.Parse(args)
-		return graphbuild.Build(pbfs, *dem, *out, os.Stderr)
+		if *bbox == "" {
+			return graphbuild.Build(pbfs, *dem, *out, os.Stderr)
+		}
+		box, err := graphbuild.ParseBox(*bbox)
+		if err != nil {
+			return err
+		}
+		if len(pbfs) != 1 {
+			return fmt.Errorf("build-graph -bbox reads exactly one -pbf, got %d", len(pbfs))
+		}
+		return graphbuild.BuildClipped(pbfs[0], *dem, *out, box, os.Stderr)
 	case "build-alt":
 		fs := flag.NewFlagSet(command, flag.ExitOnError)
 		graph := fs.String("graph", filepath.Join(dataDir(), engine.GraphFileName), "graph file")

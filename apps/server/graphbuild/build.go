@@ -179,6 +179,11 @@ func Build(pbfPaths []string, demDir, outPath string, log io.Writer) error {
 	runtime.GC()
 	p.step("pass 2: node coordinates read")
 
+	return finish(p, dem, demDir, ways, lat, lon, outPath)
+}
+
+// finish samples the elevation of the candidate nodes, assembles the graph from the ways and writes it.
+func finish(p progress, dem *elevation.DEM, demDir string, ways []rawWay, lat, lon []int32, outPath string) error {
 	elev := dem.Sample(lat, lon)
 	p.step("elevation sampled")
 
