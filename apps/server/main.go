@@ -58,7 +58,7 @@ func run(command string, args []string) error {
 		graph := fs.String("graph", filepath.Join(dataDir(), engine.GraphFileName), "graph file")
 		out := fs.String("out", "", "landmark file to write (default: the profile's file in the data directory)")
 		profile := fs.String("profile", "hike", "activity profile: hike or run")
-		count := fs.Int("landmarks", 16, "number of landmarks")
+		count := fs.Int("landmarks", 8, "number of landmarks")
 		_ = fs.Parse(args)
 		if *out == "" {
 			*out = filepath.Join(dataDir(), engine.LandmarksFileName(*profile))
