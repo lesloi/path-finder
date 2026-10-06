@@ -7,7 +7,8 @@ cd "$(dirname "$0")/.."
 # The server runs from apps/server: a relative default would look there, not in the repository's data/.
 export DATA_DIR="${DATA_DIR:-$PWD/data}"
 
-(cd apps/server && CGO_ENABLED=0 go build -o path-finder . && APP_ENV=development exec ./path-finder) &
+# PORT is the web app's (a preview tool hands one out); the server takes API_PORT, which the Vite proxy also reads.
+(cd apps/server && CGO_ENABLED=0 go build -o path-finder . && PORT="${API_PORT:-3000}" APP_ENV=development exec ./path-finder) &
 server=$!
 trap 'kill "$server" 2>/dev/null || true' EXIT INT TERM
 
