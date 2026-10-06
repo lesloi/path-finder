@@ -81,9 +81,10 @@ by twice it.
 ./path-finder plan-zones -pbf france.osm.pbf -max-nodes 40000000 -margin-km 20 > zones.txt
 ```
 
-`apps/server/zones-france.txt` is that list for the France extract of 6 October 2026 (31 zones): a job that
-updates the data uses it as it is, since a new plan renumbers the zones. Each line is a name and a box. `$dem` holds the BD ALTI tiles of the country: a build reads
-only those that meet its box.
+Each line is a name and a box: 31 zones for the France extract of 6 October 2026. Plan again with each extract
+rather than keep a list: the zones follow the nodes, and a build into a new directory (see below) does not
+care that the names change. `$dem` holds the BD ALTI tiles of the country: a build reads only those that meet
+its box.
 
 ```sh
 while read -r name box _; do
@@ -167,7 +168,7 @@ The `Dockerfile` builds one image with the server and the web app, and no data. 
 To update the data from a job, build into a new directory beside the live one, not into it, then point the
 volume's `current` link at it and restart the pods: a pod restarting in the middle of a build in place would
 find a new `graph.bin` with old landmarks, which it refuses, and a zone dropped from the plan would still be
-served.
+served. The same job plans the zones, then builds them, so a newer extract needs no new image.
 
 The data is a volume: mount the directory holding `graph.bin`, `hike.alt` and `run.alt`, or one such
 subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. On Kubernetes that is a persistent volume, mounted the
