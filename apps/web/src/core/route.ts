@@ -155,13 +155,47 @@ export function surfaceAt(surfaces: SurfaceStretch[], fraction: number): Surface
   return surfaces.at(-1)?.surface ?? 'paved';
 }
 
-/** The position `distance` kilometres along the route from its start, kept on the route. */
-export function positionAt(geometry: Route['geometry'], distance: number): Position {
-  const [k, t] = locate(distancesAlong(geometry), distance);
+// The position `distance` kilometres along a route whose distances along are known.
+function positionAlong(geometry: number[][], distances: number[], distance: number): Position {
+  const [k, t] = locate(distances, distance);
   if (!t) return [geometry[k][0], geometry[k][1]];
   const [lonA, latA] = geometry[k];
   const [lonB, latB] = geometry[k + 1];
   return [lonA + t * (lonB - lonA), latA + t * (latB - latA)];
+}
+
+/** The position `distance` kilometres along the route from its start, kept on the route. */
+export function positionAt(geometry: Route['geometry'], distance: number): Position {
+  return positionAlong(geometry, distancesAlong(geometry), distance);
+}
+
+/** The position halfway along the route: the far side of a loop. */
+export function midpoint(geometry: Route['geometry']): Position {
+  const distances = distancesAlong(geometry);
+  return positionAlong(geometry, distances, distances[distances.length - 1] / 2);
+}
+
+/** A mark `count` steps along a route, such as the 3rd kilometre. */
+export type DistanceMarker = { position: Position; count: number };
+
+/** The distance in kilometres or miles between two markers, so that a route has a handful of them. */
+export function markerInterval(length: number): number {
+  if (length <= 40) return 1;
+  return length <= 200 ? 5 : 10;
+}
+
+/**
+ * A marker every `step` kilometres along the route, counted from 1. The last one is left out when it
+ * would sit on the end of the route, where the finish is.
+ */
+export function distanceMarkers(geometry: Route['geometry'], step: number): DistanceMarker[] {
+  const distances = distancesAlong(geometry);
+  const total = distances[distances.length - 1];
+  const markers: DistanceMarker[] = [];
+  for (let count = 1; count * step < total - step / 5; count++) {
+    markers.push({ position: positionAlong(geometry, distances, count * step), count });
+  }
+  return markers;
 }
 
 /**

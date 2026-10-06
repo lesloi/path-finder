@@ -1,5 +1,5 @@
 import { Crosshair, LocateFixed, Settings } from 'lucide-react';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useSettings } from '../state/index.ts';
 import { CriteriaForm, useCriteriaDraft } from './criteria-form.tsx';
@@ -43,6 +43,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const [{ units, basemap }, update] = useSettings();
   const browser = useRouteBrowser();
   const { routeSet, loading } = browser;
+  const display = useMemo(() => ({ units, language }), [units, language]);
+  const summaries = useMemo(
+    () => routeSet?.routes.map(({ distance, elevationGain }) => ({ distance, elevationGain })),
+    [routeSet],
+  );
   const locateShown = !browser.showing && !loading && (desktop || !sheetExpanded);
 
   // Keyboard users go on from the button that opened the page.
@@ -90,7 +95,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const panel =
     routeSet && browser.showing ? (
       <RouteSetView
-        display={{ units, language }}
+        display={display}
         request={routeSet.request}
         routes={routeSet.routes}
         snapshot={browser.snapshot}
@@ -119,6 +124,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         // On desktops, the start point block also arms a click.
         pickOnClick={desktop && picking}
         routes={browser.geometries}
+        summaries={summaries}
+        display={display}
         selectedRoute={browser.selected}
         framing={browser.detail ? 'selected' : 'all'}
         {...(browser.detail && browser.hover && { hover: browser.hover })}

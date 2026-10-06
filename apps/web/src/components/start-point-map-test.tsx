@@ -1,7 +1,7 @@
 import { act, render } from '@testing-library/react';
 
 import type { Position } from '../core/index.ts';
-import { maps, markers, type GeoJSONSource } from '../maplibre-mock.ts';
+import { maps, markers, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
 import { basemapStyle } from './basemap-style.ts';
 import { StartPointMap } from './start-point-map.tsx';
 
@@ -103,6 +103,18 @@ describe('StartPointMap', () => {
     expect(attribution.options.customAttribution.join(' ')).toMatch(/IGN.*OpenStreetMap/);
   });
 
+  it('shows a scale bar in the units of the display, and follows them', () => {
+    const { rerender } = render(
+      <StartPointMap display={{ units: 'imperial', language: 'en' }} onStartChange={vi.fn()} />,
+    );
+    const scale = map().controls.find((control) => control instanceof ScaleControl) as ScaleControl;
+    expect(scale.options).toEqual({ unit: 'imperial' });
+
+    rerender(<StartPointMap display={{ units: 'metric', language: 'en' }} onStartChange={vi.fn()} />);
+
+    expect(scale.options).toEqual({ unit: 'metric' });
+  });
+
   it('shows the start point on the map', () => {
     const { rerender } = render(<StartPointMap onStartChange={vi.fn()} />);
     expect(markers.filter((marker) => marker.shown)).toEqual([]);
@@ -184,7 +196,14 @@ describe('StartPointMap', () => {
 
       const drawn = (map().getSource('routes') as GeoJSONSource & { data: { features: unknown[] } }).data.features;
       expect(drawn).toHaveLength(2);
-      expect(map().layers.map(({ id }) => id)).toEqual(['background', 'routes-casing', 'routes-line', 'routes-hit']);
+      expect(map().layers.map(({ id }) => id)).toEqual([
+        'background',
+        'routes-casing',
+        'routes-line',
+        'routes-hit',
+        'route-badges',
+        'route-markers',
+      ]);
       act(() => map().fire('click', { features: [{ properties: { index: 1 } }] }, 'routes-hit'));
       expect(onRouteSelect).toHaveBeenCalledExactlyOnceWith(1);
     });
@@ -371,7 +390,92 @@ describe('StartPointMap', () => {
     it('draws a wide invisible line to hit the routes', () => {
       renderRoutes();
 
-      expect(map().layers.map(({ id }) => id)).toEqual(['background', 'routes-casing', 'routes-line', 'routes-hit']);
+      expect(map().layers.map(({ id }) => id)).toEqual([
+        'background',
+        'routes-casing',
+        'routes-line',
+        'routes-hit',
+        'route-badges',
+        'route-markers',
+      ]);
+    });
+
+    describe('the distance', () => {
+      // About 7 km out and back.
+      const out: Position[] = [
+        [6, 45],
+        [6.05, 45.05],
+        [6, 45],
+      ];
+      const summaries = [{ distance: 14, elevationGain: 340 }];
+      const labelled = (id: 'route-badges' | 'route-markers') =>
+        (map().getSource(id) as GeoJSONSource & { data: { features: { properties: Record<string, unknown> }[] } }).data
+          .features;
+      const labels = (id: 'route-badges' | 'route-markers') => labelled(id).map(({ properties }) => properties.label);
+
+      it('labels each route with its distance and elevation gain', () => {
+        renderRoutes({
+          routes: [out, out],
+          summaries: [...summaries, { distance: 12.5 }],
+          display: { units: 'metric', language: 'fr' },
+        });
+
+        expect(labels('route-badges')).toEqual(['14,0 km\n+340 m', '12,5 km']);
+      });
+
+      it('writes it in miles and feet in imperial units', () => {
+        renderRoutes({ routes: [out], summaries, display: { units: 'imperial', language: 'en' } });
+
+        expect(labels('route-badges')).toEqual(['8.7 mi\n+1115 ft']);
+      });
+
+      it('marks the distance along the selected route only once its detail is open', () => {
+        const set = [out];
+        const view = renderRoutes({ routes: set, summaries, selectedRoute: 0 });
+        expect(labels('route-markers')).toEqual([]);
+
+        view.rerender(
+          <StartPointMap
+            routes={set}
+            summaries={summaries}
+            selectedRoute={0}
+            framing="selected"
+            onStartChange={vi.fn()}
+          />,
+        );
+
+        expect(labels('route-markers')).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13']);
+        // The route's own labels give way to its markers.
+        expect(labels('route-badges')).toEqual([]);
+      });
+
+      it('marks every mile in imperial units, and gives a multiple of ten the first place', () => {
+        renderRoutes({
+          routes: [out],
+          summaries,
+          selectedRoute: 0,
+          framing: 'selected',
+          display: { units: 'imperial', language: 'en' },
+        });
+
+        expect(labels('route-markers')).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
+        expect(labelled('route-markers').map(({ properties }) => properties.priority)).toEqual([
+          2, 2, 2, 2, 1, 2, 2, 2,
+        ]);
+      });
+
+      it('draws each marker on a dark disc the map has an image for', () => {
+        renderRoutes({ routes: [out], summaries });
+
+        expect(map().images['distance-marker']).toMatchObject({ width: 52, height: 52 });
+      });
+
+      it('has no label until the snapshot is taken', () => {
+        render(<StartPointMap routes={[out]} summaries={summaries} onStartChange={vi.fn()} />);
+        act(() => map().fire('style.load'));
+
+        expect(labelled('route-badges')).toEqual([]);
+      });
     });
 
     it('selects the route that is tapped', () => {

@@ -79,6 +79,10 @@ export class Map {
   getCanvas() {
     return this.canvas;
   }
+  images: Record<string, unknown> = {};
+  addImage(id: string, image: unknown) {
+    this.images[id] = image;
+  }
   addSource(id: string) {
     this.sources[id] = new GeoJSONSource();
   }
@@ -125,5 +129,15 @@ export class AttributionControl {
   options: unknown;
   constructor(options?: unknown) {
     this.options = options;
+  }
+}
+
+export class ScaleControl {
+  options: { unit?: string };
+  constructor(options: { unit?: string } = {}) {
+    this.options = options;
+  }
+  setUnit(unit: string) {
+    this.options.unit = unit;
   }
 }
