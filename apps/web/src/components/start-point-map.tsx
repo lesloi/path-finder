@@ -9,7 +9,7 @@ import {
   type SymbolLayerSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
 
 import {
   DEFAULT_BASEMAP,
@@ -28,7 +28,7 @@ import { basemapStyle } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
 import { MAP_COLORS, routeColor } from './route-colors.ts';
 import { useDesktop } from './use-desktop.ts';
-import { useRouteSnapshot } from './use-route-snapshot.ts';
+import { NORTH_EPSILON, useRouteSnapshot } from './use-route-snapshot.ts';
 
 const LONG_PRESS_MS = 500;
 
@@ -49,11 +49,34 @@ function columnInset() {
   return Number.isNaN(inset) ? COLUMN_INSET_FALLBACK : inset;
 }
 
+// The routes the map frames: all of them, or the selected one.
+function framedRoutes(routes: Position[][], framed: number | undefined) {
+  return framed === undefined ? routes : [routes[framed] ?? routes[0]];
+}
+
 const emptyRoutes = { type: 'FeatureCollection', features: [] } as const;
 
 // The font stack the IGN style serves glyphs for.
 const LABEL_FONT = ['Source Sans Pro Bold'];
 const DEFAULT_DISPLAY: Display = { units: 'metric', language: 'en' };
+
+/** How the user left the map, for the buttons that put it back. */
+export type MapView = {
+  /** Degrees the map is turned from north. */
+  bearing: number;
+  /** Whether the map is turned away from north up. */
+  rotated: boolean;
+  /** Whether the user moved the map since it last framed the routes. */
+  movedAway: boolean;
+};
+
+/** What the buttons over the map ask of it. */
+export type MapHandle = {
+  /** Turns the map back to north at the top. */
+  resetNorth: () => void;
+  /** Frames the routes again, or the selected one. */
+  reframe: () => void;
+};
 
 /** What the map writes on a route: its distance and, when known, its elevation gain. */
 export type RouteSummary = { distance: number; elevationGain?: number };
@@ -91,6 +114,8 @@ export function StartPointMap({
   onSnapshot,
   onStartChange,
   onBasemapFail,
+  onViewChange,
+  ref,
 }: {
   /** The map background: changing it swaps the style, and the map keeps its view and routes. */
   basemap?: Basemap;
@@ -125,6 +150,9 @@ export function StartPointMap({
   onStartChange: (start: Position) => void;
   /** The style of a new basemap could not be loaded: the map went back to this one, which the app should show. */
   onBasemapFail?: (basemap: Basemap) => void;
+  /** The user turned or moved the map, or it was put back. */
+  onViewChange?: (view: MapView) => void;
+  ref?: Ref<MapHandle>;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<Map>(null);
@@ -140,6 +168,14 @@ export function StartPointMap({
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   const interactive = Boolean(routes?.length) && routesInteractive;
+  const view = useRef<MapView>({ bearing: 0, rotated: false, movedAway: false });
+  // Tells the app what changed in the view, and only when something did: the map moves many times a second.
+  const changeView = useEffectEvent((change: Partial<MapView>) => {
+    const next = { ...view.current, ...change };
+    if ((Object.keys(next) as (keyof MapView)[]).every((key) => next[key] === view.current[key])) return;
+    view.current = next;
+    onViewChange?.(next);
+  });
   const pick = useEffectEvent((how: 'long-press' | 'click', { lng, lat }: { lng: number; lat: number }) => {
     // A tap on a route selects it: it must not move the start point too.
     if (interactive) return;
@@ -157,6 +193,9 @@ export function StartPointMap({
       center: [2.5, 46.6],
       zoom: 5,
       attributionControl: false,
+      // A flat map: the app draws no relief and no 3D, so a tilt would only skew it.
+      maxPitch: 0,
+      pitchWithRotate: false,
     });
     // Routes come from OpenStreetMap: credit it from this map on, before any route is drawn.
     // The stylesheet moves it above the sheet on phones and to the centre of the map on desktops.
@@ -174,6 +213,14 @@ export function StartPointMap({
     scale.current = new ScaleControl({ unit: initialUnits() });
     map.addControl(scale.current, 'bottom-left');
     mapRef.current = map;
+    map.on('move', () => {
+      const bearing = map.getBearing();
+      changeView({ bearing, rotated: Math.abs(bearing) > NORTH_EPSILON });
+    });
+    // A gesture carries its event; a framing the app asks for does not.
+    map.on('movestart', (event) => {
+      if ('originalEvent' in event && event.originalEvent) changeView({ movedAway: true });
+    });
     // A style drops what the app added to the map, so this runs for the first style and each one after it.
     // The Plan IGN vector style paints its background from the tiles, so tiles still loading would show
     // whatever is behind the canvas (black in dark mode).
@@ -386,18 +433,19 @@ export function StartPointMap({
     }
   }, [loaded, routes, summaries, display, selectedRoute, framing, drawnFor, styleVersion]);
 
-  // The routes, or the selected one, in the part of the map the panel leaves free.
+  // The routes, or the selected one, in the part of the map the panel leaves free. A new route set is framed north
+  // up, as its snapshot maps places to pixels without a turn; framing it again keeps the user's orientation.
   const framed = framing === 'selected' ? selectedRoute : undefined;
   const taken = drawnFor === routes;
   // The snapshot is taken after the detail of a route was opened: the map goes on to the route.
   const followsSnapshot = framed !== undefined && taken;
   const snapshotTaken = useEffectEvent(() => taken);
-  useEffect(() => {
-    if (!loaded || !routes?.length) return;
-    const map = mapRef.current!;
-    const shown = framed === undefined ? routes : [routes[framed] ?? routes[0]];
+  // Counts the asks to frame the routes again.
+  const [reframes, setReframes] = useState(0);
+  const frame = (bearing: number) => {
     const sheet = Number.parseFloat(document.documentElement.style.getPropertyValue('--sheet-height')) || 0;
-    const frame = {
+    return {
+      bearing,
       padding: {
         top: FRAME_MARGIN,
         right: FRAME_MARGIN,
@@ -405,11 +453,22 @@ export function StartPointMap({
         left: FRAME_MARGIN + (desktop ? columnInset() : 0),
       },
     };
+  };
+  useImperativeHandle(ref, () => ({
+    resetNorth: () => mapRef.current?.resetNorth(),
+    // The framing below runs again.
+    reframe: () => setReframes((count) => count + 1),
+  }));
+  useEffect(() => {
+    if (!loaded || !routes?.length) return;
+    const map = mapRef.current!;
     // Not on every selection of a route set that has its snapshot: hovering a row of the list must not
     // move the map. A new route set is framed at once, for the snapshot that is taken of it.
-    if (snapshotTaken()) map.fitBounds(boundsOf(shown), frame);
-    else map.fitBounds(boundsOf(routes), { ...frame, animate: false });
-  }, [loaded, routes, framed, desktop, followsSnapshot]);
+    if (snapshotTaken()) map.fitBounds(boundsOf(framedRoutes(routes, framed)), frame(map.getBearing()));
+    else map.fitBounds(boundsOf(routes), { ...frame(0), animate: false });
+    changeView({ movedAway: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `frame` reads `desktop`, a dependency
+  }, [loaded, routes, framed, desktop, followsSnapshot, reframes]);
 
   useEffect(() => {
     if (!hover) return;

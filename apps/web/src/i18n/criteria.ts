@@ -5,6 +5,8 @@ export const criteriaText = {
   en: {
     criteria: 'Criteria',
     myLocation: 'My location',
+    resetNorth: 'Point north',
+    reframe: 'Reframe the map',
     basemap: 'Map background',
     plan: 'Plan IGN',
     minimal: 'Minimal',
@@ -50,6 +52,8 @@ export const criteriaText = {
   fr: {
     criteria: 'Critères',
     myLocation: 'Ma position',
+    resetNorth: 'Remettre le nord en haut',
+    reframe: 'Recadrer la carte',
     basemap: 'Fond de carte',
     plan: 'Plan IGN',
     minimal: 'Épuré',
