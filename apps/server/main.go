@@ -68,7 +68,7 @@ func serve() {
 		log.Fatal(err)
 	}
 	// The graph and the landmarks of each activity are built ahead of serving, by build-graph and build-alt.
-	// The port opens once the files are mapped and indexed (the index reads every node).
+	// The port opens once the files are mapped and their headers checked.
 	opened := time.Now()
 	engines, err := engine.OpenDir(dataDir(), "hike", "run")
 	if err != nil {

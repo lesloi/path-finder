@@ -124,10 +124,9 @@ them after a rebuild. The server only opens the files for reading and writes not
 
 The server does not read the files ahead: a search faults in the pages it needs, about 5 MB for a route
 set, the first time it touches them. On a local disk that adds a few milliseconds to the first requests;
-measure it on a network volume. Before it listens, the server maps the files and indexes the nodes, which
-reads all of them once, and `/healthz` does not answer until then. On Kubernetes, use a `startupProbe` (or a
-long `initialDelaySeconds`) rather than a liveness probe with a short timeout, which would restart the pod
-in a loop while it opens. The server logs how long opening took, to size that delay.
+measure it on a network volume. Before it listens, the server maps the files and checks their headers, which reads
+almost nothing (the index that finds the nearest node to a point is in `graph.bin`), and `/healthz` does not
+answer until then. The server logs how long opening took.
 
 A `compose.yaml`:
 
