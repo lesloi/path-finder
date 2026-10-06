@@ -152,7 +152,7 @@ func TestFileWritersFailOnAnUnwritablePath(t *testing.T) {
 	if err := writeGraph(missing, nil, []uint32{0}, nil); err == nil {
 		t.Error("writeGraph into a missing directory: err = nil")
 	}
-	if err := writeLandmarks(missing, 1, 0, 8, nil); err == nil {
+	if err := writeLandmarks(missing, 1, 0, 0, 8, nil); err == nil {
 		t.Error("writeLandmarks into a missing directory: err = nil")
 	}
 	if got := bytesOf([]uint16(nil)); got != nil {
@@ -243,8 +243,8 @@ func TestAPanicInAWorkerBecomesAnError(t *testing.T) {
 	}
 }
 
-func TestConcurrentSearchesGrowWithEachBatchOfCPUs(t *testing.T) {
-	for procs, want := range map[int]int{1: 4, 2: 4, 4: 4, 8: 4, 9: 8, 16: 8, 17: 12, 64: 32} {
+func TestConcurrentSearchesFollowTheCPUs(t *testing.T) {
+	for procs, want := range map[int]int{0: 1, 1: 1, 2: 2, 4: 4, 8: 8, 16: 16} {
 		if got := concurrentSearches(procs); got != want {
 			t.Errorf("%d CPUs: %d searches, want %d", procs, got, want)
 		}
@@ -360,5 +360,22 @@ func TestLandmarksStayALowerBoundWhenTheSearchClimbsLessThanTheyDo(t *testing.T)
 				t.Errorf("climb %v, %v: cost %v with landmarks, %v without", climb, pair, b.cost, a.cost)
 			}
 		}
+	}
+}
+
+func TestHeadersRoundTripAndRefuseAnotherVersion(t *testing.T) {
+	graph := graphHead{nodes: 7, edges: 11, fingerprint: 0xDEADBEEFCAFE, bounds: bounds{minLat: -5, minLon: 6, maxLat: 7, maxLon: -8}}
+	if got, ok := readGraphHead(graph.encode()); !ok || got != graph {
+		t.Errorf("graph header: got %+v, %v, want %+v", got, ok, graph)
+	}
+	alt := altHead{landmarks: 8, nodes: 7, climb: 8, unit: 16, fingerprint: 0xFEEDFACE}
+	if got, ok := readAltHead(alt.encode()); !ok || got != alt {
+		t.Errorf("landmark header: got %+v, %v, want %+v", got, ok, alt)
+	}
+	if _, ok := readGraphHead(graph.encode()[:graphHeaderSize-1]); ok {
+		t.Error("a graph header cut short was read")
+	}
+	if _, ok := readAltHead(append([]byte("PFALT002"), make([]byte, 24)...)); ok {
+		t.Error("a header of another version was read")
 	}
 }

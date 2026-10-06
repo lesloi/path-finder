@@ -32,12 +32,19 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   holds the bounds and error codes, and the cases of the tests that both sides run. The server alone
   decides what is valid; the web app checks early to name the wrong field. Two languages, one
   vocabulary, and a test fails on the side left behind.
-- **The data is one directory, a volume (`DATA_DIR`).** Fixed file names (`graph.bin`, `hike.alt`,
-  `run.alt`) rather than a variable per file, written atomically by the build commands, so a pod only
-  needs a volume mounted read-only; a rebuild is a restart.
+- **The graph is built by zone, and every server maps all the zones (`DATA_DIR`).** A country's build keeps
+  every candidate node and its whole output in memory, which does not fit in 2 GB; a zone does
+  (`build-graph -bbox`, one pass over the country's extract). No routing sits in front of the servers:
+  opening a zone costs no memory, since its spatial index is in `graph.bin`, and a start point is answered by
+  the zone holding it with the most room. Fixed file names, written atomically, so a server only needs the
+  directory read-only and a rebuild is a restart. Revisit if a country's graph builds in one go: zones would
+  then only cost borders.
 
 ## Routing
 
+- **Nodes are numbered along a Hilbert curve, and the grid index is stored in the graph file.** A route set
+  then touches about 3 MB of the mapped files instead of about 66 MB, which lets a server with 2 GB of memory
+  serve a whole country.
 - **The engine is our own A\* with landmark lower bounds (ALT)** on a pedestrian graph from OSM, not
   BRouter. ALT made routes about 25 times faster, and a search only allocates in proportion to the
   nodes it reaches. The landmarks' metric includes the climb penalty, so the bound stays valid.

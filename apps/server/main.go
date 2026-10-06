@@ -40,14 +40,25 @@ func run(command string, args []string) error {
 		fs.Var(&pbfs, "pbf", "OSM PBF file (repeatable)")
 		dem := fs.String("dem", "", "directory holding the BD ALTI .asc tiles")
 		out := fs.String("out", filepath.Join(dataDir(), engine.GraphFileName), "graph file to write")
+		bbox := fs.String("bbox", "", "keep only this zone, as minLon,minLat,maxLon,maxLat: the memory then follows the zone, not the extract (one sorted -pbf)")
 		_ = fs.Parse(args)
-		return graphbuild.Build(pbfs, *dem, *out, os.Stderr)
+		if *bbox == "" {
+			return graphbuild.Build(pbfs, *dem, *out, os.Stderr)
+		}
+		box, err := graphbuild.ParseBox(*bbox)
+		if err != nil {
+			return err
+		}
+		if len(pbfs) != 1 {
+			return fmt.Errorf("build-graph -bbox reads exactly one -pbf, got %d", len(pbfs))
+		}
+		return graphbuild.BuildClipped(pbfs[0], *dem, *out, box, os.Stderr)
 	case "build-alt":
 		fs := flag.NewFlagSet(command, flag.ExitOnError)
 		graph := fs.String("graph", filepath.Join(dataDir(), engine.GraphFileName), "graph file")
 		out := fs.String("out", "", "landmark file to write (default: the profile's file in the data directory)")
 		profile := fs.String("profile", "hike", "activity profile: hike or run")
-		count := fs.Int("landmarks", 16, "number of landmarks")
+		count := fs.Int("landmarks", 8, "number of landmarks")
 		_ = fs.Parse(args)
 		if *out == "" {
 			*out = filepath.Join(dataDir(), engine.LandmarksFileName(*profile))
@@ -68,14 +79,21 @@ func serve() {
 		log.Fatal(err)
 	}
 	// The graph and the landmarks of each activity are built ahead of serving, by build-graph and build-alt.
-	engines, err := engine.OpenDir(dataDir(), "hike", "run")
+	// The port opens once the files are mapped and their headers checked.
+	opened := time.Now()
+	zones, err := engine.OpenZones(dataDir(), "hike", "run")
 	if err != nil {
 		log.Fatal(err)
+	}
+	log.Printf("%d zone(s) opened in %s", zones.Len(), time.Since(opened).Round(time.Millisecond))
+	hike, run := zones.Activity("hike"), zones.Activity("run")
+	if hike == nil || run == nil { // a nil pointer in an interface is not a nil interface: fail here, not in a request
+		log.Fatal("the data holds no zone for an activity")
 	}
 	if cfg.LoopLimit == 0 {
 		cfg.LoopLimit = engine.DefaultConcurrentSearches() // LOOP_LIMIT forces another
 	}
-	cfg.Generator = &generator.Generator{Engines: map[string]generator.Looper{"hike": engines["hike"], "run": engines["run"]}}
+	cfg.Generator = &generator.Generator{Engines: map[string]generator.Looper{"hike": hike, "run": run}}
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 

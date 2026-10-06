@@ -25,7 +25,12 @@ func newServer(t *testing.T) http.Handler {
 	if _, err := standin.Write(dir); err != nil {
 		t.Fatal(err)
 	}
-	engines, err := engine.OpenDir(dir, "hike", "run")
+	return serverOn(t, dir)
+}
+
+func serverOn(t *testing.T, dir string) http.Handler {
+	t.Helper()
+	zones, err := engine.OpenZones(dir, "hike", "run")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +40,7 @@ func newServer(t *testing.T) http.Handler {
 	}
 	return server.New(server.Config{
 		WebRoot:   web,
-		Generator: &generator.Generator{Engines: map[string]generator.Looper{"hike": engines["hike"], "run": engines["run"]}},
+		Generator: &generator.Generator{Engines: map[string]generator.Looper{"hike": zones.Activity("hike"), "run": zones.Activity("run")}},
 	})
 }
 
@@ -144,5 +149,52 @@ func TestHealth(t *testing.T) {
 		if rec.Code != 200 || strings.TrimSpace(rec.Body.String()) != want {
 			t.Errorf("%s: %d %q", path, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+// A pod mounts the data volume read-only: it must start and answer from it.
+func TestServesFromAReadOnlyDataDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := standin.Write(dir); err != nil {
+		t.Fatal(err)
+	}
+	files, _ := filepath.Glob(filepath.Join(dir, "*"))
+	for _, f := range files {
+		if err := os.Chmod(f, 0o444); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if f, err := os.OpenFile(filepath.Join(dir, "probe"), os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+		f.Close()
+		t.Skip("the directory is writable anyway (running as root?)")
+	}
+
+	code, routes, body := routeSets(t, serverOn(t, dir), criteria("run", `{"distance":10}`, ""))
+	if code != 200 || len(routes) == 0 {
+		t.Errorf("status %d, %d routes: %s", code, len(routes), body[:min(len(body), 200)])
+	}
+	if now, _ := filepath.Glob(filepath.Join(dir, "*")); len(now) != len(files) {
+		t.Errorf("serving wrote into the data directory: %v", now)
+	}
+}
+
+// A data directory can hold one subdirectory per zone, each with its graph and landmarks.
+func TestServesFromADirectoryOfZones(t *testing.T) {
+	dir := t.TempDir()
+	for _, zone := range []string{"zone-a", "zone-b"} {
+		if err := os.MkdirAll(filepath.Join(dir, zone), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := standin.Write(filepath.Join(dir, zone)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, routes, body := routeSets(t, serverOn(t, dir), criteria("run", `{"distance":10}`, ""))
+	if code != 200 || len(routes) == 0 {
+		t.Errorf("status %d, %d routes: %s", code, len(routes), body[:min(len(body), 200)])
 	}
 }

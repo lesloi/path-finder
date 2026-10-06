@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"runtime"
+	"sort"
 	"time"
 
 	"github.com/paulmach/osm"
@@ -178,6 +179,11 @@ func Build(pbfPaths []string, demDir, outPath string, log io.Writer) error {
 	runtime.GC()
 	p.step("pass 2: node coordinates read")
 
+	return finish(p, dem, demDir, ways, lat, lon, outPath)
+}
+
+// finish samples the elevation of the candidate nodes, assembles the graph from the ways and writes it.
+func finish(p progress, dem *elevation.DEM, demDir string, ways []rawWay, lat, lon []int32, outPath string) error {
 	elev := dem.Sample(lat, lon)
 	p.step("elevation sampled")
 
@@ -210,16 +216,7 @@ func assemble(ways []rawWay, lat, lon []int32, elev []int32) ([]engine.Node, []u
 			}
 		}
 	}
-	remap := make([]uint32, n)
-	var kept uint32
-	for i, d := range deg {
-		if d > 0 {
-			remap[i] = kept
-			kept++
-		} else {
-			remap[i] = math.MaxUint32
-		}
-	}
+	remap, kept := spatialOrder(deg, lat, lon)
 	nodes := make([]engine.Node, kept)
 	off := make([]uint32, kept+1)
 	for i, d := range deg {
@@ -252,6 +249,75 @@ func assemble(ways []rawWay, lat, lon []int32, elev []int32) ([]engine.Node, []u
 		}
 	}
 	return nodes, off, edges
+}
+
+// hilbertOrder is the resolution of the curve nodes are ordered along: 2^16 cells on a side.
+const hilbertOrder = 16
+
+// spatialOrder numbers the nodes that have an edge along a Hilbert curve over their bounding box, so that
+// nodes close on the map are close in the file, and a search reads few pages. It returns, for each
+// candidate node, its number, or MaxUint32 for a node left out, and how many nodes are kept.
+func spatialOrder(deg []uint32, lat, lon []int32) (remap []uint32, kept uint32) {
+	minLat, minLon := int32(math.MaxInt32), int32(math.MaxInt32)
+	maxLat, maxLon := int32(math.MinInt32), int32(math.MinInt32)
+	for i, d := range deg {
+		if d > 0 {
+			minLat, maxLat = min(minLat, lat[i]), max(maxLat, lat[i])
+			minLon, maxLon = min(minLon, lon[i]), max(maxLon, lon[i])
+		}
+	}
+	// One square cell size for both axes, so that the curve does not stretch along one of them.
+	span := max(int64(maxLat)-int64(minLat), int64(maxLon)-int64(minLon))
+	cell := span>>hilbertOrder + 1
+
+	type keyed struct {
+		key  uint64
+		node uint32
+	}
+	order := make([]keyed, 0, len(deg))
+	for i, d := range deg {
+		if d > 0 {
+			x, y := uint32((int64(lon[i])-int64(minLon))/cell), uint32((int64(lat[i])-int64(minLat))/cell)
+			order = append(order, keyed{hilbertKey(x, y, hilbertOrder), uint32(i)})
+		}
+	}
+	sort.Slice(order, func(a, b int) bool {
+		if order[a].key != order[b].key {
+			return order[a].key < order[b].key
+		}
+		return order[a].node < order[b].node // stable: the same input gives the same file
+	})
+	remap = make([]uint32, len(deg))
+	for i := range remap {
+		remap[i] = math.MaxUint32
+	}
+	for r, k := range order {
+		remap[k.node] = uint32(r)
+	}
+	return remap, uint32(len(order))
+}
+
+// hilbertKey is the position of cell (x, y) along the Hilbert curve that fills a square of 2^order cells
+// a side.
+func hilbertKey(x, y uint32, order int) uint64 {
+	var key uint64
+	for s := uint32(1) << (order - 1); s > 0; s >>= 1 {
+		var rx, ry uint32
+		if x&s != 0 {
+			rx = 1
+		}
+		if y&s != 0 {
+			ry = 1
+		}
+		key += uint64(s) * uint64(s) * uint64((3*rx)^ry)
+		if ry == 0 { // rotate the quadrant so that the curve stays continuous
+			if rx == 1 {
+				x, y = s-1-x&(s-1), s-1-y&(s-1)
+			}
+			x, y = y, x
+		}
+	}
+	return key
 }
 
 const (

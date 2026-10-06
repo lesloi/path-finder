@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -94,7 +95,7 @@ func openTest(tb testing.TB, t *testGraph, withLandmarks bool) *Engine {
 		}
 		alt = filepath.Join(tb.TempDir(), "graph.alt")
 		rows := buildLandmarks(e.g, e.sp, e.prof, 4, 8)
-		if err := writeLandmarks(alt, 4, uint32(e.g.n), 8, rows); err != nil {
+		if err := writeLandmarks(alt, 4, uint32(e.g.n), e.g.fingerprint, 8, rows); err != nil {
 			tb.Fatal(err)
 		}
 	}
@@ -468,5 +469,115 @@ func TestAFailedWriteLeavesNoFile(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
 		t.Errorf("files left behind: %v", entries)
+	}
+}
+
+func TestOpenDirOnAReadOnlyDirectory(t *testing.T) {
+	dir := t.TempDir()
+	var b Builder
+	for i := 0; i < 4; i++ {
+		b.AddNode(45+float64(i)*0.001, 6, 100)
+	}
+	for i := 0; i < 3; i++ {
+		b.Connect(i, i+1, KindPath, SurfaceCompact)
+	}
+	graph := filepath.Join(dir, GraphFileName)
+	if err := b.WriteGraph(graph); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName("hike")), "hike", 2); err != nil {
+		t.Fatal(err)
+	}
+	// What a read-only volume looks like to the pod: no file and no directory can be written.
+	files, _ := filepath.Glob(filepath.Join(dir, "*"))
+	for _, f := range files {
+		if err := os.Chmod(f, 0o444); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if f, err := os.OpenFile(filepath.Join(dir, "probe"), os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+		f.Close()
+		t.Skip("the directory is writable anyway (running as root?)")
+	}
+
+	engines, err := OpenDir(dir, "hike", "run")
+	if err != nil {
+		t.Fatalf("a read-only data directory: %v", err)
+	}
+	if engines["hike"].alt == nil {
+		t.Error("the landmarks were not opened")
+	}
+	if _, err := engines["hike"].Route(context.Background(), Point{Lat: 45, Lon: 6}, Point{Lat: 45.003, Lon: 6}); err != nil {
+		t.Errorf("a route on a read-only graph: %v", err)
+	}
+	if now, _ := filepath.Glob(filepath.Join(dir, "*")); len(now) != len(files) {
+		t.Errorf("opening the data wrote into its directory: %v", now)
+	}
+}
+
+// Rebuilding a graph from the same data can number its nodes differently, with the same count: its old
+// landmarks then bound the wrong nodes, and must be refused rather than trusted.
+func TestLandmarksOfAnotherGraphOfTheSameSizeAreRefused(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string, heights [4]float64) string {
+		var b Builder
+		for i, h := range heights {
+			b.AddNode(45+float64(i)*0.001, 6, h)
+		}
+		for i := 0; i < 3; i++ {
+			b.Connect(i, i+1, KindPath, SurfaceCompact)
+		}
+		path := filepath.Join(dir, name)
+		if err := b.WriteGraph(path); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	first := write("first.bin", [4]float64{100, 110, 120, 130})
+	second := write("second.bin", [4]float64{130, 120, 110, 100}) // 4 nodes and 6 edges too
+	alt := filepath.Join(dir, "first.alt")
+	if err := WriteLandmarks(first, alt, "hike", 2); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Open(first, alt, "hike"); err != nil {
+		t.Fatalf("the landmarks of their own graph: %v", err)
+	}
+	if _, err := Open(second, alt, "hike"); err == nil || !strings.Contains(err.Error(), "another graph") {
+		t.Errorf("landmarks of another graph: err = %v, want it to refuse them", err)
+	}
+}
+
+// The spatial index is written into the graph file at build time: opening a graph reads no node.
+func TestAnOpenedGraphUsesTheSpatialIndexOfItsFile(t *testing.T) {
+	g := &testGraph{}
+	g.grid(6, 6, flat)
+	path := g.write(t)
+	e, err := Open(path, "", "hike")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := computeSpatial(e.g.nodes)
+	got := e.sp
+	if got.minLat != want.minLat || got.minLon != want.minLon || got.maxLat != want.maxLat || got.maxLon != want.maxLon || got.nx != want.nx || got.ny != want.ny {
+		t.Errorf("bounds of the index: got %+v, want %+v", got, want)
+	}
+	if !slices.Equal(got.start, want.start) || !slices.Equal(got.nodes, want.nodes) {
+		t.Error("the index of the file differs from the one computed from the nodes")
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data[:len(data)-64], 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(path, "", "hike"); err == nil || !strings.Contains(err.Error(), "shorter") {
+		t.Errorf("a file cut in its index: err = %v, want it to say it is too short", err)
 	}
 }
