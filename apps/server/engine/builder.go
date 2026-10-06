@@ -89,5 +89,7 @@ func WriteLandmarks(graphPath, path, profile string, count int) error {
 		return fmt.Errorf("engine: %d landmarks is out of range for the %s profile (1 to %d)", count, profile, most)
 	}
 	rows := buildLandmarks(g, newSpatial(g), p, count, p.UpPerMeter)
-	return writeAtomic(path, func(tmp string) error { return writeLandmarks(tmp, count, uint32(g.n), p.UpPerMeter, rows) })
+	return writeAtomic(path, func(tmp string) error {
+		return writeLandmarks(tmp, count, uint32(g.n), g.fingerprint, p.UpPerMeter, rows)
+	})
 }

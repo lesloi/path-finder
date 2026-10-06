@@ -60,7 +60,8 @@ a half-written one. The server maps the files when it starts: restart it after a
 Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (16 by
 default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
 it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one activity
-profile and to one graph: build them again after each graph.
+profile and to one graph: build them again after each graph. The server refuses landmarks built for another
+graph, even one with as many nodes.
 
 ## 4. Run it locally
 

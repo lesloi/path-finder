@@ -152,7 +152,7 @@ func TestFileWritersFailOnAnUnwritablePath(t *testing.T) {
 	if err := writeGraph(missing, nil, []uint32{0}, nil); err == nil {
 		t.Error("writeGraph into a missing directory: err = nil")
 	}
-	if err := writeLandmarks(missing, 1, 0, 8, nil); err == nil {
+	if err := writeLandmarks(missing, 1, 0, 0, 8, nil); err == nil {
 		t.Error("writeLandmarks into a missing directory: err = nil")
 	}
 	if got := bytesOf([]uint16(nil)); got != nil {

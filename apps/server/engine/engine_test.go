@@ -94,7 +94,7 @@ func openTest(tb testing.TB, t *testGraph, withLandmarks bool) *Engine {
 		}
 		alt = filepath.Join(tb.TempDir(), "graph.alt")
 		rows := buildLandmarks(e.g, e.sp, e.prof, 4, 8)
-		if err := writeLandmarks(alt, 4, uint32(e.g.n), 8, rows); err != nil {
+		if err := writeLandmarks(alt, 4, uint32(e.g.n), e.g.fingerprint, 8, rows); err != nil {
 			tb.Fatal(err)
 		}
 	}
@@ -535,5 +535,38 @@ func TestOpenDirOnAReadOnlyDirectory(t *testing.T) {
 	}
 	if now, _ := filepath.Glob(filepath.Join(dir, "*")); len(now) != len(files) {
 		t.Errorf("opening the data wrote into its directory: %v", now)
+	}
+}
+
+// Rebuilding a graph from the same data can number its nodes differently, with the same count: its old
+// landmarks then bound the wrong nodes, and must be refused rather than trusted.
+func TestLandmarksOfAnotherGraphOfTheSameSizeAreRefused(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name string, heights [4]float64) string {
+		var b Builder
+		for i, h := range heights {
+			b.AddNode(45+float64(i)*0.001, 6, h)
+		}
+		for i := 0; i < 3; i++ {
+			b.Connect(i, i+1, KindPath, SurfaceCompact)
+		}
+		path := filepath.Join(dir, name)
+		if err := b.WriteGraph(path); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	first := write("first.bin", [4]float64{100, 110, 120, 130})
+	second := write("second.bin", [4]float64{130, 120, 110, 100}) // 4 nodes and 6 edges too
+	alt := filepath.Join(dir, "first.alt")
+	if err := WriteLandmarks(first, alt, "hike", 2); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Open(first, alt, "hike"); err != nil {
+		t.Fatalf("the landmarks of their own graph: %v", err)
+	}
+	if _, err := Open(second, alt, "hike"); err == nil || !strings.Contains(err.Error(), "another graph") {
+		t.Errorf("landmarks of another graph: err = %v, want it to refuse them", err)
 	}
 }

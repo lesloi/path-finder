@@ -3,6 +3,7 @@ package engine
 import (
 	"bufio"
 	"encoding/binary"
+	"hash/crc64"
 	"io"
 	"math"
 	"os"
@@ -14,14 +15,19 @@ import (
 // node or an edge touches one cache line instead of four arrays. Landmark distances are
 // quantized to 16 bits.
 //
-//	graph:     "PFGRAPH3" | N u32 | E u32 | nodes N*12 | pad16 | offsets (N+1)*4 | pad16 | edges E*12
-//	landmarks: "PFALT002" | L u32 | N u32 | climb f32 | unit f32 | rows N*rowLen u16
+//	graph:     "PFGRAPH4" | N u32 | E u32 | fingerprint u64 | pad16 | nodes N*12 | pad16 | offsets (N+1)*4 | pad16 | edges E*12
+//	landmarks: "PFALT003" | L u32 | N u32 | climb f32 | unit f32 | fingerprint u64 | rows N*rowLen u16
 //
+// The fingerprint is a CRC-64 of the graph's nodes, offsets and edges. The landmarks hold the one of the
+// graph they were built for, so that a graph built again, even with as many nodes, refuses the old ones.
+
 // A landmark row holds L distances from the landmarks, then L towards them when the metric
 // includes climbing. A distance is floor(cost / unit); 0xFFFF means unreachable or too far.
 const (
-	graphMagic     = "PFGRAPH3"
-	altMagicV2     = "PFALT002"
+	graphMagic     = "PFGRAPH4"
+	altMagic       = "PFALT003"
+	graphHeader    = 32 // magic, counts, fingerprint, padding: the nodes start on a 16-byte boundary
+	altHeader      = 32
 	altUnitMeters  = 16
 	altUnreachable = 0xFFFF
 )
@@ -37,6 +43,15 @@ type edge struct {
 	Kind uint8
 	Surf uint8
 	_    uint16
+}
+
+var fingerprintTable = crc64.MakeTable(crc64.ECMA)
+
+// fingerprint identifies the content of a graph: what its landmarks must have been built for.
+func fingerprint(nodes []node, off []uint32, edges []edge) uint64 {
+	sum := crc64.Update(0, fingerprintTable, bytesOf(nodes))
+	sum = crc64.Update(sum, fingerprintTable, bytesOf(off))
+	return crc64.Update(sum, fingerprintTable, bytesOf(edges))
 }
 
 func pad16(n int64) int64 { return (16 - n%16) % 16 }
@@ -77,10 +92,14 @@ func writeGraph(path string, nodes []node, off []uint32, edges []edge) error {
 		if _, err := io.WriteString(w, graphMagic); err != nil {
 			return err
 		}
-		if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(len(nodes)), uint32(len(edges))}); err != nil {
+		fp := fingerprint(nodes, off, edges)
+		if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(len(nodes)), uint32(len(edges)), uint32(fp), uint32(fp >> 32)}); err != nil {
 			return err
 		}
-		pos := int64(16)
+		if _, err := w.Write(make([]byte, graphHeader-24)); err != nil {
+			return err
+		}
+		pos := int64(graphHeader)
 		for _, b := range [][]byte{bytesOf(nodes), bytesOf(off), bytesOf(edges)} {
 			if _, err := w.Write(b); err != nil {
 				return err
@@ -97,12 +116,12 @@ func writeGraph(path string, nodes []node, off []uint32, edges []edge) error {
 }
 
 // writeLandmarks writes landmark rows in the format above.
-func writeLandmarks(path string, landmarks int, nodes uint32, climb float32, rows []uint16) error {
+func writeLandmarks(path string, landmarks int, nodes uint32, graphFingerprint uint64, climb float32, rows []uint16) error {
 	return writeFile(path, func(w *bufio.Writer) error {
-		if _, err := io.WriteString(w, altMagicV2); err != nil {
+		if _, err := io.WriteString(w, altMagic); err != nil {
 			return err
 		}
-		if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(landmarks), nodes, math.Float32bits(climb), math.Float32bits(altUnitMeters)}); err != nil {
+		if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(landmarks), nodes, math.Float32bits(climb), math.Float32bits(altUnitMeters), uint32(graphFingerprint), uint32(graphFingerprint >> 32)}); err != nil {
 			return err
 		}
 		_, err := w.Write(bytesOf(rows))

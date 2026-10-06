@@ -42,10 +42,12 @@ func pairKey(a, b uint32) uint64 {
 // hikeClimb is the hike profile's climb penalty, in equivalent metres per metre of ascent.
 
 type graph struct {
-	n, e  int
-	nodes []node
-	off   []uint32
-	edges []edge
+	n, e int
+	// fingerprint is the one in the file header: the landmarks built for this graph hold the same.
+	fingerprint uint64
+	nodes       []node
+	off         []uint32
+	edges       []edge
 }
 
 func align16(n int) int { return (n + 15) &^ 15 }
@@ -110,14 +112,14 @@ func openGraph(path string, warming bool) (*graph, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(data) < 16 || string(data[:8]) != graphMagic {
+	if len(data) < graphHeader || string(data[:8]) != graphMagic {
 		return nil, fmt.Errorf("%s is not a graph file of this version: build it again with build-graph", path)
 	}
 	n, e := int(binary.LittleEndian.Uint32(data[8:])), int(binary.LittleEndian.Uint32(data[12:]))
-	nodesAt := 16
+	nodesAt := graphHeader
 	offAt := align16(nodesAt + 12*n)
 	edgesAt := align16(offAt + 4*(n+1))
-	g := &graph{n: n, e: e}
+	g := &graph{n: n, e: e, fingerprint: binary.LittleEndian.Uint64(data[16:])}
 	if g.nodes, err = view[node](data, nodesAt, n); err != nil {
 		return nil, fmt.Errorf("%s: nodes: %w", path, err)
 	}
@@ -147,12 +149,12 @@ func openLandmarks(path string, g *graph, warming bool) (*landmarks, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(data) < 24 || string(data[:8]) != altMagicV2 {
-		return nil, fmt.Errorf("%s is not a v2 landmark file", path)
+	if len(data) < altHeader || string(data[:8]) != altMagic {
+		return nil, fmt.Errorf("%s is not a landmark file of this version: build it again with build-alt", path)
 	}
 	l, n := int(binary.LittleEndian.Uint32(data[8:])), int(binary.LittleEndian.Uint32(data[12:]))
-	if n != g.n {
-		return nil, fmt.Errorf("%s was built for another graph", path)
+	if n != g.n || binary.LittleEndian.Uint64(data[24:]) != g.fingerprint {
+		return nil, fmt.Errorf("%s was built for another graph: build it again with build-alt", path)
 	}
 	a := &landmarks{l: l, climb: math.Float32frombits(binary.LittleEndian.Uint32(data[16:])), unit: math.Float32frombits(binary.LittleEndian.Uint32(data[20:]))}
 	a.rowLen = l
@@ -162,7 +164,7 @@ func openLandmarks(path string, g *graph, warming bool) (*landmarks, error) {
 	if l < 1 || a.rowLen > maxLandmarkValues {
 		return nil, fmt.Errorf("%s holds %d landmarks, which a search cannot use (1 to %d values per node)", path, l, maxLandmarkValues)
 	}
-	if a.rows, err = view[uint16](data, 24, n*a.rowLen); err != nil {
+	if a.rows, err = view[uint16](data, altHeader, n*a.rowLen); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return a, nil
