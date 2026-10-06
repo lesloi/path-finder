@@ -6,7 +6,7 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 ## Getting started
 
 - [INSTALL.md](./INSTALL.md) builds the routing graph from OSM and the elevation data.
-- [CONTEXT.md](./CONTEXT.md) holds the domain vocabulary to use.
+- [GLOSSARY.md](./GLOSSARY.md) holds the domain vocabulary to use.
 - [DECISIONS.md](./DECISIONS.md) explains the lasting choices; you can question one with an issue.
 - [DESIGN.md](./DESIGN.md) guides the interface.
 
