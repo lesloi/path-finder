@@ -79,8 +79,9 @@ func PlanZones(pbfPath string, opt PlanOptions, log io.Writer) ([]Zone, error) {
 		if r = g.trim(r); g.sum(r) == 0 {
 			return
 		}
-		midLat := e.MinLat + (float64(r.r0+r.r1)/2)*opt.CellDeg
-		cosl := math.Cos(midLat * math.Pi / 180)
+		// A degree of longitude is shortest at the pole side of the zone: take the margin there.
+		farLat := math.Max(math.Abs(e.MinLat+float64(r.r0)*opt.CellDeg), math.Abs(e.MinLat+float64(r.r1)*opt.CellDeg))
+		cosl := math.Cos(farLat * math.Pi / 180)
 		cellKm := 111.32 * opt.CellDeg
 		mr := int(math.Ceil(opt.MarginKm / cellKm))
 		mc := int(math.Ceil(opt.MarginKm / (cellKm * cosl)))
@@ -91,6 +92,8 @@ func PlanZones(pbfPath string, opt PlanOptions, log io.Writer) ([]Zone, error) {
 			return
 		}
 		// Split the longer side, in kilometres, where the nodes are shared in half.
+		// (Nodes on the north or east edge of the extent are not counted here, and a build of a box that reaches it
+		// keeps them: a few more than planned.)
 		if float64(cols)*cosl >= float64(rows) && cols > 1 || rows == 1 {
 			k := g.halfway(r, false)
 			split(rect{r.r0, r.r1, r.c0, r.c0 + k})
@@ -103,7 +106,8 @@ func PlanZones(pbfPath string, opt PlanOptions, log io.Writer) ([]Zone, error) {
 	}
 	split(rect{0, ny, 0, nx})
 
-	// North to south, then west to east, so that the names do not move when a count changes a little.
+	// By the south edge of the core, northmost first, then west to east. Names follow that order, so a zone added
+	// or removed by another extract renumbers those after it: a job keeps using the list it was given.
 	sort.Slice(zones, func(i, j int) bool {
 		if zones[i].core.r0 != zones[j].core.r0 {
 			return zones[i].core.r0 > zones[j].core.r0

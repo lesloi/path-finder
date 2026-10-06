@@ -4,6 +4,7 @@ package elevation
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -105,6 +106,11 @@ func readHeader(r *bufio.Reader) (ascHeader, error) {
 		}
 		hdr[strings.ToLower(parts[0])] = v
 	}
+	for _, key := range []string{"ncols", "nrows", "xllcorner", "yllcorner", "cellsize"} {
+		if _, ok := hdr[key]; !ok {
+			return ascHeader{}, fmt.Errorf("header has no %s", key)
+		}
+	}
 	return ascHeader{ncols: int(hdr["ncols"]), nrows: int(hdr["nrows"]), xll: hdr["xllcorner"], yll: hdr["yllcorner"], cs: hdr["cellsize"], nodata: hdr["nodata_value"]}, nil
 }
 
@@ -147,7 +153,7 @@ func Load(dir string) (*DEM, error) { return load(dir, nil) }
 // within is the test of a tile header that holds when the tile meets the box, given by its latitudes and
 // longitudes in degrees.
 func within(minLat, minLon, maxLat, maxLon float64) func(ascHeader) bool {
-	// A box is not a rectangle in Lambert-93: the rectangle round points all along its edges holds it.
+	// A box is not a rectangle in Lambert-93: the rectangle through points all along its edges holds it.
 	x0, y0, x1, y1 := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
 	const steps = 8
 	for i := 0; i <= steps; i++ {
@@ -183,11 +189,14 @@ func CountWithin(dir string, minLat, minLon, maxLat, maxLon float64) (int, error
 // tiles of its zone, not of the whole country. It reads only the header of the others.
 func LoadWithin(dir string, minLat, minLon, maxLat, maxLon float64) (*DEM, error) {
 	d, err := load(dir, within(minLat, minLon, maxLat, maxLon))
-	if err != nil && strings.Contains(err.Error(), "no .asc file") {
+	if errors.Is(err, errNoTile) {
 		return nil, fmt.Errorf("no tile of %s meets the box %.3f,%.3f,%.3f,%.3f", dir, minLon, minLat, maxLon, maxLat)
 	}
 	return d, err
 }
+
+// errNoTile is what loading says when no .asc file is left to read.
+var errNoTile = errors.New("no .asc file")
 
 // load reads the .asc files below dir that keep accepts (all of them when it is nil).
 func load(dir string, keep func(ascHeader) bool) (*DEM, error) {
@@ -230,7 +239,7 @@ func load(dir string, keep func(ascHeader) bool) (*DEM, error) {
 		}
 	}
 	if len(files) == 0 {
-		return nil, fmt.Errorf("no .asc file in %s", dir)
+		return nil, fmt.Errorf("%w in %s", errNoTile, dir)
 	}
 	d := &DEM{tiles: map[[2]int]*demTile{}, x0: math.Inf(1), y0: math.Inf(1), cs: files[0].cs}
 	d.ncols, d.nrows = files[0].tile.ncols, files[0].tile.nrows

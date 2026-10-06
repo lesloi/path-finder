@@ -185,3 +185,18 @@ func TestLoadWithinReadsOnlyTheTilesOfTheBox(t *testing.T) {
 		t.Error("an empty directory: err = nil")
 	}
 }
+
+func TestATileHeaderMustSayWhereItIs(t *testing.T) {
+	dir := t.TempDir()
+	// A header with a centre instead of a corner would put the tile in the wrong place, or out of every box.
+	bad := "ncols 4\nnrows 4\nxllcenter 800000\nyllcenter 6500000\ncellsize 25\nNODATA_value -99999\n"
+	if err := os.WriteFile(filepath.Join(dir, "centre.asc"), []byte(bad), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CountWithin(dir, 45, 2, 49, 5); err == nil || !strings.Contains(err.Error(), "xllcorner") {
+		t.Errorf("CountWithin: err = %v, want it to name the missing xllcorner", err)
+	}
+	if _, err := LoadWithin(dir, 45, 2, 49, 5); err == nil {
+		t.Error("LoadWithin: err = nil")
+	}
+}

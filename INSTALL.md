@@ -81,7 +81,7 @@ by twice it.
 ./path-finder plan-zones -pbf france.osm.pbf -max-nodes 40000000 -margin-km 20 > zones.txt
 ```
 
-`apps/server/zones-france.txt` is that list for the France extract of 6 October 2026 (30 zones): a job that
+`apps/server/zones-france.txt` is that list for the France extract of 6 October 2026 (31 zones): a job that
 updates the data uses it as it is, since a new plan renumbers the zones. Each line is a name and a box. `$dem` holds the BD ALTI tiles of the country: a build reads
 only those that meet its box.
 
