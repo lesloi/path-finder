@@ -73,7 +73,7 @@ func Open(graphPath, landmarksPath, profile string) (*Engine, error) {
 // OpenAll maps a graph file once and returns an engine per activity profile, keyed by name. The
 // value is the profile's landmark file, or empty for none. Engines share the graph and its index.
 func OpenAll(graphPath string, landmarks map[string]string) (map[string]*Engine, error) {
-	g, err := openGraph(graphPath)
+	g, err := openGraph(graphPath, true)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func OpenAll(graphPath string, landmarks map[string]string) (map[string]*Engine,
 			}
 		}
 		if path != "" {
-			if e.alt, err = openLandmarks(path, g); err != nil {
+			if e.alt, err = openLandmarks(path, g, true); err != nil {
 				return nil, err
 			}
 		}

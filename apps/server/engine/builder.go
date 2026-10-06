@@ -77,7 +77,7 @@ func WriteLandmarks(graphPath, path, profile string, count int) error {
 	if p == nil {
 		return os.ErrInvalid
 	}
-	g, err := openGraph(graphPath)
+	g, err := openGraph(graphPath, false)
 	if err != nil {
 		return err
 	}

@@ -50,7 +50,8 @@ type graph struct {
 
 func align16(n int) int { return (n + 15) &^ 15 }
 
-func mapFile(path string) ([]byte, error) {
+// mapFile maps a file read-only, and reads all its pages first when warming: a server does, a build does not.
+func mapFile(path string, warming bool) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -64,7 +65,9 @@ func mapFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	warm(data)
+	if warming {
+		warm(data)
+	}
 	return data, nil
 }
 
@@ -102,8 +105,8 @@ func view[T any](data []byte, at, count int) ([]T, error) {
 	return unsafe.Slice((*T)(unsafe.Pointer(&data[at])), count), nil
 }
 
-func openGraph(path string) (*graph, error) {
-	data, err := mapFile(path)
+func openGraph(path string, warming bool) (*graph, error) {
+	data, err := mapFile(path, warming)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +142,8 @@ type landmarks struct {
 	rows   []uint16
 }
 
-func openLandmarks(path string, g *graph) (*landmarks, error) {
-	data, err := mapFile(path)
+func openLandmarks(path string, g *graph, warming bool) (*landmarks, error) {
+	data, err := mapFile(path, warming)
 	if err != nil {
 		return nil, err
 	}
