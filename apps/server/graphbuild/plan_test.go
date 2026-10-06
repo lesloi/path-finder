@@ -153,3 +153,17 @@ func TestPlanZonesRefusesWhatItCannotPlan(t *testing.T) {
 		t.Error("an extract with no node in the extent: err = nil")
 	}
 }
+
+func TestPlanZonesWarnsOfAZoneOverTheBudget(t *testing.T) {
+	// A thousand nodes in one cell cannot be split: the zone is over its budget, and the plan says so.
+	path := filepath.Join(t.TempDir(), "x.pbf")
+	writePBF(t, path, scatter(1, 1000, 45.001, 0.001, 45.009, 0.009), nil)
+	var log bytes.Buffer
+	zones, err := PlanZones(path, PlanOptions{Extent: Box{MinLon: 0, MinLat: 45, MaxLon: 0.5, MaxLat: 45.5}, MaxNodes: 100, MarginKm: 1, CellDeg: 0.05}, &log)
+	if err != nil || len(zones) != 1 {
+		t.Fatalf("%d zones, %v", len(zones), err)
+	}
+	if !strings.Contains(log.String(), "warning") || !strings.Contains(log.String(), zones[0].Name) {
+		t.Errorf("no warning in the log:\n%s", log.String())
+	}
+}

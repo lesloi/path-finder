@@ -117,6 +117,9 @@ func PlanZones(pbfPath string, opt PlanOptions, log io.Writer) ([]Zone, error) {
 			MaxLon: roundTo3(e.MinLon+float64(z.grown.c1)*opt.CellDeg, math.Ceil), MaxLat: roundTo3(e.MinLat+float64(z.grown.r1)*opt.CellDeg, math.Ceil),
 		}
 		out[i] = Zone{Name: fmt.Sprintf("z%02d", i+1), Box: box, Nodes: z.nodes}
+		if z.nodes > opt.MaxNodes {
+			p.step("warning: %s holds %d nodes, over the budget of %d, and is a single cell: use a smaller cell or a smaller margin", out[i].Name, z.nodes, opt.MaxNodes)
+		}
 	}
 	p.step("%d zones", len(out))
 	return out, nil

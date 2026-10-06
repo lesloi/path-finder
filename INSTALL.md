@@ -71,18 +71,18 @@ The graph of a country does not build in the memory of a job, so build it by zon
 in parallel, each into its own subdirectory of the data directory. `plan-zones` cuts a country into zones from
 its extract, in one pass (about two minutes for France): it counts the nodes of each cell of a grid and splits
 the area where the nodes are shared in half, until the box of a part, with its margin, holds at most
-`-max-nodes` nodes of the extract. A build keeps the nodes of its box in memory (about 40 million of them in
-1.6 GB, as `GOMEMLIMIT` below limits it), so that is the budget of a 2 GB job. Dense places get small zones, empty
-ones none. `-margin-km` is how far a zone reaches beyond its part, so that loops near the edge close (the
-longest loop reaches about 12 km from its start, and its legs a little more); the boxes of neighbours overlap
+`-max-nodes` nodes of the extract. A build keeps the nodes of its box in memory: 37 million of them held 0.9 GB
+live, and the build peaked at 1.62 GB under `GOMEMLIMIT=1600MiB`, so 40 million is the budget of a 2 GB job. Dense places get small zones, empty
+ones none. `-margin-km` is how far a zone reaches beyond its part, so that loops near the edge close (loops
+of 50 km, the longest, went up to 16 km from their start in a test: keep 20); the boxes of neighbours overlap
 by twice it.
 
 ```sh
 ./path-finder plan-zones -pbf france.osm.pbf -max-nodes 40000000 -margin-km 20 > zones.txt
 ```
 
-`apps/server/zones-france.txt` is that list for the France extract of 6 October 2026 (30 zones); make it again
-for a later extract. Each line is a name and a box. `$dem` holds the BD ALTI tiles of the country: a build reads
+`apps/server/zones-france.txt` is that list for the France extract of 6 October 2026 (30 zones): a job that
+updates the data uses it as it is, since a new plan renumbers the zones. Each line is a name and a box. `$dem` holds the BD ALTI tiles of the country: a build reads
 only those that meet its box.
 
 ```sh
@@ -94,6 +94,9 @@ while read -r name box _; do
   done
 done < zones.txt
 ```
+
+The log of `build-graph` gives the candidate nodes and the nodes kept: a zone built without the BD ALTI tiles
+of a neighbouring département keeps far fewer, and so would have holes.
 
 A zone with two million nodes in its graph is about 215 MB of files. The server maps every zone when it starts, which costs no
 memory, and answers a request from the zone whose box holds the start point with the most room round it;
@@ -160,6 +163,11 @@ time); raise it when they see `429` while the CPUs are idle.
 
 The `Dockerfile` builds one image with the server and the web app, and no data. Build it with
 `docker build -t path-finder .`, or use the one CI publishes as `ghcr.io/lesloi/path-finder:latest`.
+
+To update the data from a job, build into a new directory beside the live one, not into it, then point the
+volume's `current` link at it and restart the pods: a pod restarting in the middle of a build in place would
+find a new `graph.bin` with old landmarks, which it refuses, and a zone dropped from the plan would still be
+served.
 
 The data is a volume: mount the directory holding `graph.bin`, `hike.alt` and `run.alt`, or one such
 subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. On Kubernetes that is a persistent volume, mounted the
