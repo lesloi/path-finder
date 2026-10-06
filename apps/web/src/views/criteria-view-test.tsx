@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 
 import { CriteriaView } from './criteria-view.tsx';
 import { expectNamedControls } from '../accessible-names.ts';
 import { criteriaText, errorText, routesText } from '../i18n/index.ts';
 import { maps, markers } from '../maplibre-mock.ts';
+import { useSettings } from '../state/index.ts';
 
 vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
 
@@ -33,6 +34,31 @@ describe('CriteriaView', () => {
     render(<CriteriaView language="en" />);
 
     expect(screen.getByTestId('criteria-settings')).toHaveAttribute('href', '#/settings');
+  });
+
+  describe('the map background', () => {
+    const saved = () => renderHook(() => useSettings()).result.current[0].basemap;
+
+    it('is picked from a button over the map, and saved', () => {
+      render(<CriteriaView language="en" />);
+
+      fireEvent.click(screen.getByTestId('criteria-basemap'));
+      fireEvent.click(screen.getByTestId('criteria-basemap-aerial'));
+
+      expect(saved()).toBe('aerial');
+      expect(screen.queryByTestId('criteria-basemap-menu')).not.toBeInTheDocument();
+    });
+  });
+
+  it('goes back to the saved basemap that failed to load', () => {
+    render(<CriteriaView language="en" />);
+    act(() => maps.at(-1)!.fire('style.load'));
+    fireEvent.click(screen.getByTestId('criteria-basemap'));
+    fireEvent.click(screen.getByTestId('criteria-basemap-minimal'));
+
+    act(() => maps.at(-1)!.fire('error'));
+
+    expect(renderHook(() => useSettings()).result.current[0].basemap).toBe('plan');
   });
 
   describe('accessibility', () => {
@@ -394,7 +420,7 @@ describe('CriteriaView', () => {
       onDesktop();
       ask(new Promise(() => {}));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
 
       await submit();
 
@@ -407,7 +433,7 @@ describe('CriteriaView', () => {
       onDesktop();
       ask(answer(route(0), route(1, { kind: 'suggestion', misses: [{ criterion: 'distance', gap: 1 }] })));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
 
       await submit();
 
@@ -421,7 +447,7 @@ describe('CriteriaView', () => {
       onDesktop();
       ask(answer(route(0), route(1)));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
       await submit();
 
       await screen.findByTestId('routes-count');
@@ -441,7 +467,7 @@ describe('CriteriaView', () => {
       onDesktop();
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
       await submit();
       fireEvent.click(await screen.findByTestId('routes-row-0'));
       const plot = screen.getByTestId('route-profile-plot');
@@ -458,7 +484,7 @@ describe('CriteriaView', () => {
       onDesktop();
       ask(answer(route(0), route(1)));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
       await submit();
       await screen.findByTestId('routes-count');
 
@@ -471,7 +497,7 @@ describe('CriteriaView', () => {
       onDesktop();
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
       await submit();
       await screen.findByTestId('routes-count');
       expect(screen.queryByTestId('routes-row-0-thumbnail-map')).not.toBeInTheDocument();
@@ -485,7 +511,7 @@ describe('CriteriaView', () => {
       onDesktop();
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
       fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
       await submit();
       await screen.findByTestId('routes-count');
@@ -502,7 +528,7 @@ describe('CriteriaView', () => {
       onDesktop();
       ask(answer(route(0), route(1)));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
       await submit();
       fireEvent.click(await screen.findByTestId('routes-row-1'));
       await settle();
@@ -522,7 +548,7 @@ describe('CriteriaView', () => {
       onDesktop();
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
       await submit();
       await screen.findByTestId('routes-count');
       await settle();
@@ -539,7 +565,7 @@ describe('CriteriaView', () => {
       onDesktop();
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
       await submit();
       await screen.findByTestId('routes-count');
       fireEvent.click(screen.getByTestId('routes-back'));
@@ -564,7 +590,7 @@ describe('CriteriaView', () => {
     it('shows the route set in the sheet on phones', async () => {
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
       fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
       fireEvent.keyDown(field(), { key: 'Enter' });
       fireEvent.click(screen.getByTestId('criteria-submit'));

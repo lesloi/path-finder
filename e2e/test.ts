@@ -6,6 +6,12 @@ import { join } from 'node:path';
 const IGN = 'https://data.geopf.fr';
 const FIXTURES = join(import.meta.dirname, 'fixtures/data.geopf.fr');
 
+// A 1 by 1 transparent PNG.
+const TRANSPARENT_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=',
+  'base64',
+);
+
 /**
  * Playwright's `test`, with two guards on every test: the IGN Géoplateforme is answered from
  * committed fixtures, never from the network, and a request to any other host fails the test.
@@ -26,6 +32,8 @@ export const test = base.extend<{ privacyGuard: void }>({
         if (existsSync(fixture)) return route.fulfill({ path: fixture });
         // Tiles and glyphs outside the fixtures come back empty, as the map shows no data there.
         if (url.pathname.endsWith('.pbf')) return route.fulfill({ body: '' });
+        // Raster basemaps come as tiles of a single WMTS endpoint: a transparent pixel stands for each.
+        if (url.pathname === '/wmts') return route.fulfill({ contentType: 'image/png', body: TRANSPARENT_PNG });
         return route.fulfill({ status: 404 });
       });
 

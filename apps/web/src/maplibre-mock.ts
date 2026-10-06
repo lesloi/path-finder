@@ -30,8 +30,18 @@ export class Map {
     // A JPEG of the canvas, as an empty blob.
     toBlob: (callback: (blob: Blob | null) => void) => callback(new Blob(['snapshot'], { type: 'image/jpeg' })),
   };
-  constructor() {
+  /** What the map was created with, and every style it was given since, the latest last. */
+  options: { style?: unknown };
+  styles: { style: unknown; options: unknown }[] = [];
+  constructor(options: { style?: unknown } = {}) {
+    this.options = options;
     maps.push(this);
+  }
+  /** Like the real map, a new style drops the sources and layers added to the old one. */
+  setStyle(style: unknown, options?: unknown) {
+    this.styles.push({ style, options });
+    this.sources = {};
+    this.layers = [];
   }
   on(type: string, layerOrHandler: string | Handler, handler?: Handler) {
     const [key, listener] =

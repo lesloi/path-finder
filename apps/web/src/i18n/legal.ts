@@ -36,7 +36,7 @@ export const legalText = {
                 links: { odbl: 'ODbL' },
               },
               {
-                text: 'Plan IGN map and BD ALTI 25 m elevation © IGN, under the {licence}.',
+                text: 'Plan IGN map, aerial photography and BD ALTI 25 m elevation © IGN, under the {licence}.',
                 links: { licence: 'Licence Ouverte' },
               },
             ],
@@ -184,7 +184,7 @@ export const legalText = {
                 links: { odbl: 'ODbL' },
               },
               {
-                text: 'Fond de carte Plan IGN et altitudes BD ALTI 25 m © IGN, sous {licence}.',
+                text: 'Fond de carte Plan IGN, photographies aériennes et altitudes BD ALTI 25 m © IGN, sous {licence}.',
                 links: { licence: 'Licence Ouverte' },
               },
             ],
