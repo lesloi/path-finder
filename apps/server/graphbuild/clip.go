@@ -47,6 +47,40 @@ func BuildClipped(pbfPath, demDir, outPath string, box Box, log io.Writer) error
 	return finish(p, dem, demDir, ways, lat, lon, outPath)
 }
 
+// boxNodes are the nodes of the box in the order of the file: their ids ascend, so a way finds a node by
+// bisection.
+type boxNodes struct {
+	ids      []int64
+	lat, lon []int32
+}
+
+// find returns the position of a node of the box, or false for a node outside it.
+func (b *boxNodes) find(id int64) (uint32, bool) {
+	k := sort.Search(len(b.ids), func(i int) bool { return b.ids[i] >= id })
+	return uint32(k), k < len(b.ids) && b.ids[k] == id
+}
+
+// cut splits a way into the runs of consecutive nodes that are inside the box, as positions in b, and drops
+// the runs too short to hold an edge.
+func (b *boxNodes) cut(nodes osm.WayNodes) (runs [][]uint32) {
+	var run []uint32
+	flush := func() {
+		if len(run) >= 2 {
+			runs = append(runs, run)
+		}
+		run = nil
+	}
+	for _, n := range nodes {
+		if k, ok := b.find(int64(n.ID)); ok {
+			run = append(run, k)
+		} else {
+			flush()
+		}
+	}
+	flush()
+	return runs
+}
+
 func readClipped(path string, box Box) (ways []rawWay, lat, lon []int32, err error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -60,11 +94,8 @@ func readClipped(path string, box Box) (ways []rawWay, lat, lon []int32, err err
 	e7 := func(deg float64) int32 { return int32(math.Round(deg * 1e7)) }
 	minLat, minLon, maxLat, maxLon := e7(box.MinLat), e7(box.MinLon), e7(box.MaxLat), e7(box.MaxLon)
 
-	// The nodes of the box, in the order of the file: their ids ascend, so a way finds a node by bisection.
-	var ids []int64
-	var nodeLat, nodeLon []int32
+	var inBox boxNodes
 	lastID, inWays := int64(math.MinInt64), false
-	var runs [][]uint32
 	for sc.Scan() {
 		switch o := sc.Object().(type) {
 		case *osm.Node:
@@ -74,7 +105,7 @@ func readClipped(path string, box Box) (ways []rawWay, lat, lon []int32, err err
 			lastID = int64(o.ID)
 			la, lo := e7(o.Lat), e7(o.Lon)
 			if la >= minLat && la <= maxLat && lo >= minLon && lo <= maxLon {
-				ids, nodeLat, nodeLon = append(ids, lastID), append(nodeLat, la), append(nodeLon, lo)
+				inBox.ids, inBox.lat, inBox.lon = append(inBox.ids, lastID), append(inBox.lat, la), append(inBox.lon, lo)
 			}
 		case *osm.Way:
 			inWays = true
@@ -82,47 +113,36 @@ func readClipped(path string, box Box) (ways []rawWay, lat, lon []int32, err err
 			if !ok {
 				continue
 			}
-			// The way, cut into the runs of consecutive nodes that are inside the box.
-			var run []uint32
-			flush := func() {
-				if len(run) >= 2 {
-					runs = append(runs, run)
-					ways = append(ways, rawWay{kind: kind, surf: surf})
-				}
-				run = nil
+			for _, run := range inBox.cut(o.Nodes) {
+				ways = append(ways, rawWay{kind: kind, surf: surf, idx: run})
 			}
-			for _, n := range o.Nodes {
-				id := int64(n.ID)
-				if k := sort.Search(len(ids), func(i int) bool { return ids[i] >= id }); k < len(ids) && ids[k] == id {
-					run = append(run, uint32(k))
-				} else {
-					flush()
-				}
-			}
-			flush()
 		}
 	}
 	if err := sc.Err(); err != nil {
 		return nil, nil, nil, err
 	}
+	lat, lon = compact(ways, &inBox)
+	return ways, lat, lon, nil
+}
 
-	// Keep only the nodes that a way uses, numbered by first use: what follows works on those.
-	remap := make([]uint32, len(ids))
+// compact keeps only the nodes that a way uses, numbered by first use, and renumbers the ways to match: what
+// follows works on those nodes, not on every node of the box.
+func compact(ways []rawWay, b *boxNodes) (lat, lon []int32) {
+	remap := make([]uint32, len(b.ids))
 	for i := range remap {
 		remap[i] = math.MaxUint32
 	}
 	for wi := range ways {
-		idx := runs[wi]
+		idx := ways[wi].idx
 		for j, k := range idx {
 			if remap[k] == math.MaxUint32 {
 				remap[k] = uint32(len(lat))
-				lat, lon = append(lat, nodeLat[k]), append(lon, nodeLon[k])
+				lat, lon = append(lat, b.lat[k]), append(lon, b.lon[k])
 			}
 			idx[j] = remap[k]
 		}
-		ways[wi].idx = idx
 	}
-	return ways, lat, lon, nil
+	return lat, lon
 }
 
 // ParseBox reads a box from "minLon,minLat,maxLon,maxLat", in degrees.

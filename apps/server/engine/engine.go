@@ -6,7 +6,6 @@ package engine
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -88,14 +87,15 @@ func openGraph(path string) (*graph, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(data) < graphHeader || string(data[:8]) != graphMagic {
+	head, ok := readGraphHead(data)
+	if !ok {
 		return nil, fmt.Errorf("%s is not a graph file of this version: build it again with build-graph", path)
 	}
-	n, e := int(binary.LittleEndian.Uint32(data[8:])), int(binary.LittleEndian.Uint32(data[12:]))
-	nodesAt := graphHeader
+	n, e := int(head.nodes), int(head.edges)
+	nodesAt := graphHeaderSize
 	offAt := align16(nodesAt + 12*n)
 	edgesAt := align16(offAt + 4*(n+1))
-	g := &graph{n: n, e: e, fingerprint: binary.LittleEndian.Uint64(data[16:])}
+	g := &graph{n: n, e: e, fingerprint: head.fingerprint}
 	if g.nodes, err = view[node](data, nodesAt, n); err != nil {
 		return nil, fmt.Errorf("%s: nodes: %w", path, err)
 	}
@@ -105,9 +105,8 @@ func openGraph(path string) (*graph, error) {
 	if g.edges, err = view[edge](data, edgesAt, e); err != nil {
 		return nil, fmt.Errorf("%s: edges: %w", path, err)
 	}
-	b := readBounds(data)
-	g.sp = &spatial{bounds: b}
-	g.sp.nx, g.sp.ny = gridSize(b.minLat, b.minLon, b.maxLat, b.maxLon)
+	g.sp = &spatial{bounds: head.bounds}
+	g.sp.nx, g.sp.ny = gridSize(head.minLat, head.minLon, head.maxLat, head.maxLon)
 	startAt := align16(edgesAt + 12*e)
 	listAt := align16(startAt + 4*(g.sp.nx*g.sp.ny+1))
 	if g.sp.start, err = view[uint32](data, startAt, g.sp.nx*g.sp.ny+1); err != nil {
@@ -136,14 +135,15 @@ func openLandmarks(path string, g *graph) (*landmarks, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(data) < altHeader || string(data[:8]) != altMagic {
+	head, ok := readAltHead(data)
+	if !ok {
 		return nil, fmt.Errorf("%s is not a landmark file of this version: build it again with build-alt", path)
 	}
-	l, n := int(binary.LittleEndian.Uint32(data[8:])), int(binary.LittleEndian.Uint32(data[12:]))
-	if n != g.n || binary.LittleEndian.Uint64(data[24:]) != g.fingerprint {
+	l, n := int(head.landmarks), int(head.nodes)
+	if n != g.n || head.fingerprint != g.fingerprint {
 		return nil, fmt.Errorf("%s was built for another graph: build it again with build-alt", path)
 	}
-	a := &landmarks{l: l, climb: math.Float32frombits(binary.LittleEndian.Uint32(data[16:])), unit: math.Float32frombits(binary.LittleEndian.Uint32(data[20:]))}
+	a := &landmarks{l: l, climb: head.climb, unit: head.unit}
 	a.rowLen = l
 	if a.climb > 0 {
 		a.rowLen = 2 * l
@@ -151,7 +151,7 @@ func openLandmarks(path string, g *graph) (*landmarks, error) {
 	if l < 1 || a.rowLen > maxLandmarkValues {
 		return nil, fmt.Errorf("%s holds %d landmarks, which a search cannot use (1 to %d values per node)", path, l, maxLandmarkValues)
 	}
-	if a.rows, err = view[uint16](data, altHeader, n*a.rowLen); err != nil {
+	if a.rows, err = view[uint16](data, altHeaderSize, n*a.rowLen); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return a, nil

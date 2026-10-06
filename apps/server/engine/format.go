@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/binary"
 	"hash/crc64"
-	"io"
 	"math"
 	"os"
 	"unsafe"
@@ -30,9 +29,8 @@ import (
 const (
 	graphMagic      = "PFGRAPH5"
 	altMagic        = "PFALT003"
-	graphHeader     = 48 // magic, counts, fingerprint, bounds, padding: the nodes start on a 16-byte boundary
-	graphHeaderUsed = 40 // the bytes of it that hold something: the padding is the rest
-	altHeader       = 32
+	graphHeaderSize = 48 // magic, counts, fingerprint, bounds, padding: the nodes start on a 16-byte boundary
+	altHeaderSize   = 32
 	altUnitMeters   = 16
 	altUnreachable  = 0xFFFF
 )
@@ -62,10 +60,66 @@ func fingerprint(nodes []node, off []uint32, edges []edge) uint64 {
 // bounds are the extent of a graph, in 1e-7 degrees.
 type bounds struct{ minLat, minLon, maxLat, maxLon int32 }
 
-// readBounds reads the bounds from the header of a graph file.
-func readBounds(header []byte) bounds {
-	v := func(at int) int32 { return int32(binary.LittleEndian.Uint32(header[at:])) }
-	return bounds{minLat: v(24), minLon: v(28), maxLat: v(32), maxLon: v(36)}
+// graphHead and altHead are the headers of a graph file and of a landmark file: the only place that knows
+// where each field lies, for the writers and the readers alike.
+type graphHead struct {
+	nodes, edges uint32
+	fingerprint  uint64
+	bounds
+}
+
+type altHead struct {
+	landmarks, nodes uint32
+	climb, unit      float32
+	fingerprint      uint64 // of the graph the landmarks were built for
+}
+
+func (h graphHead) encode() []byte {
+	b, le := make([]byte, graphHeaderSize), binary.LittleEndian
+	copy(b, graphMagic)
+	le.PutUint32(b[8:], h.nodes)
+	le.PutUint32(b[12:], h.edges)
+	le.PutUint64(b[16:], h.fingerprint)
+	le.PutUint32(b[24:], uint32(h.minLat))
+	le.PutUint32(b[28:], uint32(h.minLon))
+	le.PutUint32(b[32:], uint32(h.maxLat))
+	le.PutUint32(b[36:], uint32(h.maxLon))
+	return b
+}
+
+// readGraphHead reads the header of a graph file; ok is false for a file too short or of another version.
+func readGraphHead(data []byte) (h graphHead, ok bool) {
+	if len(data) < graphHeaderSize || string(data[:8]) != graphMagic {
+		return h, false
+	}
+	le := binary.LittleEndian
+	h.nodes, h.edges, h.fingerprint = le.Uint32(data[8:]), le.Uint32(data[12:]), le.Uint64(data[16:])
+	h.minLat, h.minLon = int32(le.Uint32(data[24:])), int32(le.Uint32(data[28:]))
+	h.maxLat, h.maxLon = int32(le.Uint32(data[32:])), int32(le.Uint32(data[36:]))
+	return h, true
+}
+
+func (h altHead) encode() []byte {
+	b, le := make([]byte, altHeaderSize), binary.LittleEndian
+	copy(b, altMagic)
+	le.PutUint32(b[8:], h.landmarks)
+	le.PutUint32(b[12:], h.nodes)
+	le.PutUint32(b[16:], math.Float32bits(h.climb))
+	le.PutUint32(b[20:], math.Float32bits(h.unit))
+	le.PutUint64(b[24:], h.fingerprint)
+	return b
+}
+
+// readAltHead reads the header of a landmark file; ok is false for a file too short or of another version.
+func readAltHead(data []byte) (h altHead, ok bool) {
+	if len(data) < altHeaderSize || string(data[:8]) != altMagic {
+		return h, false
+	}
+	le := binary.LittleEndian
+	h.landmarks, h.nodes = le.Uint32(data[8:]), le.Uint32(data[12:])
+	h.climb, h.unit = math.Float32frombits(le.Uint32(data[16:])), math.Float32frombits(le.Uint32(data[20:]))
+	h.fingerprint = le.Uint64(data[24:])
+	return h, true
 }
 
 func pad16(n int64) int64 { return (16 - n%16) % 16 }
@@ -103,19 +157,12 @@ func writeFile(path string, fill func(w *bufio.Writer) error) (err error) {
 // writeGraph writes a graph in the format above.
 func writeGraph(path string, nodes []node, off []uint32, edges []edge) error {
 	return writeFile(path, func(w *bufio.Writer) error {
-		if _, err := io.WriteString(w, graphMagic); err != nil {
-			return err
-		}
-		fp := fingerprint(nodes, off, edges)
 		sp := computeSpatial(nodes)
-		if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(len(nodes)), uint32(len(edges)), uint32(fp), uint32(fp >> 32),
-			uint32(sp.minLat), uint32(sp.minLon), uint32(sp.maxLat), uint32(sp.maxLon)}); err != nil {
+		head := graphHead{nodes: uint32(len(nodes)), edges: uint32(len(edges)), fingerprint: fingerprint(nodes, off, edges), bounds: sp.bounds}
+		if _, err := w.Write(head.encode()); err != nil {
 			return err
 		}
-		if _, err := w.Write(make([]byte, graphHeader-graphHeaderUsed)); err != nil {
-			return err
-		}
-		pos := int64(graphHeader)
+		pos := int64(graphHeaderSize)
 		for _, b := range [][]byte{bytesOf(nodes), bytesOf(off), bytesOf(edges), bytesOf(sp.start), bytesOf(sp.nodes)} {
 			if _, err := w.Write(b); err != nil {
 				return err
@@ -131,13 +178,11 @@ func writeGraph(path string, nodes []node, off []uint32, edges []edge) error {
 	})
 }
 
-// writeLandmarks writes landmark rows in the format above.
+// writeLandmarks writes landmark rows in the format above, for the graph with the given fingerprint.
 func writeLandmarks(path string, landmarks int, nodes uint32, graphFingerprint uint64, climb float32, rows []uint16) error {
 	return writeFile(path, func(w *bufio.Writer) error {
-		if _, err := io.WriteString(w, altMagic); err != nil {
-			return err
-		}
-		if err := binary.Write(w, binary.LittleEndian, []uint32{uint32(landmarks), nodes, math.Float32bits(climb), math.Float32bits(altUnitMeters), uint32(graphFingerprint), uint32(graphFingerprint >> 32)}); err != nil {
+		head := altHead{landmarks: uint32(landmarks), nodes: nodes, climb: climb, unit: altUnitMeters, fingerprint: graphFingerprint}
+		if _, err := w.Write(head.encode()); err != nil {
 			return err
 		}
 		_, err := w.Write(bytesOf(rows))

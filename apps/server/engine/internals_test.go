@@ -362,3 +362,20 @@ func TestLandmarksStayALowerBoundWhenTheSearchClimbsLessThanTheyDo(t *testing.T)
 		}
 	}
 }
+
+func TestHeadersRoundTripAndRefuseAnotherVersion(t *testing.T) {
+	graph := graphHead{nodes: 7, edges: 11, fingerprint: 0xDEADBEEFCAFE, bounds: bounds{minLat: -5, minLon: 6, maxLat: 7, maxLon: -8}}
+	if got, ok := readGraphHead(graph.encode()); !ok || got != graph {
+		t.Errorf("graph header: got %+v, %v, want %+v", got, ok, graph)
+	}
+	alt := altHead{landmarks: 8, nodes: 7, climb: 8, unit: 16, fingerprint: 0xFEEDFACE}
+	if got, ok := readAltHead(alt.encode()); !ok || got != alt {
+		t.Errorf("landmark header: got %+v, %v, want %+v", got, ok, alt)
+	}
+	if _, ok := readGraphHead(graph.encode()[:graphHeaderSize-1]); ok {
+		t.Error("a graph header cut short was read")
+	}
+	if _, ok := readAltHead(append([]byte("PFALT002"), make([]byte, 24)...)); ok {
+		t.Error("a header of another version was read")
+	}
+}
