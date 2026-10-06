@@ -1,7 +1,7 @@
 # Path finder
 
 Path finder is a web app that generates running and trail routes from a start point, a distance
-and an elevation gain. Vocabulary: [CONTEXT.md](./CONTEXT.md).
+and an elevation gain. Vocabulary: [GLOSSARY.md](./GLOSSARY.md).
 
 ## Architecture
 
