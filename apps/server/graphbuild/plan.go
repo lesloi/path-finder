@@ -72,61 +72,79 @@ func PlanZones(pbfPath string, opt PlanOptions, log io.Writer) ([]Zone, error) {
 	}
 	p.step("counted %d nodes in a grid of %d by %d cells", total, ny, nx)
 
-	g := newGrid(counts, ny, nx)
-	var zones []zoneCells
-	var split func(r rect)
-	split = func(r rect) {
-		if r = g.trim(r); g.sum(r) == 0 {
-			return
-		}
-		// A degree of longitude is shortest at the pole side of the zone: take the margin there.
-		farLat := math.Max(math.Abs(e.MinLat+float64(r.r0)*opt.CellDeg), math.Abs(e.MinLat+float64(r.r1)*opt.CellDeg))
-		cosl := math.Cos(farLat * math.Pi / 180)
-		cellKm := 111.32 * opt.CellDeg
-		mr := int(math.Ceil(opt.MarginKm / cellKm))
-		mc := int(math.Ceil(opt.MarginKm / (cellKm * cosl)))
-		grown := g.clamp(rect{r.r0 - mr, r.r1 + mr, r.c0 - mc, r.c1 + mc})
-		rows, cols := r.r1-r.r0, r.c1-r.c0
-		if n := g.sum(grown); n <= opt.MaxNodes || (rows == 1 && cols == 1) {
-			zones = append(zones, zoneCells{core: r, grown: grown, nodes: n})
-			return
-		}
-		// Split the longer side, in kilometres, where the nodes are shared in half.
-		// (Nodes on the north or east edge of the extent are not counted here, and a build of a box that reaches it
-		// keeps them: a few more than planned.)
-		if float64(cols)*cosl >= float64(rows) && cols > 1 || rows == 1 {
-			k := g.halfway(r, false)
-			split(rect{r.r0, r.r1, r.c0, r.c0 + k})
-			split(rect{r.r0, r.r1, r.c0 + k, r.c1})
-		} else {
-			k := g.halfway(r, true)
-			split(rect{r.r0, r.r0 + k, r.c0, r.c1})
-			split(rect{r.r0 + k, r.r1, r.c0, r.c1})
-		}
-	}
-	split(rect{0, ny, 0, nx})
-
-	// By the south edge of the core, northmost first, then west to east. Names follow that order, so a zone added
-	// or removed by another extract renumbers those after it: a job keeps using the list it was given.
-	sort.Slice(zones, func(i, j int) bool {
-		if zones[i].core.r0 != zones[j].core.r0 {
-			return zones[i].core.r0 > zones[j].core.r0
-		}
-		return zones[i].core.c0 < zones[j].core.c0
-	})
-	out := make([]Zone, len(zones))
-	for i, z := range zones {
-		box := Box{
-			MinLon: roundTo3(e.MinLon+float64(z.grown.c0)*opt.CellDeg, math.Floor), MinLat: roundTo3(e.MinLat+float64(z.grown.r0)*opt.CellDeg, math.Floor),
-			MaxLon: roundTo3(e.MinLon+float64(z.grown.c1)*opt.CellDeg, math.Ceil), MaxLat: roundTo3(e.MinLat+float64(z.grown.r1)*opt.CellDeg, math.Ceil),
-		}
-		out[i] = Zone{Name: fmt.Sprintf("z%02d", i+1), Box: box, Nodes: z.nodes}
-		if z.nodes > opt.MaxNodes {
-			p.step("warning: %s holds %d nodes, over the budget of %d, and is a single cell: use a smaller cell or a smaller margin", out[i].Name, z.nodes, opt.MaxNodes)
-		}
-	}
+	pl := &planner{grid: newGrid(counts, ny, nx), opt: opt}
+	pl.split(rect{0, ny, 0, nx})
+	out := pl.zones(p)
 	p.step("%d zones", len(out))
 	return out, nil
+}
+
+// planner cuts a grid of node counts into the cells of zones.
+type planner struct {
+	*grid
+	opt   PlanOptions
+	cells []zoneCells
+}
+
+// margin is how many rows and columns a zone reaches beyond a block, and the cosine of the latitude it counts
+// the columns at: a degree of longitude is shortest at the pole side of the block, so the margin is taken there.
+func (pl *planner) margin(r rect) (rows, cols int, cosl float64) {
+	e, cell := pl.opt.Extent, pl.opt.CellDeg
+	farLat := math.Max(math.Abs(e.MinLat+float64(r.r0)*cell), math.Abs(e.MinLat+float64(r.r1)*cell))
+	cosl = math.Cos(farLat * math.Pi / 180)
+	cellKm := 111.32 * cell
+	return int(math.Ceil(pl.opt.MarginKm / cellKm)), int(math.Ceil(pl.opt.MarginKm / (cellKm * cosl))), cosl
+}
+
+// split makes a block a zone if its box, margin included, fits the budget (or is a single cell), and else
+// cuts it in two where the nodes are shared in half, along its longer side in kilometres, and does the same to
+// each half. Nodes on the north or east edge of the extent are not counted here, and a build of a box that
+// reaches it keeps them: a few more than planned.
+func (pl *planner) split(r rect) {
+	if r = pl.trim(r); pl.sum(r) == 0 {
+		return
+	}
+	mr, mc, cosl := pl.margin(r)
+	grown := pl.clamp(rect{r.r0 - mr, r.r1 + mr, r.c0 - mc, r.c1 + mc})
+	rows, cols := r.r1-r.r0, r.c1-r.c0
+	if n := pl.sum(grown); n <= pl.opt.MaxNodes || (rows == 1 && cols == 1) {
+		pl.cells = append(pl.cells, zoneCells{core: r, grown: grown, nodes: n})
+		return
+	}
+	if float64(cols)*cosl >= float64(rows) && cols > 1 || rows == 1 {
+		k := pl.halfway(r, false)
+		pl.split(rect{r.r0, r.r1, r.c0, r.c0 + k})
+		pl.split(rect{r.r0, r.r1, r.c0 + k, r.c1})
+	} else {
+		k := pl.halfway(r, true)
+		pl.split(rect{r.r0, r.r0 + k, r.c0, r.c1})
+		pl.split(rect{r.r0 + k, r.r1, r.c0, r.c1})
+	}
+}
+
+// zones names the zones and gives each its box in degrees, rounded outwards.
+func (pl *planner) zones(p progress) []Zone {
+	e, cell := pl.opt.Extent, pl.opt.CellDeg
+	// By the south edge of the core, northmost first, then west to east. Names follow that order, so a zone
+	// added or removed by another extract renumbers those after it: plan again with each extract.
+	sort.Slice(pl.cells, func(i, j int) bool {
+		if pl.cells[i].core.r0 != pl.cells[j].core.r0 {
+			return pl.cells[i].core.r0 > pl.cells[j].core.r0
+		}
+		return pl.cells[i].core.c0 < pl.cells[j].core.c0
+	})
+	out := make([]Zone, len(pl.cells))
+	for i, z := range pl.cells {
+		box := Box{
+			MinLon: roundTo3(e.MinLon+float64(z.grown.c0)*cell, math.Floor), MinLat: roundTo3(e.MinLat+float64(z.grown.r0)*cell, math.Floor),
+			MaxLon: roundTo3(e.MinLon+float64(z.grown.c1)*cell, math.Ceil), MaxLat: roundTo3(e.MinLat+float64(z.grown.r1)*cell, math.Ceil),
+		}
+		out[i] = Zone{Name: fmt.Sprintf("z%02d", i+1), Box: box, Nodes: z.nodes}
+		if z.nodes > pl.opt.MaxNodes {
+			p.step("warning: %s holds %d nodes, over the budget of %d, and is a single cell: use a smaller cell or a smaller margin", out[i].Name, z.nodes, pl.opt.MaxNodes)
+		}
+	}
+	return out
 }
 
 // roundTo3 rounds to a thousandth of a degree, outwards, to the number that its decimal form reads back as.
