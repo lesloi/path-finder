@@ -78,7 +78,7 @@ describe('App', () => {
 
     fireEvent.click(screen.getByTestId('criteria-settings'));
 
-    expect(await screen.findByTestId('sub-page-title')).toHaveFocus();
+    await waitFor(() => expect(screen.getByTestId('sub-page-title')).toHaveFocus());
   });
 
   it('gives the focus back to the settings button once the page is closed', async () => {
@@ -87,7 +87,8 @@ describe('App', () => {
     fireEvent.click(screen.getByTestId('criteria-settings'));
     fireEvent.click(await screen.findByTestId('sub-page-back'));
 
-    expect(await screen.findByTestId('criteria-settings')).toHaveFocus();
+    // The button is there while the page is open: wait for the focus itself, which moves after the close.
+    await waitFor(() => expect(screen.getByTestId('criteria-settings')).toHaveFocus());
   });
 
   it('opens a page as a modal dialog', async () => {
