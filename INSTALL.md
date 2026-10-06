@@ -57,20 +57,20 @@ export DATA_DIR=$PWD/../../data
 A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
 a half-written one. The server maps the files when it starts: restart it after a rebuild.
 
-To build one zone of a large extract, such as a department from the France extract, add
-`-bbox minLon,minLat,maxLon,maxLat` (one sorted `-pbf`, as Geofabrik's are, and only the BD ALTI tiles of the
-zone in `-dem`): the build reads the extract once and its memory follows the zone, not the extract. A way that
-leaves the box is cut there, so give the box a margin around the zone. Without `-bbox`, the build keeps every
-walkable way of the extracts in memory, which is fine for a region and far too much for a country. Under a
-memory limit, set `GOMEMLIMIT` to about 80 % of it (`1600MiB` for 2 GiB): the Go runtime then collects
-garbage harder as it nears the limit, at the price of a slower build.
+Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (8 by
+default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
+it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one activity
+profile and to one graph: build them again after each graph; the server refuses those of another graph.
 
 ### A country, by zones
 
-The graph of a country does not build in a couple of gigabytes of memory, so build it by zone, one after the other or
-in parallel, each into its own subdirectory of the data directory. `zones.txt` has a zone per line, a name
-and its box (with a margin round the zone, and some overlap with its neighbours so that loops near the edge
-close), and `$dem/<name>` holds the BD ALTI tiles of that zone only:
+The graph of a country does not build in a couple of gigabytes of memory, so build it by zone, each into its
+own subdirectory of the data directory. `build-graph -bbox minLon,minLat,maxLon,maxLat` reads one sorted
+extract (Geofabrik's are) once and keeps the ways inside the box: its memory follows the zone, not the
+extract. A way that leaves the box is cut there, so give each zone a margin and overlap its neighbours.
+Without `-bbox` the build keeps every walkable way in memory: fine for a region, not for a country. Give
+`-dem` the tiles of the zone only, and under a memory limit set `GOMEMLIMIT` to about 80 % of it (`1600MiB`
+for 2 GiB). With a `zones.txt` of a name and a box per line, and the tiles of each zone in `$dem/<name>`:
 
 ```sh
 while read -r name box; do
@@ -82,18 +82,10 @@ while read -r name box; do
 done < zones.txt
 ```
 
-A zone of two million nodes is about 215 MB of files. The server maps every zone when it starts, which costs no
-memory, and answers a request from the zone whose box holds the start point with the most room round it;
-when that zone has no way near the start, the next one whose box holds it answers. A data
-directory that holds a `graph.bin` itself is one zone. Every zone of a directory of zones needs its `hike.alt`
-and `run.alt`, and a subdirectory that holds landmarks or a temporary file but no `graph.bin` (a build that
-failed) stops the server at startup.
-
-Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (8 by
-default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
-it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one activity
-profile and to one graph: build them again after each graph. The server refuses landmarks built for another
-graph, even one with as many nodes.
+The server maps every zone when it starts and answers from the zone that holds the start point with the most
+room round it, or from the next one if that has no way near it. A directory that holds a `graph.bin` is one
+zone. In a directory of zones each needs its `hike.alt` and `run.alt`, and a subdirectory with landmarks or a
+temporary file but no `graph.bin` (a build that failed) stops the server.
 
 ## 4. Run it locally
 
@@ -149,15 +141,9 @@ The `Dockerfile` builds one image with the server and the web app, and no data. 
 `docker build -t path-finder .`, or use the one CI publishes as `ghcr.io/lesloi/path-finder:latest`.
 
 The data is a volume: mount the directory holding `graph.bin`, `hike.alt` and `run.alt`, or one such
-subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. Build it ahead of serving,
-with the same `DATA_DIR`, in a step of its own. The files are mapped, not copied, so servers that share the
-directory share its page cache; restart them after a rebuild. The server only opens the files for reading and
-writes nothing into the directory.
-
-The server does not read the files ahead: a search faults in the pages it needs, the first time it touches
-them. Before it listens, the server maps the files and checks their headers, which reads
-almost nothing (the index that finds the nearest node to a point is in `graph.bin`), and `/healthz` does not
-answer until then. The server logs how long opening took.
+subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. The server only reads it, and
+maps the files rather than copying them, so servers that share the directory share its page cache; restart
+them after a rebuild.
 
 A `compose.yaml`:
 
