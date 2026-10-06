@@ -2,9 +2,12 @@ import { useSyncExternalStore } from 'react';
 
 import {
   ACTIVITY_PACES,
+  BASEMAPS,
   DEFAULT_ACTIVITY,
+  DEFAULT_BASEMAP,
   DEFAULT_THEME,
   type Activity,
+  type Basemap,
   type Theme,
   type Units,
 } from '../core/index.ts';
@@ -18,6 +21,7 @@ export type Settings = {
   language?: Language;
   units: Units;
   theme: Theme;
+  basemap: Basemap;
   lastActivity: Activity;
 };
 
@@ -34,7 +38,7 @@ function parse(raw: string | null): Settings {
   } catch {
     stored = {};
   }
-  const { pace, language, units, theme, lastActivity } = isObject(stored) ? stored : {};
+  const { pace, language, units, theme, basemap, lastActivity } = isObject(stored) ? stored : {};
   const paces = isObject(pace) ? pace : {};
   return {
     pace: Object.fromEntries(
@@ -46,6 +50,7 @@ function parse(raw: string | null): Settings {
     ...((language === 'fr' || language === 'en') && { language }),
     units: units === 'imperial' ? 'imperial' : 'metric',
     theme: theme === 'light' || theme === 'dark' ? theme : DEFAULT_THEME,
+    basemap: BASEMAPS.includes(basemap as Basemap) ? (basemap as Basemap) : DEFAULT_BASEMAP,
     lastActivity: ACTIVITIES.includes(lastActivity as Activity) ? (lastActivity as Activity) : DEFAULT_ACTIVITY,
   };
 }

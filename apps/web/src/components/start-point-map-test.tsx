@@ -2,6 +2,7 @@ import { act, render } from '@testing-library/react';
 
 import type { Position } from '../core/index.ts';
 import { maps, markers, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
+import { basemapStyle } from './basemap-style.ts';
 import { StartPointMap } from './start-point-map.tsx';
 
 vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
@@ -132,6 +133,136 @@ describe('StartPointMap', () => {
     expect(map().easedTo).toEqual({ center: [5.7, 45.2], zoom: 14 });
   });
 
+  describe('the basemap', () => {
+    it('starts on the Plan IGN raster', () => {
+      render(<StartPointMap onStartChange={vi.fn()} />);
+
+      expect(map().options.style).toEqual(basemapStyle('plan'));
+      expect(JSON.stringify(map().options.style)).toContain('GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2');
+    });
+
+    it('starts on the basemap it is given', () => {
+      render(<StartPointMap basemap="minimal" onStartChange={vi.fn()} />);
+
+      expect(map().options.style).toBe(basemapStyle('minimal'));
+      expect(map().options.style).toMatch(/PLAN\.IGN\/epure\.json$/);
+    });
+
+    it('serves the aerial photography as JPEG tiles', () => {
+      expect(JSON.stringify(basemapStyle('aerial'))).toMatch(/ORTHOIMAGERY\.ORTHOPHOTOS.*image\/jpeg/);
+    });
+
+    it('swaps the style when it changes, with a full reload, and only then', () => {
+      const { rerender } = render(<StartPointMap onStartChange={vi.fn()} />);
+      rerender(<StartPointMap start={[6, 45]} onStartChange={vi.fn()} />);
+      expect(map().styles).toEqual([]);
+
+      rerender(<StartPointMap basemap="aerial" onStartChange={vi.fn()} />);
+
+      expect(map().styles).toEqual([{ style: basemapStyle('aerial'), options: { diff: false } }]);
+    });
+
+    it('draws the routes again, and selects a tapped route once, on the new style', () => {
+      const routes = [
+        [
+          [6, 45],
+          [6.1, 45.2],
+        ],
+        [
+          [7, 45],
+          [7.1, 45.2],
+        ],
+      ] satisfies Position[][];
+      const onRouteSelect = vi.fn();
+      const view = render(<StartPointMap routes={routes} onRouteSelect={onRouteSelect} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
+      act(() => map().fire('idle'));
+
+      view.rerender(
+        <StartPointMap basemap="aerial" routes={routes} onRouteSelect={onRouteSelect} onStartChange={vi.fn()} />,
+      );
+      // Between the swap and the new style there is nothing to draw in: the map does not break.
+      view.rerender(
+        <StartPointMap
+          basemap="aerial"
+          routes={routes}
+          selectedRoute={1}
+          onRouteSelect={onRouteSelect}
+          onStartChange={vi.fn()}
+        />,
+      );
+      expect(map().sources.routes).toBeUndefined();
+      act(() => map().fire('style.load'));
+
+      const drawn = (map().getSource('routes') as GeoJSONSource & { data: { features: unknown[] } }).data.features;
+      expect(drawn).toHaveLength(2);
+      expect(map().layers.map(({ id }) => id)).toEqual([
+        'background',
+        'routes-casing',
+        'routes-line',
+        'routes-hit',
+        'route-badges',
+        'route-markers',
+      ]);
+      act(() => map().fire('click', { features: [{ properties: { index: 1 } }] }, 'routes-hit'));
+      expect(onRouteSelect).toHaveBeenCalledExactlyOnceWith(1);
+    });
+
+    it('goes back to the previous basemap when the style of the new one fails to load', () => {
+      const onBasemapFail = vi.fn();
+      const view = render(<StartPointMap onBasemapFail={onBasemapFail} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
+
+      view.rerender(<StartPointMap basemap="minimal" onBasemapFail={onBasemapFail} onStartChange={vi.fn()} />);
+      act(() => map().fire('error'));
+
+      expect(map().styles.map(({ style }) => style)).toEqual([basemapStyle('minimal'), basemapStyle('plan')]);
+      expect(onBasemapFail).toHaveBeenCalledExactlyOnceWith('plan');
+      // The old style loads again, and the routes' layers are made again.
+      act(() => map().fire('style.load'));
+      expect(map().sources.routes).toBeDefined();
+      view.rerender(<StartPointMap basemap="plan" onBasemapFail={onBasemapFail} onStartChange={vi.fn()} />);
+      expect(map().styles).toHaveLength(2);
+    });
+
+    it('does not go back for an error that is not its style: a tile, or the first style', () => {
+      const onBasemapFail = vi.fn();
+      const view = render(<StartPointMap onBasemapFail={onBasemapFail} onStartChange={vi.fn()} />);
+      act(() => map().fire('error'));
+      act(() => map().fire('style.load'));
+
+      view.rerender(<StartPointMap basemap="aerial" onBasemapFail={onBasemapFail} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
+      act(() => map().fire('error'));
+
+      expect(map().styles).toHaveLength(1);
+      expect(onBasemapFail).not.toHaveBeenCalled();
+    });
+
+    it('keeps the snapshot of the routes it took on the old style', () => {
+      const onSnapshot = vi.fn();
+      const routes: Position[][] = [
+        [
+          [6, 45],
+          [6.1, 45.2],
+        ],
+      ];
+      const view = render(<StartPointMap routes={routes} onSnapshot={onSnapshot} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
+      act(() => map().fire('idle'));
+      const calls = onSnapshot.mock.calls.length;
+
+      view.rerender(
+        <StartPointMap basemap="minimal" routes={routes} onSnapshot={onSnapshot} onStartChange={vi.fn()} />,
+      );
+      act(() => map().fire('style.load'));
+      act(() => map().fire('idle'));
+
+      // A snapshot taken now would hold the routes already drawn on the canvas.
+      expect(onSnapshot).toHaveBeenCalledTimes(calls);
+    });
+  });
+
   describe('with routes', () => {
     const loop = (offset: number): Position[] => [
       [6 + offset, 45],
@@ -143,7 +274,7 @@ describe('StartPointMap', () => {
     // The style loads, the map frames the routes and settles: then they are drawn.
     function renderRoutes(props: Partial<Parameters<typeof StartPointMap>[0]> = {}) {
       const view = render(<StartPointMap routes={routes} onStartChange={vi.fn()} {...props} />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
       act(() => map().fire('idle'));
       return view;
     }
@@ -169,7 +300,7 @@ describe('StartPointMap', () => {
 
     it('keeps the routes off the map until it has taken its snapshot', () => {
       render(<StartPointMap routes={routes} onStartChange={vi.fn()} />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
 
       expect(features()).toEqual([]);
 
@@ -179,7 +310,7 @@ describe('StartPointMap', () => {
 
     it('draws the routes anyway when the map never settles', () => {
       render(<StartPointMap routes={routes} onStartChange={vi.fn()} />);
-      act(() => map().fire('load'));
+      act(() => map().fire('style.load'));
 
       act(() => vi.advanceTimersByTime(5_000));
 
@@ -210,7 +341,7 @@ describe('StartPointMap', () => {
 
       it('leads on to the selected route when its detail was opened before the map settled', () => {
         render(<StartPointMap routes={routes} framing="selected" selectedRoute={1} onStartChange={vi.fn()} />);
-        act(() => map().fire('load'));
+        act(() => map().fire('style.load'));
 
         act(() => map().fire('idle'));
 
@@ -246,7 +377,7 @@ describe('StartPointMap', () => {
       it('reports nothing when the canvas cannot be read', () => {
         const onSnapshot = vi.fn();
         render(<StartPointMap routes={routes} onSnapshot={onSnapshot} onStartChange={vi.fn()} />);
-        act(() => map().fire('load'));
+        act(() => map().fire('style.load'));
         map().canvas.toBlob = (callback) => callback(null);
 
         act(() => map().fire('idle'));
@@ -341,7 +472,7 @@ describe('StartPointMap', () => {
 
       it('has no label until the snapshot is taken', () => {
         render(<StartPointMap routes={[out]} summaries={summaries} onStartChange={vi.fn()} />);
-        act(() => map().fire('load'));
+        act(() => map().fire('style.load'));
 
         expect(labelled('route-badges')).toEqual([]);
       });

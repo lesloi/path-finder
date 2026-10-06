@@ -1,4 +1,5 @@
 export * from './activity.ts';
+export * from './basemap.ts';
 export * from './coordinates.ts';
 export * from './criteria-summary.ts';
 export * from './gpx.ts';

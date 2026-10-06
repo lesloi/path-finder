@@ -33,4 +33,40 @@ test.describe('the app', () => {
 
     await expect(page.locator('html')).not.toHaveAttribute('data-geolocation');
   });
+
+  test('keeps the map background picked from the button over the map across a reload', async ({ page }) => {
+    await openMap(page);
+
+    // The button floats right over the location button.
+    const [basemap, locate] = await Promise.all([
+      page.getByTestId('criteria-basemap').boundingBox(),
+      page.getByTestId('criteria-locate').boundingBox(),
+    ]);
+    expect(basemap!.y + basemap!.height).toBeLessThanOrEqual(locate!.y);
+    expect(Math.abs(basemap!.x - locate!.x)).toBeLessThan(1);
+
+    await page.getByTestId('criteria-basemap').click();
+    await page.getByTestId('criteria-basemap-minimal').click();
+    await page.reload();
+    await page.getByTestId('criteria-basemap').click();
+
+    await expect(page.getByTestId('criteria-basemap-minimal')).toHaveAttribute('aria-checked', 'true');
+  });
+
+  test('goes back to the previous map background when the style of the new one fails to load', async ({
+    page,
+    context,
+  }) => {
+    await openMap(page);
+    // Registered last, so it answers first: the IGN style of the minimal background is down.
+    await context.route('**/PLAN.IGN/epure.json', (route) => route.abort('failed'));
+
+    await page.getByTestId('criteria-basemap').click();
+    await page.getByTestId('criteria-basemap-minimal').click();
+
+    const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('path-finder.settings')!).basemap);
+    await expect.poll(saved).toBe('plan');
+    await page.getByTestId('criteria-basemap').click();
+    await expect(page.getByTestId('criteria-basemap-plan')).toHaveAttribute('aria-checked', 'true');
+  });
 });

@@ -9,7 +9,13 @@ describe('useSettings', () => {
     const { result } = renderHook(() => useSettings());
     const [settings] = result.current;
 
-    expect(settings).toEqual({ pace: {}, units: 'metric', theme: 'system', lastActivity: 'run' });
+    expect(settings).toEqual({
+      pace: {},
+      units: 'metric',
+      theme: 'system',
+      basemap: 'plan',
+      lastActivity: 'run',
+    });
     expect(paceFor(settings, 'run')).toBe(6);
     expect(60 / paceFor(settings, 'hike')).toBeCloseTo(4.5);
   });
@@ -22,6 +28,7 @@ describe('useSettings', () => {
         language: 'fr',
         units: 'imperial',
         theme: 'dark',
+        basemap: 'aerial',
         lastActivity: 'hike',
       }),
     );
@@ -34,6 +41,7 @@ describe('useSettings', () => {
       language: 'fr',
       units: 'imperial',
       theme: 'dark',
+      basemap: 'aerial',
       lastActivity: 'hike',
     });
     expect(paceFor(result.current[0], 'hike')).toBe(12);
@@ -58,6 +66,7 @@ describe('useSettings', () => {
         language: 'de',
         units: 'nautical',
         theme: 'sepia',
+        basemap: 'satellite',
         lastActivity: 'swim',
       }),
     ],
@@ -66,7 +75,13 @@ describe('useSettings', () => {
 
     const { result } = renderHook(() => useSettings());
 
-    expect(result.current[0]).toEqual({ pace: {}, units: 'metric', theme: 'system', lastActivity: 'run' });
+    expect(result.current[0]).toEqual({
+      pace: {},
+      units: 'metric',
+      theme: 'system',
+      basemap: 'plan',
+      lastActivity: 'run',
+    });
   });
 
   it('keeps the valid fields of partial data', () => {
@@ -74,7 +89,13 @@ describe('useSettings', () => {
 
     const { result } = renderHook(() => useSettings());
 
-    expect(result.current[0]).toEqual({ pace: { run: 5 }, units: 'imperial', theme: 'system', lastActivity: 'run' });
+    expect(result.current[0]).toEqual({
+      pace: { run: 5 },
+      units: 'imperial',
+      theme: 'system',
+      basemap: 'plan',
+      lastActivity: 'run',
+    });
   });
 });
 
