@@ -58,11 +58,11 @@ func OpenZones(dir string, activities ...string) (*Zones, error) {
 
 // zoneDirs lists the directories that hold a zone, in name order, and whether the directory is itself the zone.
 // A subdirectory may be a link, as the directories of a volume often are. One with landmarks or a temporary
-// file but no graph is a zone whose build failed.
+// file but no graph is a zone whose build failed. A directory with a graph of its own and zones beside it is
+// refused: serving the graph alone would leave the zones out without a word.
 func zoneDirs(dir string) (dirs []string, flat bool, err error) {
-	if _, err := os.Stat(filepath.Join(dir, GraphFileName)); err == nil {
-		return []string{dir}, true, nil
-	}
+	_, statErr := os.Stat(filepath.Join(dir, GraphFileName))
+	flat = statErr == nil
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, false, fmt.Errorf("engine: reading the data directory: %w", err)
@@ -78,11 +78,20 @@ func zoneDirs(dir string) (dirs []string, flat bool, err error) {
 		} else if !errors.Is(err, fs.ErrNotExist) {
 			return nil, false, err
 		}
+		if flat {
+			continue // the source data of a build, or whatever else the directory holds
+		}
 		for _, pattern := range []string{"*.alt", "*.tmp"} {
 			if left, _ := filepath.Glob(filepath.Join(sub, pattern)); len(left) > 0 {
 				return nil, false, fmt.Errorf("engine: %s holds %s but no %s: its build did not finish", sub, filepath.Base(left[0]), GraphFileName)
 			}
 		}
+	}
+	if flat {
+		if len(dirs) > 0 {
+			return nil, false, fmt.Errorf("engine: %s holds a %s and zones (%s): keep one of the two", dir, GraphFileName, filepath.Base(dirs[0]))
+		}
+		return []string{dir}, true, nil
 	}
 	if len(dirs) == 0 {
 		return nil, false, fmt.Errorf("engine: no graph in %s, nor in a directory of it: build one with build-graph", dir)

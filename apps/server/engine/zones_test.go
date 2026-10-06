@@ -237,3 +237,26 @@ func TestAZoneDirectoryCanBeALink(t *testing.T) {
 		t.Errorf("a linked zone: %v zones, %v", z, err)
 	}
 }
+
+// A graph left at the top of a data directory must not hide the zones next to it.
+func TestAGraphBesideZonesIsRefused(t *testing.T) {
+	dir := t.TempDir()
+	g, _ := zoneGraph(0, 0)
+	writeZone(t, dir, g)
+	writeZone(t, filepath.Join(dir, "north"), g)
+	if _, err := OpenZones(dir, "hike", "run"); err == nil || !strings.Contains(err.Error(), "north") {
+		t.Errorf("a graph and a zone in one directory: err = %v, want it to name the zone", err)
+	}
+
+	// The source data of a build, in subdirectories with no graph, is not a zone.
+	flat := t.TempDir()
+	writeZone(t, flat, g)
+	for _, name := range []string{"osm", "bdalti-asc", "lost+found"} {
+		if err := os.MkdirAll(filepath.Join(flat, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if z, err := OpenZones(flat, "hike", "run"); err != nil || z.Len() != 1 {
+		t.Errorf("a graph beside other directories: %v zones, %v", z, err)
+	}
+}

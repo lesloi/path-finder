@@ -73,6 +73,7 @@ Without `-bbox` the build keeps every walkable way in memory: fine for a region,
 for 2 GiB). With a `zones.txt` of a name and a box per line, and the tiles of each zone in `$dem/<name>`:
 
 ```sh
+set -e # stop at the first zone that fails: a zone left out is a hole in the map
 while read -r name box; do
   zone=$DATA_DIR/$name && mkdir -p "$zone"
   GOMEMLIMIT=1600MiB ./path-finder build-graph -pbf france.osm.pbf -dem "$dem/$name" -bbox "$box" -out "$zone/graph.bin"
@@ -84,7 +85,7 @@ done < zones.txt
 
 The server maps every zone when it starts and answers from the zone that holds the start point with the most
 room round it, or from the next one if that has no way near it. A directory that holds a `graph.bin` is one
-zone. In a directory of zones each needs its `hike.alt` and `run.alt`, and a subdirectory with landmarks or a
+zone, and the server refuses one that also has zones beside that graph. In a directory of zones each needs its `hike.alt` and `run.alt`, and a subdirectory with landmarks or a
 temporary file but no `graph.bin` (a build that failed) stops the server.
 
 ## 4. Run it locally
