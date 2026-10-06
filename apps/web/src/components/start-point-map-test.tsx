@@ -1,9 +1,10 @@
 import { act, render } from '@testing-library/react';
+import { createRef } from 'react';
 
 import type { Position } from '../core/index.ts';
 import { maps, markers, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
 import { basemapStyle } from './basemap-style.ts';
-import { StartPointMap } from './start-point-map.tsx';
+import { StartPointMap, type MapHandle } from './start-point-map.tsx';
 
 vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
 
@@ -334,6 +335,75 @@ describe('StartPointMap', () => {
       expect(features()).toHaveLength(3);
     });
 
+    describe('the view', () => {
+      it('is flat: it cannot be tilted', () => {
+        render(<StartPointMap onStartChange={vi.fn()} />);
+
+        expect(map().options).toMatchObject({ maxPitch: 0, pitchWithRotate: false });
+      });
+
+      it('frames a new route set north up, and at once', () => {
+        renderRoutes();
+
+        expect(map().fitted?.options).toMatchObject({ bearing: 0, animate: false });
+      });
+
+      it('reports a turn, and the map put back', () => {
+        const onViewChange = vi.fn();
+        render(<StartPointMap onViewChange={onViewChange} onStartChange={vi.fn()} />);
+
+        act(() => map().rotateTo(40));
+        expect(onViewChange).toHaveBeenLastCalledWith({ bearing: 40, rotated: true, movedAway: false });
+        act(() => map().rotateTo(0.05));
+        expect(onViewChange).toHaveBeenLastCalledWith({ bearing: 0.05, rotated: false, movedAway: false });
+      });
+
+      it('reports a change once, however many times the map moves', () => {
+        const onViewChange = vi.fn();
+        render(<StartPointMap onViewChange={onViewChange} onStartChange={vi.fn()} />);
+
+        act(() => map().rotateTo(40));
+        act(() => map().rotateTo(40));
+
+        expect(onViewChange).toHaveBeenCalledTimes(1);
+      });
+
+      it('turns the map back to north with the handle', () => {
+        const handle = createRef<MapHandle>();
+        render(<StartPointMap ref={handle} onStartChange={vi.fn()} />);
+        act(() => map().rotateTo(40));
+
+        act(() => handle.current!.resetNorth());
+
+        expect(map().bearing).toBe(0);
+      });
+
+      it('notices a move by the user, not a framing', () => {
+        const onViewChange = vi.fn();
+        renderRoutes({ onViewChange });
+
+        act(() => map().fire('movestart', {}));
+        expect(onViewChange).not.toHaveBeenCalled();
+        act(() => map().fire('movestart', { originalEvent: {} }));
+        expect(onViewChange).toHaveBeenLastCalledWith(expect.objectContaining({ movedAway: true }));
+      });
+
+      it('frames the routes again with the handle, keeping the orientation, and is no longer away', () => {
+        const onViewChange = vi.fn();
+        const handle = createRef<MapHandle>();
+        renderRoutes({ onViewChange, ref: handle });
+        act(() => map().rotateTo(40));
+        act(() => map().fire('movestart', { originalEvent: {} }));
+        map().fitted = undefined;
+
+        act(() => handle.current!.reframe());
+
+        expect(map().fitted?.options).toMatchObject({ bearing: 40 });
+        expect(map().fitted?.options).not.toMatchObject({ animate: false });
+        expect(onViewChange).toHaveBeenLastCalledWith(expect.objectContaining({ movedAway: false }));
+      });
+    });
+
     describe('the snapshot', () => {
       it('is taken after framing all the routes at once, and reported with where places lie in it', () => {
         const onSnapshot = vi.fn();
@@ -389,6 +459,80 @@ describe('StartPointMap', () => {
         const second = onSnapshot.mock.calls.at(-1)![0];
         expect(second.url).not.toBe(first.url);
         expect(second.of).toEqual([loop(5)]);
+      });
+
+      it('is taken from a map turned back to north, once it has settled again', () => {
+        const onSnapshot = vi.fn();
+        render(<StartPointMap routes={routes} onSnapshot={onSnapshot} onStartChange={vi.fn()} />);
+        act(() => map().fire('style.load'));
+        act(() => map().rotateTo(40));
+
+        act(() => map().fire('idle'));
+        expect(map().bearing).toBe(0);
+        expect(onSnapshot).not.toHaveBeenCalledWith(expect.objectContaining({ url: expect.anything() }));
+        act(() => map().fire('idle'));
+
+        expect(onSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({ of: routes }));
+      });
+
+      it('is taken anyway when a turned map never settles', () => {
+        const onSnapshot = vi.fn();
+        render(<StartPointMap routes={routes} onSnapshot={onSnapshot} onStartChange={vi.fn()} />);
+        act(() => map().fire('style.load'));
+        act(() => map().rotateTo(40));
+
+        act(() => vi.advanceTimersByTime(5_000));
+        act(() => vi.advanceTimersByTime(5_000));
+
+        expect(onSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({ of: routes }));
+      });
+
+      describe('on a change of layout', () => {
+        const listeners: (() => void)[] = [];
+        let wide = false;
+        const matchMedia = window.matchMedia;
+        afterEach(() => {
+          window.matchMedia = matchMedia;
+        });
+        beforeEach(() => {
+          listeners.length = 0;
+          wide = false;
+          window.matchMedia = () =>
+            ({
+              get matches() {
+                return wide;
+              },
+              addEventListener: (_: string, listener: () => void) => listeners.push(listener),
+              removeEventListener() {},
+            }) as unknown as MediaQueryList;
+        });
+        const widen = () => {
+          wide = true;
+          act(() => listeners.forEach((listener) => listener()));
+        };
+
+        it('takes the snapshot again from a map that is north up', () => {
+          const onSnapshot = vi.fn();
+          renderRoutes({ onSnapshot });
+          const first = onSnapshot.mock.calls.at(-1)![0];
+
+          widen();
+          act(() => map().fire('idle'));
+
+          expect(onSnapshot.mock.calls.at(-1)![0].url).not.toBe(first.url);
+        });
+
+        it('keeps the snapshot it has while the map is turned', () => {
+          const onSnapshot = vi.fn();
+          renderRoutes({ onSnapshot });
+          const calls = onSnapshot.mock.calls.length;
+          act(() => map().rotateTo(40));
+
+          widen();
+          act(() => map().fire('idle'));
+
+          expect(onSnapshot).toHaveBeenCalledTimes(calls);
+        });
       });
 
       it('reports nothing when the canvas cannot be read', () => {

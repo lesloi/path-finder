@@ -1,4 +1,4 @@
-import { Crosshair, LocateFixed, Settings } from 'lucide-react';
+import { Crosshair, LocateFixed, Navigation2, Scan, Settings } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useSettings } from '../state/index.ts';
@@ -12,6 +12,8 @@ import { BASEMAPS, formatPosition, parsePosition, type Position } from '../core/
 import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
   StartPointMap,
+  type MapHandle,
+  type MapView,
   BasemapPicker,
   BottomSheet,
   FLOATING_BUTTON,
@@ -21,6 +23,18 @@ import {
   useToastTimeout,
   useDesktop,
 } from '../components/index.ts';
+
+// The bottom-right buttons, from the bottom: the location or reframe one, the basemap, the north. Each
+// class is written whole for Tailwind; `below` counts the buttons the one stands on.
+const STACKED_ABOVE = [
+  'bottom-[calc(var(--sheet-height,0px)+--spacing(3))] desktop:bottom-safe-6',
+  'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2))] ' +
+    'desktop:bottom-[calc(env(safe-area-inset-bottom)+--spacing(6)+var(--spacing-touch)+--spacing(2))]',
+  'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2)+var(--spacing-touch)+--spacing(2))] ' +
+    'desktop:bottom-[calc(env(safe-area-inset-bottom)+--spacing(6)+var(--spacing-touch)+--spacing(2)+var(--spacing-touch)+--spacing(2))]',
+];
+const stackedAbove = (below: 0 | 1 | 2) =>
+  `right-safe-3 transition-[bottom] duration-250 ease-[ease] ${STACKED_ABOVE[below]}`;
 
 /**
  * The first view: where the user sets the criteria of a route set, over a full-screen map. Asking
@@ -39,6 +53,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // What went wrong, and the start point then: setting a new one drops the toast.
   const [toast, setToast] = useState<{ problem: 'unavailable' | 'unreadable'; start?: Position }>();
   const settingsLink = useRef<HTMLAnchorElement>(null);
+  const map = useRef<MapHandle>(null);
+  const [mapView, setMapView] = useState<MapView>({ bearing: 0, rotated: false, movedAway: false });
   const pageWasOpen = useRef(pageOpen);
   const [{ units, basemap }, update] = useSettings();
   const browser = useRouteBrowser();
@@ -49,6 +65,14 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     [routeSet],
   );
   const locateShown = !browser.showing && !loading && (desktop || !sheetExpanded);
+  // In the place of the location button, which the routes hide.
+  const reframeShown = browser.showing && mapView.movedAway && (desktop || !sheetExpanded);
+
+  // A button that puts the map back goes away once it has: the focus goes on from the settings.
+  function putBack(action: 'resetNorth' | 'reframe') {
+    map.current?.[action]();
+    settingsLink.current?.focus();
+  }
 
   // Keyboard users go on from the button that opened the page.
   useEffect(() => {
@@ -118,6 +142,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   return (
     <>
       <StartPointMap
+        ref={map}
+        onViewChange={setMapView}
         basemap={basemap}
         start={start}
         focus={focus}
@@ -147,20 +173,28 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <Settings size={20} aria-hidden />
       </a>
       {(desktop || !sheetExpanded) && (
-        <BasemapPicker
-          // Over the location button, or in its place while that one is hidden.
-          className={
-            (locateShown
-              ? 'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2))] ' +
-                'desktop:bottom-[calc(env(safe-area-inset-bottom)+--spacing(6)+var(--spacing-touch)+--spacing(2))] '
-              : 'bottom-[calc(var(--sheet-height,0px)+--spacing(3))] desktop:bottom-safe-6 ') +
-            'right-safe-3 transition-[bottom] duration-250 ease-[ease]'
-          }
-          label={t.basemap}
-          value={basemap}
-          options={BASEMAPS.map((value) => ({ value, label: t[value] }))}
-          onChange={(picked) => update({ basemap: picked })}
-        />
+        <>
+          <BasemapPicker
+            // Over the location button, or in its place while that one is hidden.
+            className={stackedAbove(locateShown || reframeShown ? 1 : 0)}
+            label={t.basemap}
+            value={basemap}
+            options={BASEMAPS.map((value) => ({ value, label: t[value] }))}
+            onChange={(picked) => update({ basemap: picked })}
+          />
+          {mapView.rotated && (
+            <button
+              type="button"
+              data-testid="criteria-north"
+              className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(locateShown || reframeShown ? 2 : 1)}`}
+              aria-label={t.resetNorth}
+              onClick={() => putBack('resetNorth')}
+            >
+              {/* The arrow turns against the map, so it keeps pointing north. */}
+              <Navigation2 size={20} aria-hidden style={{ transform: `rotate(${-mapView.bearing}deg)` }} />
+            </button>
+          )}
+        </>
       )}
       {/* Above the sheet on phones, whatever its height; an expanded sheet leaves it no room. */}
       {locateShown && (
@@ -175,6 +209,20 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           onClick={locate}
         >
           <LocateFixed size={20} aria-hidden />
+        </button>
+      )}
+      {reframeShown && (
+        <button
+          type="button"
+          data-testid="criteria-reframe"
+          className={
+            `${FLOATING_BUTTON} fixed right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3))] z-5 ` +
+            'transition-[bottom] duration-250 ease-[ease] desktop:bottom-safe-6'
+          }
+          aria-label={t.reframe}
+          onClick={() => putBack('reframe')}
+        >
+          <Scan size={20} aria-hidden />
         </button>
       )}
       {desktop ? (

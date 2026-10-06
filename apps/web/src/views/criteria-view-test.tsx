@@ -36,6 +36,32 @@ describe('CriteriaView', () => {
     expect(screen.getByTestId('criteria-settings')).toHaveAttribute('href', '#/settings');
   });
 
+  describe('the north button', () => {
+    it('shows once the map is turned, and turns it back', () => {
+      render(<CriteriaView language="en" />);
+      expect(screen.queryByTestId('criteria-north')).not.toBeInTheDocument();
+
+      act(() => map().rotateTo(30));
+      const button = screen.getByTestId('criteria-north');
+      expect(button).toHaveAccessibleName(en.resetNorth);
+      // The arrow turns against the map.
+      expect(button.querySelector('svg')).toHaveStyle({ transform: 'rotate(-30deg)' });
+      fireEvent.click(button);
+
+      expect(map().bearing).toBe(0);
+      expect(screen.queryByTestId('criteria-north')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-settings')).toHaveFocus();
+    });
+
+    it('is named in French', () => {
+      render(<CriteriaView language="fr" />);
+
+      act(() => map().rotateTo(30));
+
+      expect(screen.getByTestId('criteria-north')).toHaveAccessibleName(fr.resetNorth);
+    });
+  });
+
   describe('the map background', () => {
     const saved = () => renderHook(() => useSettings()).result.current[0].basemap;
 
@@ -461,6 +487,35 @@ describe('CriteriaView', () => {
 
       fireEvent.click(screen.getByTestId('route-back'));
       expect(screen.getByTestId('routes-count')).toBeInTheDocument();
+    });
+
+    it('puts the routes back in view after the user moved the map', async () => {
+      onDesktop();
+      ask(answer(route(0), route(1)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      await submit();
+      await screen.findByTestId('routes-count');
+      await settle();
+      expect(screen.queryByTestId('criteria-reframe')).not.toBeInTheDocument();
+
+      act(() => map().fire('movestart', { originalEvent: {} }));
+      map().fitted = undefined;
+      expect(screen.getByTestId('criteria-reframe')).toHaveAccessibleName(en.reframe);
+      fireEvent.click(screen.getByTestId('criteria-reframe'));
+
+      expect(map().fitted?.options).toMatchObject({ bearing: 0 });
+      expect(screen.queryByTestId('criteria-reframe')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-settings')).toHaveFocus();
+    });
+
+    it('offers no way to frame the routes before there are some', () => {
+      onDesktop();
+      render(<CriteriaView language="en" />);
+
+      act(() => map().fire('movestart', { originalEvent: {} }));
+
+      expect(screen.queryByTestId('criteria-reframe')).not.toBeInTheDocument();
     });
 
     it('shows a dot on the map where the user points on the profile', async () => {

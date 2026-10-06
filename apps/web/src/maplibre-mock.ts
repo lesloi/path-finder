@@ -63,6 +63,21 @@ export class Map {
   triggerRepaint() {
     this.fire('render');
   }
+  bearing = 0;
+  /** Turns the map and fires `move`, as a gesture would. */
+  rotateTo(bearing: number) {
+    this.bearing = bearing;
+    this.fire('move');
+  }
+  getBearing() {
+    return this.bearing;
+  }
+  jumpTo({ bearing }: { bearing?: number }) {
+    if (bearing !== undefined) this.rotateTo(bearing);
+  }
+  resetNorth() {
+    this.rotateTo(0);
+  }
   getCenter() {
     return { lng: 6, lat: 45 };
   }
