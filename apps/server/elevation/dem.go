@@ -75,6 +75,39 @@ type ascFile struct {
 	tile         *demTile
 }
 
+// ascHeader is the six lines that open an ASC tile: its size, its lower-left corner and its cell size.
+type ascHeader struct {
+	ncols, nrows int
+	xll, yll, cs float64
+	nodata       float64
+}
+
+// extent is the area of the tile in Lambert-93 metres.
+func (h ascHeader) extent() (x0, y0, x1, y1 float64) {
+	return h.xll, h.yll, h.xll + float64(h.ncols)*h.cs, h.yll + float64(h.nrows)*h.cs
+}
+
+// readHeader reads the header of an ASC tile from r, which then stands at its first value.
+func readHeader(r *bufio.Reader) (ascHeader, error) {
+	hdr := map[string]float64{}
+	for range 6 {
+		line, err := r.ReadString('\n')
+		if err != nil {
+			return ascHeader{}, err
+		}
+		parts := strings.Fields(line)
+		if len(parts) != 2 {
+			return ascHeader{}, fmt.Errorf("bad header line %q", line)
+		}
+		v, err := strconv.ParseFloat(parts[1], 64)
+		if err != nil {
+			return ascHeader{}, err
+		}
+		hdr[strings.ToLower(parts[0])] = v
+	}
+	return ascHeader{ncols: int(hdr["ncols"]), nrows: int(hdr["nrows"]), xll: hdr["xllcorner"], yll: hdr["yllcorner"], cs: hdr["cellsize"], nodata: hdr["nodata_value"]}, nil
+}
+
 func readASC(path string) (*ascFile, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -82,24 +115,11 @@ func readASC(path string) (*ascFile, error) {
 	}
 	defer f.Close()
 	r := bufio.NewReaderSize(f, 1<<20)
-	hdr := map[string]float64{}
-	for range 6 {
-		line, err := r.ReadString('\n')
-		if err != nil {
-			return nil, err
-		}
-		parts := strings.Fields(line)
-		if len(parts) != 2 {
-			return nil, fmt.Errorf("bad header line %q", line)
-		}
-		v, err := strconv.ParseFloat(parts[1], 64)
-		if err != nil {
-			return nil, err
-		}
-		hdr[strings.ToLower(parts[0])] = v
+	h, err := readHeader(r)
+	if err != nil {
+		return nil, err
 	}
-	nc, nr := int(hdr["ncols"]), int(hdr["nrows"])
-	nodata := hdr["nodata_value"]
+	nc, nr, nodata := h.ncols, h.nrows, h.nodata
 	t := &demTile{ncols: nc, nrows: nr, v: make([]float32, 0, nc*nr)}
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 1<<20), 1<<24)
@@ -118,14 +138,71 @@ func readASC(path string) (*ascFile, error) {
 	if len(t.v) != nc*nr {
 		return nil, fmt.Errorf("%s: got %d values, want %d", path, len(t.v), nc*nr)
 	}
-	return &ascFile{xll: hdr["xllcorner"], yll: hdr["yllcorner"], cs: hdr["cellsize"], tile: t}, nil
+	return &ascFile{xll: h.xll, yll: h.yll, cs: h.cs, tile: t}, nil
 }
 
 // Load reads every .asc file below dir.
-func Load(dir string) (*DEM, error) {
+func Load(dir string) (*DEM, error) { return load(dir, nil) }
+
+// within is the test of a tile header that holds when the tile meets the box, given by its latitudes and
+// longitudes in degrees.
+func within(minLat, minLon, maxLat, maxLon float64) func(ascHeader) bool {
+	// A box is not a rectangle in Lambert-93: the rectangle round points all along its edges holds it.
+	x0, y0, x1, y1 := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
+	const steps = 8
+	for i := 0; i <= steps; i++ {
+		for j := 0; j <= steps; j++ {
+			x, y := Lambert93(minLat+(maxLat-minLat)*float64(i)/steps, minLon+(maxLon-minLon)*float64(j)/steps)
+			x0, y0, x1, y1 = min(x0, x), min(y0, y), max(x1, x), max(y1, y)
+		}
+	}
+	return func(h ascHeader) bool {
+		tx0, ty0, tx1, ty1 := h.extent()
+		return tx0 < x1 && tx1 > x0 && ty0 < y1 && ty1 > y0
+	}
+}
+
+// CountWithin is how many .asc files below dir meet the box: it reads only their headers, so a job can tell at
+// once that it has not been given the tiles of its zone.
+func CountWithin(dir string, minLat, minLon, maxLat, maxLon float64) (int, error) {
+	keep, n := within(minLat, minLon, maxLat, maxLon), 0
+	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(strings.ToLower(p), ".asc") {
+			return err
+		}
+		ok, herr := headerKept(p, keep)
+		if ok {
+			n++
+		}
+		return herr
+	})
+	return n, err
+}
+
+// LoadWithin reads the .asc files below dir whose tile meets the box: the memory of a build is then that of the
+// tiles of its zone, not of the whole country. It reads only the header of the others.
+func LoadWithin(dir string, minLat, minLon, maxLat, maxLon float64) (*DEM, error) {
+	d, err := load(dir, within(minLat, minLon, maxLat, maxLon))
+	if err != nil && strings.Contains(err.Error(), "no .asc file") {
+		return nil, fmt.Errorf("no tile of %s meets the box %.3f,%.3f,%.3f,%.3f", dir, minLon, minLat, maxLon, maxLat)
+	}
+	return d, err
+}
+
+// load reads the .asc files below dir that keep accepts (all of them when it is nil).
+func load(dir string, keep func(ascHeader) bool) (*DEM, error) {
 	var paths []string
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() && strings.HasSuffix(strings.ToLower(p), ".asc") {
+			if keep != nil {
+				ok, herr := headerKept(p, keep)
+				if herr != nil {
+					return herr
+				}
+				if !ok {
+					return nil
+				}
+			}
 			paths = append(paths, p)
 		}
 		return err
@@ -238,4 +315,18 @@ func (d *DEM) Sample(lat, lon []int32) []int32 {
 	}
 	wg.Wait()
 	return elev
+}
+
+// headerKept reads only the header of a tile, to tell whether keep wants it.
+func headerKept(path string, keep func(ascHeader) bool) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	h, err := readHeader(bufio.NewReader(f))
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", path, err)
+	}
+	return keep(h), nil
 }

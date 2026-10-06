@@ -113,3 +113,27 @@ func TestParseBox(t *testing.T) {
 		}
 	}
 }
+
+func TestNodeStoreFindsNodesAcrossBlocks(t *testing.T) {
+	var s nodeStore
+	const n = 2*nodeBlock + 5 // three blocks, the last one nearly empty
+	for i := 0; i < n; i++ {
+		s.add(int64(10*i+3), int32(i), int32(-i))
+	}
+	for _, i := range []int{0, 1, nodeBlock - 1, nodeBlock, nodeBlock + 1, 2*nodeBlock - 1, 2 * nodeBlock, n - 1} {
+		got, ok := s.find(int64(10*i + 3))
+		lat, lon := s.at(got)
+		if !ok || got != i || lat != int32(i) || lon != int32(-i) {
+			t.Errorf("node %d: found %d (%v) at %d,%d", i, got, ok, lat, lon)
+		}
+	}
+	for _, id := range []int64{-5, 4, int64(10*nodeBlock + 4), int64(10*n + 3), 1 << 50} {
+		if _, ok := s.find(id); ok {
+			t.Errorf("id %d is not in the store", id)
+		}
+	}
+	var empty nodeStore
+	if _, ok := empty.find(1); ok {
+		t.Error("an empty store finds a node")
+	}
+}
