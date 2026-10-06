@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import { Map } from 'maplibre-gl';
+import { Map, ScaleControl } from 'maplibre-gl';
 
 import { App } from './App.tsx';
 import { expectNamedControls } from './accessible-names.ts';
@@ -8,6 +8,8 @@ import { commonText } from './i18n/index.ts';
 
 // jsdom has no WebGL.
 vi.mock('maplibre-gl');
+// The automock leaves out the method the map calls on its scale.
+ScaleControl.prototype.setUnit = vi.fn();
 
 const onDesktop = () =>
   vi

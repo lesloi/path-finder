@@ -2,14 +2,27 @@ import {
   AttributionControl,
   Map,
   Marker,
+  ScaleControl,
   type GeoJSONSource,
   type MapMouseEvent,
   type MapTouchEvent,
+  type SymbolLayerSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
-import type { MapSnapshot, Position } from '../core/index.ts';
+import {
+  distanceMarkers,
+  formatDistance,
+  formatHeight,
+  KM_PER_MILE,
+  markerInterval,
+  midpoint,
+  type Display,
+  type MapSnapshot,
+  type Position,
+} from '../core/index.ts';
+import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
 import { MAP_COLORS, routeColor } from './route-colors.ts';
 import { useDesktop } from './use-desktop.ts';
 import { useRouteSnapshot } from './use-route-snapshot.ts';
@@ -35,6 +48,13 @@ function columnInset() {
 
 const emptyRoutes = { type: 'FeatureCollection', features: [] } as const;
 
+// The font stack the IGN style serves glyphs for.
+const LABEL_FONT = ['Source Sans Pro Bold'];
+const DEFAULT_DISPLAY: Display = { units: 'metric', language: 'en' };
+
+/** What the map writes on a route: its distance and, when known, its elevation gain. */
+export type RouteSummary = { distance: number; elevationGain?: number };
+
 // The south-west and north-east corners around some positions.
 function boundsOf(geometries: Position[][]): [Position, Position] {
   const points = geometries.flat();
@@ -49,13 +69,16 @@ function boundsOf(geometries: Position[][]): [Position, Position] {
 /**
  * The full-screen map, which shows the start point and sets it on a long press, or on a click when
  * `pickOnClick`. With `routes`, it draws each in its colour, the selected one thicker and on top, and
- * no longer sets the start point.
+ * no longer sets the start point. It labels each route with its distance, and marks the distance along
+ * the selected one once its detail is open (`framing` is `selected`).
  */
 export function StartPointMap({
   start,
   focus,
   pickOnClick = false,
   routes,
+  summaries,
+  display = DEFAULT_DISPLAY,
   selectedRoute,
   framing = 'all',
   hover,
@@ -66,6 +89,10 @@ export function StartPointMap({
 }: {
   /** The geometry of each route of the route set, in order. */
   routes?: Position[][];
+  /** The distance and elevation gain of each route, in the same order, for its label. */
+  summaries?: RouteSummary[];
+  /** The units of the scale, the labels and the distance markers, and the language of the labels. */
+  display?: Display;
   selectedRoute?: number;
   /** What the map frames when the routes or the selection change: all the routes, or the selected one. */
   framing?: 'all' | 'selected';
@@ -94,6 +121,8 @@ export function StartPointMap({
   const mapRef = useRef<Map>(null);
   const [loaded, setLoaded] = useState(false);
   const desktop = useDesktop();
+  const scale = useRef<ScaleControl>(null);
+  const initialUnits = useEffectEvent(() => display.units);
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   const interactive = Boolean(routes?.length) && routesInteractive;
@@ -126,6 +155,9 @@ export function StartPointMap({
       }),
       'bottom-left',
     );
+    // The ruler: a bar whose length is a round distance, so a route can be sized up by eye.
+    scale.current = new ScaleControl({ unit: initialUnits() });
+    map.addControl(scale.current, 'bottom-left');
     mapRef.current = map;
     // The IGN style paints its background from the tiles, so tiles still loading would show
     // whatever is behind the canvas (black in dark mode).
@@ -164,6 +196,42 @@ export function StartPointMap({
         type: 'line',
         source: 'routes',
         paint: { 'line-color': MAP_COLORS.white, 'line-width': HIT_WIDTH, 'line-opacity': 0 },
+      });
+      // The labels sit on top, so they are placed first: the basemap's own give way, and ours yield to a
+      // more important one.
+      const label: SymbolLayerSpecification['layout'] = {
+        'text-font': LABEL_FONT,
+        'text-allow-overlap': false,
+        'symbol-sort-key': ['get', 'priority'],
+      };
+      const halo: SymbolLayerSpecification['paint'] = {
+        'text-halo-color': MAP_COLORS.white,
+        'text-halo-width': 3,
+        'text-color': ['get', 'color'],
+      };
+      map.addSource('route-badges', { type: 'geojson', data: emptyRoutes });
+      map.addLayer({
+        id: 'route-badges',
+        type: 'symbol',
+        source: 'route-badges',
+        layout: { ...label, 'text-field': ['get', 'label'], 'text-size': 14 },
+        paint: halo,
+      });
+      map.addImage('distance-marker', distanceMarkerImage(), { pixelRatio: DISTANCE_MARKER_RATIO });
+      map.addSource('route-markers', { type: 'geojson', data: emptyRoutes });
+      map.addLayer({
+        id: 'route-markers',
+        type: 'symbol',
+        source: 'route-markers',
+        layout: {
+          ...label,
+          'icon-image': 'distance-marker',
+          'icon-allow-overlap': false,
+          'text-field': ['get', 'label'],
+          'text-size': 12,
+        },
+        // White figures on a dark disc: they read over the route and over any map.
+        paint: { 'text-color': MAP_COLORS.white },
       });
       map.on('click', 'routes-hit', ({ features }) => selectRoute(features![0].properties.index as number));
       map.on('mouseenter', 'routes-hit', () => (map.getCanvas().style.cursor = 'pointer'));
@@ -222,6 +290,62 @@ export function StartPointMap({
     features.sort((a, b) => Number(a.properties.selected) - Number(b.properties.selected));
     (mapRef.current!.getSource('routes') as GeoJSONSource).setData({ type: 'FeatureCollection', features });
   }, [loaded, routes, selectedRoute, drawnFor]);
+
+  useEffect(() => {
+    scale.current?.setUnit(display.units);
+  }, [display.units]);
+
+  // Drawn with the routes, so that the thumbnails' snapshot, taken without them, has no label either.
+  useEffect(() => {
+    if (!loaded) return;
+    const map = mapRef.current!;
+    const drawn = drawnFor === routes ? (routes ?? []) : [];
+    const detail = framing === 'selected';
+    const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
+    // One label per route, until the detail of one is open and its markers say it better.
+    const badges = detail
+      ? []
+      : drawn.map((geometry, index) => {
+          const summary = summaries?.[index];
+          const label = summary ? [formatDistance(summary.distance, display)] : [];
+          if (summary?.elevationGain !== undefined) label.push(`+${formatHeight(summary.elevationGain, display)}`);
+          return {
+            type: 'Feature' as const,
+            geometry: point(midpoint(geometry)),
+            properties: {
+              label: label.join('\n'),
+              color: routeColor(index),
+              priority: index === selectedRoute ? 0 : 1,
+            },
+          };
+        });
+    const kilometres = display.units === 'metric' ? 1 : KM_PER_MILE;
+    const summary = selectedRoute === undefined ? undefined : summaries?.[selectedRoute];
+    const geometry = detail && selectedRoute !== undefined ? drawn[selectedRoute] : undefined;
+    const interval = summary && markerInterval(summary.distance / kilometres);
+    const markers =
+      geometry && interval
+        ? distanceMarkers(geometry, interval * kilometres).map(({ position, count }) => {
+            const label = count * interval;
+            return {
+              type: 'Feature' as const,
+              geometry: point(position),
+              // A multiple of ten, then of five, keeps its place when markers crowd.
+              properties: {
+                label: String(label),
+                color: routeColor(selectedRoute!),
+                priority: label % 10 === 0 ? 0 : label % 5 === 0 ? 1 : 2,
+              },
+            };
+          })
+        : [];
+    for (const [id, features] of [
+      ['route-badges', badges],
+      ['route-markers', markers],
+    ] as const) {
+      (map.getSource(id) as GeoJSONSource).setData({ type: 'FeatureCollection', features });
+    }
+  }, [loaded, routes, summaries, display, selectedRoute, framing, drawnFor]);
 
   // The routes, or the selected one, in the part of the map the panel leaves free.
   const framed = framing === 'selected' ? selectedRoute : undefined;

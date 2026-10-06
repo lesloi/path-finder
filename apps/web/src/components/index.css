@@ -147,8 +147,9 @@
 }
 
 /*
- * The compact attribution: bottom left above the sheet on phones, and at the bottom centre
- * of the map, beside the left column, on desktops.
+ * The bottom left of the map holds the scale and the compact attribution. On phones they sit above the
+ * sheet. On desktops the corner spans the map beside the left column: the scale stays at its left, and
+ * the attribution is centred in it.
  */
 .maplibregl-map .maplibregl-ctrl-bottom-left {
   bottom: var(--sheet-height, 0px);
@@ -157,7 +158,34 @@
 
   @variant desktop {
     bottom: env(safe-area-inset-bottom);
-    left: var(--map-centre);
-    transform: translateX(-50%);
+    left: var(--column-inset);
+    right: 0;
+
+    .maplibregl-ctrl-attrib {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      translate: -50% 0;
+    }
   }
+}
+
+/*
+ * The scale is a bare ruler, legible over any map thanks to a white halo. The map stays light in dark mode,
+ * and a `light-dark()` colour would not follow it here: the ink is the light theme's.
+ */
+.maplibregl-map .maplibregl-ctrl-scale {
+  background: none;
+  border: 2px solid #1c1d1b;
+  border-top: none;
+  color: #1c1d1b;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 4px 2px;
+  text-shadow:
+    0 0 3px #fff,
+    0 0 3px #fff,
+    0 0 3px #fff;
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
 }

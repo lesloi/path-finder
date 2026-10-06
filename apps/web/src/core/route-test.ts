@@ -6,6 +6,9 @@ import {
   projectOnSnapshot,
   toMercator,
   positionAt,
+  midpoint,
+  markerInterval,
+  distanceMarkers,
   projectRoute,
   gradeAt,
   surfaceAt,
@@ -166,6 +169,58 @@ describe('positionAt', () => {
   it('stays on the route beyond its ends', () => {
     expect(positionAt(geometry, -1)).toEqual([geometry[0][0], geometry[0][1]]);
     expect(positionAt(geometry, 99)).toEqual([geometry[2][0], geometry[2][1]]);
+  });
+});
+
+describe('midpoint', () => {
+  it('is halfway along the route', () => {
+    const [lon, lat] = midpoint(northward([0, 0, 0, 0, 0], 100));
+
+    expect(lon).toBeCloseTo(6.1294);
+    expect(lat).toBeCloseTo(45.8992 + 200 / METRES_PER_DEGREE, 6);
+  });
+});
+
+describe('markerInterval', () => {
+  it.each([
+    [5, 1],
+    [40, 1],
+    [42, 5],
+    [200, 5],
+    [250, 10],
+  ])('a route of %d is marked every %d', (length, interval) => {
+    expect(markerInterval(length)).toBe(interval);
+  });
+});
+
+describe('distanceMarkers', () => {
+  // 2.5 km long.
+  const geometry = northward(
+    Array.from({ length: 26 }, () => 0),
+    100,
+  );
+
+  it('puts a numbered marker at every step', () => {
+    const markers = distanceMarkers(geometry, 1);
+
+    expect(markers.map(({ count }) => count)).toEqual([1, 2]);
+    expect(markers[1].position[1]).toBeCloseTo(45.8992 + 2000 / METRES_PER_DEGREE, 6);
+  });
+
+  it('leaves out a marker that would sit on the end of the route', () => {
+    expect(
+      distanceMarkers(
+        northward(
+          Array.from({ length: 31 }, () => 0),
+          100,
+        ),
+        1,
+      ).map(({ count }) => count),
+    ).toEqual([1, 2]);
+  });
+
+  it('has none on a route shorter than a step', () => {
+    expect(distanceMarkers(geometry, 5)).toEqual([]);
   });
 });
 
