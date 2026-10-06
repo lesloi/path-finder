@@ -243,8 +243,8 @@ func TestAPanicInAWorkerBecomesAnError(t *testing.T) {
 	}
 }
 
-func TestConcurrentSearchesGrowWithEachBatchOfCPUs(t *testing.T) {
-	for procs, want := range map[int]int{1: 4, 2: 4, 4: 4, 8: 4, 9: 8, 16: 8, 17: 12, 64: 32} {
+func TestConcurrentSearchesFollowTheCPUs(t *testing.T) {
+	for procs, want := range map[int]int{0: 1, 1: 1, 2: 2, 4: 4, 8: 8, 16: 16} {
 		if got := concurrentSearches(procs); got != want {
 			t.Errorf("%d CPUs: %d searches, want %d", procs, got, want)
 		}

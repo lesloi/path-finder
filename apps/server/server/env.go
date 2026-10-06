@@ -15,8 +15,8 @@ import (
 //	WEB_ROOT            built web app (default ../web/dist)
 //	APP_ENV             "development" turns the limits off and the logs on
 //	TRUSTED_PROXIES     reverse proxies whose X-Forwarded-For counts (default none)
-//	LOOP_LIMIT          generations running at once, beyond which the answer is 429 (default: follows the CPUs, 4 per
-//	                    8 of them, see engine.DefaultConcurrentSearches)
+//	LOOP_LIMIT          generations running at once, beyond which the answer is 429 (default: one per CPU, see
+//	                    engine.DefaultConcurrentSearches)
 //	RATE_LIMIT          requests per address per RATE_WINDOW (default 60)
 //	RATE_WINDOW         a duration such as 10m (default 10m)
 //	GENERATION_TIMEOUT  a duration such as 15s (default 15s)
