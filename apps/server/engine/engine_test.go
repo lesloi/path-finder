@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -548,5 +549,35 @@ func TestLandmarksOfAnotherGraphOfTheSameSizeAreRefused(t *testing.T) {
 	}
 	if _, err := Open(second, alt, "hike"); err == nil || !strings.Contains(err.Error(), "another graph") {
 		t.Errorf("landmarks of another graph: err = %v, want it to refuse them", err)
+	}
+}
+
+// The spatial index is written into the graph file at build time: opening a graph reads no node.
+func TestAnOpenedGraphUsesTheSpatialIndexOfItsFile(t *testing.T) {
+	g := &testGraph{}
+	g.grid(6, 6, flat)
+	path := g.write(t)
+	e, err := Open(path, "", "hike")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := computeSpatial(e.g.nodes)
+	got := e.sp
+	if got.minLat != want.minLat || got.minLon != want.minLon || got.maxLat != want.maxLat || got.maxLon != want.maxLon || got.nx != want.nx || got.ny != want.ny {
+		t.Errorf("bounds of the index: got %+v, want %+v", got, want)
+	}
+	if !slices.Equal(got.start, want.start) || !slices.Equal(got.nodes, want.nodes) {
+		t.Error("the index of the file differs from the one computed from the nodes")
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data[:len(data)-64], 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(path, "", "hike"); err == nil || !strings.Contains(err.Error(), "shorter") {
+		t.Errorf("a file cut in its index: err = %v, want it to say it is too short", err)
 	}
 }

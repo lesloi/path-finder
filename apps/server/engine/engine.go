@@ -48,6 +48,7 @@ type graph struct {
 	nodes       []node
 	off         []uint32
 	edges       []edge
+	sp          *spatial
 }
 
 func align16(n int) int { return (n + 15) &^ 15 }
@@ -103,6 +104,17 @@ func openGraph(path string) (*graph, error) {
 	}
 	if g.edges, err = view[edge](data, edgesAt, e); err != nil {
 		return nil, fmt.Errorf("%s: edges: %w", path, err)
+	}
+	b := readBounds(data)
+	g.sp = &spatial{minLat: b.minLat, minLon: b.minLon, maxLat: b.maxLat, maxLon: b.maxLon}
+	g.sp.nx, g.sp.ny = gridSize(b.minLat, b.minLon, b.maxLat, b.maxLon)
+	startAt := align16(edgesAt + 12*e)
+	listAt := align16(startAt + 4*(g.sp.nx*g.sp.ny+1))
+	if g.sp.start, err = view[uint32](data, startAt, g.sp.nx*g.sp.ny+1); err != nil {
+		return nil, fmt.Errorf("%s: index cells: %w", path, err)
+	}
+	if g.sp.nodes, err = view[uint32](data, listAt, n); err != nil {
+		return nil, fmt.Errorf("%s: index nodes: %w", path, err)
 	}
 	return g, nil
 }
@@ -183,34 +195,47 @@ type Engine struct {
 	minMult float32
 }
 
+// spatial is a grid over the graph: the nodes of each cell, as numbers in one list, so that finding the
+// nearest node to a point reads a few cells. It is written into the graph file at build time.
 type spatial struct {
 	minLat, minLon int32
+	maxLat, maxLon int32
 	nx, ny         int
-	start          []uint32
+	start          []uint32 // start[c] to start[c+1] is the slice of nodes holding the nodes of cell c
 	nodes          []uint32
 }
 
-func newSpatial(g *graph) *spatial {
-	s := &spatial{minLat: math.MaxInt32, minLon: math.MaxInt32}
-	maxLat, maxLon := int32(math.MinInt32), int32(math.MinInt32)
-	for _, n := range g.nodes {
-		s.minLat, maxLat = min(s.minLat, n.Lat), max(maxLat, n.Lat)
-		s.minLon, maxLon = min(s.minLon, n.Lon), max(maxLon, n.Lon)
+// gridSize is the number of cells of a grid over a bounding box.
+func gridSize(minLat, minLon, maxLat, maxLon int32) (nx, ny int) {
+	if maxLat < minLat || maxLon < minLon { // no node
+		return 1, 1
 	}
-	s.ny, s.nx = int((maxLat-s.minLat)/cellLat)+1, int((maxLon-s.minLon)/cellLon)+1
+	return int((maxLon-minLon)/cellLon) + 1, int((maxLat-minLat)/cellLat) + 1
+}
+
+func computeSpatial(nodes []node) *spatial {
+	s := &spatial{minLat: math.MaxInt32, minLon: math.MaxInt32, maxLat: math.MinInt32, maxLon: math.MinInt32}
+	for _, n := range nodes {
+		s.minLat, s.maxLat = min(s.minLat, n.Lat), max(s.maxLat, n.Lat)
+		s.minLon, s.maxLon = min(s.minLon, n.Lon), max(s.maxLon, n.Lon)
+	}
+	if len(nodes) == 0 {
+		s.minLat, s.minLon, s.maxLat, s.maxLon = 0, 0, 0, 0
+	}
+	s.nx, s.ny = gridSize(s.minLat, s.minLon, s.maxLat, s.maxLon)
 	s.start = make([]uint32, s.nx*s.ny+1)
 	cell := func(i int) int {
-		return int((g.nodes[i].Lat-s.minLat)/cellLat)*s.nx + int((g.nodes[i].Lon-s.minLon)/cellLon)
+		return int((nodes[i].Lat-s.minLat)/cellLat)*s.nx + int((nodes[i].Lon-s.minLon)/cellLon)
 	}
-	for i := range g.nodes {
+	for i := range nodes {
 		s.start[cell(i)+1]++
 	}
 	for c := 1; c < len(s.start); c++ {
 		s.start[c] += s.start[c-1]
 	}
-	s.nodes = make([]uint32, g.n)
+	s.nodes = make([]uint32, len(nodes))
 	fill := make([]uint32, s.nx*s.ny)
-	for i := range g.nodes {
+	for i := range nodes {
 		c := cell(i)
 		s.nodes[s.start[c]+fill[c]] = uint32(i)
 		fill[c]++

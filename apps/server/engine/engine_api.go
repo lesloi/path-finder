@@ -77,7 +77,7 @@ func OpenAll(graphPath string, landmarks map[string]string) (map[string]*Engine,
 	if err != nil {
 		return nil, err
 	}
-	sp := newSpatial(g)
+	sp := g.sp
 	engines := make(map[string]*Engine, len(landmarks))
 	for name, path := range landmarks {
 		p := profiles[name]
