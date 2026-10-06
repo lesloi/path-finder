@@ -61,13 +61,13 @@ To build one zone of a large extract, such as a department from the France extra
 `-bbox minLon,minLat,maxLon,maxLat` (one sorted `-pbf`, as Geofabrik's are, and only the BD ALTI tiles of the
 zone in `-dem`): the build reads the extract once and its memory follows the zone, not the extract. A way that
 leaves the box is cut there, so give the box a margin around the zone. Without `-bbox`, the build keeps every
-walkable way of the extracts in memory, which is fine for a region and far too much for a country. In a job
-with a memory limit, set `GOMEMLIMIT` to about 80 % of it (`1600MiB` for 2 GiB): the Go runtime then collects
+walkable way of the extracts in memory, which is fine for a region and far too much for a country. Under a
+memory limit, set `GOMEMLIMIT` to about 80 % of it (`1600MiB` for 2 GiB): the Go runtime then collects
 garbage harder as it nears the limit, at the price of a slower build.
 
 ### A country, by zones
 
-The graph of a country does not build in the memory of a job, so build it by zone, one after the other or
+The graph of a country does not build in a couple of gigabytes of memory, so build it by zone, one after the other or
 in parallel, each into its own subdirectory of the data directory. `zones.txt` has a zone per line, a name
 and its box (with a margin round the zone, and some overlap with its neighbours so that loops near the edge
 close), and `$dem/<name>` holds the BD ALTI tiles of that zone only:
@@ -149,10 +149,10 @@ The `Dockerfile` builds one image with the server and the web app, and no data. 
 `docker build -t path-finder .`, or use the one CI publishes as `ghcr.io/lesloi/path-finder:latest`.
 
 The data is a volume: mount the directory holding `graph.bin`, `hike.alt` and `run.alt`, or one such
-subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. On Kubernetes that is a persistent volume, mounted the
-same way into every pod, and filled by the job that runs `build-graph` and `build-alt` with the same
-`DATA_DIR`. The files are mapped, not copied, so pods that share a volume share its page cache; restart
-them after a rebuild. The server only opens the files for reading and writes nothing into the directory.
+subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. Build it ahead of serving,
+with the same `DATA_DIR`, in a step of its own. The files are mapped, not copied, so servers that share the
+directory share its page cache; restart them after a rebuild. The server only opens the files for reading and
+writes nothing into the directory.
 
 The server does not read the files ahead: a search faults in the pages it needs, the first time it touches
 them. Before it listens, the server maps the files and checks their headers, which reads
