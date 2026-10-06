@@ -293,6 +293,23 @@ describe('StartPointMap', () => {
       ]);
     });
 
+    it('draws only the selected route once its detail is open, and all of them again when it closes', () => {
+      const view = renderRoutes({ selectedRoute: 1, framing: 'selected' });
+
+      expect(features().map(({ properties }) => properties)).toEqual([{ index: 1, selected: true, color: '#2563eb' }]);
+
+      view.rerender(<StartPointMap routes={routes} selectedRoute={1} framing="all" onStartChange={vi.fn()} />);
+      expect(features()).toHaveLength(3);
+    });
+
+    it('draws the route it is given as selected when the detail moves to another route', () => {
+      const view = renderRoutes({ selectedRoute: 0, framing: 'selected' });
+
+      view.rerender(<StartPointMap routes={routes} selectedRoute={2} framing="selected" onStartChange={vi.fn()} />);
+
+      expect(features().map(({ properties }) => properties)).toEqual([{ index: 2, selected: true, color: '#7a3fc4' }]);
+    });
+
     it('draws nothing before the style has loaded', () => {
       render(<StartPointMap routes={routes} onStartChange={vi.fn()} />);
 

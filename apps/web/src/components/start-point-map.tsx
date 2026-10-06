@@ -95,8 +95,8 @@ function boundsOf(geometries: Position[][]): [Position, Position] {
 /**
  * The full-screen map, which shows the start point and sets it on a long press, or on a click when
  * `pickOnClick`. With `routes`, it draws each in its colour, the selected one thicker and on top, and
- * no longer sets the start point. It labels each route with its distance, and marks the distance along
- * the selected one once its detail is open (`framing` is `selected`).
+ * no longer sets the start point. It labels each route with its distance. Once the detail of one is open
+ * (`framing` is `selected`), it draws only that route, and marks the distance along it.
  */
 export function StartPointMap({
   basemap = DEFAULT_BASEMAP,
@@ -126,7 +126,7 @@ export function StartPointMap({
   /** The units of the scale, the labels and the distance markers, and the language of the labels. */
   display?: Display;
   selectedRoute?: number;
-  /** What the map frames when the routes or the selection change: all the routes, or the selected one. */
+  /** What the map frames and draws: all the routes, or only the selected one, once its detail is open. */
   framing?: 'all' | 'selected';
   /** A place along the selected route, such as where the user points at its elevation profile. */
   hover?: Position;
@@ -367,15 +367,18 @@ export function StartPointMap({
   useEffect(() => {
     const source = mapRef.current?.getSource('routes') as GeoJSONSource | undefined;
     if (!loaded || !source) return;
-    const features = (drawnFor === routes ? (routes ?? []) : []).map((geometry, index) => ({
-      type: 'Feature' as const,
-      geometry: { type: 'LineString' as const, coordinates: geometry },
-      properties: { index, selected: index === selectedRoute, color: routeColor(index) },
-    }));
+    const features = (drawnFor === routes ? (routes ?? []) : [])
+      .map((geometry, index) => ({
+        type: 'Feature' as const,
+        geometry: { type: 'LineString' as const, coordinates: geometry },
+        properties: { index, selected: index === selectedRoute, color: routeColor(index) },
+      }))
+      // Once the detail of a route is open, the others are left out: they are not drawn, nor tappable.
+      .filter(({ properties }) => framing !== 'selected' || properties.selected);
     // The selected route last, so it is drawn on top.
     features.sort((a, b) => Number(a.properties.selected) - Number(b.properties.selected));
     source.setData({ type: 'FeatureCollection', features });
-  }, [loaded, routes, selectedRoute, drawnFor, styleVersion]);
+  }, [loaded, routes, selectedRoute, framing, drawnFor, styleVersion]);
 
   useEffect(() => {
     scale.current?.setUnit(display.units);
