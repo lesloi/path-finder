@@ -32,12 +32,22 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   holds the bounds and error codes, and the cases of the tests that both sides run. The server alone
   decides what is valid; the web app checks early to name the wrong field. Two languages, one
   vocabulary, and a test fails on the side left behind.
-- **The data is one directory, a volume (`DATA_DIR`).** Fixed file names (`graph.bin`, `hike.alt`,
-  `run.alt`) rather than a variable per file, written atomically by the build commands, so a pod only
-  needs a volume mounted read-only; a rebuild is a restart.
+- **The data is a set of zones, each a directory (`DATA_DIR`).** A country's graph does not build in the
+  2 GB of a job (the build keeps every candidate node and the whole output in memory), so it is built by
+  zone from the country's sorted extract in one pass (`build-graph -bbox`), and every server maps all the
+  zones. Opening a zone costs no memory, because the spatial index is in `graph.bin`; a start point is answered
+  by the zone holding it with the most room, and falls to the next only when the first has no way near it.
+  Fixed file names per zone (`graph.bin`, `hike.alt`, `run.alt`), written atomically, so a pod only needs a
+  volume mounted read-only and a rebuild is a restart; a zone that did not finish building stops the server.
+  Landmarks carry the CRC of their graph, so a graph built again refuses the old ones. Revisit if a country's
+  graph ever builds in one job: zones would then only cost borders.
 
 ## Routing
 
+- **Nodes are numbered along a Hilbert curve, and the grid index is stored in the graph file.** A route set
+  then touches about 3 MB of the mapped files instead of about 66 MB, which is what lets the page cache of a
+  2 GB pod serve a whole country. The file formats carry a version in their magic: change a layout, change
+  the magic.
 - **The engine is our own A\* with landmark lower bounds (ALT)** on a pedestrian graph from OSM, not
   BRouter. ALT made routes about 25 times faster, and a search only allocates in proportion to the
   nodes it reaches. The landmarks' metric includes the climb penalty, so the bound stays valid.
