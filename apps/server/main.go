@@ -81,15 +81,15 @@ func serve() {
 	// The graph and the landmarks of each activity are built ahead of serving, by build-graph and build-alt.
 	// The port opens once the files are mapped and their headers checked.
 	opened := time.Now()
-	engines, err := engine.OpenDir(dataDir(), "hike", "run")
+	zones, err := engine.OpenZones(dataDir(), "hike", "run")
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("data opened in %s", time.Since(opened).Round(time.Millisecond))
+	log.Printf("%d zone(s) opened in %s", zones.Len(), time.Since(opened).Round(time.Millisecond))
 	if cfg.LoopLimit == 0 {
 		cfg.LoopLimit = engine.DefaultConcurrentSearches() // LOOP_LIMIT forces another
 	}
-	cfg.Generator = &generator.Generator{Engines: map[string]generator.Looper{"hike": engines["hike"], "run": engines["run"]}}
+	cfg.Generator = &generator.Generator{Engines: map[string]generator.Looper{"hike": zones.Activity("hike"), "run": zones.Activity("run")}}
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 

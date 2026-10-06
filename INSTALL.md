@@ -65,6 +65,29 @@ walkable way of the extracts in memory, which is fine for a region and far too m
 with a memory limit, set `GOMEMLIMIT` to about 80 % of it (`1600MiB` for 2 GiB): the Go runtime then collects
 garbage harder as it nears the limit, at the price of a slower build.
 
+### A country, by zones
+
+The graph of a country does not build in the memory of a job, so build it by zone, one after the other or
+in parallel, each into its own subdirectory of the data directory. `zones.txt` has a zone per line, a name
+and its box (with a margin round the zone, and some overlap with its neighbours so that loops near the edge
+close), and `$dem/<name>` holds the BD ALTI tiles of that zone only:
+
+```sh
+while read -r name box; do
+  zone=$DATA_DIR/$name && mkdir -p "$zone"
+  GOMEMLIMIT=1600MiB ./path-finder build-graph -pbf france.osm.pbf -dem "$dem/$name" -bbox "$box" -out "$zone/graph.bin"
+  for profile in hike run; do
+    ./path-finder build-alt -graph "$zone/graph.bin" -out "$zone/$profile.alt" -profile "$profile"
+  done
+done < zones.txt
+```
+
+A zone of two million nodes took 2 minutes 15 on one CPU, nearly all of it reading the France extract once,
+and about 200 MB of files with 8 landmarks. The server maps every zone when it starts, which costs no
+memory, and answers a request from the zone whose box holds the start point with the most room round it;
+when that zone has no way near the start, or no loop from it, the next one whose box holds it answers. A data
+directory that holds a `graph.bin` itself is one zone.
+
 Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (8 by
 default): more make long searches faster and the file bigger. On a graph of two million nodes, 8 and 16 gave
 the same route sets in the same time, and the file is half the size (about 60 MB against 120 MB). A way with no BD ALTI elevation under
@@ -95,17 +118,17 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable             | Required | Default       | Description                                                                                    |
-| -------------------- | -------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                       |
-| `PORT`               | no       | `3000`        | Port the server listens on                                                                     |
-| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                              |
-| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin`, and the `hike.alt` and `run.alt` landmarks, which are optional |
-| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                     |
-| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))     |
-| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none             |
-| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                   |
-| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                    |
+| Variable             | Required | Default       | Description                                                                                                 |
+| -------------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
+| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                                    |
+| `PORT`               | no       | `3000`        | Port the server listens on                                                                                  |
+| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                                           |
+| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin` and the optional `hike.alt` and `run.alt`, or one such subdirectory per zone |
+| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                                  |
+| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))                  |
+| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none                          |
+| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                                |
+| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                                 |
 
 ### How many at once
 

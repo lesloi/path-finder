@@ -30,7 +30,7 @@ func newServer(t *testing.T) http.Handler {
 
 func serverOn(t *testing.T, dir string) http.Handler {
 	t.Helper()
-	engines, err := engine.OpenDir(dir, "hike", "run")
+	zones, err := engine.OpenZones(dir, "hike", "run")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func serverOn(t *testing.T, dir string) http.Handler {
 	}
 	return server.New(server.Config{
 		WebRoot:   web,
-		Generator: &generator.Generator{Engines: map[string]generator.Looper{"hike": engines["hike"], "run": engines["run"]}},
+		Generator: &generator.Generator{Engines: map[string]generator.Looper{"hike": zones.Activity("hike"), "run": zones.Activity("run")}},
 	})
 }
 
@@ -179,5 +179,22 @@ func TestServesFromAReadOnlyDataDirectory(t *testing.T) {
 	}
 	if now, _ := filepath.Glob(filepath.Join(dir, "*")); len(now) != len(files) {
 		t.Errorf("serving wrote into the data directory: %v", now)
+	}
+}
+
+// A data directory can hold one subdirectory per zone, each with its graph and landmarks.
+func TestServesFromADirectoryOfZones(t *testing.T) {
+	dir := t.TempDir()
+	for _, zone := range []string{"zone-a", "zone-b"} {
+		if err := os.MkdirAll(filepath.Join(dir, zone), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := standin.Write(filepath.Join(dir, zone)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, routes, body := routeSets(t, serverOn(t, dir), criteria("run", `{"distance":10}`, ""))
+	if code != 200 || len(routes) == 0 {
+		t.Errorf("status %d, %d routes: %s", code, len(routes), body[:min(len(body), 200)])
 	}
 }
