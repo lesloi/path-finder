@@ -122,12 +122,12 @@ same way into every pod, and filled by the job that runs `build-graph` and `buil
 `DATA_DIR`. The files are mapped, not copied, so pods that share a volume share its page cache; restart
 them after a rebuild. The server only opens the files for reading and writes nothing into the directory.
 
-Before it listens, the server reads every page of the mapped files, so that the first searches do not wait
-for the volume: it takes about as long as reading the files once (seconds for a region, longer for a
-network volume). Until then `/healthz` does not answer, so a readiness probe on it keeps the pod out of
-rotation; give the probe a delay that covers it. On Kubernetes, use a `startupProbe` (or a long
-`initialDelaySeconds`) rather than a liveness probe with a short timeout, which would restart the pod
-in a loop while it warms. The server logs how long the warm-up took, to size that delay.
+The server does not read the files ahead: a search faults in the pages it needs, about 5 MB for a route
+set, the first time it touches them. On a local disk that adds a few milliseconds to the first requests;
+measure it on a network volume. Before it listens, the server maps the files and indexes the nodes, which
+reads all of them once, and `/healthz` does not answer until then. On Kubernetes, use a `startupProbe` (or a
+long `initialDelaySeconds`) rather than a liveness probe with a short timeout, which would restart the pod
+in a loop while it opens. The server logs how long opening took, to size that delay.
 
 A `compose.yaml`:
 

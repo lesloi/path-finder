@@ -68,13 +68,13 @@ func serve() {
 		log.Fatal(err)
 	}
 	// The graph and the landmarks of each activity are built ahead of serving, by build-graph and build-alt.
-	// Opening reads every page of the files, so the port opens only once the pages are cached.
+	// The port opens once the files are mapped and indexed (the index reads every node).
 	opened := time.Now()
 	engines, err := engine.OpenDir(dataDir(), "hike", "run")
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("data opened and warmed in %s", time.Since(opened).Round(time.Millisecond))
+	log.Printf("data opened in %s", time.Since(opened).Round(time.Millisecond))
 	if cfg.LoopLimit == 0 {
 		cfg.LoopLimit = engine.DefaultConcurrentSearches() // LOOP_LIMIT forces another
 	}

@@ -471,26 +471,6 @@ func TestAFailedWriteLeavesNoFile(t *testing.T) {
 	}
 }
 
-func TestWarmReadsEveryPageOfAMappedFile(t *testing.T) {
-	page := os.Getpagesize()
-	for name, c := range map[string]struct{ size, pages int }{
-		"an empty file":          {0, 0},
-		"three pages and a byte": {3*page + 1, 4},
-		"exactly two pages":      {2 * page, 2},
-	} {
-		t.Run(name, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "data")
-			if err := os.WriteFile(path, make([]byte, c.size), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			data := make([]byte, c.size) // warm needs no mapping; the mapped case is the one below
-			if got := warm(data); got != c.pages {
-				t.Errorf("warm read %d pages, want %d", got, c.pages)
-			}
-		})
-	}
-}
-
 func TestOpenDirOnAReadOnlyDirectory(t *testing.T) {
 	dir := t.TempDir()
 	var b Builder

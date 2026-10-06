@@ -52,8 +52,7 @@ type graph struct {
 
 func align16(n int) int { return (n + 15) &^ 15 }
 
-// mapFile maps a file read-only, and reads all its pages first when warming: a server does, a build does not.
-func mapFile(path string, warming bool) ([]byte, error) {
+func mapFile(path string) ([]byte, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -63,32 +62,8 @@ func mapFile(path string, warming bool) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, err := syscall.Mmap(int(f.Fd()), 0, int(st.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
-	if err != nil {
-		return nil, err
-	}
-	if warming {
-		warm(data)
-	}
-	return data, nil
+	return syscall.Mmap(int(f.Fd()), 0, int(st.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
 }
-
-// warm reads one byte of every page of a mapped file, so that its pages are in the page cache before the
-// server listens: the first searches then do not wait for the disk. It returns the pages read.
-func warm(data []byte) int {
-	page := os.Getpagesize()
-	pages := 0
-	var sink byte
-	for at := 0; at < len(data); at += page {
-		sink += data[at]
-		pages++
-	}
-	warmSink.Store(uint32(sink))
-	return pages
-}
-
-// warmSink keeps the compiler from dropping the reads of warm.
-var warmSink atomic.Uint32
 
 // maxLandmarkValues is how many landmark distances a search keeps for its target: the landmarks, twice
 // over when the metric includes climbing.
@@ -107,8 +82,8 @@ func view[T any](data []byte, at, count int) ([]T, error) {
 	return unsafe.Slice((*T)(unsafe.Pointer(&data[at])), count), nil
 }
 
-func openGraph(path string, warming bool) (*graph, error) {
-	data, err := mapFile(path, warming)
+func openGraph(path string) (*graph, error) {
+	data, err := mapFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -144,8 +119,8 @@ type landmarks struct {
 	rows   []uint16
 }
 
-func openLandmarks(path string, g *graph, warming bool) (*landmarks, error) {
-	data, err := mapFile(path, warming)
+func openLandmarks(path string, g *graph) (*landmarks, error) {
+	data, err := mapFile(path)
 	if err != nil {
 		return nil, err
 	}
