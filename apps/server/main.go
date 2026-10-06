@@ -53,6 +53,28 @@ func run(command string, args []string) error {
 			return fmt.Errorf("build-graph -bbox reads exactly one -pbf, got %d", len(pbfs))
 		}
 		return graphbuild.BuildClipped(pbfs[0], *dem, *out, box, os.Stderr)
+	case "plan-zones":
+		fs := flag.NewFlagSet(command, flag.ExitOnError)
+		pbf := fs.String("pbf", "", "sorted OSM PBF file of the country")
+		extent := fs.String("extent", "-5.3,41.3,9.7,51.2", "area to cover, as minLon,minLat,maxLon,maxLat (default: metropolitan France)")
+		maxNodes := fs.Int("max-nodes", 40_000_000, "most nodes of the extract a zone should hold, margin included")
+		margin := fs.Float64("margin-km", 20, "how far a zone reaches beyond its part (at least the radius of the longest loop)")
+		cell := fs.Float64("cell", 0.02, "size in degrees of the cells that nodes are counted in")
+		_ = fs.Parse(args)
+		// The list of zones goes to the standard output, what is said of each to the standard error.
+		box, err := graphbuild.ParseBox(*extent)
+		if err != nil {
+			return err
+		}
+		zones, err := graphbuild.PlanZones(*pbf, graphbuild.PlanOptions{Extent: box, MaxNodes: *maxNodes, MarginKm: *margin, CellDeg: *cell}, os.Stderr)
+		if err != nil {
+			return err
+		}
+		for _, z := range zones {
+			fmt.Println(z.Line())
+			fmt.Fprintf(os.Stderr, "%s: %d nodes\n", z.Name, z.Nodes)
+		}
+		return nil
 	case "build-alt":
 		fs := flag.NewFlagSet(command, flag.ExitOnError)
 		graph := fs.String("graph", filepath.Join(dataDir(), engine.GraphFileName), "graph file")
@@ -65,7 +87,7 @@ func run(command string, args []string) error {
 		}
 		return engine.WriteLandmarks(*graph, *out, *profile, *count)
 	}
-	return fmt.Errorf("unknown command %q: use build-graph, build-alt, or none to serve", command)
+	return fmt.Errorf("unknown command %q: use build-graph, build-alt, plan-zones, or none to serve", command)
 }
 
 type stringList []string

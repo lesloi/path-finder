@@ -68,20 +68,36 @@ The graph of a country does not build in a couple of gigabytes of memory, so bui
 own subdirectory of the data directory. `build-graph -bbox minLon,minLat,maxLon,maxLat` reads one sorted
 extract (Geofabrik's are) once and keeps the ways inside the box: its memory follows the zone, not the
 extract. A way that leaves the box is cut there, so give each zone a margin and overlap its neighbours.
-Without `-bbox` the build keeps every walkable way in memory: fine for a region, not for a country. Give
-`-dem` the tiles of the zone only, and under a memory limit set `GOMEMLIMIT` to about 80 % of it (`1600MiB`
-for 2 GiB). With a `zones.txt` of a name and a box per line, and the tiles of each zone in `$dem/<name>`:
+Without `-bbox` the build keeps every walkable way in memory: fine for a region, not for a country. `-dem`
+can hold the tiles of the whole country: a build reads only those that meet its box. Under a memory limit set
+`GOMEMLIMIT` to about 80 % of it (`1600MiB` for 2 GiB).
+
+`plan-zones` cuts a country into zones from its extract, in one pass (two minutes for France). It splits the
+area where the nodes are shared in half until the box of a part, margin included, holds at most `-max-nodes`
+nodes of the extract, which a build keeps in memory: 37 million held 0.9 GB live and peaked at 1.62 GB, so 40
+million is the budget of a 2 GB job. `-margin-km` is how far a zone reaches beyond its part, so that loops near
+its edge close: those of 50 km, the longest, went up to 16 km from their start in a test, so keep 20. Plan
+again with each extract, since the zones follow the nodes:
+
+```sh
+./path-finder plan-zones -pbf france.osm.pbf -max-nodes 40000000 -margin-km 20 > zones.txt
+```
+
+Each line is a name and a box (31 zones for the France extract of 6 October 2026):
 
 ```sh
 set -e # stop at the first zone that fails: a zone left out is a hole in the map
-while read -r name box; do
+while read -r name box _; do
   zone=$DATA_DIR/$name && mkdir -p "$zone"
-  GOMEMLIMIT=1600MiB ./path-finder build-graph -pbf france.osm.pbf -dem "$dem/$name" -bbox "$box" -out "$zone/graph.bin"
+  GOMEMLIMIT=1600MiB ./path-finder build-graph -pbf france.osm.pbf -dem "$dem" -bbox "$box" -out "$zone/graph.bin"
   for profile in hike run; do
     ./path-finder build-alt -graph "$zone/graph.bin" -out "$zone/$profile.alt" -profile "$profile"
   done
 done < zones.txt
 ```
+
+The log of `build-graph` gives the candidate nodes and the nodes kept: a zone built without the tiles of a
+neighbouring département keeps far fewer, and has holes.
 
 The server maps every zone when it starts and answers from the zone that holds the start point with the most
 room round it, or from the next one if that has no way near it. A directory that holds a `graph.bin` is one
@@ -146,6 +162,11 @@ is about `LOOP_LIMIT × CPUs × 50 MB`.
 
 The `Dockerfile` builds one image with the server and the web app, and no data. Build it with
 `docker build -t path-finder .`, or use the one CI publishes as `ghcr.io/lesloi/path-finder:latest`.
+
+To update the data from a job, build into a new directory beside the live one, not into it (the job plans the
+zones, then builds them, so a newer extract needs no new image), then point the volume's `current` link at it
+and restart the pods. A pod restarting in the middle of a build in place would find a new `graph.bin` with old
+landmarks, which it refuses, and a zone dropped from the plan would still be served.
 
 The data is a volume: mount the directory holding `graph.bin`, `hike.alt` and `run.alt`, or one such
 subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. The server only reads it, and

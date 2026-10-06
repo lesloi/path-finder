@@ -260,3 +260,18 @@ func TestAGraphBesideZonesIsRefused(t *testing.T) {
 		t.Errorf("a graph beside other directories: %v zones, %v", z, err)
 	}
 }
+
+// A job that updates the data points a link at the new directory: the server follows it.
+func TestADataDirectoryCanBeALink(t *testing.T) {
+	real, links := t.TempDir(), t.TempDir()
+	g, _ := zoneGraph(0, 0)
+	writeZone(t, filepath.Join(real, "zone"), g)
+	current := filepath.Join(links, "current")
+	if err := os.Symlink(real, current); err != nil {
+		t.Fatal(err)
+	}
+	z, err := OpenZones(current, "hike", "run")
+	if err != nil || z.Len() != 1 {
+		t.Errorf("a data directory that is a link: %v zones, %v", z, err)
+	}
+}
