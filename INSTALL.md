@@ -135,6 +135,12 @@ needs to know about this one's.
 Lower the limit when a small machine runs short of memory or when users see `504` (nothing found in
 time); raise it when they see `429` while the CPUs are idle.
 
+In a small container, set `LOOP_LIMIT` to its number of CPUs: the throughput is about the same as with the
+default (which allows 4), but a search waits less. Set `GOMAXPROCS` to the same number, since Go never goes
+below 2 in a container, and `GOMEMLIMIT` to about 70 % of the memory limit (`350MiB` for 500 MB), so that the
+garbage collector keeps the heap under it. A search holds about 50 MB per worker, and a search has `GOMAXPROCS`
+workers (8 at most): the memory is about `LOOP_LIMIT × GOMAXPROCS × 50 MB`.
+
 ## 5. Host it
 
 The `Dockerfile` builds one image with the server and the web app, and no data. Build it with
