@@ -470,3 +470,68 @@ func TestAFailedWriteLeavesNoFile(t *testing.T) {
 		t.Errorf("files left behind: %v", entries)
 	}
 }
+
+func TestWarmReadsEveryPageOfAMappedFile(t *testing.T) {
+	page := os.Getpagesize()
+	path := filepath.Join(t.TempDir(), "data")
+	if err := os.WriteFile(path, make([]byte, 3*page+1), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	data, err := mapFile(path) // warms what it maps
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := warm(data); got != 4 {
+		t.Errorf("warm read %d pages of a file of three pages and a byte, want 4", got)
+	}
+	if got := warm(nil); got != 0 {
+		t.Errorf("warm read %d pages of an empty mapping", got)
+	}
+}
+
+func TestOpenDirOnAReadOnlyDirectory(t *testing.T) {
+	dir := t.TempDir()
+	var b Builder
+	for i := 0; i < 4; i++ {
+		b.AddNode(45+float64(i)*0.001, 6, 100)
+	}
+	for i := 0; i < 3; i++ {
+		b.Connect(i, i+1, KindPath, SurfaceCompact)
+	}
+	graph := filepath.Join(dir, GraphFileName)
+	if err := b.WriteGraph(graph); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName("hike")), "hike", 2); err != nil {
+		t.Fatal(err)
+	}
+	// What a read-only volume looks like to the pod: no file and no directory can be written.
+	files, _ := filepath.Glob(filepath.Join(dir, "*"))
+	for _, f := range files {
+		if err := os.Chmod(f, 0o444); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+	if f, err := os.OpenFile(filepath.Join(dir, "probe"), os.O_CREATE|os.O_WRONLY, 0o644); err == nil {
+		f.Close()
+		t.Skip("the directory is writable anyway (running as root?)")
+	}
+
+	engines, err := OpenDir(dir, "hike", "run")
+	if err != nil {
+		t.Fatalf("a read-only data directory: %v", err)
+	}
+	if engines["hike"].alt == nil {
+		t.Error("the landmarks were not opened")
+	}
+	if _, err := engines["hike"].Route(context.Background(), Point{Lat: 45, Lon: 6}, Point{Lat: 45.003, Lon: 6}); err != nil {
+		t.Errorf("a route on a read-only graph: %v", err)
+	}
+	if now, _ := filepath.Glob(filepath.Join(dir, "*")); len(now) != len(files) {
+		t.Errorf("opening the data wrote into its directory: %v", now)
+	}
+}

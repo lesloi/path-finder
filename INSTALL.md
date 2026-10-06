@@ -119,7 +119,12 @@ The data is a volume: mount the directory holding `graph.bin`, `hike.alt` and `r
 (the image sets `DATA_DIR=/data`), read-only. On Kubernetes that is a persistent volume, mounted the
 same way into every pod, and filled by the job that runs `build-graph` and `build-alt` with the same
 `DATA_DIR`. The files are mapped, not copied, so pods that share a volume share its page cache; restart
-them after a rebuild.
+them after a rebuild. The server only opens the files for reading and writes nothing into the directory.
+
+Before it listens, the server reads every page of the mapped files, so that the first searches do not wait
+for the volume: it takes about as long as reading the files once (seconds for a region, longer for a
+network volume). Until then `/healthz` does not answer, so a readiness probe on it keeps the pod out of
+rotation; give the probe a delay that covers it.
 
 A `compose.yaml`:
 

@@ -60,8 +60,30 @@ func mapFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return syscall.Mmap(int(f.Fd()), 0, int(st.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
+	data, err := syscall.Mmap(int(f.Fd()), 0, int(st.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
+	if err != nil {
+		return nil, err
+	}
+	warm(data)
+	return data, nil
 }
+
+// warm reads one byte of every page of a mapped file, so that its pages are in the page cache before the
+// server listens: the first searches then do not wait for the disk. It returns the pages read.
+func warm(data []byte) int {
+	page := os.Getpagesize()
+	pages := 0
+	var sink byte
+	for at := 0; at < len(data); at += page {
+		sink += data[at]
+		pages++
+	}
+	warmSink.Store(uint32(sink))
+	return pages
+}
+
+// warmSink keeps the compiler from dropping the reads of warm.
+var warmSink atomic.Uint32
 
 // maxLandmarkValues is how many landmark distances a search keeps for its target: the landmarks, twice
 // over when the metric includes climbing.
