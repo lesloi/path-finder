@@ -90,8 +90,10 @@ type ActivityZones struct {
 }
 
 // Loops asks the zones whose box holds the start, the one with the most room round it first. A box is a
-// rectangle round an area of any shape, so a zone with no way near the start (ErrOffGraph), or no loop from it
-// (ErrNoLoop, near its edge), leaves the start to the next. When none answers, the error is the first zone's.
+// rectangle round an area of any shape, so a zone with no way near the start (ErrOffGraph) leaves it to the
+// next. A zone that has ways there but no loop (ErrNoLoop) is not asked again elsewhere: with the zones
+// overlapping, the one with the most room already holds every way the others have round the start, and a
+// second failing search would only take the time of the request. When none answers, the error is the first's.
 func (a *ActivityZones) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	type candidate struct {
 		engine *Engine
@@ -110,7 +112,7 @@ func (a *ActivityZones) Loops(ctx context.Context, req LoopRequest) ([]*Route, e
 	var first error
 	for _, c := range candidates {
 		loops, err := c.engine.Loops(ctx, req)
-		if err == nil || !(errors.Is(err, ErrOffGraph) || errors.Is(err, ErrNoLoop)) {
+		if err == nil || !errors.Is(err, ErrOffGraph) {
 			return loops, err
 		}
 		if first == nil {

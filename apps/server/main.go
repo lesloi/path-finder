@@ -86,10 +86,14 @@ func serve() {
 		log.Fatal(err)
 	}
 	log.Printf("%d zone(s) opened in %s", zones.Len(), time.Since(opened).Round(time.Millisecond))
+	hike, run := zones.Activity("hike"), zones.Activity("run")
+	if hike == nil || run == nil { // a nil pointer in an interface is not a nil interface: fail here, not in a request
+		log.Fatal("the data holds no zone for an activity")
+	}
 	if cfg.LoopLimit == 0 {
 		cfg.LoopLimit = engine.DefaultConcurrentSearches() // LOOP_LIMIT forces another
 	}
-	cfg.Generator = &generator.Generator{Engines: map[string]generator.Looper{"hike": zones.Activity("hike"), "run": zones.Activity("run")}}
+	cfg.Generator = &generator.Generator{Engines: map[string]generator.Looper{"hike": hike, "run": run}}
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 

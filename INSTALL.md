@@ -83,9 +83,10 @@ done < zones.txt
 ```
 
 A zone of two million nodes took 2 minutes 15 on one CPU, nearly all of it reading the France extract once,
-and about 200 MB of files with 8 landmarks. The server maps every zone when it starts, which costs no
+then 4 seconds and 210 MB of memory per profile for the landmarks, and left 215 MB of files (91 MB of graph and
+62 MB of landmarks for each profile). The server maps every zone when it starts, which costs no
 memory, and answers a request from the zone whose box holds the start point with the most room round it;
-when that zone has no way near the start, or no loop from it, the next one whose box holds it answers. A data
+when that zone has no way near the start, the next one whose box holds it answers. A data
 directory that holds a `graph.bin` itself is one zone.
 
 Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (8 by
@@ -148,8 +149,8 @@ time); raise it when they see `429` while the CPUs are idle.
 The `Dockerfile` builds one image with the server and the web app, and no data. Build it with
 `docker build -t path-finder .`, or use the one CI publishes as `ghcr.io/lesloi/path-finder:latest`.
 
-The data is a volume: mount the directory holding `graph.bin`, `hike.alt` and `run.alt` on `/data`
-(the image sets `DATA_DIR=/data`), read-only. On Kubernetes that is a persistent volume, mounted the
+The data is a volume: mount the directory holding `graph.bin`, `hike.alt` and `run.alt`, or one such
+subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. On Kubernetes that is a persistent volume, mounted the
 same way into every pod, and filled by the job that runs `build-graph` and `build-alt` with the same
 `DATA_DIR`. The files are mapped, not copied, so pods that share a volume share its page cache; restart
 them after a rebuild. The server only opens the files for reading and writes nothing into the directory.

@@ -1,5 +1,6 @@
 # The server, serving the built web app on the same origin. It needs the graph and landmark files built
-# ahead of serving: mount the directory that holds them (graph.bin, hike.alt, run.alt) on /data.
+# ahead of serving: mount the directory that holds them (graph.bin, hike.alt, run.alt, or one such
+# subdirectory per zone) on /data.
 
 FROM node:26-slim AS web
 RUN npm install --global pnpm@12.6.0
