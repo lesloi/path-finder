@@ -48,8 +48,10 @@ func writeZone(t *testing.T, dir string, g *testGraph) {
 	if err := os.WriteFile(graph, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName("hike")), "hike", 2); err != nil {
-		t.Fatal(err)
+	for _, activity := range []string{"hike", "run"} {
+		if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName(activity)), activity, 2); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -135,15 +137,15 @@ func TestAZoneWithNoWayNearTheStartLetsTheNextOneAnswer(t *testing.T) {
 	}
 }
 
-func TestTheMarginIsTheDistanceToTheNearestEdgeOfTheBox(t *testing.T) {
+func TestEdgeDistanceIsTheDistanceToTheNearestEdgeOfTheBox(t *testing.T) {
 	_, centre := zoneGraph(0, 0)
 	b := bounds{minLat: int32(centre.Lat*1e7) - 10_000_000, maxLat: int32(centre.Lat*1e7) + 10_000_000,
 		minLon: int32(centre.Lon*1e7) - 10_000_000, maxLon: int32(centre.Lon*1e7) + 10_000_000}
 	// The nearest edges are the east and west ones: a degree of longitude is 111 km times cos(45°), about 79 km.
-	if m := margin(b, centre.Lat, centre.Lon); m < 77_000 || m > 80_000 {
+	if m := edgeDistance(b, centre.Lat, centre.Lon); m < 77_000 || m > 80_000 {
 		t.Errorf("margin at the centre of a box of a degree on a side: %.0f m", m)
 	}
-	if m := margin(b, centre.Lat+2, centre.Lon); m >= 0 {
+	if m := edgeDistance(b, centre.Lat+2, centre.Lon); m >= 0 {
 		t.Errorf("margin of a point outside the box: %.0f m, want it negative", m)
 	}
 }
@@ -171,5 +173,67 @@ func TestZonesFailAtStartupOnWhatCannotBeServed(t *testing.T) {
 	}
 	if _, err := OpenZones(dir, "hike"); err == nil || !strings.Contains(err.Error(), "bad") {
 		t.Errorf("a truncated zone: err = %v, want it to name the zone", err)
+	}
+}
+
+// A zone that did not finish building must stop the server, not leave a hole in the map.
+func TestAZoneThatDidNotFinishBuildingStopsTheStartup(t *testing.T) {
+	good, _ := zoneGraph(0, 0)
+	for name, leftovers := range map[string][]string{
+		"landmarks without a graph": {"hike.alt", "run.alt"},
+		"a temporary graph":         {"graph.bin.tmp"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeZone(t, filepath.Join(dir, "good"), good)
+			broken := filepath.Join(dir, "broken")
+			if err := os.MkdirAll(broken, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			for _, f := range leftovers {
+				if err := os.WriteFile(filepath.Join(broken, f), []byte("x"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := OpenZones(dir, "hike", "run"); err == nil || !strings.Contains(err.Error(), "broken") {
+				t.Errorf("err = %v, want it to name the unfinished zone", err)
+			}
+		})
+	}
+}
+
+// With several zones, a zone without the landmarks of an activity would serve slowly and unnoticed.
+func TestEachZoneOfADirectoryNeedsItsLandmarks(t *testing.T) {
+	dir := t.TempDir()
+	g, _ := zoneGraph(0, 0)
+	writeZone(t, filepath.Join(dir, "zone"), g)
+	if err := os.Remove(filepath.Join(dir, "zone", LandmarksFileName("run"))); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenZones(dir, "hike", "run"); err == nil || !strings.Contains(err.Error(), "run.alt") {
+		t.Errorf("a zone without run.alt: err = %v", err)
+	}
+	// A directory that is one zone keeps the landmarks optional.
+	flat := t.TempDir()
+	writeZone(t, flat, g)
+	if err := os.Remove(filepath.Join(flat, LandmarksFileName("run"))); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := OpenZones(flat, "hike", "run"); err != nil {
+		t.Errorf("a flat directory without run.alt: %v", err)
+	}
+}
+
+// Volumes expose their directories as links.
+func TestAZoneDirectoryCanBeALink(t *testing.T) {
+	dir, store := t.TempDir(), t.TempDir()
+	g, _ := zoneGraph(0, 0)
+	writeZone(t, filepath.Join(store, "real"), g)
+	if err := os.Symlink(filepath.Join(store, "real"), filepath.Join(dir, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	z, err := OpenZones(dir, "hike", "run")
+	if err != nil || z.Len() != 1 {
+		t.Errorf("a linked zone: %v zones, %v", z, err)
 	}
 }

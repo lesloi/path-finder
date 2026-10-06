@@ -106,7 +106,7 @@ func openGraph(path string) (*graph, error) {
 		return nil, fmt.Errorf("%s: edges: %w", path, err)
 	}
 	b := readBounds(data)
-	g.sp = &spatial{minLat: b.minLat, minLon: b.minLon, maxLat: b.maxLat, maxLon: b.maxLon}
+	g.sp = &spatial{bounds: b}
 	g.sp.nx, g.sp.ny = gridSize(b.minLat, b.minLon, b.maxLat, b.maxLon)
 	startAt := align16(edgesAt + 12*e)
 	listAt := align16(startAt + 4*(g.sp.nx*g.sp.ny+1))
@@ -198,11 +198,10 @@ type Engine struct {
 // spatial is a grid over the graph: the nodes of each cell, as numbers in one list, so that finding the
 // nearest node to a point reads a few cells. It is written into the graph file at build time.
 type spatial struct {
-	minLat, minLon int32
-	maxLat, maxLon int32
-	nx, ny         int
-	start          []uint32 // start[c] to start[c+1] is the slice of nodes holding the nodes of cell c
-	nodes          []uint32
+	bounds
+	nx, ny int
+	start  []uint32 // start[c] to start[c+1] is the slice of nodes holding the nodes of cell c
+	nodes  []uint32
 }
 
 // gridSize is the number of cells of a grid over a bounding box.
@@ -214,7 +213,7 @@ func gridSize(minLat, minLon, maxLat, maxLon int32) (nx, ny int) {
 }
 
 func computeSpatial(nodes []node) *spatial {
-	s := &spatial{minLat: math.MaxInt32, minLon: math.MaxInt32, maxLat: math.MinInt32, maxLon: math.MinInt32}
+	s := &spatial{bounds: bounds{minLat: math.MaxInt32, minLon: math.MaxInt32, maxLat: math.MinInt32, maxLon: math.MinInt32}}
 	for _, n := range nodes {
 		s.minLat, s.maxLat = min(s.minLat, n.Lat), max(s.maxLat, n.Lat)
 		s.minLon, s.maxLon = min(s.minLon, n.Lon), max(s.maxLon, n.Lon)

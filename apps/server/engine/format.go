@@ -24,16 +24,17 @@ import (
 // index that finds the nearest node to a point, written at build time so that opening a graph reads no node.
 // The fingerprint is a CRC-64 of the graph's nodes, offsets and edges. The landmarks hold the one of the
 // graph they were built for, so that a graph built again, even with as many nodes, refuses the old ones.
-
+//
 // A landmark row holds L distances from the landmarks, then L towards them when the metric
 // includes climbing. A distance is floor(cost / unit); 0xFFFF means unreachable or too far.
 const (
-	graphMagic     = "PFGRAPH5"
-	altMagic       = "PFALT003"
-	graphHeader    = 48 // magic, counts, fingerprint, bounds, padding: the nodes start on a 16-byte boundary
-	altHeader      = 32
-	altUnitMeters  = 16
-	altUnreachable = 0xFFFF
+	graphMagic      = "PFGRAPH5"
+	altMagic        = "PFALT003"
+	graphHeader     = 48 // magic, counts, fingerprint, bounds, padding: the nodes start on a 16-byte boundary
+	graphHeaderUsed = 40 // the bytes of it that hold something: the padding is the rest
+	altHeader       = 32
+	altUnitMeters   = 16
+	altUnreachable  = 0xFFFF
 )
 
 type node struct {
@@ -111,7 +112,7 @@ func writeGraph(path string, nodes []node, off []uint32, edges []edge) error {
 			uint32(sp.minLat), uint32(sp.minLon), uint32(sp.maxLat), uint32(sp.maxLon)}); err != nil {
 			return err
 		}
-		if _, err := w.Write(make([]byte, graphHeader-40)); err != nil {
+		if _, err := w.Write(make([]byte, graphHeader-graphHeaderUsed)); err != nil {
 			return err
 		}
 		pos := int64(graphHeader)

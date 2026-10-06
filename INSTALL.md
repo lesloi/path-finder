@@ -82,16 +82,15 @@ while read -r name box; do
 done < zones.txt
 ```
 
-A zone of two million nodes took 2 minutes 15 on one CPU, nearly all of it reading the France extract once,
-then 4 seconds and 210 MB of memory per profile for the landmarks, and left 215 MB of files (91 MB of graph and
-62 MB of landmarks for each profile). The server maps every zone when it starts, which costs no
+A zone of two million nodes is about 215 MB of files. The server maps every zone when it starts, which costs no
 memory, and answers a request from the zone whose box holds the start point with the most room round it;
 when that zone has no way near the start, the next one whose box holds it answers. A data
-directory that holds a `graph.bin` itself is one zone.
+directory that holds a `graph.bin` itself is one zone. Every zone of a directory of zones needs its `hike.alt`
+and `run.alt`, and a subdirectory that holds landmarks or a temporary file but no `graph.bin` (a build that
+failed) stops the server at startup.
 
 Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (8 by
-default): more make long searches faster and the file bigger. On a graph of two million nodes, 8 and 16 gave
-the same route sets in the same time, and the file is half the size (about 60 MB against 120 MB). A way with no BD ALTI elevation under
+default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
 it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one activity
 profile and to one graph: build them again after each graph. The server refuses landmarks built for another
 graph, even one with as many nodes.
@@ -155,9 +154,8 @@ same way into every pod, and filled by the job that runs `build-graph` and `buil
 `DATA_DIR`. The files are mapped, not copied, so pods that share a volume share its page cache; restart
 them after a rebuild. The server only opens the files for reading and writes nothing into the directory.
 
-The server does not read the files ahead: a search faults in the pages it needs, about 5 MB for a route
-set, the first time it touches them. On a local disk that adds a few milliseconds to the first requests;
-measure it on a network volume. Before it listens, the server maps the files and checks their headers, which reads
+The server does not read the files ahead: a search faults in the pages it needs, the first time it touches
+them. Before it listens, the server maps the files and checks their headers, which reads
 almost nothing (the index that finds the nearest node to a point is in `graph.bin`), and `/healthz` does not
 answer until then. The server logs how long opening took.
 

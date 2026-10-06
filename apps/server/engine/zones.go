@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -26,50 +27,67 @@ type zone struct {
 }
 
 // OpenZones maps the zones of a data directory for the activities. It fails at once on a zone that cannot be
-// served, rather than on the first request that needs it.
+// served, or that did not finish building, rather than on the first request that needs it, or by leaving a hole
+// in the map. A zone in a directory of zones must have the landmarks of every activity: with many zones, one
+// that serves slowly would go unnoticed. A directory that is one zone keeps them optional.
 func OpenZones(dir string, activities ...string) (*Zones, error) {
 	if len(activities) == 0 {
 		return nil, errors.New("engine: no activity to open")
 	}
-	dirs, err := zoneDirs(dir)
+	dirs, flat, err := zoneDirs(dir)
 	if err != nil {
 		return nil, err
 	}
 	z := &Zones{}
 	for _, d := range dirs {
+		if !flat {
+			for _, activity := range activities {
+				if _, err := os.Stat(filepath.Join(d, LandmarksFileName(activity))); err != nil {
+					return nil, fmt.Errorf("engine: zone %s has no %s: build it with build-alt", d, LandmarksFileName(activity))
+				}
+			}
+		}
 		engines, err := OpenDir(d, activities...)
 		if err != nil {
 			return nil, err
 		}
-		g := engines[activities[0]].g
-		z.zones = append(z.zones, &zone{box: bounds{minLat: g.sp.minLat, minLon: g.sp.minLon, maxLat: g.sp.maxLat, maxLon: g.sp.maxLon}, engines: engines})
+		z.zones = append(z.zones, &zone{box: engines[activities[0]].g.sp.bounds, engines: engines})
 	}
 	return z, nil
 }
 
-// zoneDirs lists the directories that hold a zone, in name order.
-func zoneDirs(dir string) ([]string, error) {
+// zoneDirs lists the directories that hold a zone, in name order, and whether the directory is itself the zone.
+// A subdirectory may be a link, as the directories of a volume often are. One with landmarks or a temporary
+// file but no graph is a zone whose build failed.
+func zoneDirs(dir string) (dirs []string, flat bool, err error) {
 	if _, err := os.Stat(filepath.Join(dir, GraphFileName)); err == nil {
-		return []string{dir}, nil
+		return []string{dir}, true, nil
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("engine: reading the data directory: %w", err)
+		return nil, false, fmt.Errorf("engine: reading the data directory: %w", err)
 	}
-	var dirs []string
 	for _, e := range entries {
-		if !e.IsDir() {
+		sub := filepath.Join(dir, e.Name())
+		if info, err := os.Stat(sub); err != nil || !info.IsDir() {
 			continue
 		}
-		sub := filepath.Join(dir, e.Name())
 		if _, err := os.Stat(filepath.Join(sub, GraphFileName)); err == nil {
 			dirs = append(dirs, sub)
+			continue
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return nil, false, err
+		}
+		for _, pattern := range []string{"*.alt", "*.tmp"} {
+			if left, _ := filepath.Glob(filepath.Join(sub, pattern)); len(left) > 0 {
+				return nil, false, fmt.Errorf("engine: %s holds %s but no %s: its build did not finish", sub, filepath.Base(left[0]), GraphFileName)
+			}
 		}
 	}
 	if len(dirs) == 0 {
-		return nil, fmt.Errorf("engine: no graph in %s, nor in a directory of it: build one with build-graph", dir)
+		return nil, false, fmt.Errorf("engine: no graph in %s, nor in a directory of it: build one with build-graph", dir)
 	}
-	return dirs, nil
+	return dirs, false, nil
 }
 
 // Len is the number of zones.
@@ -101,7 +119,7 @@ func (a *ActivityZones) Loops(ctx context.Context, req LoopRequest) ([]*Route, e
 	}
 	var candidates []candidate
 	for _, zn := range a.z.zones {
-		if m := margin(zn.box, req.Start.Lat, req.Start.Lon); m >= 0 {
+		if m := edgeDistance(zn.box, req.Start.Lat, req.Start.Lon); m >= 0 {
 			candidates = append(candidates, candidate{zn.engines[a.name], m})
 		}
 	}
@@ -112,7 +130,7 @@ func (a *ActivityZones) Loops(ctx context.Context, req LoopRequest) ([]*Route, e
 	var first error
 	for _, c := range candidates {
 		loops, err := c.engine.Loops(ctx, req)
-		if err == nil || !errors.Is(err, ErrOffGraph) {
+		if !errors.Is(err, ErrOffGraph) {
 			return loops, err
 		}
 		if first == nil {
@@ -122,8 +140,8 @@ func (a *ActivityZones) Loops(ctx context.Context, req LoopRequest) ([]*Route, e
 	return nil, first
 }
 
-// margin is the distance in metres from a point to the nearest edge of a box, negative outside it.
-func margin(b bounds, lat, lon float64) float64 {
+// edgeDistance is the distance in metres from a point to the nearest edge of a box, negative outside it.
+func edgeDistance(b bounds, lat, lon float64) float64 {
 	cosl := math.Cos(lat * rad)
 	toEdges := [4]float64{
 		(lat - float64(b.minLat)*1e-7) * metersPerDegree,
