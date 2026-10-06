@@ -69,8 +69,8 @@ describe('App', () => {
 
     fireEvent.click(screen.getByTestId('criteria-settings'));
     fireEvent.click(await screen.findByTestId('sub-page-back'));
-    // The settings button comes back once the page is closed: the sheet handle never left.
-    await screen.findByTestId('criteria-settings');
+    // The sheet handle never left: wait for the dialog itself to go.
+    await waitFor(() => expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument());
 
     expect(vi.mocked(Map).mock.instances).toHaveLength(created);
   });
@@ -121,8 +121,9 @@ describe('App', () => {
 
     fireEvent.click(screen.getByTestId('sub-page'));
 
-    expect(await screen.findByTestId('criteria-settings')).toBeInTheDocument();
-    expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument();
+    // The settings button is there while the pages are open: wait for the dialog itself to go.
+    await waitFor(() => expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument());
+    expect(screen.getByTestId('criteria-settings')).toBeInTheDocument();
   });
 
   it('closes a page with a back arrow on phones', async () => {
@@ -163,7 +164,8 @@ describe('App', () => {
     fireEvent.click(screen.getByTestId('criteria-settings'));
     fireEvent.click(await screen.findByTestId('sub-page-close'));
 
-    expect(await screen.findByTestId('criteria-settings')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument());
+    expect(screen.getByTestId('criteria-settings')).toBeInTheDocument();
   });
 
   it('speaks French when the browser prefers French', async () => {
