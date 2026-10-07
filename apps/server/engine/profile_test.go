@@ -32,37 +32,56 @@ func TestEveryContractSurfaceHasAProfile(t *testing.T) {
 	}
 }
 
-// A preference is soft and the climb is steered by the target elevation gain alone.
+// A preference is soft, and the climb is steered by the target elevation gain alone.
 func TestProfilesAreSoftAndShareTheClimbCost(t *testing.T) {
-	for name, p := range profiles {
-		if p.Name != name {
-			t.Errorf("%s is named %q", name, p.Name)
-		}
-		if p.UpPerMeter != climbCost {
-			t.Errorf("%s: climb cost %v, want %v", name, p.UpPerMeter, climbCost)
-		}
-		for k, v := range p.Kind {
-			if v < 1 || v > 100 {
-				t.Errorf("%s: %s costs %v per metre, want a finite cost of at least 1", name, kindNames[k], v)
+	const mostCost = 100 // a finite cost: a way is never excluded
+	for _, name := range ProfileNames {
+		t.Run(name, func(t *testing.T) {
+			p := profiles[name]
+			if p.Name != name {
+				t.Errorf("named %q", p.Name)
 			}
-		}
-		for s, v := range p.Surf {
-			if v < 1 || v > 100 {
-				t.Errorf("%s: surface %d costs %v per metre, want a finite cost of at least 1", name, s, v)
+			if p.UpPerMeter != climbCost {
+				t.Errorf("climb cost %v, want %v", p.UpPerMeter, climbCost)
 			}
-		}
+			costs := map[string][]float32{"kind": p.Kind[:], "surface": p.Surf[:]}
+			for what, list := range costs {
+				for i, v := range list {
+					if v < 1 || v > mostCost {
+						t.Errorf("%s %d costs %v per metre, want a finite cost of at least 1", what, i, v)
+					}
+				}
+			}
+		})
 	}
 }
 
 func TestProfilesDifferWhereThePreferenceSaysSo(t *testing.T) {
-	plain, paved, unpaved := profiles["any"], profiles["paved"], profiles["unpaved"]
-	if paved.Surf[SurfaceRough] <= plain.Surf[SurfaceRough] || paved.Kind[KindSteps] <= plain.Kind[KindSteps] {
-		t.Error("paved does not penalise rough surfaces and steps more than any")
-	}
-	if unpaved.Surf[SurfaceRough] >= plain.Surf[SurfaceRough] || unpaved.Kind[KindSteps] >= plain.Kind[KindSteps] {
-		t.Error("unpaved does not tolerate rough surfaces and steps more than any")
-	}
-	if unpaved.Surf[SurfacePaved] <= plain.Surf[SurfacePaved] || unpaved.Kind[KindResidential] <= plain.Kind[KindResidential] {
-		t.Error("unpaved does not penalise paved ways more than any")
+	plain := profiles["any"]
+	for name, tc := range map[string]struct {
+		rough, steps, paved, residential func(a, b float32) bool
+	}{
+		"paved":   {rough: gt, steps: gt, paved: eq, residential: eq},
+		"unpaved": {rough: lt, steps: lt, paved: gt, residential: gt},
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := profiles[name]
+			if !tc.rough(p.Surf[SurfaceRough], plain.Surf[SurfaceRough]) {
+				t.Errorf("rough surface: %v against %v for any", p.Surf[SurfaceRough], plain.Surf[SurfaceRough])
+			}
+			if !tc.steps(p.Kind[KindSteps], plain.Kind[KindSteps]) {
+				t.Errorf("steps: %v against %v for any", p.Kind[KindSteps], plain.Kind[KindSteps])
+			}
+			if !tc.paved(p.Surf[SurfacePaved], plain.Surf[SurfacePaved]) {
+				t.Errorf("paved surface: %v against %v for any", p.Surf[SurfacePaved], plain.Surf[SurfacePaved])
+			}
+			if !tc.residential(p.Kind[KindResidential], plain.Kind[KindResidential]) {
+				t.Errorf("residential: %v against %v for any", p.Kind[KindResidential], plain.Kind[KindResidential])
+			}
+		})
 	}
 }
+
+func gt(a, b float32) bool { return a > b }
+func lt(a, b float32) bool { return a < b }
+func eq(a, b float32) bool { return a == b }

@@ -46,11 +46,15 @@ the route, rather than a target in metres.
 _Avoid_: Easy, mountainous
 
 **Surface preference**:
-A soft preference for paved roads, unpaved paths, or no preference. It picks the routing
-profile of the search (`any`, `paved`, `unpaved`: costs per way kind and surface, with one climb cost for
-all), so it weights the generation, and the loops found are ranked on it too. It never excludes a route
-outright.
+A soft preference for paved roads, unpaved paths, or no preference. It picks the **routing profile**
+of the search, so it weights the generation, and the loops found are ranked on it too. It never excludes
+a route outright.
 _Avoid_: Road type, terrain filter
+
+**Routing profile**:
+The costs of a search, one per surface preference (`any`, `paved`, `unpaved`): a multiplier per way kind and
+per surface, and one climb cost for all of them. It is not an activity.
+_Avoid_: Activity profile
 
 **Error code**:
 The short key the server answers with when it refuses or fails a request (`invalid-criteria`,

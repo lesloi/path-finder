@@ -64,7 +64,7 @@ type Profile struct {
 // ProfileNames are the surface preferences a profile exists for, the ones of the contract.
 var ProfileNames = []string{"any", "paved", "unpaved"}
 
-// anyProfile is the hike profile, the one validated so far. The others change it.
+// anyProfile is the profile of no preference, from the costs validated so far. The others derive from it.
 func anyProfile() *Profile {
 	return &Profile{
 		Name: "any",
@@ -78,21 +78,24 @@ func anyProfile() *Profile {
 	}
 }
 
+// derive is the profile named name, from the profile of no preference changed by adjust.
+func derive(name string, adjust func(p *Profile)) *Profile {
+	p := anyProfile()
+	p.Name = name
+	adjust(p)
+	return p
+}
+
 var profiles = map[string]*Profile{
 	"any": anyProfile(),
 	// paved avoids what is hard to run on: rough surfaces and steps.
-	"paved": func() *Profile {
-		p := anyProfile()
-		p.Name = "paved"
+	"paved": derive("paved", func(p *Profile) {
 		p.Kind[KindSteps] = 3
 		p.Surf[SurfaceRough] = 1.5
-		return p
-	}(),
+	}),
 	// unpaved prefers paths and tracks: it tolerates rough surfaces and steps, and pays for paved ways. The
 	// multipliers stay at or above 1, so that the search heuristic stays admissible.
-	"unpaved": func() *Profile {
-		p := anyProfile()
-		p.Name = "unpaved"
+	"unpaved": derive("unpaved", func(p *Profile) {
 		p.Kind[KindSteps] = 1.0
 		p.Kind[KindCycleway] = 1.8
 		p.Kind[KindLivingStreet] = 1.8
@@ -103,8 +106,7 @@ var profiles = map[string]*Profile{
 		p.Kind[KindSecondary] = 5
 		p.Surf[SurfacePaved] = 1.5
 		p.Surf[SurfaceRough] = 1.0
-		return p
-	}(),
+	}),
 }
 
 // minMult is the smallest cost per metre, which keeps the A* heuristic admissible.

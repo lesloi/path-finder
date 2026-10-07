@@ -49,6 +49,12 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
 - **The engine is our own A\* with landmark lower bounds (ALT)** on a pedestrian graph from OSM, not
   BRouter. ALT made routes about 25 times faster, and a search only allocates in proportion to the
   nodes it reaches. The landmarks' metric includes the climb penalty, so the bound stays valid.
+- **One routing profile per surface preference, and one climb cost for all.** The user sets a length, a
+  surface preference and an elevation gain; there is no activity to route for. The target elevation gain
+  steers the climb, so the climb cost does not change with the preference, and a preference only reweights
+  way kinds and surfaces. Every multiplier stays at least 1, so that the search heuristic stays admissible.
+  Revisit if the comparison with a reference (#131) shows that runners and walkers need different costs on the
+  same surface.
 - **Loops go through 2–4 waypoints on a circle through the start point**, each leg avoiding what the
   earlier ones used, resized up to four times, then ranked on distance, overlap and elevation gain.
   Criteria whose waypoints alone exceed the target are refused. A waypoint is moved to the nearest way
