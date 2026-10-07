@@ -243,4 +243,7 @@ func TestTheSurfacePreferenceSteersTheSearch(t *testing.T) {
 	if !(share["paved"] < share["any"] && share["any"] < share["unpaved"]) {
 		t.Errorf("unpaved share by preference = %v, want paved < any < unpaved", share)
 	}
+	if share["paved"] >= 0.5 || share["unpaved"] <= 0.5 {
+		t.Errorf("unpaved share by preference = %v, want a majority of paved ways for paved and of unpaved ways for unpaved", share)
+	}
 }

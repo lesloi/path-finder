@@ -88,9 +88,21 @@ func derive(name string, adjust func(p *Profile)) *Profile {
 
 var profiles = map[string]*Profile{
 	"any": anyProfile(),
-	// paved avoids what is hard to run on: rough surfaces and steps.
+	// paved prefers ways that are paved: it makes streets cheaper and the ways that are rough or usually
+	// unpaved dearer, and avoids steps. Footways and pedestrian ways stay at 1, which keeps the search
+	// heuristic admissible.
 	"paved": derive("paved", func(p *Profile) {
+		p.Kind[KindPath] = 1.3
+		p.Kind[KindTrack] = 1.3
+		p.Kind[KindBridleway] = 1.4
+		p.Kind[KindCycleway] = 1.1
 		p.Kind[KindSteps] = 3
+		p.Kind[KindLivingStreet] = 1.1
+		p.Kind[KindResidential] = 1.2
+		p.Kind[KindService] = 1.3
+		p.Kind[KindUnclassified] = 1.3
+		p.Surf[SurfacePaved] = 1.0
+		p.Surf[SurfaceCompact] = 1.2
 		p.Surf[SurfaceRough] = 1.5
 	}),
 	// unpaved prefers paths and tracks: it tolerates rough surfaces and steps, and pays for paved ways. The

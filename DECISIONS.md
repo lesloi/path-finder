@@ -52,7 +52,9 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
 - **One routing profile per surface preference, and one climb cost for all.** The user sets a length, a
   surface preference and an elevation gain; there is no activity to route for. The target elevation gain
   steers the climb, so the climb cost does not change with the preference, and a preference only reweights
-  way kinds and surfaces. Every multiplier stays at least 1, so that the search heuristic stays admissible.
+  way kinds and surfaces. `paved` makes paved ways cheaper and rough or usually unpaved ones dearer, and
+  `unpaved` the reverse, since the way kinds of `any` already lean towards paths and would drown a surface
+  weight alone. Every multiplier stays at least 1, so that the search heuristic stays admissible.
   Revisit if the comparison with a reference (#131) shows that runners and walkers need different costs on the
   same surface.
 - **Loops go through 2–4 waypoints on a circle through the start point**, each leg avoiding what the

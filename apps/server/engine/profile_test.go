@@ -61,7 +61,7 @@ func TestProfilesDifferWhereThePreferenceSaysSo(t *testing.T) {
 	for name, tc := range map[string]struct {
 		rough, steps, paved, residential func(a, b float32) bool
 	}{
-		"paved":   {rough: gt, steps: gt, paved: eq, residential: eq},
+		"paved":   {rough: gt, steps: gt, paved: lt, residential: lt},
 		"unpaved": {rough: lt, steps: lt, paved: gt, residential: gt},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -84,4 +84,3 @@ func TestProfilesDifferWhereThePreferenceSaysSo(t *testing.T) {
 
 func gt(a, b float32) bool { return a > b }
 func lt(a, b float32) bool { return a < b }
-func eq(a, b float32) bool { return a == b }
