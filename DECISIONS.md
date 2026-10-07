@@ -36,7 +36,8 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   every candidate node and its whole output in memory, which does not fit in 2 GB; a zone does
   (`build-graph -bbox`, one pass over the country's extract). No routing sits in front of the servers:
   opening a zone costs no memory, since its spatial index is in `graph.bin`, and a start point is answered by
-  the zone holding it with the most room. Fixed file names, written atomically, so a server only needs the
+  the zone holding it with the most room. Fixed file names (`graph.bin`, and `any.alt`, `paved.alt`, `unpaved.alt`, one landmark file per surface
+  preference), written atomically, so a server only needs the
   directory read-only and a rebuild is a restart. Revisit if a country's graph builds in one go: zones would
   then only cost borders.
 

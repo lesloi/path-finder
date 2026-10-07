@@ -38,7 +38,7 @@ const body = `{"start":[6.1294,45.8992],"activity":"hike","target":{"distance":1
 
 func generate(t *testing.T, looper *fakeLooper, ctx context.Context, request string) ([]contract.Route, error) {
 	t.Helper()
-	g := &Generator{Engines: map[string]Looper{"hike": looper}, Seed: func() uint64 { return 42 }}
+	g := &Generator{Engines: map[string]Looper{"any": looper}, Seed: func() uint64 { return 42 }}
 	out, err := g.Generate(ctx, json.RawMessage(request))
 	if err != nil {
 		return nil, err
@@ -144,17 +144,17 @@ func TestGenerateSkipsALoopWithNoLength(t *testing.T) {
 	}
 }
 
-func TestGenerateUsesTheEngineOfTheActivity(t *testing.T) {
-	hike, run := &fakeLooper{}, &fakeLooper{}
-	g := &Generator{Engines: map[string]Looper{"hike": hike, "run": run}}
-	if _, err := g.Generate(context.Background(), json.RawMessage(`{"start":[6.1294,45.8992],"activity":"run","target":{"distance":5},"surface":"any","pace":5}`)); err != nil {
+func TestGenerateUsesTheEngineOfTheSurfacePreference(t *testing.T) {
+	anyLooper, paved, unpaved := &fakeLooper{}, &fakeLooper{}, &fakeLooper{}
+	g := &Generator{Engines: map[string]Looper{"any": anyLooper, "paved": paved, "unpaved": unpaved}}
+	if _, err := g.Generate(context.Background(), json.RawMessage(`{"start":[6.1294,45.8992],"activity":"run","target":{"distance":5},"surface":"unpaved","pace":5}`)); err != nil {
 		t.Fatal(err)
 	}
-	if run.got.Candidates == 0 || hike.got.Candidates != 0 {
-		t.Errorf("run asked %+v, hike asked %+v", run.got, hike.got)
+	if unpaved.got.Candidates == 0 || anyLooper.got.Candidates != 0 || paved.got.Candidates != 0 {
+		t.Errorf("unpaved asked %+v, any asked %+v, paved asked %+v", unpaved.got, anyLooper.got, paved.got)
 	}
 	if _, err := (&Generator{}).Generate(context.Background(), json.RawMessage(body)); err == nil {
-		t.Error("an activity without an engine: err = nil")
+		t.Error("a surface preference without an engine: err = nil")
 	}
 }
 

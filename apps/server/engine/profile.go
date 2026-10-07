@@ -47,8 +47,13 @@ func isTrail(kind uint8) bool {
 	return false
 }
 
-// Profile is an activity expressed as data: cost multipliers per way kind and per surface,
-// plus the extra cost of climbing. Costs are in equivalent metres.
+// climbCost is the extra cost of a metre of ascent, in equivalent metres, the same for every profile: the
+// target elevation gain steers the climb, not the surface preference.
+const climbCost = 8
+
+// Profile is a surface preference expressed as data: cost multipliers per way kind and per surface,
+// plus the extra cost of climbing. Costs are in equivalent metres. A preference is soft: every
+// multiplier is finite and at least 1, so it weights the search and never excludes a way.
 type Profile struct {
 	Name       string
 	Kind       [NumKinds]float32
@@ -56,27 +61,50 @@ type Profile struct {
 	UpPerMeter float32 // equivalent metres added per metre of ascent
 }
 
-var profiles = map[string]*Profile{
-	"hike": {
-		Name: "hike",
+// ProfileNames are the surface preferences a profile exists for, the ones of the contract.
+var ProfileNames = []string{"any", "paved", "unpaved"}
+
+// anyProfile is the hike profile, the one validated so far. The others change it.
+func anyProfile() *Profile {
+	return &Profile{
+		Name: "any",
 		Kind: [NumKinds]float32{
 			KindPath: 1.0, KindFootway: 1.0, KindPedestrian: 1.0, KindBridleway: 1.05, KindTrack: 1.0, KindCycleway: 1.3,
 			KindSteps: 1.6, KindLivingStreet: 1.3, KindResidential: 1.5, KindService: 1.6, KindUnclassified: 1.7,
 			KindTertiary: 2.2, KindSecondary: 3.5, KindPrimary: 6, KindTrunk: 12,
 		},
 		Surf:       [NumSurfaces]float32{SurfaceUnknown: 1.0, SurfacePaved: 1.1, SurfaceCompact: 1.0, SurfaceRough: 1.15},
-		UpPerMeter: 8,
-	},
-	"run": {
-		Name: "run",
-		Kind: [NumKinds]float32{
-			KindPath: 1.05, KindFootway: 1.0, KindPedestrian: 1.0, KindBridleway: 1.1, KindTrack: 1.0, KindCycleway: 1.1,
-			KindSteps: 3, KindLivingStreet: 1.3, KindResidential: 1.5, KindService: 1.6, KindUnclassified: 1.7,
-			KindTertiary: 2.2, KindSecondary: 3.5, KindPrimary: 6, KindTrunk: 12,
-		},
-		Surf:       [NumSurfaces]float32{SurfaceUnknown: 1.0, SurfacePaved: 1.0, SurfaceCompact: 1.0, SurfaceRough: 1.5},
-		UpPerMeter: 12,
-	},
+		UpPerMeter: climbCost,
+	}
+}
+
+var profiles = map[string]*Profile{
+	"any": anyProfile(),
+	// paved avoids what is hard to run on: rough surfaces and steps.
+	"paved": func() *Profile {
+		p := anyProfile()
+		p.Name = "paved"
+		p.Kind[KindSteps] = 3
+		p.Surf[SurfaceRough] = 1.5
+		return p
+	}(),
+	// unpaved prefers paths and tracks: it tolerates rough surfaces and steps, and pays for paved ways. The
+	// multipliers stay at or above 1, so that the search heuristic stays admissible.
+	"unpaved": func() *Profile {
+		p := anyProfile()
+		p.Name = "unpaved"
+		p.Kind[KindSteps] = 1.0
+		p.Kind[KindCycleway] = 1.8
+		p.Kind[KindLivingStreet] = 1.8
+		p.Kind[KindResidential] = 2.2
+		p.Kind[KindService] = 2.2
+		p.Kind[KindUnclassified] = 2.2
+		p.Kind[KindTertiary] = 3.5
+		p.Kind[KindSecondary] = 5
+		p.Surf[SurfacePaved] = 1.5
+		p.Surf[SurfaceRough] = 1.0
+		return p
+	}(),
 }
 
 // minMult is the smallest cost per metre, which keeps the A* heuristic admissible.

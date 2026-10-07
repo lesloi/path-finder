@@ -38,8 +38,6 @@ func pairKey(a, b uint32) uint64 {
 	return uint64(a)<<32 | uint64(b)
 }
 
-// hikeClimb is the hike profile's climb penalty, in equivalent metres per metre of ascent.
-
 type graph struct {
 	n, e int
 	// fingerprint is the one in the file header: the landmarks built for this graph hold the same.
@@ -184,7 +182,7 @@ func (a *landmarks) bound(rv []uint16, tg *[maxLandmarkValues]uint16) float32 {
 	return float32(best) * a.unit
 }
 
-// Engine routes and generates loops on a graph for one activity profile. It is safe for
+// Engine routes and generates loops on a graph for one surface-preference profile. It is safe for
 // concurrent use: the graph and landmarks are read-only, and engines of other profiles share them.
 type Engine struct {
 	g       *graph

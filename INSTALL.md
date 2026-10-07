@@ -42,7 +42,7 @@ The steps below put the data under `data/` in the repository. Any other director
 
 The server binary builds its own graph, and the landmarks that speed up searches, with two commands.
 Run them ahead of serving, never while it serves. They write into the **data directory**, set by
-`DATA_DIR` (`data` by default): `graph.bin`, then `hike.alt` and `run.alt`.
+`DATA_DIR` (`data` by default): `graph.bin`, then `any.alt`, `paved.alt` and `unpaved.alt`, one per surface preference.
 
 ```sh
 cd apps/server
@@ -50,8 +50,9 @@ CGO_ENABLED=0 go build -o path-finder .
 
 export DATA_DIR=$PWD/../../data
 ./path-finder build-graph -pbf $DATA_DIR/osm/rhone-alpes-latest.osm.pbf -dem $DATA_DIR/bdalti-asc
-./path-finder build-alt -profile hike
-./path-finder build-alt -profile run
+./path-finder build-alt -profile any
+./path-finder build-alt -profile paved
+./path-finder build-alt -profile unpaved
 ```
 
 A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
@@ -59,7 +60,7 @@ a half-written one. The server maps the files when it starts: restart it after a
 
 Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (8 by
 default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
-it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one activity
+it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one surface-preference
 profile and to one graph: build them again after each graph; the server refuses those of another graph.
 
 ### A country, by zones
@@ -90,7 +91,7 @@ set -e # stop at the first zone that fails: a zone left out is a hole in the map
 while read -r name box _; do
   zone=$DATA_DIR/$name && mkdir -p "$zone"
   GOMEMLIMIT=1600MiB ./path-finder build-graph -pbf france.osm.pbf -dem "$dem" -bbox "$box" -out "$zone/graph.bin"
-  for profile in hike run; do
+  for profile in any paved unpaved; do
     ./path-finder build-alt -graph "$zone/graph.bin" -out "$zone/$profile.alt" -profile "$profile"
   done
 done < zones.txt
@@ -101,13 +102,13 @@ neighbouring département keeps far fewer, and has holes.
 
 The server maps every zone when it starts and answers from the zone that holds the start point with the most
 room round it, or from the next one if that has no way near it. A directory that holds a `graph.bin` is one
-zone, and the server refuses one that also has zones beside that graph. In a directory of zones each needs its `hike.alt` and `run.alt`, and a subdirectory with landmarks or a
+zone, and the server refuses one that also has zones beside that graph. In a directory of zones each needs its `any.alt`, `paved.alt` and `unpaved.alt`, and a subdirectory with landmarks or a
 temporary file but no `graph.bin` (a build that failed) stops the server.
 
 ## 4. Run it locally
 
 ```sh
-export DATA_DIR=$PWD/data   # holds graph.bin, and hike.alt and run.alt if you built them
+export DATA_DIR=$PWD/data   # holds graph.bin, and any.alt, paved.alt and unpaved.alt if you built them
 pnpm dev
 ```
 
@@ -127,17 +128,17 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable             | Required | Default       | Description                                                                                                 |
-| -------------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
-| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                                    |
-| `PORT`               | no       | `3000`        | Port the server listens on                                                                                  |
-| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                                           |
-| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin` and the optional `hike.alt` and `run.alt`, or one such subdirectory per zone |
-| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                                  |
-| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))                  |
-| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none                          |
-| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                                |
-| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                                 |
+| Variable             | Required | Default       | Description                                                                                                                 |
+| -------------------- | -------- | ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                                                    |
+| `PORT`               | no       | `3000`        | Port the server listens on                                                                                                  |
+| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                                                           |
+| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin` and the optional `any.alt`, `paved.alt` and `unpaved.alt`, or one such subdirectory per zone |
+| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                                                  |
+| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))                                  |
+| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none                                          |
+| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                                                |
+| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                                                 |
 
 ### How many at once
 
@@ -168,7 +169,7 @@ zones, then builds them, so a newer extract needs no new image), then point the 
 and restart the pods. A pod restarting in the middle of a build in place would find a new `graph.bin` with old
 landmarks, which it refuses, and a zone dropped from the plan would still be served.
 
-The data is a volume: mount the directory holding `graph.bin`, `hike.alt` and `run.alt`, or one such
+The data is a volume: mount the directory holding `graph.bin`, `any.alt`, `paved.alt` and `unpaved.alt`, or one such
 subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. The server only reads it, and
 maps the files rather than copying them, so servers that share the directory share its page cache; restart
 them after a rebuild.

@@ -169,7 +169,7 @@ func TestBuildMakesAGraphTheEngineRoutesOn(t *testing.T) {
 		}
 	}
 
-	e, err := engine.Open(graph, "", "hike")
+	e, err := engine.Open(graph, "", "any")
 	if err != nil {
 		t.Fatal(err)
 	}

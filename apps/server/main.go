@@ -79,7 +79,7 @@ func run(command string, args []string) error {
 		fs := flag.NewFlagSet(command, flag.ExitOnError)
 		graph := fs.String("graph", filepath.Join(dataDir(), engine.GraphFileName), "graph file")
 		out := fs.String("out", "", "landmark file to write (default: the profile's file in the data directory)")
-		profile := fs.String("profile", "hike", "activity profile: hike or run")
+		profile := fs.String("profile", "any", "surface-preference profile: any, paved or unpaved")
 		count := fs.Int("landmarks", 8, "number of landmarks")
 		_ = fs.Parse(args)
 		if *out == "" {
@@ -100,22 +100,26 @@ func serve() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// The graph and the landmarks of each activity are built ahead of serving, by build-graph and build-alt.
+	// The graph and the landmarks of each profile are built ahead of serving, by build-graph and build-alt.
 	// The port opens once the files are mapped and their headers checked.
 	opened := time.Now()
-	zones, err := engine.OpenZones(dataDir(), "hike", "run")
+	zones, err := engine.OpenZones(dataDir(), engine.ProfileNames...)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("%d zone(s) opened in %s", zones.Len(), time.Since(opened).Round(time.Millisecond))
-	hike, run := zones.Activity("hike"), zones.Activity("run")
-	if hike == nil || run == nil { // a nil pointer in an interface is not a nil interface: fail here, not in a request
-		log.Fatal("the data holds no zone for an activity")
+	engines := make(map[string]generator.Looper, len(engine.ProfileNames))
+	for _, name := range engine.ProfileNames {
+		z := zones.Profile(name)
+		if z == nil { // a nil pointer in an interface is not a nil interface: fail here, not in a request
+			log.Fatalf("the data holds no zone for the %s profile", name)
+		}
+		engines[name] = z
 	}
 	if cfg.LoopLimit == 0 {
 		cfg.LoopLimit = engine.DefaultConcurrentSearches() // LOOP_LIMIT forces another
 	}
-	cfg.Generator = &generator.Generator{Engines: map[string]generator.Looper{"hike": hike, "run": run}}
+	cfg.Generator = &generator.Generator{Engines: engines}
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 

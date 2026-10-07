@@ -13,14 +13,14 @@ import (
 	"github.com/lesloi/path-finder/apps/server/engine"
 )
 
-// Looper generates loops, as an engine does for one activity.
+// Looper generates loops, as an engine does for one profile.
 type Looper interface {
 	Loops(ctx context.Context, req engine.LoopRequest) ([]*engine.Route, error)
 }
 
 // Generator builds route sets. It is safe for concurrent use.
 type Generator struct {
-	// Engines by activity ("run", "hike").
+	// Engines by surface preference ("any", "paved", "unpaved").
 	Engines map[string]Looper
 	// Candidates is how many loops to ask the engine for (default 40).
 	Candidates int
@@ -35,13 +35,13 @@ const defaultCandidates = 40
 // routes the loops finished by then make, if any, and ctx's error otherwise: asking for more
 // would only take longer.
 func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, error) {
-	criteria, activity, err := contract.ParseCriteria(body, true)
+	criteria, _, err := contract.ParseCriteria(body, true)
 	if err != nil {
 		return nil, err
 	}
-	looper := g.Engines[activity]
+	looper := g.Engines[criteria.Surface]
 	if looper == nil {
-		return nil, errors.New("generator: no engine for activity " + activity)
+		return nil, errors.New("generator: no engine for surface preference " + criteria.Surface)
 	}
 	km, err := criteria.TargetDistanceKm()
 	if err != nil {

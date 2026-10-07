@@ -34,7 +34,7 @@ func zoneGraph(eastM, northM float64) (g *testGraph, centre Point) {
 	return g, pointOf(g, first+(w/2)*w+w/2)
 }
 
-// writeZone puts the graph, and the landmarks of the hike profile, in dir.
+// writeZone puts the graph, and the landmarks of every profile, in dir.
 func writeZone(t *testing.T, dir string, g *testGraph) {
 	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -48,8 +48,8 @@ func writeZone(t *testing.T, dir string, g *testGraph) {
 	if err := os.WriteFile(graph, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	for _, activity := range []string{"hike", "run"} {
-		if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName(activity)), activity, 2); err != nil {
+	for _, profile := range ProfileNames {
+		if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName(profile)), profile, 2); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -57,18 +57,18 @@ func writeZone(t *testing.T, dir string, g *testGraph) {
 
 func loopsFrom(t *testing.T, z *Zones, from Point) ([]*Route, error) {
 	t.Helper()
-	hike := z.Activity("hike")
-	if hike == nil {
-		t.Fatal("no hike activity")
+	loops := z.Profile("any")
+	if loops == nil {
+		t.Fatal("no any profile")
 	}
-	return hike.Loops(context.Background(), LoopRequest{Start: from, Distance: 3000, Candidates: 8, Seed: 3})
+	return loops.Loops(context.Background(), LoopRequest{Start: from, Distance: 3000, Candidates: 8, Seed: 3})
 }
 
 func TestZonesOfAFlatDirectoryAreOneZone(t *testing.T) {
 	dir := t.TempDir()
 	g, centre := zoneGraph(0, 0)
 	writeZone(t, dir, g)
-	z, err := OpenZones(dir, "hike", "run")
+	z, err := OpenZones(dir, "any", "paved")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,8 +78,8 @@ func TestZonesOfAFlatDirectoryAreOneZone(t *testing.T) {
 	if loops, err := loopsFrom(t, z, centre); err != nil || len(loops) == 0 {
 		t.Errorf("loops from the zone: %d, %v", len(loops), err)
 	}
-	if z.Activity("ride") != nil {
-		t.Error("an activity that was not opened has loops")
+	if z.Profile("teleport") != nil {
+		t.Error("a profile that was not opened has loops")
 	}
 }
 
@@ -92,7 +92,7 @@ func TestEachZoneAnswersForItsOwnArea(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, "empty-folder"), 0o755); err != nil { // not a zone: no graph in it
 		t.Fatal(err)
 	}
-	z, err := OpenZones(dir, "hike", "run")
+	z, err := OpenZones(dir, "any", "paved")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestAZoneWithNoWayNearTheStartLetsTheNextOneAnswer(t *testing.T) {
 	sparse.connect(a, b, KindPath)
 	writeZone(t, filepath.Join(dir, "a-sparse"), sparse)
 
-	z, err := OpenZones(dir, "hike")
+	z, err := OpenZones(dir, "any")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestEdgeDistanceIsTheDistanceToTheNearestEdgeOfTheBox(t *testing.T) {
 }
 
 func TestZonesFailAtStartupOnWhatCannotBeServed(t *testing.T) {
-	if _, err := OpenZones(t.TempDir(), "hike"); err == nil || !strings.Contains(err.Error(), "no graph") {
+	if _, err := OpenZones(t.TempDir(), "any"); err == nil || !strings.Contains(err.Error(), "no graph") {
 		t.Errorf("a directory without a zone: err = %v", err)
 	}
 	if _, err := OpenZones(t.TempDir()); err == nil {
@@ -171,7 +171,7 @@ func TestZonesFailAtStartupOnWhatCannotBeServed(t *testing.T) {
 	if err := os.WriteFile(graph, data[:len(data)/2], 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := OpenZones(dir, "hike"); err == nil || !strings.Contains(err.Error(), "bad") {
+	if _, err := OpenZones(dir, "any"); err == nil || !strings.Contains(err.Error(), "bad") {
 		t.Errorf("a truncated zone: err = %v, want it to name the zone", err)
 	}
 }
@@ -180,7 +180,7 @@ func TestZonesFailAtStartupOnWhatCannotBeServed(t *testing.T) {
 func TestAZoneThatDidNotFinishBuildingStopsTheStartup(t *testing.T) {
 	good, _ := zoneGraph(0, 0)
 	for name, leftovers := range map[string][]string{
-		"landmarks without a graph": {"hike.alt", "run.alt"},
+		"landmarks without a graph": {"any.alt", "paved.alt"},
 		"a temporary graph":         {"graph.bin.tmp"},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -195,32 +195,32 @@ func TestAZoneThatDidNotFinishBuildingStopsTheStartup(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := OpenZones(dir, "hike", "run"); err == nil || !strings.Contains(err.Error(), "broken") {
+			if _, err := OpenZones(dir, "any", "paved"); err == nil || !strings.Contains(err.Error(), "broken") {
 				t.Errorf("err = %v, want it to name the unfinished zone", err)
 			}
 		})
 	}
 }
 
-// With several zones, a zone without the landmarks of an activity would serve slowly and unnoticed.
+// With several zones, a zone without the landmarks of a profile would serve slowly and unnoticed.
 func TestEachZoneOfADirectoryNeedsItsLandmarks(t *testing.T) {
 	dir := t.TempDir()
 	g, _ := zoneGraph(0, 0)
 	writeZone(t, filepath.Join(dir, "zone"), g)
-	if err := os.Remove(filepath.Join(dir, "zone", LandmarksFileName("run"))); err != nil {
+	if err := os.Remove(filepath.Join(dir, "zone", LandmarksFileName("paved"))); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := OpenZones(dir, "hike", "run"); err == nil || !strings.Contains(err.Error(), "run.alt") {
-		t.Errorf("a zone without run.alt: err = %v", err)
+	if _, err := OpenZones(dir, "any", "paved"); err == nil || !strings.Contains(err.Error(), "paved.alt") {
+		t.Errorf("a zone without paved.alt: err = %v", err)
 	}
 	// A directory that is one zone keeps the landmarks optional.
 	flat := t.TempDir()
 	writeZone(t, flat, g)
-	if err := os.Remove(filepath.Join(flat, LandmarksFileName("run"))); err != nil {
+	if err := os.Remove(filepath.Join(flat, LandmarksFileName("paved"))); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := OpenZones(flat, "hike", "run"); err != nil {
-		t.Errorf("a flat directory without run.alt: %v", err)
+	if _, err := OpenZones(flat, "any", "paved"); err != nil {
+		t.Errorf("a flat directory without paved.alt: %v", err)
 	}
 }
 
@@ -232,7 +232,7 @@ func TestAZoneDirectoryCanBeALink(t *testing.T) {
 	if err := os.Symlink(filepath.Join(store, "real"), filepath.Join(dir, "linked")); err != nil {
 		t.Fatal(err)
 	}
-	z, err := OpenZones(dir, "hike", "run")
+	z, err := OpenZones(dir, "any", "paved")
 	if err != nil || z.Len() != 1 {
 		t.Errorf("a linked zone: %v zones, %v", z, err)
 	}
@@ -244,7 +244,7 @@ func TestAGraphBesideZonesIsRefused(t *testing.T) {
 	g, _ := zoneGraph(0, 0)
 	writeZone(t, dir, g)
 	writeZone(t, filepath.Join(dir, "north"), g)
-	if _, err := OpenZones(dir, "hike", "run"); err == nil || !strings.Contains(err.Error(), "north") {
+	if _, err := OpenZones(dir, "any", "paved"); err == nil || !strings.Contains(err.Error(), "north") {
 		t.Errorf("a graph and a zone in one directory: err = %v, want it to name the zone", err)
 	}
 
@@ -256,7 +256,7 @@ func TestAGraphBesideZonesIsRefused(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if z, err := OpenZones(flat, "hike", "run"); err != nil || z.Len() != 1 {
+	if z, err := OpenZones(flat, "any", "paved"); err != nil || z.Len() != 1 {
 		t.Errorf("a graph beside other directories: %v zones, %v", z, err)
 	}
 }
@@ -270,7 +270,7 @@ func TestADataDirectoryCanBeALink(t *testing.T) {
 	if err := os.Symlink(real, current); err != nil {
 		t.Fatal(err)
 	}
-	z, err := OpenZones(current, "hike", "run")
+	z, err := OpenZones(current, "any", "paved")
 	if err != nil || z.Len() != 1 {
 		t.Errorf("a data directory that is a link: %v zones, %v", z, err)
 	}
