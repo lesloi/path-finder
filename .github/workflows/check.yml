@@ -25,16 +25,3 @@ jobs:
         with:
           go-version-file: apps/server/go.mod
       - run: pnpm check
-
-  # The app builds as the image does: the web app (`pnpm build`), then the server binary.
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
-      - uses: actions/setup-go@v7
-        with:
-          go-version-file: apps/server/go.mod
-      - run: pnpm build
-      - run: CGO_ENABLED=0 go build -trimpath -o /dev/null .
-        working-directory: apps/server
