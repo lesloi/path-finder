@@ -43,7 +43,7 @@ type Criteria struct {
 	Surface       string         `json:"surface"`
 	Pace          float64        `json:"pace"`
 	// IncludeTechnical allows the ways tagged technical (see engine.EdgeTechnical). Without it they are excluded,
-	// which is the one hard rule of the criteria: a surface preference only weights. It is never assumed.
+	// which is the one hard rule of the criteria: a surface preference only weights (DECISIONS.md, Routing). It is never assumed.
 	IncludeTechnical bool `json:"includeTechnical"`
 }
 

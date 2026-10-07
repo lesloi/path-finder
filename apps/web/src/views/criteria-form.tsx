@@ -273,7 +273,7 @@ export function CriteriaForm({
             ]}
             onChange={(surface) => change({ surface })}
           />
-          {/* Paved routes never reach such ways. */}
+          {/* A paved request always excludes them (DECISIONS.md, Routing), so there is nothing to choose. */}
           {draft.surface !== 'paved' && (
             <Switch
               testId="criteria-technical"

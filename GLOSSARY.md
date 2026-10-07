@@ -52,10 +52,10 @@ a route outright: the only hard rule of the criteria is the exclusion of **techn
 _Avoid_: Road type, terrain filter
 
 **Technical stretch**:
-A way tagged as asking for the hands, ropes or chains, or as exposed: on foot, `sac_scale` from
+A way tagged as asking for the hands, ropes or chains: on foot, `sac_scale` from
 `demanding_mountain_hiking` (T3) up. T1 and T2 are ordinary hiking and trail running. The switch « Inclure les
 passages techniques signalés » in the criteria is off by default, kept with the last criteria, and shown unless
-the surface preference is paved, which always excludes them. When it is off, flagged ways are excluded outright,
+the surface preference is paved, when the form always asks to exclude them and keeps the stored value. When it is off, flagged ways are excluded outright,
 not weighted, and a start point or waypoint on one moves to the nearest way allowed. An untagged way is never
 excluded: the switch says « signalés », it does not promise safety. A route that holds one carries the badge
 « passages techniques ».
@@ -140,7 +140,7 @@ _Avoid_: Sync, upload
 **Settings**:
 The user's preferences kept on the device: pace, language (English or French,
 the browser's until the user picks one), units, the last criteria (surface preference,
-elevation gain, whether the length is a distance or a duration), and which POI categories the map shows. Lost if the user clears the site's data.
+elevation gain, technical stretches, whether the length is a distance or a duration), and which POI categories the map shows. Lost if the user clears the site's data.
 _Avoid_: Profile, account
 
 ### On the map

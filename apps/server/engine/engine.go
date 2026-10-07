@@ -529,7 +529,7 @@ type route struct {
 
 // route finds the cheapest route, or nil when there is none or ctx is cancelled.
 // The context is read every 1,024 settled nodes, so a cancellation takes effect within microseconds.
-// skip is a set of edge flags: an edge holding one is not used, which keeps the landmark bounds valid, since
+// skip is a set of edge flags (DECISIONS.md, Routing): an edge holding one is not used, which keeps the landmark bounds valid, since
 // removing edges can only raise the cost of a route.
 // maxSettled caps the nodes one search may settle (0 for no cap): a loop leg that needs more is
 // not worth finding, and a huge search would also have to regrow its table, which cannot be interrupted.
