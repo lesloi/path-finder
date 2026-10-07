@@ -1,4 +1,4 @@
-import { formatDistance, formatDuration, formatHeight } from './units.ts';
+import { formatDistance, formatDuration, formatHeight, formatPace, paceUnit, parsePace } from './units.ts';
 
 describe('formatDistance', () => {
   it.each([
@@ -27,5 +27,31 @@ describe('formatDuration', () => {
     ['to the nearest minute', 84.6, '1 h 25'],
   ])('writes a duration %s', (_, minutes, expected) => {
     expect(formatDuration(minutes, 'en')).toBe(expected);
+  });
+});
+
+describe('pace', () => {
+  it('is minutes per distance, never a speed', () => {
+    expect(paceUnit('metric')).toBe('min/km');
+    expect(paceUnit('imperial')).toBe('min/mi');
+  });
+
+  it.each([
+    ['per kilometre', 5.5, 'metric', '5:30'],
+    ['per mile', 5.5, 'imperial', '8:51'],
+  ] as const)('writes a pace %s', (_, minPerKm, units, expected) => {
+    expect(formatPace(minPerKm, units)).toBe(expected);
+  });
+
+  it.each([
+    ['minutes and seconds', '5:30', 'metric', 5.5],
+    ['whole minutes', ' 6 ', 'metric', 6],
+    ['a mile pace', '8:51', 'imperial', 8.85 / 1.609344],
+  ] as const)('reads %s', (_, input, units, expected) => {
+    expect(parsePace(input, units)).toBeCloseTo(expected, 6);
+  });
+
+  it.each(['', '0', '0:00', '5:60', '5,5', 'fast'])('rejects "%s"', (input) => {
+    expect(parsePace(input, 'metric')).toBeUndefined();
   });
 });

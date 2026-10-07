@@ -13,7 +13,7 @@ spot on the map.
 _Avoid_: Origin, departure
 
 **Criteria**:
-Everything the user sets to ask for routes: start point, activity, a target distance or a
+Everything the user sets to ask for routes: start point, a target distance or a
 target duration, an optional target elevation gain, a surface preference, and up to three
 optional waypoints.
 _Avoid_: Filters, query, search parameters
@@ -22,7 +22,7 @@ _Avoid_: Filters, query, search parameters
 A point a route must pass through between its start and its end, in the order the user
 placed it. Up to three per set of criteria. Waypoints never replace the target distance or
 target duration: criteria whose waypoints alone exceed the target are refused. A waypoint
-off the ways the activity allows is moved to the nearest one, unless it is too far from any.
+off the ways a route can use is moved to the nearest one, unless it is too far from any.
 _Avoid_: Stage, via, étape
 
 **Target distance**:
@@ -62,19 +62,22 @@ The short key the server answers with when it refuses or fails a request (`inval
 app words each code in the user's language.
 _Avoid_: Error message
 
-### Activities and effort
+### Pace and effort
 
 **Activity**:
-What the user is doing: run or hike (ride later). An activity is data (default pace,
-allowed ways), not a branch in the code.
+The app has none. Run, trail run and hike are told apart by what the user sets: the
+length, the surface preference, the elevation gain, and the pace. Travel by bike will be a
+travel mode, not an activity.
 _Avoid_: Sport, mode, profile
 
 **Trail run**:
-A run with the unpaved surface preference. Not a separate activity.
+Running on unpaved ways: the unpaved surface preference. Not a separate kind of route.
 
 **Pace**:
-The user's flat-ground speed for an activity, stored in their settings.
-_Avoid_: Speed (except as the imperial/metric display of the same value)
+The user's flat-ground pace, in minutes per km (or per mile), 6 min/km until they set it.
+It gives the estimated duration, and turns a target duration into a distance. It is set
+under the duration and in the route list, and stored in their settings.
+_Avoid_: Speed
 
 **Effort distance**:
 Distance plus climb converted to distance, at 100 m of elevation gain for 1 km. Without
@@ -88,8 +91,8 @@ One generated loop, with its geometry, distance, elevation gain, surface breakdo
 _Avoid_: Trace, track, itinerary, path
 
 **Route name**:
-The label of a route in its GPX export: the activity, the day of the export, the distance,
-and the elevation gain when known, such as "Course · 28 sept. · 12,3 km · +340 m", in the
+The label of a route in its GPX export: the day of the export, the distance,
+and the elevation gain when known, such as "28 sept. · 12,3 km · +340 m", in the
 user's language and units. It never names where the route starts.
 _Avoid_: Title
 
@@ -125,9 +128,9 @@ otherwise downloaded, so the user can open it in their watch vendor's app.
 _Avoid_: Sync, upload
 
 **Settings**:
-The user's preferences kept on the device: pace per activity, language (English or French,
-the browser's until the user picks one), units, the last
-activity used (run on first launch), and which POI categories the map shows. Lost if the user clears the site's data.
+The user's preferences kept on the device: pace, language (English or French,
+the browser's until the user picks one), units, the last criteria (surface preference,
+elevation gain, whether the length is a distance or a duration), and which POI categories the map shows. Lost if the user clears the site's data.
 _Avoid_: Profile, account
 
 ### On the map

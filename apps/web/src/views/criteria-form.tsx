@@ -1,4 +1,4 @@
-import { Footprints, Info, Layers, Mountain, Ruler, Timer, TrendingUp, type LucideIcon } from 'lucide-react';
+import { Layers, Ruler, Timer, TrendingUp } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import {
@@ -11,31 +11,34 @@ import {
   type Criteria,
   type CriteriaField,
 } from '../contract/index.ts';
-import { CHIP, CHIP_ROW, Dialog, PRIMARY_BUTTON, SegmentedControl, Slider, useDesktop } from '../components/index.ts';
 import {
-  ACTIVITY_PACES,
-  DEFAULT_ACTIVITY,
+  CHIP,
+  CHIP_ROW,
+  Dialog,
+  PaceField,
+  PRIMARY_BUTTON,
+  SegmentedControl,
+  Slider,
+  useDesktop,
+} from '../components/index.ts';
+import {
   formatDuration,
   KM_PER_MILE,
   METRES_PER_FOOT,
-  type Activity,
   type Position,
   type RouteSetRequest,
   type Units,
 } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
-import { paceFor, useSettings } from '../state/index.ts';
+import { useSettings, type ElevationLevel } from '../state/index.ts';
 
-const ACTIVITIES = Object.keys(ACTIVITY_PACES) as Activity[];
-const ACTIVITY_ICONS = { run: Footprints, hike: Mountain } satisfies Record<Activity, LucideIcon>;
-
-const CRITERIA = ['activity', 'target', 'elevation', 'surface'] as const;
+const CRITERIA = ['target', 'surface', 'elevation'] as const;
 
 const DURATION_STEP = 5; // minutes
 const DURATION_DEFAULT = 60; // minutes
 
 type Target = 'distance' | 'duration';
-type Level = 'any' | 'flat' | 'hilly' | 'target';
+type Level = ElevationLevel;
 type Surface = Criteria['surface'];
 type Criterion = (typeof CRITERIA)[number];
 
@@ -50,12 +53,12 @@ export type Draft = {
 };
 
 /** The bounds of the sliders in the user's units, inside the API's bounds once converted back. */
-function boundsFor(activity: Activity, units: Units) {
+function boundsFor(units: Units) {
   const { kmPerDistanceUnit, metresPerGainUnit, gainStep } = unitsFor(units);
   return {
     distance: {
       min: Math.ceil(MIN_TARGET_DISTANCE / kmPerDistanceUnit),
-      max: Math.floor(MAX_TARGET_DISTANCE[activity] / kmPerDistanceUnit),
+      max: Math.floor(MAX_TARGET_DISTANCE / kmPerDistanceUnit),
     },
     gain: { max: Math.floor(MAX_TARGET_ELEVATION_GAIN / metresPerGainUnit / gainStep) * gainStep },
   };
@@ -63,58 +66,66 @@ function boundsFor(activity: Activity, units: Units) {
 
 function unitsFor(units: Units) {
   return units === 'metric'
-    ? { kmPerDistanceUnit: 1, metresPerGainUnit: 1, gainStep: 50, distance: 'km', gain: 'm', defaults: [10, 300] }
+    ? { kmPerDistanceUnit: 1, metresPerGainUnit: 1, gainStep: 50, distance: 'km', gain: 'm', defaultDistance: 10 }
     : {
         kmPerDistanceUnit: KM_PER_MILE,
         metresPerGainUnit: METRES_PER_FOOT,
         gainStep: 100,
         distance: 'mi',
         gain: 'ft',
-        defaults: [6, 1_000],
+        defaultDistance: 6,
       };
 }
 
-function defaultDraft(units: Units): Draft {
-  const [distance, gain] = unitsFor(units).defaults;
-  return { target: 'distance', distance, duration: DURATION_DEFAULT, level: 'any', gain, surface: 'any' };
-}
+const defaultDistance = (units: Units) => unitsFor(units).defaultDistance;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-// The same distance and elevation gain in other units, as close as the sliders' steps allow.
-function convert(draft: Draft, from: Units, to: Units): Draft {
-  const a = unitsFor(from);
-  const b = unitsFor(to);
-  const gain = Math.round((draft.gain * a.metresPerGainUnit) / b.metresPerGainUnit / b.gainStep) * b.gainStep;
-  return {
-    ...draft,
-    distance: Math.round((draft.distance * a.kmPerDistanceUnit) / b.kmPerDistanceUnit),
-    gain,
-  };
+// The same distance in other units, as close as the slider's step allows.
+function convertDistance(distance: number, from: Units, to: Units): number {
+  return Math.round((distance * unitsFor(from).kmPerDistanceUnit) / unitsFor(to).kmPerDistanceUnit);
 }
 
 const round = (value: number, decimals: number) => Math.round(value * 10 ** decimals) / 10 ** decimals;
 
 /**
- * What the user has set in the form, in their units. It follows a change of units made in the
+ * What the user has set in the form, in their units. The distance and the duration are asked anew with each
+ * visit; the rest is what they asked for last, kept on the device. It follows a change of units made in the
  * settings while the view stays mounted.
  */
 export function useCriteriaDraft(): [Draft, (draft: Draft) => void] {
-  const [{ units, lastActivity }] = useSettings();
-  const [draft, setDraft] = useState(() => defaultDraft(units));
+  const [{ units, criteria }, update] = useSettings();
+  const [lengths, setLengths] = useState(() => ({
+    distance: defaultDistance(units),
+    duration: DURATION_DEFAULT,
+  }));
   const [unitsBefore, setUnitsBefore] = useState(units);
   if (units !== unitsBefore) {
     setUnitsBefore(units);
     // Converts what the slider shows, not a distance it had to clamp.
-    const { distance } = boundsFor(lastActivity, unitsBefore);
-    setDraft(convert({ ...draft, distance: clamp(draft.distance, distance.min, distance.max) }, unitsBefore, units));
+    const { distance } = boundsFor(unitsBefore);
+    setLengths({
+      ...lengths,
+      distance: convertDistance(clamp(lengths.distance, distance.min, distance.max), unitsBefore, units),
+    });
+  }
+  const { metresPerGainUnit, gainStep } = unitsFor(units);
+  const draft: Draft = {
+    ...criteria,
+    ...lengths,
+    gain: Math.round(criteria.gain / metresPerGainUnit / gainStep) * gainStep,
+  };
+  function setDraft({ target, level, surface, gain, ...next }: Draft) {
+    setLengths(next);
+    // The gain is kept in metres, so a change of units does not change it.
+    update({ criteria: { target, level, surface, gain: Math.round(gain * metresPerGainUnit) } });
   }
   return [draft, setDraft];
 }
 
 /**
- * The criteria of a route set: activity, target distance or duration, elevation gain, and
- * surface, over the user's settings. `onSubmit` receives a request body that `parseCriteria`
+ * The criteria of a route set: target distance or duration, surface, and elevation gain,
+ * over the user's settings. `onSubmit` receives a request body that `parseCriteria`
  * accepts. On a phone, `compact` shows chips that each open one criterion.
  */
 export function CriteriaForm({
@@ -135,27 +146,21 @@ export function CriteriaForm({
   const desktop = useDesktop();
   const [settings, update] = useSettings();
   const { units } = settings;
-  const activity = settings.lastActivity;
   const own = useCriteriaDraft();
   const [draft, setDraft] = kept ?? own;
   const [open, setOpen] = useState<Criterion>();
-  const [paceInfo, setPaceInfo] = useState(false);
   // The sheet expanded behind the dialog.
   if (open && !(compact && !desktop)) setOpen(undefined);
 
-  const bounds = boundsFor(activity, units);
+  const bounds = boundsFor(units);
   const unit = unitsFor(units);
-  // A new activity may have a shorter maximum distance.
   const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
   const gain = clamp(draft.gain, 0, bounds.gain.max);
-  // The pace only turns a duration into a distance.
-  const showPaceHint = draft.target === 'duration' && settings.pace[activity] === undefined;
   const level = draft.level;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
   const request: RouteSetRequest | undefined = start && {
     start,
-    activity,
     target:
       draft.target === 'distance'
         ? { distance: round(distance * unit.kmPerDistanceUnit, 2) }
@@ -163,34 +168,11 @@ export function CriteriaForm({
     ...(level === 'target' && { elevationGain: Math.round(gain * unit.metresPerGainUnit) }),
     ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
     surface: draft.surface,
-    pace: paceFor(settings, activity),
+    pace: settings.pace,
   };
   const field = request && invalidField(request);
 
   const sections: Record<Criterion, { title: string; content: ReactNode }> = {
-    activity: {
-      title: t.activity,
-      content: (
-        <div role="group" data-testid="criteria-activity" aria-label={t.activity} className="flex gap-2">
-          {ACTIVITIES.map((value) => {
-            return (
-              <button
-                key={value}
-                type="button"
-                className={CHIP}
-                data-testid={`criteria-activity-${value}`}
-                data-set={value === activity ? '' : undefined}
-                aria-pressed={value === activity}
-                onClick={() => update({ lastActivity: value })}
-              >
-                <ActivityIcon activity={value} />
-                {t.activities[value]}
-              </button>
-            );
-          })}
-        </div>
-      ),
-    },
     target: {
       title: t.target,
       content: (
@@ -222,33 +204,20 @@ export function CriteriaForm({
               label={t.duration}
               value={draft.duration}
               shown={formatDuration(draft.duration, language)}
-              aside={
-                showPaceHint && (
-                  <button
-                    type="button"
-                    className="flex min-h-touch items-center gap-1 text-sm text-accent"
-                    data-testid="criteria-pace-info"
-                    aria-expanded={paceInfo}
-                    onClick={() => setPaceInfo(!paceInfo)}
-                  >
-                    <Info size={16} aria-hidden />
-                    {t.aboutPace}
-                  </button>
-                )
-              }
               min={TARGET_DURATION.min}
               max={TARGET_DURATION.max}
               step={DURATION_STEP}
               onChange={(value) => change({ duration: value })}
             />
           )}
-          {showPaceHint && paceInfo && (
-            <p className="text-sm text-ink-2">
-              <a className="text-accent underline" data-testid="criteria-pace-link" href="#/settings">
-                {t.adjustPace}
-              </a>{' '}
-              {t.adjustPaceHint}
-            </p>
+          {draft.target === 'duration' && (
+            <PaceField
+              label={t.pace}
+              pace={settings.pace}
+              units={units}
+              testId="criteria-pace"
+              onChange={(pace) => update({ pace })}
+            />
           )}
         </div>
       ),
@@ -303,20 +272,15 @@ export function CriteriaForm({
   };
 
   const criteria = CRITERIA;
-  const defaults = defaultDraft(units);
   const TargetIcon = draft.target === 'distance' ? Ruler : Timer;
   // `name` stands for the value on a chip that is the default, so two "Any" chips are told apart.
   const chips: Record<Criterion, { label: string; name?: string; icon?: ReactNode; set: boolean }> = {
-    activity: {
-      label: t.activities[activity],
-      icon: <ActivityIcon activity={activity} />,
-      set: activity !== DEFAULT_ACTIVITY,
-    },
     target: {
       label: draft.target === 'distance' ? `${distance} ${unit.distance}` : formatDuration(draft.duration, language),
       icon: <TargetIcon size={18} aria-hidden />,
       set:
-        draft.target === 'duration' || distance !== clamp(defaults.distance, bounds.distance.min, bounds.distance.max),
+        draft.target === 'duration' ||
+        distance !== clamp(defaultDistance(units), bounds.distance.min, bounds.distance.max),
     },
     elevation: {
       label: level === 'target' ? `${gain} ${unit.gain}` : { any: t.any, flat: t.flat, hilly: t.hilly }[level],
@@ -394,11 +358,6 @@ export function CriteriaForm({
   );
 }
 
-function ActivityIcon({ activity }: { activity: Activity }) {
-  const Icon = ACTIVITY_ICONS[activity];
-  return <Icon size={18} aria-hidden />;
-}
-
 // The first field `parseCriteria` rejects, as the API would.
 function invalidField(request: RouteSetRequest): CriteriaField | undefined {
   try {
@@ -427,7 +386,6 @@ function message(
   const t = criteriaText[language];
   const messages: Record<CriteriaField, string> = {
     start: t.startError,
-    activity: t.activityError,
     target: target === 'distance' ? t.distanceError(distance.min, distance.max, unit.distance) : t.durationError,
     elevationGain: t.elevationGainError(gain.max, unit.gain),
     surface: t.surfaceError,

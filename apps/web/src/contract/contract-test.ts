@@ -8,7 +8,7 @@ type Case = {
   name: string;
   body: unknown;
   countElevationGain?: boolean;
-  expect: { field: string } | { criteria: unknown; activity: string };
+  expect: { field: string } | { criteria: unknown };
 };
 
 describe('parseCriteria', () => {
@@ -22,7 +22,7 @@ describe('parseCriteria', () => {
         );
         expect(() => parseCriteria(body, options)).toThrow(RangeError);
       } else {
-        expect(parseCriteria(body, options)).toEqual(expected);
+        expect(parseCriteria(body, options)).toEqual(expected.criteria);
       }
     },
   );

@@ -1,7 +1,6 @@
-import type { Activity } from '../contract/index.ts';
 import type { Language } from './language.ts';
 
-/** Words several screens share: page titles, activity names, hemispheres, units of time, the GPX attribution. */
+/** Words several screens share: page titles, hemispheres, units of time, the GPX attribution. */
 export const commonText = {
   en: {
     back: 'Back',
@@ -10,7 +9,6 @@ export const commonText = {
     credits: 'Credits',
     privacy: 'Privacy policy',
     legalNotice: 'Legal notice',
-    activities: { run: 'Run', hike: 'Hike' },
     hemispheres: { north: 'N', south: 'S', east: 'E', west: 'W' },
     hour: 'h',
     minute: 'min',
@@ -23,10 +21,9 @@ export const commonText = {
     credits: 'Crédits',
     privacy: 'Politique de confidentialité',
     legalNotice: 'Mentions légales',
-    activities: { run: 'Course', hike: 'Randonnée' },
     hemispheres: { north: 'N', south: 'S', east: 'E', west: 'O' },
     hour: 'h',
     minute: 'min',
     gpxAttribution: 'Données © les contributeurs d’OpenStreetMap, ODbL.',
   },
-} satisfies Record<Language, { activities: Record<Activity, string> } & Record<string, unknown>>;
+} satisfies Record<Language, unknown>;

@@ -15,7 +15,6 @@ type criteriaCase struct {
 	Expect             struct {
 		Field    string          `json:"field"`
 		Criteria json.RawMessage `json:"criteria"`
-		Activity string          `json:"activity"`
 	} `json:"expect"`
 }
 
@@ -32,7 +31,7 @@ func TestParseCriteriaCases(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			count := tc.CountElevationGain == nil || *tc.CountElevationGain
-			c, activity, err := ParseCriteria(tc.Body, count)
+			c, err := ParseCriteria(tc.Body, count)
 			if tc.Expect.Field != "" {
 				var ce *CriteriaError
 				if !errors.As(err, &ce) || ce.Field != tc.Expect.Field {
@@ -47,8 +46,8 @@ func TestParseCriteriaCases(t *testing.T) {
 			var gotAny, wantAny any
 			_ = json.Unmarshal(got, &gotAny)
 			_ = json.Unmarshal(tc.Expect.Criteria, &wantAny)
-			if !reflect.DeepEqual(gotAny, wantAny) || activity != tc.Expect.Activity {
-				t.Errorf("got %s (%s), want %s (%s)", got, activity, tc.Expect.Criteria, tc.Expect.Activity)
+			if !reflect.DeepEqual(gotAny, wantAny) {
+				t.Errorf("got %s, want %s", got, tc.Expect.Criteria)
 			}
 		})
 	}
@@ -117,7 +116,7 @@ func TestTargetDistanceFromADuration(t *testing.T) {
 }
 
 func TestCriteriaErrorSaysWhatIsWrong(t *testing.T) {
-	_, _, err := ParseCriteria([]byte(`{"start":[200,45]}`), true)
+	_, err := ParseCriteria([]byte(`{"start":[200,45]}`), true)
 	var ce *CriteriaError
 	if !errors.As(err, &ce) || ce.Field != "start" || ce.Error() == "" || ce.Error() != ce.Message {
 		t.Errorf("err = %#v", err)

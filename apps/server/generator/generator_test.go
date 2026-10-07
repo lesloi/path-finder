@@ -34,7 +34,7 @@ func engineLoop(heading float64) *engine.Route {
 	}
 }
 
-const body = `{"start":[6.1294,45.8992],"activity":"hike","target":{"distance":10},"elevationGain":300,"surface":"any","pace":6}`
+const body = `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":300,"surface":"any","pace":6}`
 
 func generate(t *testing.T, looper *fakeLooper, ctx context.Context, request string) ([]contract.Route, error) {
 	t.Helper()
@@ -88,7 +88,7 @@ func TestGenerateSpellsOutTheContract(t *testing.T) {
 
 func TestGenerateSetsNoAscentForAShortcut(t *testing.T) {
 	looper := &fakeLooper{}
-	hilly := `{"start":[6.1294,45.8992],"activity":"hike","target":{"distance":10},"elevationGain":"hilly","surface":"any","pace":6}`
+	hilly := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":"hilly","surface":"any","pace":6}`
 	if _, err := generate(t, looper, context.Background(), hilly); err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestGenerateSetsNoAscentForAShortcut(t *testing.T) {
 func TestGenerateReportsInvalidCriteria(t *testing.T) {
 	_, err := generate(t, &fakeLooper{}, context.Background(), `{"start":[6,45]}`)
 	var ce *contract.CriteriaError
-	if !errors.As(err, &ce) || ce.Field != "activity" {
+	if !errors.As(err, &ce) || ce.Field != "target" {
 		t.Errorf("err = %v", err)
 	}
 }
@@ -147,7 +147,7 @@ func TestGenerateSkipsALoopWithNoLength(t *testing.T) {
 func TestGenerateUsesTheEngineOfTheSurfacePreference(t *testing.T) {
 	anyLooper, paved, unpaved := &fakeLooper{}, &fakeLooper{}, &fakeLooper{}
 	g := &Generator{Engines: map[string]Looper{"any": anyLooper, "paved": paved, "unpaved": unpaved}}
-	if _, err := g.Generate(context.Background(), json.RawMessage(`{"start":[6.1294,45.8992],"activity":"run","target":{"distance":5},"surface":"unpaved","pace":5}`)); err != nil {
+	if _, err := g.Generate(context.Background(), json.RawMessage(`{"start":[6.1294,45.8992],"target":{"distance":5},"surface":"unpaved","pace":5}`)); err != nil {
 		t.Fatal(err)
 	}
 	if unpaved.got.Candidates == 0 || anyLooper.got.Candidates != 0 || paved.got.Candidates != 0 {

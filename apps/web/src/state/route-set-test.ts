@@ -5,7 +5,6 @@ import { requestRouteSet, retryDelay, useRouteSet } from './route-set.ts';
 
 const request: RouteSetRequest = {
   start: [6.1294, 45.8992],
-  activity: 'run',
   target: { distance: 10 },
   surface: 'any',
   pace: 6,

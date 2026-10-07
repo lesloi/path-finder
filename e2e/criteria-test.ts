@@ -27,7 +27,21 @@ test.describe('the criteria form', () => {
     await expect(page.getByTestId('criteria-duration')).toBeVisible();
     // The e2e server has a stand-in graph with elevation (`apps/server/internal/standin`): the elevation gain is offered.
     await expect(page.getByTestId('criteria-elevation-hilly')).toBeAttached();
-    await page.getByTestId('criteria-pace-info').click();
-    await expect(page.getByTestId('criteria-pace-link')).toHaveAttribute('href', '#/settings');
+    // The pace is set where it is used, under the duration.
+    await expect(page.getByTestId('criteria-pace')).toHaveValue('6:00');
+  });
+
+  test('keeps the pace across a reload', async ({ page, isMobile }) => {
+    await page.goto('/');
+    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
+    await choose(page, 'target', 'duration');
+
+    await page.getByTestId('criteria-pace').fill('5:30');
+    await page.getByTestId('criteria-pace').blur();
+    await page.reload();
+    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
+
+    // The last criteria are kept too: the length is still set by duration.
+    await expect(page.getByTestId('criteria-pace')).toHaveValue('5:30');
   });
 });

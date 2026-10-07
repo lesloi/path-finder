@@ -19,28 +19,24 @@ function parse(content: string) {
 
 describe('gpxExport', () => {
   it('names the track after the route', () => {
-    const { content } = gpxExport(route, 'run', DAY, french);
+    const { content } = gpxExport(route, DAY, french);
 
-    expect(parse(content).querySelector('trk > name')?.textContent).toBe('Course · 28 sept. · 12,3 km · +340 m');
+    expect(parse(content).querySelector('trk > name')?.textContent).toBe('28 sept. · 12,3 km · +340 m');
   });
 
-  it('names the file after the activity, the day, the distance, and the elevation gain', () => {
-    expect(gpxExport(route, 'run', DAY, french).fileName).toBe('Course-2809-12km_340m.gpx');
-  });
-
-  it('leaves accents out of the file name', () => {
-    expect(gpxExport(route, 'hike', DAY, french).fileName).toBe('Randonnee-2809-12km_340m.gpx');
+  it('names the file after the day, the distance, and the elevation gain', () => {
+    expect(gpxExport(route, DAY, french).fileName).toBe('2809-12km_340m.gpx');
   });
 
   it('follows the language and units of the settings', () => {
-    const { fileName, content } = gpxExport(route, 'run', DAY, { units: 'imperial', language: 'en' });
+    const { fileName, content } = gpxExport(route, DAY, { units: 'imperial', language: 'en' });
 
-    expect(fileName).toBe('Run-2809-8mi_1114ft.gpx');
-    expect(parse(content).querySelector('trk > name')?.textContent).toBe('Run · Sep 28 · 7.7 mi · +1114 ft');
+    expect(fileName).toBe('2809-8mi_1114ft.gpx');
+    expect(parse(content).querySelector('trk > name')?.textContent).toBe('Sep 28 · 7.7 mi · +1114 ft');
   });
 
   it('writes one GPX 1.1 track with a height on every point and no timestamps', () => {
-    const gpx = parse(gpxExport(route, 'run', DAY, french).content);
+    const gpx = parse(gpxExport(route, DAY, french).content);
 
     expect(gpx.querySelector('parsererror')).toBeNull();
     expect(gpx.documentElement.getAttribute('version')).toBe('1.1');
@@ -56,20 +52,18 @@ describe('gpxExport', () => {
   it('writes no heights and no elevation gain for a route without them', () => {
     const geometry = loop(5).map(([lon, lat]): [number, number] => [lon, lat]);
 
-    const { fileName, content } = gpxExport({ geometry, distance: 12.34, estimatedDuration: 74 }, 'run', DAY, french);
+    const { fileName, content } = gpxExport({ geometry, distance: 12.34, estimatedDuration: 74 }, DAY, french);
 
-    expect(fileName).toBe('Course-2809-12km.gpx');
+    expect(fileName).toBe('2809-12km.gpx');
     const gpx = parse(content);
     expect(gpx.querySelectorAll('trkpt')).toHaveLength(5);
     expect(gpx.querySelector('ele')).toBeNull();
   });
 
   it('describes the route and its estimated duration, and credits OpenStreetMap', () => {
-    const desc = parse(gpxExport(route, 'run', DAY, french).content).querySelector('trk > desc')?.textContent;
+    const desc = parse(gpxExport(route, DAY, french).content).querySelector('trk > desc')?.textContent;
 
-    expect(desc).toBe(
-      'Course · 28 sept. · 12,3 km · +340 m · 1 h 25 min. Données © les contributeurs d’OpenStreetMap, ODbL.',
-    );
+    expect(desc).toBe('28 sept. · 12,3 km · +340 m · 1 h 25 min. Données © les contributeurs d’OpenStreetMap, ODbL.');
   });
 
   it(`keeps at most ${MAX_GPX_POINTS} points, with the start and end of the loop`, () => {
@@ -81,7 +75,7 @@ describe('gpxExport', () => {
     ]);
     const long = { ...route, geometry: zigzag };
 
-    const points = [...parse(gpxExport(long, 'run', DAY, french).content).querySelectorAll('trkpt')];
+    const points = [...parse(gpxExport(long, DAY, french).content).querySelectorAll('trkpt')];
 
     expect(points.length).toBeLessThanOrEqual(MAX_GPX_POINTS);
     expect(points[0].getAttribute('lat')).toBe(long.geometry[0][1].toFixed(6));

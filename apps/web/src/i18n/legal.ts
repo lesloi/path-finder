@@ -73,7 +73,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Your settings (pace, language, units, last activity) are kept in your browser’s storage. Routes are never saved. We receive neither. Clearing the site’s data in your browser erases them.',
+              text: 'Your settings (pace, language, units, last criteria) are kept in your browser’s storage. Routes are never saved. We receive neither. Clearing the site’s data in your browser erases them.',
             },
           },
         ],
@@ -95,7 +95,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'When you ask for routes, our server receives your criteria (start point coordinates, activity, pace, target distance or duration, elevation gain, surface preference) and, as with any connection, your IP address. It uses them only to generate the routes and forgets them once the response is sent. It writes no log that contains a location or an IP address.',
+              text: 'When you ask for routes, our server receives your criteria (start point coordinates, pace, target distance or duration, elevation gain, surface preference) and, as with any connection, your IP address. It uses them only to generate the routes and forgets them once the response is sent. It writes no log that contains a location or an IP address.',
             },
           },
           {
@@ -221,7 +221,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Vos réglages (allure, langue, unités, dernière activité) sont enregistrés dans le stockage de votre navigateur. Les itinéraires ne sont jamais enregistrés. Nous ne recevons ni les uns ni les autres. Effacer les données du site dans votre navigateur les supprime.',
+              text: 'Vos réglages (allure, langue, unités, derniers critères) sont enregistrés dans le stockage de votre navigateur. Les itinéraires ne sont jamais enregistrés. Nous ne recevons ni les uns ni les autres. Effacer les données du site dans votre navigateur les supprime.',
             },
           },
         ],
@@ -243,7 +243,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Quand vous demandez des itinéraires, notre serveur reçoit vos critères (coordonnées du point de départ, activité, allure, distance ou durée visée, dénivelé, préférence de revêtement) et, comme pour toute connexion, votre adresse IP. Il s’en sert uniquement pour calculer les itinéraires et les oublie dès la réponse envoyée. Il n’écrit aucun journal contenant une position ou une adresse IP.',
+              text: 'Quand vous demandez des itinéraires, notre serveur reçoit vos critères (coordonnées du point de départ, allure, distance ou durée visée, dénivelé, préférence de revêtement) et, comme pour toute connexion, votre adresse IP. Il s’en sert uniquement pour calculer les itinéraires et les oublie dès la réponse envoyée. Il n’écrit aucun journal contenant une position ou une adresse IP.',
             },
           },
           {

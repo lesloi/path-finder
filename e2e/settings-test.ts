@@ -7,7 +7,6 @@ test.describe('the settings', () => {
   test('survive a reload', async ({ page }) => {
     await page.goto('/#/settings');
 
-    await page.getByTestId('settings-pace-run').fill('5:30');
     await page.getByTestId('settings-units').click();
     await page.getByTestId('settings-units-imperial').click();
     await page.getByTestId('settings-language').click();
@@ -16,9 +15,6 @@ test.describe('the settings', () => {
 
     await expect(page.getByTestId('settings-language')).toHaveAccessibleName(`${fr.language} Français`);
     await expect(page.getByTestId('settings-units')).toHaveAccessibleName(`${fr.units} ${fr.imperial}`);
-    // 5:30 min/km is 8:51 min/mi.
-    await expect(page.getByTestId('settings-pace-run')).toHaveAccessibleName(`${fr.activities.run} (min/mi)`);
-    await expect(page.getByTestId('settings-pace-run')).toHaveValue('8:51');
   });
 
   test('keep a forced theme across a reload', async ({ page }) => {

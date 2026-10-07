@@ -14,14 +14,14 @@ import (
 var contractJSON []byte
 
 type limits struct {
-	Activities       map[string]struct{ MaxDistanceKm float64 } `json:"activities"`
-	MinDistanceKm    float64                                    `json:"minDistanceKm"`
-	DurationMinutes  struct{ Min, Max float64 }                 `json:"durationMinutes"`
-	MaxGainMetres    float64                                    `json:"maxElevationGainMetres"`
-	ClimbPerEffortKm float64                                    `json:"climbPerEffortKm"`
-	HillyMatchPerKm  float64                                    `json:"hillyMatchPerKm"`
-	Surfaces         []string                                   `json:"surfaces"`
-	ErrorCodes       []string                                   `json:"errorCodes"`
+	MaxDistanceKm    float64                    `json:"maxDistanceKm"`
+	MinDistanceKm    float64                    `json:"minDistanceKm"`
+	DurationMinutes  struct{ Min, Max float64 } `json:"durationMinutes"`
+	MaxGainMetres    float64                    `json:"maxElevationGainMetres"`
+	ClimbPerEffortKm float64                    `json:"climbPerEffortKm"`
+	HillyMatchPerKm  float64                    `json:"hillyMatchPerKm"`
+	Surfaces         []string                   `json:"surfaces"`
+	ErrorCodes       []string                   `json:"errorCodes"`
 }
 
 var bounds = func() limits {

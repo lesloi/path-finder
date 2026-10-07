@@ -1,5 +1,4 @@
 import { commonText } from '../i18n/index.ts';
-import type { Activity } from './activity.ts';
 import { routeName } from './route-name.ts';
 import { KM_PER_MILE, METRES_PER_FOOT, type Display } from './units.ts';
 
@@ -22,15 +21,10 @@ export const MAX_GPX_POINTS = 2_000;
 
 /**
  * The GPX export of a route, built on the device: a GPX 1.1 file with one track named after
- * the route, in a file such as "Course-2809-12km_340m.gpx".
+ * the route, in a file such as "2809-12km_340m.gpx".
  */
-export function gpxExport(
-  route: GpxRoute,
-  activity: Activity,
-  day: Date,
-  settings: Display,
-): { fileName: string; content: string } {
-  const name = routeName(activity, day, route, settings);
+export function gpxExport(route: GpxRoute, day: Date, settings: Display): { fileName: string; content: string } {
+  const name = routeName(day, route, settings);
   const minutes = Math.round(route.estimatedDuration);
   const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
   const points = simplify(route.geometry, MAX_GPX_POINTS)
@@ -50,25 +44,19 @@ ${points}
 </trk>
 </gpx>
 `;
-  return { fileName: `${fileName(route, activity, day, settings)}.gpx`, content };
+  return { fileName: `${fileName(route, day, settings)}.gpx`, content };
 }
 
-/** Short and without accents, such as "Randonnee-2809-12km_340m", or "Run-2809-8mi_1114ft" in imperial units. */
-function fileName(
-  { distance, elevationGain }: GpxRoute,
-  activity: Activity,
-  day: Date,
-  { units, language }: Display,
-): string {
+/** Short, such as "2809-12km_340m", or "2809-8mi_1114ft" in imperial units. */
+function fileName({ distance, elevationGain }: GpxRoute, day: Date, { units }: Display): string {
   const metric = units === 'metric';
-  const activityName = commonText[language].activities[activity].normalize('NFD').replace(/\p{Diacritic}/gu, '');
   const date = `${day.getDate()}`.padStart(2, '0') + `${day.getMonth() + 1}`.padStart(2, '0');
   const length = metric ? `${Math.round(distance)}km` : `${Math.round(distance / KM_PER_MILE)}mi`;
   const climb =
     elevationGain === undefined
       ? ''
       : `_${metric ? `${Math.round(elevationGain)}m` : `${Math.round(elevationGain / METRES_PER_FOOT)}ft`}`;
-  return `${activityName}-${date}-${length}${climb}`;
+  return `${date}-${length}${climb}`;
 }
 
 /** Douglas–Peucker, with a tolerance doubled from 1 m until at most `max` points are left. */

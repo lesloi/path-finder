@@ -12,12 +12,13 @@ import {
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
-import { useRef, type PointerEvent, type ReactNode } from 'react';
+import { useRef, useState, type PointerEvent, type ReactNode } from 'react';
 
 import type { Miss } from '../contract/index.ts';
 import {
   ElevationProfile,
   ICON_BUTTON,
+  PaceField,
   PRIMARY_BUTTON,
   ProfileSparkline,
   routeBorder,
@@ -30,7 +31,9 @@ import {
   formatDistance,
   formatDuration,
   formatHeight,
+  formatPace,
   gpxExport,
+  paceUnit,
   missText,
   saveGpx,
   type Position,
@@ -55,17 +58,20 @@ const words = ({ language }: Display) => ({ ...criteriaText[language], ...routes
 /**
  * The route set the user asked for: first a list of its routes, then the detail of one, which
  * swipes (or the arrow buttons on desktops) to the next. `onSelect` hears the route shown in the
- * list or the detail, `onHover` a place the user points at on the elevation profile.
+ * list or the detail, `onHover` a place the user points at on the elevation profile. The durations of the
+ * routes are at `pace`, which `onPaceChange` hears the user change in the list.
  */
 export function RouteSetView({
   display,
   request,
   routes,
+  pace,
   snapshot,
   selected,
   detail,
   onSelect,
   onDetailChange,
+  onPaceChange,
   onBack,
   onHover,
   condensed = false,
@@ -74,6 +80,8 @@ export function RouteSetView({
   /** The criteria the routes were generated for. */
   request: RouteSetRequest;
   routes: Route[];
+  /** Minutes per km, which the durations of the routes are estimated at. */
+  pace: number;
   /** What the map showed for these routes, to draw their thumbnails over. */
   snapshot?: MapSnapshot;
   selected: number;
@@ -81,6 +89,7 @@ export function RouteSetView({
   detail: boolean;
   onSelect: (index: number) => void;
   onDetailChange: (detail: boolean) => void;
+  onPaceChange: (pace: number) => void;
   /** Back to the criteria. */
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
@@ -93,7 +102,6 @@ export function RouteSetView({
     return (
       <RouteDetail
         display={display}
-        request={request}
         routes={routes}
         snapshot={snapshot}
         selected={selected}
@@ -137,6 +145,7 @@ export function RouteSetView({
           <span className="min-w-0 flex-1 truncate">{summary}</span>
         </div>
       )}
+      <RoutePace display={display} pace={pace} onChange={onPaceChange} />
       <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
         {routes.map((route, index) => (
           <li key={index}>
@@ -158,6 +167,38 @@ export function RouteSetView({
         ))}
       </ul>
     </>
+  );
+}
+
+// The pace the durations are estimated at, and a way to change it.
+function RoutePace({ display, pace, onChange }: { display: Display; pace: number; onChange: (pace: number) => void }) {
+  const t = words(display);
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return (
+      <PaceField
+        label={t.pace}
+        pace={pace}
+        units={display.units}
+        testId="routes-pace-input"
+        autoFocus
+        onChange={onChange}
+        onDone={() => setEditing(false)}
+      />
+    );
+  }
+  return (
+    <p data-testid="routes-pace" className="m-0 text-sm text-ink-2">
+      {t.estimatedAt(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)} ·{' '}
+      <button
+        type="button"
+        data-testid="routes-pace-edit"
+        className="min-h-touch text-accent underline"
+        onClick={() => setEditing(true)}
+      >
+        {t.editPace}
+      </button>
+    </p>
   );
 }
 
@@ -254,7 +295,6 @@ function MissMarker({ miss, text, testId }: { miss: Miss; text: string; testId: 
 
 function RouteDetail({
   display,
-  request,
   routes,
   snapshot,
   selected,
@@ -265,7 +305,6 @@ function RouteDetail({
   condensed,
 }: {
   display: Display;
-  request: RouteSetRequest;
   routes: Route[];
   snapshot?: MapSnapshot;
   selected: number;
@@ -399,7 +438,7 @@ function RouteDetail({
             data-testid="route-export"
             className={PRIMARY_BUTTON}
             // Nothing awaited before the share sheet: it needs the tap that opened it.
-            onClick={() => void saveGpx(gpxExport(route, request.activity, new Date(), display))}
+            onClick={() => void saveGpx(gpxExport(route, new Date(), display))}
           >
             <Download size={18} aria-hidden />
             {t.exportGpx}

@@ -1,36 +1,66 @@
 import { useSyncExternalStore } from 'react';
 
+import { MAX_TARGET_ELEVATION_GAIN, SURFACES, type Criteria } from '../contract/index.ts';
 import {
-  ACTIVITY_PACES,
   BASEMAPS,
-  DEFAULT_ACTIVITY,
   DEFAULT_BASEMAP,
+  DEFAULT_PACE,
   DEFAULT_THEME,
-  type Activity,
   type Basemap,
   type Theme,
   type Units,
 } from '../core/index.ts';
 import type { Language } from '../i18n/index.ts';
 
+/** How the elevation gain is asked for: no preference, a shortcut, or a target in metres. */
+export type ElevationLevel = 'any' | 'flat' | 'hilly' | 'target';
+
+/** The criteria the form starts from, the ones that do not change from one search to the next. */
+export type LastCriteria = {
+  /** What the length is set by. */
+  target: 'distance' | 'duration';
+  surface: Criteria['surface'];
+  level: ElevationLevel;
+  /** The target elevation gain, in metres whatever the units. */
+  gain: number;
+};
+
 /** What the user sets once and keeps on the device. Only the pace leaves it, with a route set request. */
 export type Settings = {
-  /** Minutes per km, per activity. Absent until the user sets it. */
-  pace: Partial<Record<Activity, number>>;
+  /** Minutes per km on flat ground. */
+  pace: number;
   /** Absent until the user picks one: the app follows the browser. */
   language?: Language;
   units: Units;
   theme: Theme;
   basemap: Basemap;
-  lastActivity: Activity;
+  criteria: LastCriteria;
 };
 
 const KEY = 'path-finder.settings';
-const ACTIVITIES = Object.keys(ACTIVITY_PACES) as Activity[];
+const LEVELS: ElevationLevel[] = ['any', 'flat', 'hilly', 'target'];
+
+export const DEFAULT_CRITERIA: LastCriteria = { target: 'distance', surface: 'any', level: 'any', gain: 300 };
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+const isPace = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
+const isGain = (value: unknown): value is number =>
+  typeof value === 'number' && value >= 0 && value <= MAX_TARGET_ELEVATION_GAIN;
+
+function parseCriteria(stored: unknown): LastCriteria {
+  const { target, surface, level, gain } = isObject(stored) ? stored : {};
+  return {
+    target: target === 'duration' ? 'duration' : DEFAULT_CRITERIA.target,
+    surface: SURFACES.includes(surface as Criteria['surface'])
+      ? (surface as Criteria['surface'])
+      : DEFAULT_CRITERIA.surface,
+    level: LEVELS.includes(level as ElevationLevel) ? (level as ElevationLevel) : DEFAULT_CRITERIA.level,
+    gain: isGain(gain) ? gain : DEFAULT_CRITERIA.gain,
+  };
+}
 
 // Each field falls back to its default on its own, so older or damaged data never breaks the app.
+// A pace kept per activity, or a last activity, from an earlier version is not read.
 function parse(raw: string | null): Settings {
   let stored: unknown;
   try {
@@ -38,20 +68,14 @@ function parse(raw: string | null): Settings {
   } catch {
     stored = {};
   }
-  const { pace, language, units, theme, basemap, lastActivity } = isObject(stored) ? stored : {};
-  const paces = isObject(pace) ? pace : {};
+  const { pace, language, units, theme, basemap, criteria } = isObject(stored) ? stored : {};
   return {
-    pace: Object.fromEntries(
-      ACTIVITIES.flatMap((activity) => {
-        const value = paces[activity];
-        return typeof value === 'number' && Number.isFinite(value) && value > 0 ? [[activity, value]] : [];
-      }),
-    ),
+    pace: isPace(pace) ? pace : DEFAULT_PACE,
     ...((language === 'fr' || language === 'en') && { language }),
     units: units === 'imperial' ? 'imperial' : 'metric',
     theme: theme === 'light' || theme === 'dark' ? theme : DEFAULT_THEME,
     basemap: BASEMAPS.includes(basemap as Basemap) ? (basemap as Basemap) : DEFAULT_BASEMAP,
-    lastActivity: ACTIVITIES.includes(lastActivity as Activity) ? (lastActivity as Activity) : DEFAULT_ACTIVITY,
+    criteria: parseCriteria(criteria),
   };
 }
 
@@ -97,9 +121,4 @@ export function watchSettings(listener: (settings: Settings) => void): () => voi
 /** The settings kept on the device, shared by every component that uses them. */
 export function useSettings(): [Settings, (change: Partial<Settings>) => void] {
   return [useSyncExternalStore(subscribe, getSettings), updateSettings];
-}
-
-/** The user's pace for an activity, in minutes per km, or its default. */
-export function paceFor(settings: Settings, activity: Activity): number {
-  return settings.pace[activity] ?? ACTIVITY_PACES[activity].default;
 }

@@ -9,7 +9,7 @@ import (
 // CriteriaError is a request body that is not valid criteria, with the field that failed.
 // Messages name the field, never its value: the server keeps no location.
 type CriteriaError struct {
-	Field   string // start, activity, target, elevationGain, surface or pace
+	Field   string // start, target, elevationGain, surface or pace
 	Message string
 }
 
@@ -67,8 +67,8 @@ func (c Criteria) TargetDistanceKm() (float64, error) {
 	return distance, nil
 }
 
-func fail(field, message string) (Criteria, string, error) {
-	return Criteria{}, "", &CriteriaError{Field: field, Message: message}
+func fail(field, message string) (Criteria, error) {
+	return Criteria{}, &CriteriaError{Field: field, Message: message}
 }
 
 func number(v any) (float64, bool) {
@@ -81,11 +81,10 @@ func within(v any, lo, hi float64) (float64, bool) {
 	return n, ok && n >= lo && n <= hi
 }
 
-// ParseCriteria reads criteria and the activity from a request body, within the bounds of
+// ParseCriteria reads criteria from a request body, within the bounds of
 // contract.json. It returns a *CriteriaError naming the field on anything else, including a target
-// duration too short for the target elevation gain or too long for the activity at the user's
-// pace. Without countElevationGain, the target elevation gain is checked but dropped.
-func ParseCriteria(body []byte, countElevationGain bool) (Criteria, string, error) {
+// duration too short for the target elevation gain or too long at the user's pace. Without countElevationGain, the target elevation gain is checked but dropped.
+func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 	var raw any
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return fail("start", "criteria must be JSON")
@@ -107,18 +106,12 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, string, erro
 	}
 	c.Start = [2]float64{lon, lat}
 
-	activity, _ := obj["activity"].(string)
-	limit, known := bounds.Activities[activity]
-	if !known {
-		return fail("activity", "unknown activity")
-	}
-
 	target, ok := obj["target"].(map[string]any)
 	if !ok || len(target) != 1 {
 		return fail("target", "target must be a distance or a duration")
 	}
 	if v, isDistance := target["distance"]; isDistance {
-		d, ok := within(v, bounds.MinDistanceKm, limit.MaxDistanceKm)
+		d, ok := within(v, bounds.MinDistanceKm, bounds.MaxDistanceKm)
 		if !ok {
 			return fail("target", "target distance out of bounds")
 		}
@@ -170,10 +163,10 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, string, erro
 	if err != nil {
 		return fail("target", err.Error())
 	}
-	if distance > limit.MaxDistanceKm {
+	if distance > bounds.MaxDistanceKm {
 		return fail("target", "target duration makes too long a route at this pace")
 	}
-	return c, activity, nil
+	return c, nil
 }
 
 func contains(list []string, s string) bool {
