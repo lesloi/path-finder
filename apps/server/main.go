@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -122,7 +123,17 @@ func serve() {
 	if cfg.LoopLimit == 0 {
 		cfg.LoopLimit = engine.DefaultConcurrentSearches() // LOOP_LIMIT forces another
 	}
-	cfg.Generator = &generator.Generator{Engines: engines}
+	gen := &generator.Generator{Engines: engines}
+	// SEARCH_SEED fixes the seed of every search, so that the end-to-end tests ask for the same loops each time.
+	// Without it each request has its own, and asking again can bring other loops.
+	if raw := os.Getenv("SEARCH_SEED"); raw != "" {
+		seed, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil {
+			log.Fatalf("SEARCH_SEED must be a whole number: %v", err)
+		}
+		gen.Seed = func() uint64 { return seed }
+	}
+	cfg.Generator = gen
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 

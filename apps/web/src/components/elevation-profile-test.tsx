@@ -16,6 +16,7 @@ const route: Route = {
   misses: [],
   unpavedShare: 0,
   surfaces: [{ surface: 'paved', share: 1 }],
+  technical: false,
 };
 
 function plot(onHover = vi.fn(), props: Partial<Route> = {}, language: 'en' | 'fr' = 'en') {

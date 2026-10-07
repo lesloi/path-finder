@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clock,
   Download,
+  Mountain,
   Ruler,
   SlidersHorizontal,
   Timer,
@@ -202,6 +203,7 @@ function RouteRow({
     ...(gain ? [`${t.elevationGain} ${gain}`] : []),
     `${t.estimatedDuration} ${duration}`,
     ...misses,
+    ...(route.technical ? [t.technical] : []),
   ].join(', ');
   return (
     <button
@@ -238,6 +240,7 @@ function RouteRow({
         {route.misses.map((miss, k) => (
           <MissMarker key={miss.criterion} miss={miss} text={misses[k]} testId={`routes-row-${index}-miss`} />
         ))}
+        {route.technical && <Marker icon={Mountain} text={t.technical} testId={`routes-row-${index}-technical`} />}
       </span>
       {/* The empty width of the row: where the route climbs, at a glance. */}
       <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
@@ -248,12 +251,12 @@ function RouteRow({
 
 /** A criterion a suggestion misses, with its gap, such as "+30% elevation gain". */
 function MissMarker({ miss, text, testId }: { miss: Miss; text: string; testId: string }) {
-  const Icon = MISS_ICONS[miss.criterion];
+  return <Marker icon={MISS_ICONS[miss.criterion]} text={text} testId={`${testId}-${miss.criterion}`} />;
+}
+
+function Marker({ icon: Icon, text, testId }: { icon: LucideIcon; text: string; testId: string }) {
   return (
-    <span
-      data-testid={`${testId}-${miss.criterion}`}
-      className="flex items-center gap-1 text-sm font-semibold text-ink"
-    >
+    <span data-testid={testId} className="flex items-center gap-1 text-sm font-semibold text-ink">
       <Icon size={14} aria-hidden className="text-miss" />
       {text}
     </span>

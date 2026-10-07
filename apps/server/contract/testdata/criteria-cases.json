@@ -8,7 +8,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "elevationGain": 300
+      "elevationGain": 300,
+      "includeTechnical": false
     },
     "expect": {
       "criteria": {
@@ -18,7 +19,8 @@
         },
         "elevationGain": 300,
         "surface": "any",
-        "pace": 6
+        "pace": 6,
+        "includeTechnical": false
       }
     }
   },
@@ -31,7 +33,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "elevationGain": "hilly"
+      "elevationGain": "hilly",
+      "includeTechnical": false
     },
     "expect": {
       "criteria": {
@@ -41,7 +44,8 @@
         },
         "elevationGain": "hilly",
         "surface": "any",
-        "pace": 6
+        "pace": 6,
+        "includeTechnical": false
       }
     }
   },
@@ -54,7 +58,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "elevationGain": "flat"
+      "elevationGain": "flat",
+      "includeTechnical": false
     },
     "expect": {
       "criteria": {
@@ -64,7 +69,8 @@
         },
         "elevationGain": "flat",
         "surface": "any",
-        "pace": 6
+        "pace": 6,
+        "includeTechnical": false
       }
     }
   },
@@ -77,7 +83,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "name": "x"
+      "name": "x",
+      "includeTechnical": false
     },
     "expect": {
       "criteria": {
@@ -86,7 +93,8 @@
           "distance": 10
         },
         "surface": "any",
-        "pace": 6
+        "pace": 6,
+        "includeTechnical": false
       }
     }
   },
@@ -98,7 +106,8 @@
         "distance": 10
       },
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "criteria": {
@@ -107,7 +116,8 @@
           "distance": 10
         },
         "surface": "any",
-        "pace": 6
+        "pace": 6,
+        "includeTechnical": false
       }
     }
   },
@@ -125,7 +135,8 @@
         "distance": 10
       },
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "start"
@@ -139,7 +150,8 @@
         "distance": 10
       },
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "start"
@@ -153,7 +165,8 @@
         "distance": 10
       },
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "start"
@@ -165,7 +178,8 @@
       "start": [6.1294, 45.8992],
       "target": {},
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "target"
@@ -180,7 +194,8 @@
         "duration": 60
       },
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "target"
@@ -194,7 +209,8 @@
         "distance": 1.9
       },
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "target"
@@ -208,7 +224,8 @@
         "distance": 51
       },
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "target"
@@ -222,7 +239,8 @@
         "duration": 14
       },
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "target"
@@ -236,7 +254,8 @@
         "duration": 361
       },
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "target"
@@ -251,7 +270,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "elevationGain": -1
+      "elevationGain": -1,
+      "includeTechnical": false
     },
     "expect": {
       "field": "elevationGain"
@@ -266,7 +286,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "elevationGain": 2501
+      "elevationGain": 2501,
+      "includeTechnical": false
     },
     "expect": {
       "field": "elevationGain"
@@ -281,7 +302,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "elevationGain": "steep"
+      "elevationGain": "steep",
+      "includeTechnical": false
     },
     "expect": {
       "field": "elevationGain"
@@ -295,7 +317,8 @@
         "distance": 10
       },
       "surface": "sand",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "surface"
@@ -309,7 +332,8 @@
         "distance": 10
       },
       "surface": "any",
-      "pace": 0
+      "pace": 0,
+      "includeTechnical": false
     },
     "expect": {
       "field": "pace"
@@ -323,7 +347,8 @@
         "distance": 10
       },
       "surface": "any",
-      "pace": "6"
+      "pace": "6",
+      "includeTechnical": false
     },
     "expect": {
       "field": "pace"
@@ -338,7 +363,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "elevationGain": 2500
+      "elevationGain": 2500,
+      "includeTechnical": false
     },
     "expect": {
       "criteria": {
@@ -348,7 +374,8 @@
         },
         "elevationGain": 2500,
         "surface": "any",
-        "pace": 6
+        "pace": 6,
+        "includeTechnical": false
       }
     }
   },
@@ -360,7 +387,8 @@
         "duration": 360
       },
       "surface": "any",
-      "pace": 7.2
+      "pace": 7.2,
+      "includeTechnical": false
     },
     "expect": {
       "criteria": {
@@ -369,7 +397,8 @@
           "duration": 360
         },
         "surface": "any",
-        "pace": 7.2
+        "pace": 7.2,
+        "includeTechnical": false
       }
     }
   },
@@ -382,7 +411,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "elevationGain": 2000
+      "elevationGain": 2000,
+      "includeTechnical": false
     },
     "expect": {
       "field": "target"
@@ -397,7 +427,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "elevationGain": 2000
+      "elevationGain": 2000,
+      "includeTechnical": false
     },
     "countElevationGain": false,
     "expect": {
@@ -407,7 +438,8 @@
           "duration": 30
         },
         "surface": "any",
-        "pace": 6
+        "pace": 6,
+        "includeTechnical": false
       }
     }
   },
@@ -420,7 +452,8 @@
       },
       "surface": "any",
       "pace": 6,
-      "elevationGain": 2501
+      "elevationGain": 2501,
+      "includeTechnical": false
     },
     "countElevationGain": false,
     "expect": {
@@ -435,7 +468,8 @@
         "duration": 360
       },
       "surface": "any",
-      "pace": 6
+      "pace": 6,
+      "includeTechnical": false
     },
     "expect": {
       "field": "target"
@@ -449,7 +483,8 @@
         "duration": 360
       },
       "surface": "any",
-      "pace": 9
+      "pace": 9,
+      "includeTechnical": false
     },
     "expect": {
       "criteria": {
@@ -458,7 +493,113 @@
           "duration": 360
         },
         "surface": "any",
-        "pace": 9
+        "pace": 9,
+        "includeTechnical": false
+      }
+    }
+  },
+  {
+    "name": "includes the technical stretches when asked",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "unpaved",
+      "pace": 6,
+      "includeTechnical": true
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "unpaved",
+        "pace": 6,
+        "includeTechnical": true
+      }
+    }
+  },
+  {
+    "name": "refuses criteria without the technical switch",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "unpaved",
+      "pace": 6
+    },
+    "expect": {
+      "field": "includeTechnical"
+    }
+  },
+  {
+    "name": "refuses a technical switch that is not a boolean (string)",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "unpaved",
+      "pace": 6,
+      "includeTechnical": "true"
+    },
+    "expect": {
+      "field": "includeTechnical"
+    }
+  },
+  {
+    "name": "refuses a technical switch that is not a boolean (number)",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "unpaved",
+      "pace": 6,
+      "includeTechnical": 1
+    },
+    "expect": {
+      "field": "includeTechnical"
+    }
+  },
+  {
+    "name": "refuses a null technical switch",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "unpaved",
+      "pace": 6,
+      "includeTechnical": null
+    },
+    "expect": {
+      "field": "includeTechnical"
+    }
+  },
+  {
+    "name": "excludes the technical stretches of a paved request whatever it sends",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "paved",
+      "pace": 6,
+      "includeTechnical": true
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "paved",
+        "pace": 6,
+        "includeTechnical": false
       }
     }
   }

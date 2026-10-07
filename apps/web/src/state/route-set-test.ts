@@ -8,6 +8,7 @@ const request: RouteSetRequest = {
   target: { distance: 10 },
   surface: 'any',
   pace: 6,
+  includeTechnical: false,
 };
 
 const route: Route = {
@@ -21,6 +22,7 @@ const route: Route = {
   misses: [],
   unpavedShare: 0,
   surfaces: [{ surface: 'paved', share: 1 }],
+  technical: false,
 };
 
 function answer(response: Response | Promise<Response>) {

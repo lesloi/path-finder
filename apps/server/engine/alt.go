@@ -104,7 +104,7 @@ func buildLandmarks(g *graph, sp *spatial, p *Profile, count int, up float32) []
 		minLat, maxLat = min(minLat, n.Lat), max(maxLat, n.Lat)
 		minLon, maxLon = min(minLon, n.Lon), max(maxLon, n.Lon)
 	}
-	center, _, _ := sp.nearest(g, float64(minLat+maxLat)/2e7, float64(minLon+maxLon)/2e7)
+	center, _, _ := sp.nearest(g, noSkip, float64(minLat+maxLat)/2e7, float64(minLon+maxLon)/2e7)
 	reach := make([]float32, g.n)
 	dijkstraAll(g, p, center, reach, 0, false)
 

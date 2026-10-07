@@ -351,8 +351,8 @@ func TestLandmarksStayALowerBoundWhenTheSearchClimbsLessThanTheyDo(t *testing.T)
 	ctx := context.Background()
 	for _, climb := range []float32{0, 1, 3, 8, 16} {
 		for _, pair := range [][2]int{{at(0, 0), at(8, 8)}, {at(8, 0), at(0, 8)}, {at(4, 0), at(4, 8)}, {at(0, 4), at(8, 4)}} {
-			a := sp.route(ctx, plain, climb, nil, 0, uint32(pair[0]), uint32(pair[1]))
-			b := sb.route(ctx, boosted, climb, nil, 0, uint32(pair[0]), uint32(pair[1]))
+			a := sp.route(ctx, plain, climb, nil, searchLimits{}, uint32(pair[0]), uint32(pair[1]))
+			b := sb.route(ctx, boosted, climb, nil, searchLimits{}, uint32(pair[0]), uint32(pair[1]))
 			if a == nil || b == nil {
 				t.Fatalf("climb %v: no route (%v, %v)", climb, a, b)
 			}

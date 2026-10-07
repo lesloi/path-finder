@@ -18,6 +18,8 @@ const (
 	baseHeight = 600
 	hillHeight = 80
 	wavelength = 2500
+	// technicalFrom is the lattice column from which the tracks are technical: 1.2 km east of the start.
+	technicalFrom = side/2 + 8
 )
 
 // Files are what Write produced.
@@ -27,7 +29,8 @@ type Files struct {
 }
 
 // Write writes the graph and the landmarks of every profile into dir. Ways west of the start
-// are paved residential streets, those east of it rough tracks, so loops cover both surfaces.
+// are paved residential streets, those east of it rough tracks, so loops cover both surfaces. The tracks
+// from column technicalFrom on are tagged technical, so that a route set with and without them differs.
 func Write(dir string) (Files, error) {
 	var b engine.Builder
 	const metresPerDegree = 111194.9
@@ -41,9 +44,12 @@ func Write(dir string) (Files, error) {
 		}
 	}
 	way := func(a, c, x int) {
-		if x < side/2 {
+		switch {
+		case x < side/2:
 			b.Connect(a, c, engine.KindResidential, engine.SurfacePaved)
-		} else {
+		case x >= technicalFrom:
+			b.ConnectTechnical(a, c, engine.KindTrack, engine.SurfaceRough)
+		default:
 			b.Connect(a, c, engine.KindTrack, engine.SurfaceRough)
 		}
 	}

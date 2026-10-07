@@ -35,6 +35,8 @@ export const criteriaText = {
     paved: 'Paved',
     anySurface: 'Any',
     unpaved: 'Unpaved',
+    includeTechnical: 'Allow flagged technical stretches',
+    technicalShort: 'Technical',
     findRoutes: 'Find routes',
     pace: 'Pace',
     distanceError: (min: number, max: number, unit: string) =>
@@ -44,6 +46,7 @@ export const criteriaText = {
     startError: 'Choose a start point.',
     surfaceError: 'Choose a surface.',
     paceError: 'Your pace is not valid.',
+    includeTechnicalError: 'Choose whether to include technical stretches.',
   },
   fr: {
     criteria: 'Critères',
@@ -78,6 +81,8 @@ export const criteriaText = {
     paved: 'Goudronné',
     anySurface: 'Indifférent',
     unpaved: 'Non goudronné',
+    includeTechnical: 'Autoriser les passages techniques signalés',
+    technicalShort: 'Technique',
     findRoutes: 'Trouver des parcours',
     pace: 'Allure',
     distanceError: (min: number, max: number, unit: string) =>
@@ -87,5 +92,6 @@ export const criteriaText = {
     startError: 'Choisissez un point de départ.',
     surfaceError: 'Choisissez un revêtement.',
     paceError: 'Votre allure n’est pas valide.',
+    includeTechnicalError: 'Choisissez si les passages techniques sont inclus.',
   },
 } satisfies Record<Language, unknown>;

@@ -55,6 +55,10 @@ export DATA_DIR=$PWD/../../data
 ./path-finder build-alt -profile unpaved
 ```
 
+A graph built before the technical stretches is refused when the server starts (the current format is `PFGRAPH6`): build it again, then
+the landmarks. A server that is running keeps the zones it serves when replaced files cannot be served, and says why
+in its log.
+
 A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
 a half-written one. A running server looks at the directory every 30 seconds and serves the files that replace
 the ones it maps, with no restart. Replace a file by renaming a new one over it, never by writing into it.
@@ -137,6 +141,7 @@ pnpm start   # http://localhost:3000
 | `DATA_DIR`           | no       | `data`        | The directory with `graph.bin` and the optional `any.alt`, `paved.alt` and `unpaved.alt`, or one such subdirectory per zone |
 | `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                                                  |
 | `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))                                  |
+| `SEARCH_SEED`        | no       | random        | A whole number that fixes the seed of every search, so that the same criteria bring the same loops (for tests)              |
 | `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none                                          |
 | `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                                                |
 | `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                                                 |

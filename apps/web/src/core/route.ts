@@ -25,6 +25,8 @@ export type Route = {
   misses: Miss[];
   unpavedShare: number;
   surfaces: SurfaceStretch[];
+  /** Holds a technical stretch: a way where the hands, ropes or chains are needed. */
+  technical: boolean;
 };
 
 /** A sample of the elevation profile: kilometres from the start, and the height there in metres. */
@@ -46,13 +48,24 @@ const isPoint = (value: unknown): value is number[] =>
 
 function parseRoute(value: unknown): Route | undefined {
   if (!isObject(value)) return undefined;
-  const { geometry, distance, elevationGain, elevationLoss, estimatedDuration, kind, misses, unpavedShare, surfaces } =
-    value;
+  const {
+    geometry,
+    distance,
+    elevationGain,
+    elevationLoss,
+    estimatedDuration,
+    kind,
+    misses,
+    unpavedShare,
+    surfaces,
+    technical,
+  } = value;
   if (!Array.isArray(geometry) || !geometry.every(isPoint)) return undefined;
   if (!isNumber(distance) || !isNumber(estimatedDuration) || !isNumber(unpavedShare)) return undefined;
   if (elevationGain !== undefined && !isNumber(elevationGain)) return undefined;
   if (elevationLoss !== undefined && !isNumber(elevationLoss)) return undefined;
   if (kind !== 'match' && kind !== 'suggestion') return undefined;
+  if (typeof technical !== 'boolean') return undefined;
   const validMisses =
     Array.isArray(misses) &&
     misses.every(
@@ -75,6 +88,7 @@ function parseRoute(value: unknown): Route | undefined {
     misses: (misses as Miss[]).map(({ criterion, gap }) => ({ criterion, gap })),
     unpavedShare,
     surfaces: (surfaces as SurfaceStretch[]).map(({ surface, share }) => ({ surface, share })),
+    technical,
   };
 }
 

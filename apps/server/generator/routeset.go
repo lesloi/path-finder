@@ -40,6 +40,7 @@ type candidate struct {
 	elevationGain *float64    // metres
 	elevationLoss *float64
 	unpavedShare  float64
+	technical     bool
 	surfaces      []contract.SurfaceStretch
 }
 
@@ -148,7 +149,7 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	return ranked{contract.Route{
 		Geometry: cand.geometry, Distance: cand.distance, ElevationGain: cand.elevationGain,
 		ElevationLoss: cand.elevationLoss, EstimatedDuration: estimated, Kind: kind, Misses: misses,
-		UnpavedShare: cand.unpavedShare, Surfaces: cand.surfaces,
+		UnpavedShare: cand.unpavedShare, Surfaces: cand.surfaces, Technical: cand.technical,
 	}, score, cells}, true
 }
 

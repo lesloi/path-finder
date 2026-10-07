@@ -67,4 +67,5 @@ type Route struct {
 	Misses            []Miss           `json:"misses"`
 	UnpavedShare      float64          `json:"unpavedShare"`
 	Surfaces          []SurfaceStretch `json:"surfaces"`
+	Technical         bool             `json:"technical"` // holds a technical stretch
 }

@@ -23,9 +23,11 @@ export type LastCriteria = {
   level: ElevationLevel;
   /** The target elevation gain, in metres whatever the units. */
   gain: number;
+  /** Whether to include the technical stretches. Kept whatever the surface; a paved request sends false instead. */
+  includeTechnical: boolean;
 };
 
-/** What the user sets once and keeps on the device. Only the pace leaves it, with a route set request. */
+/** What the user sets once and keeps on the device. Only the pace and the last criteria leave it, with a route set request. */
 export type Settings = {
   /** Minutes per km on flat ground. */
   pace: number;
@@ -40,7 +42,13 @@ export type Settings = {
 const KEY = 'path-finder.settings';
 const LEVELS: ElevationLevel[] = ['any', 'flat', 'hilly', 'target'];
 
-export const DEFAULT_CRITERIA: LastCriteria = { target: 'distance', surface: 'any', level: 'any', gain: 300 };
+export const DEFAULT_CRITERIA: LastCriteria = {
+  target: 'distance',
+  surface: 'any',
+  level: 'any',
+  gain: 300,
+  includeTechnical: false,
+};
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 const isPace = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
@@ -53,12 +61,13 @@ const isSurface = (value: unknown): value is LastCriteria['surface'] =>
 const isLevel = (value: unknown): value is ElevationLevel => LEVELS.includes(value as ElevationLevel);
 
 function parseLastCriteria(stored: unknown): LastCriteria {
-  const { target, surface, level, gain } = isObject(stored) ? stored : {};
+  const { target, surface, level, gain, includeTechnical } = isObject(stored) ? stored : {};
   return {
     target: isTarget(target) ? target : DEFAULT_CRITERIA.target,
     surface: isSurface(surface) ? surface : DEFAULT_CRITERIA.surface,
     level: isLevel(level) ? level : DEFAULT_CRITERIA.level,
     gain: isGain(gain) ? gain : DEFAULT_CRITERIA.gain,
+    includeTechnical: includeTechnical === true,
   };
 }
 

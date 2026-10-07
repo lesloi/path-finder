@@ -10,11 +10,11 @@ import (
 )
 
 // File formats. The graph packs what a search reads together: one 12-byte record per node
-// (position and elevation) and per edge (target, length, kind, surface), so that visiting a
+// (position and elevation) and per edge (target, length, kind, surface, flags), so that visiting a
 // node or an edge touches one cache line instead of four arrays. Landmark distances are
 // quantized to 16 bits.
 //
-//	graph:     "PFGRAPH5" | N u32 | E u32 | fingerprint u64 | bounds 4*i32 | pad16 | nodes N*12 | pad16 |
+//	graph:     "PFGRAPH6" | N u32 | E u32 | fingerprint u64 | bounds 4*i32 | pad16 | nodes N*12 | pad16 |
 //	           offsets (N+1)*4 | pad16 | edges E*12 | pad16 | grid cells (nx*ny+1)*4 | pad16 | grid nodes N*4
 //	landmarks: "PFALT003" | L u32 | N u32 | climb f32 | unit f32 | fingerprint u64 | rows N*rowLen u16
 //
@@ -27,7 +27,7 @@ import (
 // A landmark row holds L distances from the landmarks, then L towards them when the metric
 // includes climbing. A distance is floor(cost / unit); 0xFFFF means unreachable or too far.
 const (
-	graphMagic      = "PFGRAPH5"
+	graphMagic      = "PFGRAPH6"
 	altMagic        = "PFALT003"
 	graphHeaderSize = 48 // magic, counts, fingerprint, bounds, padding: the nodes start on a 16-byte boundary
 	altHeaderSize   = 32
@@ -41,12 +41,17 @@ type node struct {
 }
 
 type edge struct {
-	To   uint32
-	Len  float32 // metres
-	Kind uint8
-	Surf uint8
-	_    uint16
+	To    uint32
+	Len   float32 // metres
+	Kind  uint8
+	Surf  uint8
+	Flags uint8 // EdgeTechnical…
+	_     uint8
 }
+
+// EdgeTechnical flags a way that asks for the hands, ropes or chains, or exposed ground: on foot, a
+// sac_scale of demanding_mountain_hiking (T3) and up. An untagged way is not flagged.
+const EdgeTechnical uint8 = 1
 
 var fingerprintTable = crc64.MakeTable(crc64.ECMA)
 

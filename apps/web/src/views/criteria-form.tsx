@@ -19,6 +19,7 @@ import {
   PRIMARY_BUTTON,
   SegmentedControl,
   Slider,
+  Switch,
   useDesktop,
 } from '../components/index.ts';
 import {
@@ -49,6 +50,7 @@ export type Draft = {
   level: ElevationLevel;
   gain: number;
   surface: Surface;
+  includeTechnical: boolean;
 };
 
 /** The bounds of the sliders in the user's units, inside the API's bounds once converted back. */
@@ -114,10 +116,12 @@ export function useCriteriaDraft(): [Draft, (draft: Draft) => void] {
     ...lengths,
     gain: Math.round(lastCriteria.gain / metresPerGainUnit / gainStep) * gainStep,
   };
-  function setDraft({ target, level, surface, gain, ...next }: Draft) {
+  function setDraft({ target, level, surface, gain, includeTechnical, ...next }: Draft) {
     setLengths(next);
     // The gain is kept in metres, so a change of units does not change it.
-    update({ lastCriteria: { target, level, surface, gain: Math.round(gain * metresPerGainUnit) } });
+    update({
+      lastCriteria: { target, level, surface, includeTechnical, gain: Math.round(gain * metresPerGainUnit) },
+    });
   }
   return [draft, setDraft];
 }
@@ -156,6 +160,10 @@ export function CriteriaForm({
   const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
   const gain = clamp(draft.gain, 0, bounds.gain.max);
   const level = draft.level;
+  // Only the surface preferences that can route onto technical ways get the switch. A paved request always excludes
+  // them, whatever was kept: the stored value is not touched.
+  const technicalApplies = draft.surface !== 'paved';
+  const allowed = technicalApplies && draft.includeTechnical;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
   const request: RouteSetRequest | undefined = start && {
@@ -168,6 +176,7 @@ export function CriteriaForm({
     ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
     surface: draft.surface,
     pace: settings.pace,
+    includeTechnical: allowed,
   };
   const field = request && invalidField(request);
 
@@ -255,17 +264,27 @@ export function CriteriaForm({
     surface: {
       title: t.surface,
       content: (
-        <SegmentedControl
-          testId="criteria-surface"
-          label={t.surface}
-          value={draft.surface}
-          options={[
-            { value: 'paved', label: t.paved },
-            { value: 'any', label: t.anySurface },
-            { value: 'unpaved', label: t.unpaved },
-          ]}
-          onChange={(surface) => change({ surface })}
-        />
+        <div className="flex flex-col gap-2">
+          <SegmentedControl
+            testId="criteria-surface"
+            label={t.surface}
+            value={draft.surface}
+            options={[
+              { value: 'paved', label: t.paved },
+              { value: 'any', label: t.anySurface },
+              { value: 'unpaved', label: t.unpaved },
+            ]}
+            onChange={(surface) => change({ surface })}
+          />
+          {technicalApplies && (
+            <Switch
+              testId="criteria-technical"
+              label={t.includeTechnical}
+              checked={draft.includeTechnical}
+              onChange={(includeTechnical) => change({ includeTechnical })}
+            />
+          )}
+        </div>
       ),
     },
   };
@@ -287,10 +306,14 @@ export function CriteriaForm({
       set: level !== 'any',
     },
     surface: {
-      label: { paved: t.paved, any: t.anySurface, unpaved: t.unpaved }[draft.surface],
+      // Technical stretches that are allowed show on the chip too: the phone hides the switch behind it.
+      label: [
+        { paved: t.paved, any: t.anySurface, unpaved: t.unpaved }[draft.surface],
+        ...(allowed ? [t.technicalShort] : []),
+      ].join(' · '),
       name: t.surface,
       icon: <Layers size={18} aria-hidden />,
-      set: draft.surface !== 'any',
+      set: draft.surface !== 'any' || allowed,
     },
   };
 
@@ -388,6 +411,7 @@ function message(
     elevationGain: t.elevationGainError(gain.max, unit.gain),
     surface: t.surfaceError,
     pace: t.paceError,
+    includeTechnical: t.includeTechnicalError,
   };
   return messages[field];
 }

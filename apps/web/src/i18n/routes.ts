@@ -23,6 +23,7 @@ export const routesText = {
     altitude: 'Altitude',
     slope: 'Slope',
     exportGpx: 'Export GPX',
+    technical: 'technical stretches',
     finding: 'Finding routes…',
     // The worded gap of a missed criterion: "+30% elevation gain".
     misses: { distance: 'distance', duration: 'duration', elevationGain: 'elevation gain' },
@@ -50,6 +51,7 @@ export const routesText = {
     altitude: 'Altitude',
     slope: 'Pente',
     exportGpx: 'Exporter en GPX',
+    technical: 'passages techniques',
     finding: 'Recherche de parcours…',
     misses: { distance: 'de distance', duration: 'de durée', elevationGain: 'de dénivelé' },
     noRoutes: 'Aucun parcours trouvé autour de ce point de départ.',

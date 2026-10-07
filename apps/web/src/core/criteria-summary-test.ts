@@ -7,6 +7,7 @@ const request: RouteSetRequest = {
   target: { distance: 10 },
   surface: 'any',
   pace: 6,
+  includeTechnical: false,
 };
 const metric = { units: 'metric', language: 'en' } as const;
 
@@ -29,6 +30,12 @@ describe('criteriaSummary', () => {
 
   it('adds a surface preference', () => {
     expect(criteriaSummary({ ...request, surface: 'unpaved' }, metric)).toBe(`10.0 km · ${criteriaText.en.unpaved}`);
+  });
+
+  it('says when technical stretches are allowed', () => {
+    expect(criteriaSummary({ ...request, includeTechnical: true }, metric)).toBe(
+      `10.0 km · ${criteriaText.en.technicalShort}`,
+    );
   });
 
   it('follows the units and the language', () => {

@@ -35,6 +35,8 @@ export default defineConfig({
       DATA_DIR: GRAPH_DIR,
       // Two projects run side by side: more than one generation at once must not get a 429.
       LOOP_LIMIT: '4',
+      // The same loops for the same criteria: what the tests find on the stand-in graph does not depend on chance.
+      SEARCH_SEED: '7',
     },
   },
 });

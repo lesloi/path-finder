@@ -45,10 +45,17 @@ func (b *Builder) AddNode(lat, lon, elevation float64) int {
 
 // Connect joins two nodes with a way of the given kind and surface, usable both ways. Its length is
 // the distance between the nodes.
-func (b *Builder) Connect(from, to int, kind, surface uint8) {
+func (b *Builder) Connect(from, to int, kind, surface uint8) { b.connect(from, to, kind, surface, 0) }
+
+// ConnectTechnical is Connect for a technical way (EdgeTechnical).
+func (b *Builder) ConnectTechnical(from, to int, kind, surface uint8) {
+	b.connect(from, to, kind, surface, EdgeTechnical)
+}
+
+func (b *Builder) connect(from, to int, kind, surface, flags uint8) {
 	length := b.distance(from, to)
-	b.edges[from] = append(b.edges[from], edge{To: uint32(to), Len: length, Kind: kind, Surf: surface})
-	b.edges[to] = append(b.edges[to], edge{To: uint32(from), Len: length, Kind: kind, Surf: surface})
+	b.edges[from] = append(b.edges[from], edge{To: uint32(to), Len: length, Kind: kind, Surf: surface, Flags: flags})
+	b.edges[to] = append(b.edges[to], edge{To: uint32(from), Len: length, Kind: kind, Surf: surface, Flags: flags})
 }
 
 func (b *Builder) distance(from, to int) float32 {

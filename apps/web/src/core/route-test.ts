@@ -38,6 +38,7 @@ const route: Route = {
     { surface: 'paved', share: 0.7 },
     { surface: 'unpaved', share: 0.3 },
   ],
+  technical: false,
 };
 
 describe('parseRoutes', () => {
@@ -68,6 +69,8 @@ describe('parseRoutes', () => {
     ['no distance', { routes: [{ ...route, distance: undefined }] }],
     ['an elevation gain that is not a number', { routes: [{ ...route, elevationGain: '400' }] }],
     ['an elevation loss that is not a number', { routes: [{ ...route, elevationLoss: '390' }] }],
+    ['no technical flag', { routes: [{ ...route, technical: undefined }] }],
+    ['a technical flag that is not a boolean', { routes: [{ ...route, technical: 'yes' }] }],
     ['an unknown kind', { routes: [{ ...route, kind: 'perfect' }] }],
     ['an unknown missed criterion', { routes: [{ ...route, misses: [{ criterion: 'surface', gap: 1 }] }] }],
     ['an unknown surface', { routes: [{ ...route, surfaces: [{ surface: 'ice', share: 1 }] }] }],
