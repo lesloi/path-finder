@@ -25,32 +25,28 @@ func flagAround(t *testGraph, at func(x, y int) int, cx, cy, r int) {
 }
 
 func TestSearchSkipsTechnicalWaysOnlyWhenAsked(t *testing.T) {
+	// A direct technical way from a to b, and a longer detour through c that is allowed.
 	g := &testGraph{}
-	at := g.grid(6, 6, flat)
-	flagAround(g, at, 2, 2, 1) // a technical block between the corners
+	a, b, c := g.addNode(0, 0, 100), g.addNode(0, 400, 100), g.addNode(300, 200, 100)
+	g.connect(a, b, KindPath)
+	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
+	g.connect(a, c, KindPath)
+	g.connect(c, b, KindPath)
 	e := openTest(t, g, true)
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
-	from, to := uint32(at(0, 0)), uint32(at(5, 5))
-	technical := func(r *route) bool {
-		for _, id := range r.edges {
-			if e.g.edges[id].Flags&EdgeTechnical != 0 {
-				return true
-			}
-		}
-		return false
-	}
+	ctx := context.Background()
 
-	allowed := s.route(context.Background(), e, 0, nil, 0, 0, from, to)
-	if allowed == nil || !technical(allowed) {
-		t.Fatalf("with technical ways allowed, the route should cross the block: %+v", allowed)
+	allowed := s.route(ctx, e, 0, nil, 0, 0, uint32(a), uint32(b))
+	if allowed == nil || len(allowed.edges) != 1 || e.g.edges[allowed.edges[0]].Flags&EdgeTechnical == 0 {
+		t.Fatalf("with technical ways allowed, the route should take the direct one: %+v", allowed)
 	}
-	excluded := s.route(context.Background(), e, 0, nil, EdgeTechnical, 0, from, to)
-	if excluded == nil || technical(excluded) {
-		t.Fatalf("with technical ways excluded, the route holds one: %+v", excluded)
+	excluded := s.route(ctx, e, 0, nil, EdgeTechnical, 0, uint32(a), uint32(b))
+	if excluded == nil || len(excluded.edges) != 2 {
+		t.Fatalf("with technical ways excluded, the route should take the detour: %+v", excluded)
 	}
-	if excluded.cost < allowed.cost {
-		t.Errorf("excluding ways made the route cheaper: %v < %v", excluded.cost, allowed.cost)
+	if excluded.cost <= allowed.cost {
+		t.Errorf("the detour should cost more: %v <= %v", excluded.cost, allowed.cost)
 	}
 }
 
