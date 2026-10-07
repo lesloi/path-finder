@@ -485,7 +485,7 @@ describe('CriteriaView', () => {
       // As the slider moves, without asking again.
       expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 05');
       expect(screen.getByTestId('routes-pace-input-value')).toHaveTextContent('5:00 min/km');
-      fireEvent.click(screen.getByTestId('routes-pace-close'));
+      fireEvent.click(screen.getByTestId('routes-pace-edit'));
       expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.en.estimatedPace('5:00 min/km'));
       expect(routeSets).toHaveBeenCalledTimes(1);
     });

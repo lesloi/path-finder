@@ -11,7 +11,6 @@ import {
   SlidersHorizontal,
   Timer,
   TrendingUp,
-  X,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
@@ -44,7 +43,7 @@ import {
   type RouteSetRequest,
   type Display,
 } from '../core/index.ts';
-import { commonText, criteriaText, routesText } from '../i18n/index.ts';
+import { criteriaText, routesText } from '../i18n/index.ts';
 
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
@@ -173,53 +172,39 @@ export function RouteSetView({
   );
 }
 
-// The pace the durations are estimated at, and a way to change it.
+// The pace the durations are estimated at, and, with `onChange`, a pencil that opens a slider to change it and
+// closes it again.
 function RoutePace({ display, pace, onChange }: { display: Display; pace: number; onChange?: (pace: number) => void }) {
-  const t = { ...commonText[display.language], ...words(display) };
+  const t = words(display);
   const [editing, setEditing] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
-  const edit = useRef<HTMLButtonElement>(null);
-  const wasEditing = useRef(false);
-  // The focus goes to the slider where the user asked to edit, and back to the button when they close it.
+  // The focus goes to the slider where the user asked to edit.
   useEffect(() => {
     if (editing) editor.current?.querySelector('input')?.focus();
-    else if (wasEditing.current) edit.current?.focus();
-    wasEditing.current = editing;
   }, [editing]);
-  if (editing && onChange) {
-    return (
-      <div ref={editor} className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <PaceSlider label={t.pace} pace={pace} units={display.units} testId="routes-pace-input" onChange={onChange} />
-        </div>
-        <button
-          type="button"
-          data-testid="routes-pace-close"
-          className={ICON_BUTTON}
-          aria-label={t.close}
-          onClick={() => setEditing(false)}
-        >
-          <X size={18} aria-hidden />
-        </button>
-      </div>
-    );
-  }
+  const slider = editing && onChange;
   return (
-    <p data-testid="routes-pace" className="m-0 flex items-center gap-1 text-sm text-ink-2">
+    <div ref={editor} data-testid="routes-pace" className="flex items-center gap-1 text-sm text-ink-2">
       {onChange && (
         <button
           type="button"
-          ref={edit}
           data-testid="routes-pace-edit"
-          className={ICON_BUTTON}
+          className={`${ICON_BUTTON} -ml-3 flex-none aria-pressed:text-accent`}
           aria-label={t.editPace}
-          onClick={() => setEditing(true)}
+          aria-pressed={editing}
+          onClick={() => setEditing(!editing)}
         >
           <Pencil size={16} aria-hidden />
         </button>
       )}
-      {t.estimatedPace(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)}
-    </p>
+      {slider ? (
+        <div className="min-w-0 flex-1">
+          <PaceSlider label={t.pace} pace={pace} units={display.units} testId="routes-pace-input" onChange={onChange} />
+        </div>
+      ) : (
+        t.estimatedPace(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)
+      )}
+    </div>
   );
 }
 

@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { expectNamedControls } from '../accessible-names.ts';
 import type { Route, RouteSetRequest } from '../core/index.ts';
-import { commonText, criteriaText, routesText } from '../i18n/index.ts';
+import { criteriaText, routesText } from '../i18n/index.ts';
 import { RouteSetView } from './route-set-view.tsx';
 
 const METRES_PER_DEGREE = 111_195;
@@ -245,18 +245,19 @@ describe('RouteSetView', () => {
       fireEvent.change(slider, { target: { value: '330' } });
       expect(onPaceChange).toHaveBeenCalledExactlyOnceWith(5.5);
 
-      expect(screen.getByTestId('routes-pace-close')).toHaveAccessibleName(commonText.en.close);
+      expect(screen.getByTestId('routes-pace-edit')).toHaveAttribute('aria-pressed', 'true');
     });
 
-    it('goes back to the pace line with the cross, and the focus on the edit button', () => {
+    it('goes back to the pace line with the same pencil', () => {
       render(<View onPaceChange={vi.fn()} />);
       fireEvent.click(screen.getByTestId('routes-pace-edit'));
+      expect(screen.getByTestId('routes-pace-input')).toHaveFocus();
 
-      fireEvent.click(screen.getByTestId('routes-pace-close'));
+      fireEvent.click(screen.getByTestId('routes-pace-edit'));
 
       expect(screen.queryByTestId('routes-pace-input')).not.toBeInTheDocument();
       expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedPace('6:00 min/km'));
-      expect(screen.getByTestId('routes-pace-edit')).toHaveFocus();
+      expect(screen.getByTestId('routes-pace-edit')).toHaveAttribute('aria-pressed', 'false');
     });
 
     it('only says the pace when it cannot be changed here', () => {
