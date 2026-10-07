@@ -30,15 +30,14 @@ import {
   type Units,
 } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
-import { useSettings, type ElevationLevel } from '../state/index.ts';
+import { useSettings, type ElevationLevel, type LastCriteria } from '../state/index.ts';
 
 const CRITERIA = ['target', 'surface', 'elevation'] as const;
 
 const DURATION_STEP = 5; // minutes
 const DURATION_DEFAULT = 60; // minutes
 
-type Target = 'distance' | 'duration';
-type Level = ElevationLevel;
+type Target = LastCriteria['target'];
 type Surface = Criteria['surface'];
 type Criterion = (typeof CRITERIA)[number];
 
@@ -47,7 +46,7 @@ export type Draft = {
   target: Target;
   distance: number;
   duration: number;
-  level: Level;
+  level: ElevationLevel;
   gain: number;
   surface: Surface;
 };
@@ -94,7 +93,7 @@ const round = (value: number, decimals: number) => Math.round(value * 10 ** deci
  * settings while the view stays mounted.
  */
 export function useCriteriaDraft(): [Draft, (draft: Draft) => void] {
-  const [{ units, criteria }, update] = useSettings();
+  const [{ units, lastCriteria }, update] = useSettings();
   const [lengths, setLengths] = useState(() => ({
     distance: defaultDistance(units),
     duration: DURATION_DEFAULT,
@@ -111,14 +110,14 @@ export function useCriteriaDraft(): [Draft, (draft: Draft) => void] {
   }
   const { metresPerGainUnit, gainStep } = unitsFor(units);
   const draft: Draft = {
-    ...criteria,
+    ...lastCriteria,
     ...lengths,
-    gain: Math.round(criteria.gain / metresPerGainUnit / gainStep) * gainStep,
+    gain: Math.round(lastCriteria.gain / metresPerGainUnit / gainStep) * gainStep,
   };
   function setDraft({ target, level, surface, gain, ...next }: Draft) {
     setLengths(next);
     // The gain is kept in metres, so a change of units does not change it.
-    update({ criteria: { target, level, surface, gain: Math.round(gain * metresPerGainUnit) } });
+    update({ lastCriteria: { target, level, surface, gain: Math.round(gain * metresPerGainUnit) } });
   }
   return [draft, setDraft];
 }
@@ -271,7 +270,6 @@ export function CriteriaForm({
     },
   };
 
-  const criteria = CRITERIA;
   const TargetIcon = draft.target === 'distance' ? Ruler : Timer;
   // `name` stands for the value on a chip that is the default, so two "Any" chips are told apart.
   const chips: Record<Criterion, { label: string; name?: string; icon?: ReactNode; set: boolean }> = {
@@ -311,7 +309,7 @@ export function CriteriaForm({
     return (
       <>
         <div className={CHIP_ROW}>
-          {criteria.map((criterion) => (
+          {CRITERIA.map((criterion) => (
             <button
               key={criterion}
               type="button"
@@ -346,7 +344,7 @@ export function CriteriaForm({
 
   return (
     <>
-      {criteria.map((criterion) => (
+      {CRITERIA.map((criterion) => (
         <section key={criterion} className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-ink-2">{sections[criterion].title}</h2>
           {sections[criterion].content}

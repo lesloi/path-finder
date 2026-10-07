@@ -34,7 +34,7 @@ export type Settings = {
   units: Units;
   theme: Theme;
   basemap: Basemap;
-  criteria: LastCriteria;
+  lastCriteria: LastCriteria;
 };
 
 const KEY = 'path-finder.settings';
@@ -71,14 +71,14 @@ function parse(raw: string | null): Settings {
   } catch {
     stored = {};
   }
-  const { pace, language, units, theme, basemap, criteria } = isObject(stored) ? stored : {};
+  const { pace, language, units, theme, basemap, lastCriteria } = isObject(stored) ? stored : {};
   return {
     pace: isPace(pace) ? pace : DEFAULT_PACE,
     ...((language === 'fr' || language === 'en') && { language }),
     units: units === 'imperial' ? 'imperial' : 'metric',
     theme: theme === 'light' || theme === 'dark' ? theme : DEFAULT_THEME,
     basemap: BASEMAPS.includes(basemap as Basemap) ? (basemap as Basemap) : DEFAULT_BASEMAP,
-    criteria: parseLastCriteria(criteria),
+    lastCriteria: parseLastCriteria(lastCriteria),
   };
 }
 

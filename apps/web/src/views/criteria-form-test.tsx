@@ -208,7 +208,7 @@ describe('CriteriaForm', () => {
 
   describe('last criteria', () => {
     it('restores what was asked last', () => {
-      store({ criteria: { target: 'duration', surface: 'unpaved', level: 'target', gain: 450 } });
+      store({ lastCriteria: { target: 'duration', surface: 'unpaved', level: 'target', gain: 450 } });
       const { onSubmit, submit } = setup();
 
       submit();
@@ -230,7 +230,7 @@ describe('CriteriaForm', () => {
       choose('elevation', 'target');
       fireEvent.change(slider('gain'), { target: { value: '1500' } });
 
-      expect(JSON.parse(localStorage.getItem('path-finder.settings')!).criteria).toEqual({
+      expect(JSON.parse(localStorage.getItem('path-finder.settings')!).lastCriteria).toEqual({
         target: 'duration',
         surface: 'paved',
         level: 'target',
@@ -239,7 +239,7 @@ describe('CriteriaForm', () => {
     });
 
     it('shows a gain kept in metres in the units of the settings', () => {
-      store({ units: 'imperial', criteria: { target: 'distance', surface: 'any', level: 'target', gain: 457 } });
+      store({ units: 'imperial', lastCriteria: { target: 'distance', surface: 'any', level: 'target', gain: 457 } });
       setup();
 
       expect(slider('gain')).toHaveValue('1500');
@@ -349,7 +349,7 @@ describe('CriteriaForm', () => {
     });
 
     it('shows chips instead of the form, highlighting the criteria that are not the default', () => {
-      store({ criteria: { target: 'distance', surface: 'paved', level: 'any', gain: 300 } });
+      store({ lastCriteria: { target: 'distance', surface: 'paved', level: 'any', gain: 300 } });
       setup({ compact: true });
 
       expect(screen.queryByTestId('criteria-distance')).not.toBeInTheDocument();

@@ -9,7 +9,7 @@ const DEFAULTS = {
   units: 'metric',
   theme: 'system',
   basemap: 'plan',
-  criteria: { target: 'distance', surface: 'any', level: 'any', gain: 300 },
+  lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300 },
 };
 
 describe('useSettings', () => {
@@ -17,7 +17,7 @@ describe('useSettings', () => {
     const { result } = renderHook(() => useSettings());
 
     expect(result.current[0]).toEqual(DEFAULTS);
-    expect(DEFAULT_CRITERIA).toEqual(DEFAULTS.criteria);
+    expect(DEFAULT_CRITERIA).toEqual(DEFAULTS.lastCriteria);
   });
 
   it('keeps the settings across reloads', () => {
@@ -27,7 +27,7 @@ describe('useSettings', () => {
       units: 'imperial',
       theme: 'dark',
       basemap: 'aerial',
-      criteria: { target: 'duration', surface: 'unpaved', level: 'target', gain: 450 },
+      lastCriteria: { target: 'duration', surface: 'unpaved', level: 'target', gain: 450 },
     } as const;
     const first = renderHook(() => useSettings());
     act(() => first.result.current[1](kept));
@@ -58,10 +58,10 @@ describe('useSettings', () => {
         units: 'nautical',
         theme: 'sepia',
         basemap: 'satellite',
-        criteria: { target: 'both', surface: 'ice', level: 'steep', gain: -5 },
+        lastCriteria: { target: 'both', surface: 'ice', level: 'steep', gain: -5 },
       }),
     ],
-    ['criteria that are not an object', JSON.stringify({ criteria: 'any' })],
+    ['criteria that are not an object', JSON.stringify({ lastCriteria: 'any' })],
   ])('falls back to the defaults on %s data', (_, raw) => {
     localStorage.setItem(KEY, raw);
 
@@ -94,7 +94,7 @@ describe('useSettings', () => {
   it('keeps the valid fields of partial data', () => {
     localStorage.setItem(
       KEY,
-      JSON.stringify({ pace: 5, units: 'imperial', criteria: { surface: 'paved', level: 'steep', gain: 600 } }),
+      JSON.stringify({ pace: 5, units: 'imperial', lastCriteria: { surface: 'paved', level: 'steep', gain: 600 } }),
     );
 
     const { result } = renderHook(() => useSettings());
@@ -103,7 +103,7 @@ describe('useSettings', () => {
       ...DEFAULTS,
       pace: 5,
       units: 'imperial',
-      criteria: { target: 'distance', surface: 'paved', level: 'any', gain: 600 },
+      lastCriteria: { target: 'distance', surface: 'paved', level: 'any', gain: 600 },
     });
   });
 });

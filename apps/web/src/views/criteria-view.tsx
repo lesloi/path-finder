@@ -8,7 +8,7 @@ import { RoutesFoundButton } from './routes-found-button.tsx';
 import { SearchingPanel } from './searching-panel.tsx';
 import { useRouteBrowser } from './use-route-browser.ts';
 import { RouteSetView } from './route-set-view.tsx';
-import { BASEMAPS, estimatedDuration, formatPosition, parsePosition, type Position } from '../core/index.ts';
+import { BASEMAPS, formatPosition, parsePosition, routesAtPace, type Position } from '../core/index.ts';
 import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
   StartPointMap,
@@ -60,16 +60,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const browser = useRouteBrowser();
   const { routeSet, loading } = browser;
   const display = useMemo(() => ({ units, language }), [units, language]);
-  // By distance, the pace changes no route: only the durations. By duration, the routes are at the pace they
-  // were asked for, and a new pace is a new search.
-  const byDistance = routeSet !== undefined && 'distance' in routeSet.request.target;
-  const routes = useMemo(
-    () =>
-      byDistance
-        ? routeSet.routes.map((route) => ({ ...route, estimatedDuration: estimatedDuration(route, pace) }))
-        : routeSet?.routes,
-    [routeSet, byDistance, pace],
-  );
+  const atPace = useMemo(() => routeSet && routesAtPace(routeSet.request, routeSet.routes, pace), [routeSet, pace]);
   const summaries = useMemo(
     () => routeSet?.routes.map(({ distance, elevationGain }) => ({ distance, elevationGain })),
     [routeSet],
@@ -99,7 +90,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   function changePace(value: number) {
     update({ pace: value });
-    if (routeSet && !byDistance) browser.ask({ ...routeSet.request, pace: value });
+    if (routeSet && 'duration' in routeSet.request.target) browser.ask({ ...routeSet.request, pace: value });
   }
 
   function changeStart(position: Position) {
@@ -132,12 +123,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   }
 
   const panel =
-    routes && routeSet && browser.showing ? (
+    atPace && routeSet && browser.showing ? (
       <RouteSetView
         display={display}
         request={routeSet.request}
-        routes={routes}
-        pace={byDistance ? pace : routeSet.request.pace}
+        routes={atPace.routes}
+        pace={atPace.pace}
         snapshot={browser.snapshot}
         selected={browser.selected}
         detail={browser.detail}
