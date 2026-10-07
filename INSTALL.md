@@ -56,7 +56,8 @@ export DATA_DIR=$PWD/../../data
 ```
 
 A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
-a half-written one. The server maps the files when it starts: restart it after a rebuild.
+a half-written one. A running server looks at the directory every 30 seconds and serves the files that replace
+the ones it maps, with no restart. Replace a file by renaming a new one over it, never by writing into it.
 
 Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (8 by
 default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
@@ -166,13 +167,13 @@ The `Dockerfile` builds one image with the server and the web app, and no data. 
 
 To update the data from a job, build into a new directory beside the live one, not into it (the job plans the
 zones, then builds them, so a newer extract needs no new image), then point the volume's `current` link at it
-and restart the pods. A pod restarting in the middle of a build in place would find a new `graph.bin` with old
-landmarks, which it refuses, and a zone dropped from the plan would still be served.
+(the pods swap to it within 30 seconds). A build in place would show a pod a new `graph.bin` with old landmarks,
+which it refuses until the landmarks are there, and a zone dropped from the plan would still be served.
 
 The data is a volume: mount the directory holding `graph.bin`, `any.alt`, `paved.alt` and `unpaved.alt`, or one such
 subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. The server only reads it, and
-maps the files rather than copying them, so servers that share the directory share its page cache; restart
-them after a rebuild.
+maps the files rather than copying them, so servers that share the directory share its page cache. They pick
+up a rebuild by themselves.
 
 A `compose.yaml`:
 

@@ -81,6 +81,7 @@ func WriteLandmarks(graphPath, path, profile string, count int) error {
 	if err != nil {
 		return err
 	}
+	defer g.file.unmap()
 	perNode := 1 // landmark distances a node keeps per landmark: twice with climb, for both directions
 	if p.UpPerMeter > 0 {
 		perNode = 2
