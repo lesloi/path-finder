@@ -34,7 +34,7 @@ func engineLoop(heading float64) *engine.Route {
 	}
 }
 
-const body = `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":300,"surface":"any","pace":6}`
+const body = `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":300,"surface":"any","pace":6,"includeTechnical":false}`
 
 func generate(t *testing.T, looper *fakeLooper, ctx context.Context, request string) ([]contract.Route, error) {
 	t.Helper()
@@ -51,7 +51,7 @@ func TestGenerateAsksTheEngineForLoopsFromTheCriteria(t *testing.T) {
 	if _, err := generate(t, looper, context.Background(), body); err != nil {
 		t.Fatal(err)
 	}
-	want := engine.LoopRequest{Start: engine.Point{Lat: 45.8992, Lon: 6.1294}, Distance: 10_000, Ascent: 300, Candidates: 80, Seed: 42}
+	want := engine.LoopRequest{Start: engine.Point{Lat: 45.8992, Lon: 6.1294}, Distance: 10_000, Ascent: 300, Candidates: 80, Seed: 42, ExcludeTechnical: true}
 	got := looper.got
 	if got.Enough == nil {
 		t.Error("the engine is not told when to stop")
@@ -72,7 +72,7 @@ func TestGenerateSpellsOutTheContract(t *testing.T) {
 		t.Fatalf("%d routes", len(routes))
 	}
 	r := routes[0]
-	if r.Distance != 10 || *r.ElevationGain != 300 || *r.ElevationLoss != 300 || r.UnpavedShare != 0.25 || r.Kind != "match" {
+	if r.Distance != 10 || *r.ElevationGain != 300 || *r.ElevationLoss != 300 || r.UnpavedShare != 0.25 || r.Kind != "match" || r.Technical {
 		t.Errorf("route = %+v", r)
 	}
 	if got := r.Geometry[0]; len(got) != 3 || got[0] != 6.1294 || got[1] != 45.8992 || got[2] != 450.1 {
@@ -88,7 +88,7 @@ func TestGenerateSpellsOutTheContract(t *testing.T) {
 
 func TestGenerateSetsNoAscentForAShortcut(t *testing.T) {
 	looper := &fakeLooper{}
-	hilly := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":"hilly","surface":"any","pace":6}`
+	hilly := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":"hilly","surface":"any","pace":6,"includeTechnical":false}`
 	if _, err := generate(t, looper, context.Background(), hilly); err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestGenerateSkipsALoopWithNoLength(t *testing.T) {
 func TestGenerateUsesTheEngineOfTheSurfacePreference(t *testing.T) {
 	anyLooper, paved, unpaved := &fakeLooper{}, &fakeLooper{}, &fakeLooper{}
 	g := &Generator{Engines: map[string]Looper{"any": anyLooper, "paved": paved, "unpaved": unpaved}}
-	if _, err := g.Generate(context.Background(), json.RawMessage(`{"start":[6.1294,45.8992],"target":{"distance":5},"surface":"unpaved","pace":5}`)); err != nil {
+	if _, err := g.Generate(context.Background(), json.RawMessage(`{"start":[6.1294,45.8992],"target":{"distance":5},"surface":"unpaved","pace":5,"includeTechnical":false}`)); err != nil {
 		t.Fatal(err)
 	}
 	if unpaved.got.Candidates == 0 || anyLooper.got.Candidates != 0 || paved.got.Candidates != 0 {
@@ -195,5 +195,45 @@ func TestCmpOrFallsBackOnlyForANonPositiveValue(t *testing.T) {
 		if got := cmpOr(tc.v, tc.fallback); got != tc.want {
 			t.Errorf("cmpOr(%d, %d) = %d, want %d", tc.v, tc.fallback, got, tc.want)
 		}
+	}
+}
+
+func TestGenerateExcludesTechnicalWaysUnlessTheCriteriaAllowThem(t *testing.T) {
+	for _, tc := range []struct {
+		include string
+		exclude bool
+	}{{"false", true}, {"true", false}} {
+		for _, surface := range []string{"any", "paved", "unpaved"} {
+			looper := &fakeLooper{}
+			g := &Generator{Engines: map[string]Looper{surface: looper}}
+			req := `{"start":[6.1294,45.8992],"target":{"distance":5},"surface":"` + surface + `","pace":5,"includeTechnical":` + tc.include + `}`
+			if _, err := g.Generate(context.Background(), json.RawMessage(req)); err != nil {
+				t.Fatal(err)
+			}
+			if looper.got.ExcludeTechnical != tc.exclude {
+				t.Errorf("includeTechnical %s on %s: ExcludeTechnical = %v, want %v", tc.include, surface, looper.got.ExcludeTechnical, tc.exclude)
+			}
+		}
+	}
+}
+
+func TestGenerateTellsWhichRoutesHoldATechnicalStretch(t *testing.T) {
+	technical, plain := engineLoop(0), engineLoop(1.5)
+	technical.Technical = true
+	looper := &fakeLooper{loops: []*engine.Route{technical, plain}}
+	routes, err := generate(t, looper, context.Background(), body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var flagged, unflagged int
+	for _, r := range routes {
+		if r.Technical {
+			flagged++
+		} else {
+			unflagged++
+		}
+	}
+	if flagged != 1 || unflagged != 1 {
+		t.Errorf("%d technical routes and %d plain ones out of %d, want one each", flagged, unflagged, len(routes))
 	}
 }

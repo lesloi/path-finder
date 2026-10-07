@@ -20,9 +20,9 @@ import (
 )
 
 type rawWay struct {
-	kind, surf uint8
-	ids        []int64
-	idx        []uint32
+	kind, surf, flags uint8
+	ids               []int64
+	idx               []uint32
 }
 
 var highwayKinds = map[string]uint8{
@@ -41,31 +41,41 @@ var surfaceGroups = map[string]uint8{
 	"rock": engine.SurfaceRough, "pebblestone": engine.SurfaceRough, "cobblestone": engine.SurfaceRough, "grass_paver": engine.SurfaceRough, "woodchips": engine.SurfaceRough,
 }
 
-// classifyWay decides whether a pedestrian can use a way, and under which kind and surface group.
-func classifyWay(tags osm.Tags) (kind, surf uint8, ok bool) {
+// technicalScales are the sac_scale values from which a way is technical on foot: T3 (ropes, chains, hands for
+// balance) and up. T1 and T2 are ordinary hiking and trail running.
+var technicalScales = map[string]bool{
+	"demanding_mountain_hiking": true, "alpine_hiking": true, "demanding_alpine_hiking": true, "difficult_alpine_hiking": true,
+}
+
+// classifyWay decides whether a pedestrian can use a way, and under which kind and surface group, with the
+// edge flags it carries. A way with no sac_scale is not flagged.
+func classifyWay(tags osm.Tags) (kind, surf, flags uint8, ok bool) {
 	hw := tags.Find("highway")
 	kind, ok = highwayKinds[hw]
 	if !ok {
-		return 0, 0, false
+		return 0, 0, 0, false
 	}
 	foot := tags.Find("foot")
 	if foot == "no" || tags.Find("area") == "yes" {
-		return 0, 0, false
+		return 0, 0, 0, false
 	}
 	explicit := foot == "yes" || foot == "designated" || foot == "permissive"
 	switch tags.Find("access") {
 	case "no", "private":
 		if !explicit {
-			return 0, 0, false
+			return 0, 0, 0, false
 		}
 	}
 	if kind == engine.KindTrunk && !explicit {
-		return 0, 0, false
+		return 0, 0, 0, false
 	}
 	if kind == engine.KindCycleway && !explicit && foot != "" {
-		return 0, 0, false
+		return 0, 0, 0, false
 	}
-	return kind, surfaceGroups[tags.Find("surface")], true
+	if technicalScales[tags.Find("sac_scale")] {
+		flags = engine.EdgeTechnical
+	}
+	return kind, surfaceGroups[tags.Find("surface")], flags, true
 }
 
 func readWays(path string) ([]rawWay, error) {
@@ -83,7 +93,7 @@ func readWays(path string) ([]rawWay, error) {
 		if !isWay {
 			continue
 		}
-		kind, surf, ok := classifyWay(w.Tags)
+		kind, surf, flags, ok := classifyWay(w.Tags)
 		if !ok || len(w.Nodes) < 2 {
 			continue
 		}
@@ -91,7 +101,7 @@ func readWays(path string) ([]rawWay, error) {
 		for i, n := range w.Nodes {
 			ids[i] = int64(n.ID)
 		}
-		ways = append(ways, rawWay{kind: kind, surf: surf, ids: ids})
+		ways = append(ways, rawWay{kind: kind, surf: surf, flags: flags, ids: ids})
 	}
 	return ways, sc.Err()
 }
@@ -231,10 +241,10 @@ func assemble(ways []rawWay, lat, lon []int32, elev []int32) ([]engine.Node, []u
 	edgeCount := off[kept]
 	edges := make([]engine.Edge, edgeCount)
 	fill := make([]uint32, kept)
-	add := func(a, b uint32, l float32, kind, surf uint8) {
+	add := func(a, b uint32, l float32, kind, surf, flags uint8) {
 		e := off[a] + fill[a]
 		fill[a]++
-		edges[e] = engine.Edge{To: b, Len: l, Kind: kind, Surf: surf}
+		edges[e] = engine.Edge{To: b, Len: l, Kind: kind, Surf: surf, Flags: flags}
 	}
 	for _, w := range ways {
 		for i := 1; i < len(w.idx); i++ {
@@ -244,8 +254,8 @@ func assemble(ways []rawWay, lat, lon []int32, elev []int32) ([]engine.Node, []u
 			}
 			ra, rb := remap[a], remap[b]
 			l := float32(haversineM(lat[a], lon[a], lat[b], lon[b]))
-			add(ra, rb, l, w.kind, w.surf)
-			add(rb, ra, l, w.kind, w.surf)
+			add(ra, rb, l, w.kind, w.surf, w.flags)
+			add(rb, ra, l, w.kind, w.surf, w.flags)
 		}
 	}
 	return nodes, off, edges

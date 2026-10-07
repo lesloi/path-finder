@@ -44,6 +44,7 @@ type Route struct {
 	Descent    float64
 	TrailShare float64   // share of the distance on trails, 0 to 1
 	Stretches  []Stretch // the surface along the route, consecutive stretches of one kind merged
+	Technical  bool      // the route holds a technical stretch
 }
 
 // LoopRequest asks for loops from Start. Distance is the target length in metres and Ascent the
@@ -54,10 +55,21 @@ type LoopRequest struct {
 	Ascent     float64
 	Candidates int
 	Seed       uint64
+	// ExcludeTechnical keeps loops off the ways flagged technical, and moves the start point to the
+	// nearest way that is not. It is a hard rule, where a surface preference only weights.
+	ExcludeTechnical bool
 	// Enough, when set, is called with the loops found so far after each new one, one call at a time
 	// and without retaining the slice. Returning true ends the search: the loops still being
 	// searched are dropped, so a caller that has what it needs spares the CPU.
 	Enough func(found []*Route) bool
+}
+
+// skip is the edge flags a search may not use.
+func (r LoopRequest) skip() uint8 {
+	if r.ExcludeTechnical {
+		return EdgeTechnical
+	}
+	return 0
 }
 
 // Open maps a graph file, and its landmark file when landmarksPath is not empty, for the named
@@ -141,17 +153,17 @@ func OpenDir(dir string, profiles ...string) (map[string]*Engine, error) {
 
 // Route finds the cheapest route from one point to another. It returns ctx's error when ctx ends first.
 func (e *Engine) Route(ctx context.Context, from, to Point) (*Route, error) {
-	src, d, ok := e.sp.nearest(e.g, from.Lat, from.Lon)
+	src, d, ok := e.sp.nearest(e.g, 0, from.Lat, from.Lon)
 	if !ok || d > maxSnapMeters {
 		return nil, ErrOffGraph
 	}
-	dst, d, ok := e.sp.nearest(e.g, to.Lat, to.Lon)
+	dst, d, ok := e.sp.nearest(e.g, 0, to.Lat, to.Lon)
 	if !ok || d > maxSnapMeters {
 		return nil, ErrOffGraph
 	}
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
-	r := s.route(ctx, e, e.prof.UpPerMeter, nil, 0, src, dst)
+	r := s.route(ctx, e, e.prof.UpPerMeter, nil, 0, 0, src, dst)
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -168,7 +180,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if req.Distance <= 0 || req.Candidates <= 0 {
 		return nil, errors.New("engine: loops need a positive distance and candidate count")
 	}
-	start, d, ok := e.sp.nearest(e.g, req.Start.Lat, req.Start.Lon)
+	start, d, ok := e.sp.nearest(e.g, req.skip(), req.Start.Lat, req.Start.Lon)
 	if !ok || d > maxSnapMeters {
 		return nil, ErrOffGraph
 	}
@@ -185,7 +197,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 		}
 	}
 	found, failure := generate(ctx, e, e.sp, &loopParams{
-		distM: req.Distance, ascentM: req.Ascent, candidates: req.Candidates, seed: req.Seed,
+		distM: req.Distance, ascentM: req.Ascent, candidates: req.Candidates, seed: req.Seed, skip: req.skip(),
 	}, start, enough)
 	if failure != nil {
 		return nil, failure
@@ -212,6 +224,12 @@ func (e *Engine) describe(nodes, edges []uint32) *Route {
 		Ascent:    ascent(e.g, nodes),
 		Descent:   descent(e.g, nodes),
 		Stretches: e.stretches(edges),
+	}
+	for _, id := range edges {
+		if e.g.edges[id].Flags&EdgeTechnical != 0 {
+			r.Technical = true
+			break
+		}
 	}
 	if dist > 0 {
 		r.TrailShare = trail / dist

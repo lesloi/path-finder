@@ -19,6 +19,7 @@ import {
   PRIMARY_BUTTON,
   SegmentedControl,
   Slider,
+  Switch,
   useDesktop,
 } from '../components/index.ts';
 import {
@@ -49,6 +50,7 @@ export type Draft = {
   level: ElevationLevel;
   gain: number;
   surface: Surface;
+  includeTechnical: boolean;
 };
 
 /** The bounds of the sliders in the user's units, inside the API's bounds once converted back. */
@@ -114,10 +116,12 @@ export function useCriteriaDraft(): [Draft, (draft: Draft) => void] {
     ...lengths,
     gain: Math.round(lastCriteria.gain / metresPerGainUnit / gainStep) * gainStep,
   };
-  function setDraft({ target, level, surface, gain, ...next }: Draft) {
+  function setDraft({ target, level, surface, gain, includeTechnical, ...next }: Draft) {
     setLengths(next);
     // The gain is kept in metres, so a change of units does not change it.
-    update({ lastCriteria: { target, level, surface, gain: Math.round(gain * metresPerGainUnit) } });
+    update({
+      lastCriteria: { target, level, surface, includeTechnical, gain: Math.round(gain * metresPerGainUnit) },
+    });
   }
   return [draft, setDraft];
 }
@@ -168,6 +172,8 @@ export function CriteriaForm({
     ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
     surface: draft.surface,
     pace: settings.pace,
+    // The switch is hidden when the surface is paved: what it kept never goes with such a request.
+    includeTechnical: draft.surface !== 'paved' && draft.includeTechnical,
   };
   const field = request && invalidField(request);
 
@@ -255,17 +261,28 @@ export function CriteriaForm({
     surface: {
       title: t.surface,
       content: (
-        <SegmentedControl
-          testId="criteria-surface"
-          label={t.surface}
-          value={draft.surface}
-          options={[
-            { value: 'paved', label: t.paved },
-            { value: 'any', label: t.anySurface },
-            { value: 'unpaved', label: t.unpaved },
-          ]}
-          onChange={(surface) => change({ surface })}
-        />
+        <div className="flex flex-col gap-2">
+          <SegmentedControl
+            testId="criteria-surface"
+            label={t.surface}
+            value={draft.surface}
+            options={[
+              { value: 'paved', label: t.paved },
+              { value: 'any', label: t.anySurface },
+              { value: 'unpaved', label: t.unpaved },
+            ]}
+            onChange={(surface) => change({ surface })}
+          />
+          {/* Paved routes never reach such ways. */}
+          {draft.surface !== 'paved' && (
+            <Switch
+              testId="criteria-technical"
+              label={t.includeTechnical}
+              checked={draft.includeTechnical}
+              onChange={(includeTechnical) => change({ includeTechnical })}
+            />
+          )}
+        </div>
       ),
     },
   };
@@ -388,6 +405,7 @@ function message(
     elevationGain: t.elevationGainError(gain.max, unit.gain),
     surface: t.surfaceError,
     pace: t.paceError,
+    includeTechnical: t.includeTechnicalError,
   };
   return messages[field];
 }

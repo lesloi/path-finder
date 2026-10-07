@@ -44,9 +44,33 @@ func TestClassifyWay(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			kind, surface, ok := classifyWay(tc.tags)
+			kind, surface, _, ok := classifyWay(tc.tags)
 			if ok != tc.ok || (ok && (kind != tc.kind || surface != tc.surface)) {
 				t.Errorf("got kind %d surface %d ok %v, want kind %d surface %d ok %v", kind, surface, ok, tc.kind, tc.surface, tc.ok)
+			}
+		})
+	}
+}
+
+func TestClassifyWayFlagsTechnicalWaysFromT3(t *testing.T) {
+	cases := []struct {
+		scale     string
+		technical bool
+	}{
+		{"", false}, // untagged: not excluded
+		{"hiking", false},
+		{"mountain_hiking", false},
+		{"demanding_mountain_hiking", true},
+		{"alpine_hiking", true},
+		{"demanding_alpine_hiking", true},
+		{"difficult_alpine_hiking", true},
+		{"unknown", false},
+	}
+	for _, tc := range cases {
+		t.Run("sac_scale="+tc.scale, func(t *testing.T) {
+			_, _, flags, ok := classifyWay(tags("highway", "path", "sac_scale", tc.scale))
+			if !ok || (flags&engine.EdgeTechnical != 0) != tc.technical {
+				t.Errorf("flags %d ok %v, want technical %v", flags, ok, tc.technical)
 			}
 		})
 	}
@@ -90,5 +114,29 @@ func TestAssembleCutsWaysIntoEdgesAndDropsWhatHasNoElevation(t *testing.T) {
 		if e.Kind != engine.KindPath || e.Surf != engine.SurfaceRough || math.Abs(float64(e.Len)-111.2) > 1 {
 			t.Errorf("edge = %+v", e)
 		}
+	}
+}
+
+func TestAssembleCarriesTheTechnicalFlagToBothDirections(t *testing.T) {
+	lat := []int32{450_000_000, 450_010_000, 450_020_000}
+	lon := []int32{60_000_000, 60_000_000, 60_000_000}
+	elev := []int32{1000, 1100, 1200}
+	ways := []rawWay{
+		{kind: engine.KindPath, flags: engine.EdgeTechnical, idx: []uint32{0, 1}},
+		{kind: engine.KindPath, idx: []uint32{1, 2}},
+	}
+
+	_, off, edges := assemble(ways, lat, lon, elev)
+
+	// Node 0 has one edge, node 1 two (back to 0, on to 2), node 2 one.
+	technical := func(from int) []bool {
+		var out []bool
+		for e := off[from]; e < off[from+1]; e++ {
+			out = append(out, edges[e].Flags&engine.EdgeTechnical != 0)
+		}
+		return out
+	}
+	if got := fmt.Sprint(technical(0), technical(1), technical(2)); got != "[true] [true false] [false]" {
+		t.Errorf("technical flags per node = %s", got)
 	}
 }

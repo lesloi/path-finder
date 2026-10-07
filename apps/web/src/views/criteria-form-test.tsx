@@ -51,6 +51,7 @@ describe('CriteriaForm', () => {
       target: { distance: 10 },
       surface: 'any',
       pace: 6,
+      includeTechnical: false,
     });
   });
 
@@ -206,6 +207,81 @@ describe('CriteriaForm', () => {
     });
   });
 
+  describe('technical stretches', () => {
+    const technical = () => screen.queryByTestId('criteria-technical');
+    const stored = () => JSON.parse(localStorage.getItem('path-finder.settings')!).lastCriteria;
+
+    it('is off by default and asks for the stretches to be excluded', () => {
+      const { onSubmit, submit } = setup();
+
+      expect(technical()).not.toBeChecked();
+      expect(technical()).toHaveAccessibleName(en.includeTechnical);
+      submit();
+
+      expect(onSubmit.mock.calls[0][0].includeTechnical).toBe(false);
+    });
+
+    it.each(['any', 'unpaved'])('can be turned on with the %s surface preference', (surface) => {
+      const { onSubmit, submit } = setup();
+      choose('surface', surface);
+
+      fireEvent.click(technical()!);
+      submit();
+
+      expect(technical()).toBeChecked();
+      expect(onSubmit.mock.calls[0][0].includeTechnical).toBe(true);
+    });
+
+    it('is hidden with the paved surface preference, which excludes them whatever was kept', () => {
+      store({ lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300, includeTechnical: true } });
+      const { onSubmit, submit } = setup();
+      choose('surface', 'paved');
+
+      expect(technical()).not.toBeInTheDocument();
+      submit();
+
+      expect(onSubmit.mock.calls[0][0].includeTechnical).toBe(false);
+      expect(stored().includeTechnical).toBe(true);
+      expect(parseCriteria(onSubmit.mock.calls[0][0]).includeTechnical).toBe(false);
+    });
+
+    it('comes back as it was kept when the surface preference is not paved again', () => {
+      store({ lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300, includeTechnical: true } });
+      setup();
+      choose('surface', 'paved');
+
+      choose('surface', 'unpaved');
+
+      expect(technical()).toBeChecked();
+    });
+
+    it('is kept on the device with the last criteria, for the next search', () => {
+      setup();
+      fireEvent.click(technical()!);
+
+      cleanup();
+      const { onSubmit, submit } = setup();
+
+      expect(technical()).toBeChecked();
+      submit();
+      expect(onSubmit.mock.calls[0][0].includeTechnical).toBe(true);
+    });
+
+    it('is in the surface dialog of the compact form', () => {
+      vi.restoreAllMocks();
+      setup({ compact: true });
+      fireEvent.click(screen.getByTestId('criteria-chip-surface'));
+
+      expect(within(screen.getByTestId('criteria-dialog')).getByTestId('criteria-technical')).toBeInTheDocument();
+    });
+
+    it('is worded in French', () => {
+      setup({ language: 'fr' });
+
+      expect(technical()).toHaveAccessibleName('Inclure les passages techniques signalés');
+    });
+  });
+
   describe('last criteria', () => {
     it('restores what was asked last', () => {
       store({ lastCriteria: { target: 'duration', surface: 'unpaved', level: 'target', gain: 450 } });
@@ -235,6 +311,7 @@ describe('CriteriaForm', () => {
         surface: 'paved',
         level: 'target',
         gain: 457,
+        includeTechnical: false,
       });
     });
 

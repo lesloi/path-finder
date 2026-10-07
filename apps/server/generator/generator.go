@@ -52,6 +52,8 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		Distance:   km * 1000,
 		Candidates: cmpOr(g.Candidates, defaultCandidates),
 		Seed:       g.seed(),
+		// Technical ways are left out unless the criteria allow them, whatever the surface preference.
+		ExcludeTechnical: !criteria.IncludeTechnical,
 	}
 	if criteria.ElevationGain != nil && criteria.ElevationGain.Shortcut == "" {
 		req.Ascent = criteria.ElevationGain.Metres
@@ -133,7 +135,7 @@ func toCandidate(l *engine.Route) *candidate {
 	gain, loss := round(l.Ascent, 1), round(l.Descent, 1)
 	c := &candidate{
 		geometry: geometry, distance: round(l.Distance/1000, 3), elevationGain: &gain, elevationLoss: &loss,
-		unpavedShare: unpaved / total,
+		unpavedShare: unpaved / total, technical: l.Technical,
 	}
 	// Consecutive stretches of one surface are already merged; shares add up to 1.
 	c.surfaces = make([]contract.SurfaceStretch, len(l.Stretches))

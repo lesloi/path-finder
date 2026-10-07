@@ -31,6 +31,19 @@ test.describe('the criteria form', () => {
     await expect(page.getByTestId('criteria-pace')).toHaveValue('360');
   });
 
+  test('offers the technical stretches unless the surface is paved, off by default', async ({ page, isMobile }) => {
+    await page.goto('/');
+    if (isMobile) {
+      await page.getByTestId('criteria-sheet-handle').click();
+    }
+
+    await expect(page.getByTestId('criteria-technical')).not.toBeChecked();
+    await choose(page, 'surface', 'paved');
+    await expect(page.getByTestId('criteria-technical')).toHaveCount(0);
+    await choose(page, 'surface', 'unpaved');
+    await expect(page.getByTestId('criteria-technical')).toBeAttached();
+  });
+
   test('keeps the pace across a reload', async ({ page, isMobile }) => {
     await page.goto('/');
     if (isMobile) await page.getByTestId('criteria-sheet-handle').click();

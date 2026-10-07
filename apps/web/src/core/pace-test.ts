@@ -18,7 +18,7 @@ describe('estimatedDuration', () => {
 
 describe('routesAtPace', () => {
   const routes = [{ distance: 10, elevationGain: 0, estimatedDuration: 60 }] as Route[];
-  const asked: Omit<RouteSetRequest, 'target'> = { start: [6, 45], surface: 'any', pace: 6 };
+  const asked: Omit<RouteSetRequest, 'target'> = { start: [6, 45], surface: 'any', pace: 6, includeTechnical: false };
 
   it('recomputes the durations at the pace by distance', () => {
     const request: RouteSetRequest = { ...asked, target: { distance: 10 } };

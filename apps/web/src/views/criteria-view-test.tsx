@@ -420,6 +420,7 @@ describe('CriteriaView', () => {
       misses: [],
       unpavedShare: 0.3,
       surfaces: [{ surface: 'paved', share: 1 }],
+      technical: false,
       ...overrides,
     });
     const answer = (...routes: object[]) => Response.json({ routes });

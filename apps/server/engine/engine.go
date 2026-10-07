@@ -49,6 +49,16 @@ type graph struct {
 	file        mapped
 }
 
+// hasEdgeWithout tells whether a node has a way that holds none of the flags.
+func (g *graph) hasEdgeWithout(n uint32, flags uint8) bool {
+	for e := g.off[n]; e < g.off[n+1]; e++ {
+		if g.edges[e].Flags&flags == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func align16(n int) int { return (n + 15) &^ 15 }
 
 // fileID identifies the version of a file: a replaced file has another inode, a rewritten one another size or
@@ -318,7 +328,9 @@ func computeSpatial(nodes []node) *spatial {
 	return s
 }
 
-func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bool) {
+// nearest is the node closest to a point. With skip set, only a node with a way that holds none of those
+// flags counts: a point near a technical path then moves to the nearest way it may use.
+func (s *spatial) nearest(g *graph, skip uint8, latDeg, lonDeg float64) (uint32, float64, bool) {
 	lat, lon := int32(latDeg*1e7), int32(lonDeg*1e7)
 	cy, cx := int(lat-s.minLat)/cellLat, int(lon-s.minLon)/cellLon
 	cosl := math.Cos(latDeg * rad)
@@ -329,6 +341,9 @@ func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bo
 		}
 		c := y*s.nx + x
 		for _, n := range s.nodes[s.start[c]:s.start[c+1]] {
+			if skip != 0 && !g.hasEdgeWithout(n, skip) {
+				continue
+			}
 			dy := float64(g.nodes[n].Lat-lat) * 1e-7 * metersPerDegree
 			dx := float64(g.nodes[n].Lon-lon) * 1e-7 * metersPerDegree * cosl
 			if d := dx*dx + dy*dy; d < best {
@@ -514,9 +529,11 @@ type route struct {
 
 // route finds the cheapest route, or nil when there is none or ctx is cancelled.
 // The context is read every 1,024 settled nodes, so a cancellation takes effect within microseconds.
+// skip is a set of edge flags: an edge holding one is not used, which keeps the landmark bounds valid, since
+// removing edges can only raise the cost of a route.
 // maxSettled caps the nodes one search may settle (0 for no cap): a loop leg that needs more is
 // not worth finding, and a huge search would also have to regrow its table, which cannot be interrupted.
-func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *avoidSet, maxSettled int, src, dst uint32) *route {
+func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *avoidSet, skip uint8, maxSettled int, src, dst uint32) *route {
 	s.reset()
 	s.settled = 0
 	if ctx.Err() != nil { // short searches never reach the periodic check below
@@ -597,6 +614,9 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 		nu := &nodes[u]
 		for e := g.off[u]; e < g.off[u+1]; e++ {
 			ed := &edges[e]
+			if ed.Flags&skip != 0 {
+				continue
+			}
 			nv := &nodes[ed.To]
 			c := ed.Len * cx.mult[ed.Kind][ed.Surf]
 			if dz := float32(nv.Elev-nu.Elev) * 0.1; dz > 0 {
@@ -689,6 +709,7 @@ type loopParams struct {
 	distM, ascentM float64
 	candidates     int
 	seed           uint64
+	skip           uint8 // edge flags a loop may not use
 }
 
 type loopResult struct {
@@ -746,7 +767,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 		for j := 0; j < k; j++ {
 			phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(k+1)
 			x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
-			n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
+			n, d, ok := sp.nearest(g, lp.skip, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
 			if !ok || d > 400 {
 				return best
 			}
@@ -763,7 +784,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 			if avoid.n > 0 {
 				av = avoid
 			}
-			leg := s.route(ctx, cx, climb, av, loopLegMaxSettled, points[j-1], points[j])
+			leg := s.route(ctx, cx, climb, av, lp.skip, loopLegMaxSettled, points[j-1], points[j])
 			if leg == nil {
 				return best
 			}

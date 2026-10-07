@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clock,
   Download,
+  Mountain,
   Ruler,
   SlidersHorizontal,
   Timer,
@@ -202,6 +203,7 @@ function RouteRow({
     ...(gain ? [`${t.elevationGain} ${gain}`] : []),
     `${t.estimatedDuration} ${duration}`,
     ...misses,
+    ...(route.technical ? [t.technical] : []),
   ].join(', ');
   return (
     <button
@@ -238,6 +240,7 @@ function RouteRow({
         {route.misses.map((miss, k) => (
           <MissMarker key={miss.criterion} miss={miss} text={misses[k]} testId={`routes-row-${index}-miss`} />
         ))}
+        {route.technical && <TechnicalBadge text={t.technical} testId={`routes-row-${index}-technical`} />}
       </span>
       {/* The empty width of the row: where the route climbs, at a glance. */}
       <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
@@ -255,6 +258,16 @@ function MissMarker({ miss, text, testId }: { miss: Miss; text: string; testId: 
       className="flex items-center gap-1 text-sm font-semibold text-ink"
     >
       <Icon size={14} aria-hidden className="text-miss" />
+      {text}
+    </span>
+  );
+}
+
+/** Tells that a route holds a technical stretch, so the user sees what the switch changed. */
+function TechnicalBadge({ text, testId }: { text: string; testId: string }) {
+  return (
+    <span data-testid={testId} className="flex items-center gap-1 text-sm font-semibold text-ink">
+      <Mountain size={14} aria-hidden className="text-miss" />
       {text}
     </span>
   );

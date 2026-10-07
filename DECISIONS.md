@@ -63,6 +63,11 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   weight alone. Every multiplier stays at least 1, so that the search heuristic stays admissible.
   Revisit if the comparison with a reference (#131) shows that runners and walkers need different costs on the
   same surface.
+- **Technical stretches are the one hard exclusion, stored as an edge flag in the graph.** A surface preference
+  stays a weight, but a walker who did not ask for ropes or chains must never be routed onto them, so flagged
+  ways (`sac_scale` T3 and up) are skipped, not made dearer. Skipping edges only raises costs, so the landmark
+  bounds stay valid and need no new `.alt` file. The flag changes the graph format (`PFGRAPH6`): a graph built
+  before it would read as having none, and serve every way as allowed, so it is refused until it is built again.
 - **Loops go through 2–4 waypoints on a circle through the start point**, each leg avoiding what the
   earlier ones used, resized up to four times, then ranked on distance, overlap and elevation gain.
   Criteria whose waypoints alone exceed the target are refused. A waypoint is moved to the nearest way

@@ -85,9 +85,9 @@ func readClipped(path string, box Box) (ways []rawWay, lat, lon []int32, err err
 			}
 		case *osm.Way:
 			inWays = true
-			if kind, surf, ok := classifyWay(o.Tags); ok {
+			if kind, surf, flags, ok := classifyWay(o.Tags); ok {
 				for _, run := range cutInBox(o.Nodes, &nodes) {
-					ways = append(ways, rawWay{kind: kind, surf: surf, idx: run})
+					ways = append(ways, rawWay{kind: kind, surf: surf, flags: flags, idx: run})
 				}
 			}
 		}

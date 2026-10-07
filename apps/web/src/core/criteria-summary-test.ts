@@ -7,6 +7,7 @@ const request: RouteSetRequest = {
   target: { distance: 10 },
   surface: 'any',
   pace: 6,
+  includeTechnical: false,
 };
 const metric = { units: 'metric', language: 'en' } as const;
 

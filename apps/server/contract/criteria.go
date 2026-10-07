@@ -9,7 +9,7 @@ import (
 // CriteriaError is a request body that is not valid criteria, with the field that failed.
 // Messages name the field, never its value: the server keeps no location.
 type CriteriaError struct {
-	Field   string // start, target, elevationGain, surface or pace
+	Field   string // start, target, elevationGain, surface, pace or includeTechnical
 	Message string
 }
 
@@ -42,6 +42,9 @@ type Criteria struct {
 	ElevationGain *ElevationGain `json:"elevationGain,omitempty"`
 	Surface       string         `json:"surface"`
 	Pace          float64        `json:"pace"`
+	// IncludeTechnical allows the ways tagged technical (see engine.EdgeTechnical). Without it they are excluded,
+	// which is the one hard rule of the criteria: a surface preference only weights. It is never assumed.
+	IncludeTechnical bool `json:"includeTechnical"`
 }
 
 // TargetDistanceKm is the distance to ask the engine for. It fails when a target duration is too
@@ -154,6 +157,12 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 		return fail("pace", "pace must be a positive number")
 	}
 	c.Pace = pace
+
+	include, ok := obj["includeTechnical"].(bool)
+	if !ok {
+		return fail("includeTechnical", "includeTechnical must be true or false")
+	}
+	c.IncludeTechnical = include
 
 	if countElevationGain {
 		c.ElevationGain = gain

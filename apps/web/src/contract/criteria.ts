@@ -20,10 +20,12 @@ export type Criteria = {
   surface: 'paved' | 'unpaved' | 'any';
   /** Minutes per kilometre on flat ground. */
   pace: number;
+  /** Allows the ways tagged technical. Never assumed: without it the server refuses the criteria. */
+  includeTechnical: boolean;
 };
 
 /** The criteria fields `parseCriteria` checks, so a form can say which one is wrong. */
-export type CriteriaField = 'start' | 'target' | 'elevationGain' | 'surface' | 'pace';
+export type CriteriaField = 'start' | 'target' | 'elevationGain' | 'surface' | 'pace' | 'includeTechnical';
 
 /** Criteria that are not valid, with the field that failed. */
 export class CriteriaError extends RangeError {
@@ -72,7 +74,7 @@ function targetDistance(criteria: Criteria): number {
  */
 export function parseCriteria(body: unknown, { countElevationGain = true } = {}): Criteria {
   check(isObject(body), 'start', 'Criteria must be an object');
-  const { start, target, elevationGain, surface, pace } = body;
+  const { start, target, elevationGain, surface, pace, includeTechnical } = body;
 
   check(
     Array.isArray(start) && start.length === 2 && within(start[0], -180, 180) && within(start[1], -90, 90),
@@ -100,6 +102,7 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
   );
   check(SURFACES.includes(surface as Criteria['surface']), 'surface', 'Unknown surface preference');
   check(isNumber(pace) && pace > 0, 'pace', 'pace must be a positive number');
+  check(typeof includeTechnical === 'boolean', 'includeTechnical', 'includeTechnical must be true or false');
 
   const criteria: Criteria = {
     start: [start[0], start[1]],
@@ -108,6 +111,7 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
       elevationGain !== undefined && { elevationGain: elevationGain as Criteria['elevationGain'] }),
     surface: surface as Criteria['surface'],
     pace,
+    includeTechnical,
   };
   let distance: number;
   try {

@@ -22,6 +22,7 @@ function route(overrides: Partial<Route> = {}): Route {
       { surface: 'paved', share: 0.7 },
       { surface: 'unpaved', share: 0.3 },
     ],
+    technical: false,
     ...overrides,
   };
 }
@@ -46,6 +47,7 @@ const request: RouteSetRequest = {
   elevationGain: 400,
   surface: 'any',
   pace: 6,
+  includeTechnical: false,
 };
 
 const onDesktop = () =>
@@ -151,6 +153,15 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('routes-row-1')).toHaveAccessibleName(
         expect.stringContaining(`+30% ${routesText.en.misses.elevationGain}`),
       );
+    });
+
+    it('badges the routes that hold a technical stretch, and only those', () => {
+      render(<View list={[route({ technical: true }), route()]} />);
+
+      expect(screen.getByTestId('routes-row-0-technical')).toHaveTextContent(en.technical);
+      expect(screen.getByTestId('routes-row-0')).toHaveAccessibleName(expect.stringContaining(en.technical));
+      expect(screen.queryByTestId('routes-row-1-technical')).not.toBeInTheDocument();
+      expect(screen.getByTestId('routes-row-1')).not.toHaveAccessibleName(expect.stringContaining(en.technical));
     });
 
     it('marks no criterion on a match', () => {

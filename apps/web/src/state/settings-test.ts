@@ -9,7 +9,7 @@ const DEFAULTS = {
   units: 'metric',
   theme: 'system',
   basemap: 'plan',
-  lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300 },
+  lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300, includeTechnical: false },
 };
 
 describe('useSettings', () => {
@@ -27,7 +27,7 @@ describe('useSettings', () => {
       units: 'imperial',
       theme: 'dark',
       basemap: 'aerial',
-      lastCriteria: { target: 'duration', surface: 'unpaved', level: 'target', gain: 450 },
+      lastCriteria: { target: 'duration', surface: 'unpaved', level: 'target', gain: 450, includeTechnical: true },
     } as const;
     const first = renderHook(() => useSettings());
     act(() => first.result.current[1](kept));
@@ -103,8 +103,18 @@ describe('useSettings', () => {
       ...DEFAULTS,
       pace: 5,
       units: 'imperial',
-      lastCriteria: { target: 'distance', surface: 'paved', level: 'any', gain: 600 },
+      lastCriteria: { target: 'distance', surface: 'paved', level: 'any', gain: 600, includeTechnical: false },
     });
+  });
+
+  it('keeps the switch of the technical stretches, off unless it was stored as true', () => {
+    localStorage.setItem(KEY, JSON.stringify({ lastCriteria: { includeTechnical: true } }));
+    expect(renderHook(() => useSettings()).result.current[0].lastCriteria.includeTechnical).toBe(true);
+
+    for (const stored of ['true', 1, null, 'yes']) {
+      localStorage.setItem(KEY, JSON.stringify({ lastCriteria: { includeTechnical: stored } }));
+      expect(renderHook(() => useSettings()).result.current[0].lastCriteria.includeTechnical).toBe(false);
+    }
   });
 });
 

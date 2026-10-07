@@ -55,6 +55,9 @@ export DATA_DIR=$PWD/../../data
 ./path-finder build-alt -profile unpaved
 ```
 
+A graph built before the technical stretches (`PFGRAPH6`) is refused when the server starts: build it again, then
+the landmarks.
+
 A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
 a half-written one. A running server looks at the directory every 30 seconds and serves the files that replace
 the ones it maps, with no restart. Replace a file by renaming a new one over it, never by writing into it.

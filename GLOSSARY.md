@@ -14,8 +14,8 @@ _Avoid_: Origin, departure
 
 **Criteria**:
 Everything the user sets to ask for routes: start point, a target distance or a
-target duration, an optional target elevation gain, a surface preference, and up to three
-optional waypoints.
+target duration, an optional target elevation gain, a surface preference, whether to include
+technical stretches, and up to three optional waypoints.
 _Avoid_: Filters, query, search parameters
 
 **Waypoint**:
@@ -48,8 +48,18 @@ _Avoid_: Easy, mountainous
 **Surface preference**:
 A soft preference for paved roads, unpaved paths, or no preference. It picks the **routing profile**
 of the search, so it weights the generation, and the loops found are ranked on it too. It never excludes
-a route outright.
+a route outright: the only hard rule of the criteria is the exclusion of **technical stretches**.
 _Avoid_: Road type, terrain filter
+
+**Technical stretch**:
+A way tagged as asking for the hands, ropes or chains, or as exposed: on foot, `sac_scale` from
+`demanding_mountain_hiking` (T3) up. T1 and T2 are ordinary hiking and trail running. The switch « Inclure les
+passages techniques signalés » in the criteria is off by default, kept with the last criteria, and shown unless
+the surface preference is paved, which always excludes them. When it is off, flagged ways are excluded outright,
+not weighted, and a start point or waypoint on one moves to the nearest way allowed. An untagged way is never
+excluded: the switch says « signalés », it does not promise safety. A route that holds one carries the badge
+« passages techniques ».
+_Avoid_: Dangerous, difficult, T3
 
 **Routing profile**:
 The costs of a search, one per surface preference (`any`, `paved`, `unpaved`): a multiplier per way kind and

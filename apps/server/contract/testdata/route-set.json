@@ -21,7 +21,8 @@
           "surface": "unpaved",
           "share": 0.4
         }
-      ]
+      ],
+      "technical": true
     },
     {
       "geometry": [
@@ -43,7 +44,8 @@
           "surface": "paved",
           "share": 1
         }
-      ]
+      ],
+      "technical": false
     }
   ]
 }

@@ -60,6 +60,34 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('routes-row-0-profile')).toBeVisible();
   });
 
+  test('badges the routes with a technical stretch only once they are included', async ({ page, isMobile }) => {
+    const badge = page.locator('[data-testid^="routes-row-"][data-testid$="-technical"]');
+    const find = async () => {
+      await page.getByTestId('criteria-start').fill(START);
+      await page.getByTestId('criteria-start').press('Enter');
+      await page.getByTestId('criteria-submit').click();
+      await expect(page.getByTestId('routes-count')).toBeVisible();
+    };
+    await page.goto('/');
+    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
+    await page.locator('label', { has: page.getByTestId('criteria-surface-unpaved') }).click();
+
+    // The stand-in graph tags the tracks 1.2 km east of the start as technical.
+    await find();
+    await expect(page.getByTestId('routes-row-0')).toBeVisible();
+    await expect(badge).toHaveCount(0);
+
+    await page.getByTestId('routes-back').click();
+    // On phones, the sheet may be back to its chips.
+    const handle = page.getByTestId('criteria-sheet-handle');
+    if (isMobile && (await handle.getAttribute('aria-expanded')) !== 'true') await handle.click();
+    await page.locator('label', { has: page.getByTestId('criteria-technical') }).click();
+    await find();
+
+    await expect(page.getByTestId('routes-row-0')).toBeVisible();
+    await expect(badge.first()).toBeVisible();
+  });
+
   test('goes back to the criteria, still set', async ({ page }) => {
     await findRoutes(page);
 
