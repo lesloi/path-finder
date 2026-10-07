@@ -22,13 +22,13 @@ type Looper interface {
 type Generator struct {
 	// Engines by surface preference ("any", "paved", "unpaved").
 	Engines map[string]Looper
-	// Candidates is how many loops to ask the engine for (default 40).
+	// Candidates is how many loops to ask the engine for (default 80).
 	Candidates int
 	// Seed gives each request its own seed, so asking again can bring other loops (default random).
 	Seed func() uint64
 }
 
-const defaultCandidates = 40
+const defaultCandidates = 80
 
 // Generate reads the criteria from body and returns the routes of a route set. It reports
 // criteria that are not valid as a *contract.CriteriaError. When ctx ends first, it returns the

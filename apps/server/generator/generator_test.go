@@ -51,7 +51,7 @@ func TestGenerateAsksTheEngineForLoopsFromTheCriteria(t *testing.T) {
 	if _, err := generate(t, looper, context.Background(), body); err != nil {
 		t.Fatal(err)
 	}
-	want := engine.LoopRequest{Start: engine.Point{Lat: 45.8992, Lon: 6.1294}, Distance: 10_000, Ascent: 300, Candidates: 40, Seed: 42}
+	want := engine.LoopRequest{Start: engine.Point{Lat: 45.8992, Lon: 6.1294}, Distance: 10_000, Ascent: 300, Candidates: 80, Seed: 42}
 	got := looper.got
 	if got.Enough == nil {
 		t.Error("the engine is not told when to stop")
