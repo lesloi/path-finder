@@ -8,8 +8,6 @@ import {
   TARGET_DURATION,
 } from './limits.ts';
 
-export type Activity = 'run' | 'hike';
-
 /** Longitude and latitude, in degrees. */
 export type Position = [number, number];
 
@@ -25,7 +23,7 @@ export type Criteria = {
 };
 
 /** The criteria fields `parseCriteria` checks, so a form can say which one is wrong. */
-export type CriteriaField = 'start' | 'activity' | 'target' | 'elevationGain' | 'surface' | 'pace';
+export type CriteriaField = 'start' | 'target' | 'elevationGain' | 'surface' | 'pace';
 
 /** Criteria that are not valid, with the field that failed. */
 export class CriteriaError extends RangeError {
@@ -72,25 +70,20 @@ function targetDistance(criteria: Criteria): number {
  * checks them again and has the last word: it shares the bounds and the cases of its tests with
  * this check, and nothing else.
  */
-export function parseCriteria(
-  body: unknown,
-  { countElevationGain = true } = {},
-): { criteria: Criteria; activity: Activity } {
+export function parseCriteria(body: unknown, { countElevationGain = true } = {}): Criteria {
   check(isObject(body), 'start', 'Criteria must be an object');
-  const { start, activity, target, elevationGain, surface, pace } = body;
+  const { start, target, elevationGain, surface, pace } = body;
 
   check(
     Array.isArray(start) && start.length === 2 && within(start[0], -180, 180) && within(start[1], -90, 90),
     'start',
     'start must be a longitude and a latitude',
   );
-  check(typeof activity === 'string' && Object.hasOwn(MAX_TARGET_DISTANCE, activity), 'activity', 'Unknown activity');
-  const maxDistance = MAX_TARGET_DISTANCE[activity as Activity];
 
   check(isObject(target) && Object.keys(target).length === 1, 'target', 'target must be a distance or a duration');
   let parsedTarget: Criteria['target'];
   if ('distance' in target) {
-    check(within(target.distance, MIN_TARGET_DISTANCE, maxDistance), 'target', 'Target distance out of bounds');
+    check(within(target.distance, MIN_TARGET_DISTANCE, MAX_TARGET_DISTANCE), 'target', 'Target distance out of bounds');
     parsedTarget = { distance: target.distance };
   } else {
     check(within(target.duration, TARGET_DURATION.min, TARGET_DURATION.max), 'target', 'Target duration out of bounds');
@@ -122,6 +115,6 @@ export function parseCriteria(
   } catch (error) {
     throw new CriteriaError('target', (error as Error).message);
   }
-  check(distance <= maxDistance, 'target', 'Target duration makes too long a route at this pace');
-  return { criteria, activity: activity as Activity };
+  check(distance <= MAX_TARGET_DISTANCE, 'target', 'Target duration makes too long a route at this pace');
+  return criteria;
 }

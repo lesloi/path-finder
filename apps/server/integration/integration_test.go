@@ -61,14 +61,14 @@ func routeSets(t *testing.T, h http.Handler, body string) (int, []contract.Route
 	return rec.Code, answer.Routes, rec.Body.String()
 }
 
-func criteria(activity, target, rest string) string {
-	return `{"start":[6.1294,45.8992],"activity":"` + activity + `","target":` + target + `,"surface":"any","pace":6` + rest + `}`
+func criteria(target, rest string) string {
+	return `{"start":[6.1294,45.8992],"target":` + target + `,"surface":"any","pace":6` + rest + `}`
 }
 
 func TestRouteSetOfTheDefaultCriteria(t *testing.T) {
 	h := newServer(t)
 	start := time.Now()
-	code, routes, body := routeSets(t, h, criteria("run", `{"distance":10}`, ""))
+	code, routes, body := routeSets(t, h, criteria(`{"distance":10}`, ""))
 	t.Logf("route set in %v", time.Since(start))
 
 	if code != 200 {
@@ -106,10 +106,10 @@ func TestRouteSetOfTheDefaultCriteria(t *testing.T) {
 func TestRouteSetsForBothActivitiesAndTargets(t *testing.T) {
 	h := newServer(t)
 	for name, body := range map[string]string{
-		"a hike":                  criteria("hike", `{"distance":8}`, ""),
-		"a target duration":       criteria("run", `{"duration":60}`, ""),
-		"a target elevation gain": criteria("run", `{"distance":10}`, `,"elevationGain":200`),
-		"the hilly shortcut":      criteria("run", `{"distance":10}`, `,"elevationGain":"hilly"`),
+		"a short distance":        criteria(`{"distance":8}`, ""),
+		"a target duration":       criteria(`{"duration":60}`, ""),
+		"a target elevation gain": criteria(`{"distance":10}`, `,"elevationGain":200`),
+		"the hilly shortcut":      criteria(`{"distance":10}`, `,"elevationGain":"hilly"`),
 	} {
 		t.Run(name, func(t *testing.T) {
 			code, routes, out := routeSets(t, h, body)
@@ -122,7 +122,7 @@ func TestRouteSetsForBothActivitiesAndTargets(t *testing.T) {
 
 func TestAStartFarFromAnyWayHasNoRoutes(t *testing.T) {
 	h := newServer(t)
-	body := strings.Replace(criteria("run", `{"distance":10}`, ""), "[6.1294,45.8992]", "[2.35,48.85]", 1)
+	body := strings.Replace(criteria(`{"distance":10}`, ""), "[6.1294,45.8992]", "[2.35,48.85]", 1)
 	code, routes, out := routeSets(t, h, body)
 	if code != 200 || routes == nil || len(routes) != 0 {
 		t.Errorf("status %d, routes %v: %s", code, routes, out)
@@ -131,13 +131,13 @@ func TestAStartFarFromAnyWayHasNoRoutes(t *testing.T) {
 
 func TestRefusals(t *testing.T) {
 	h := newServer(t)
-	if code, _, out := routeSets(t, h, `{"start":[6.1294,45.8992],"activity":"ride"}`); code != 400 || !strings.Contains(out, `"field":"activity"`) {
-		t.Errorf("unknown activity: %d %s", code, out)
+	if code, _, out := routeSets(t, h, criteria(`{"distance":51}`, "")); code != 400 || !strings.Contains(out, `"field":"target"`) {
+		t.Errorf("a distance over the limit: %d %s", code, out)
 	}
 	if code, _, out := routeSets(t, h, `{"start":`); code != 400 || !strings.Contains(out, "invalid-json") {
 		t.Errorf("broken JSON: %d %s", code, out)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/route-sets", strings.NewReader(criteria("run", `{"distance":10}`, "")))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/route-sets", strings.NewReader(criteria(`{"distance":10}`, "")))
 	req.Header.Set("X-Build-Id", "build-0")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -178,7 +178,7 @@ func TestServesFromAReadOnlyDataDirectory(t *testing.T) {
 		t.Skip("the directory is writable anyway (running as root?)")
 	}
 
-	code, routes, body := routeSets(t, serverOn(t, dir), criteria("run", `{"distance":10}`, ""))
+	code, routes, body := routeSets(t, serverOn(t, dir), criteria(`{"distance":10}`, ""))
 	if code != 200 || len(routes) == 0 {
 		t.Errorf("status %d, %d routes: %s", code, len(routes), body[:min(len(body), 200)])
 	}
@@ -198,7 +198,7 @@ func TestServesFromADirectoryOfZones(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	code, routes, body := routeSets(t, serverOn(t, dir), criteria("run", `{"distance":10}`, ""))
+	code, routes, body := routeSets(t, serverOn(t, dir), criteria(`{"distance":10}`, ""))
 	if code != 200 || len(routes) == 0 {
 		t.Errorf("status %d, %d routes: %s", code, len(routes), body[:min(len(body), 200)])
 	}

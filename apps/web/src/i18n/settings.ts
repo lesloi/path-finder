@@ -3,7 +3,6 @@ import type { Language } from './language.ts';
 export const settingsText = {
   en: {
     display: 'Display',
-    pace: 'Pace',
     theme: 'Theme',
     system: 'System',
     light: 'Light',
@@ -16,7 +15,6 @@ export const settingsText = {
   },
   fr: {
     display: 'Affichage',
-    pace: 'Allure',
     theme: 'Thème',
     system: 'Système',
     light: 'Clair',

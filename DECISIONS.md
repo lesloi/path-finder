@@ -76,6 +76,6 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
 
 ## Naming
 
-- **A route is named after its activity and day**, with the distance and elevation gain
-  (`Course · 28 sept. · 12,3 km · +340 m`), not after a place. The name only has to tell routes apart in
+- **A route is named after its day**, with the distance and elevation gain
+  (`28 sept. · 12,3 km · +340 m`), not after a place. The name only has to tell routes apart in
   a watch vendor's app, and a commune would need a runtime call or a heavy file.

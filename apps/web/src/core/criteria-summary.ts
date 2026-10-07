@@ -1,16 +1,12 @@
-import { commonText, criteriaText } from '../i18n/index.ts';
+import { criteriaText } from '../i18n/index.ts';
 import type { RouteSetRequest } from './route.ts';
 import { formatDistance, formatDuration, formatHeight, type Display } from './units.ts';
 
-/** What the user asked for in a line, such as "Run · 10.0 km · Hilly · Unpaved". The start point is left out. */
-export function criteriaSummary(
-  { activity, target, elevationGain, surface }: RouteSetRequest,
-  display: Display,
-): string {
+/** What the user asked for in a line, such as "10.0 km · Hilly · Unpaved". The start point is left out. */
+export function criteriaSummary({ target, elevationGain, surface }: RouteSetRequest, display: Display): string {
   const { language } = display;
   const t = criteriaText[language];
   const parts = [
-    commonText[language].activities[activity],
     'distance' in target ? formatDistance(target.distance, display) : formatDuration(target.duration, display.language),
   ];
   if (elevationGain !== undefined) {

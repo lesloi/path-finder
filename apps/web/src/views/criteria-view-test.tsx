@@ -170,7 +170,7 @@ describe('CriteriaView', () => {
         string,
         RequestInit,
       ];
-      expect(JSON.parse(body as string)).toMatchObject({ start: [6.2, 45.8], activity: 'run' });
+      expect(JSON.parse(body as string)).toMatchObject({ start: [6.2, 45.8], pace: 6 });
     });
   });
 
@@ -467,6 +467,43 @@ describe('CriteriaView', () => {
       await settle();
       expect(routesSource()).toHaveLength(2);
       expect(map().fitted).toBeDefined();
+    });
+
+    it('estimates the durations at the pace of the settings, and recomputes them on the spot by distance', async () => {
+      onDesktop();
+      const routeSets = ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      await submit();
+      await screen.findByTestId('routes-count');
+      // 10 km and 300 m of climb are 13 km of effort: 78 minutes at 6 min/km, not the 70 the server said.
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 18');
+
+      fireEvent.click(screen.getByTestId('routes-pace-edit'));
+      fireEvent.change(screen.getByTestId('routes-pace-input'), { target: { value: '300' } });
+
+      // As the slider moves, without asking again.
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 05');
+      expect(screen.getByTestId('routes-pace-input-value')).toHaveTextContent('5:00 min/km');
+      fireEvent.click(screen.getByTestId('routes-pace-edit'));
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.en.estimatedPace('5:00 min/km'));
+      expect(routeSets).toHaveBeenCalledTimes(1);
+    });
+
+    it('says the pace of the routes by duration, without a way to change it there', async () => {
+      onDesktop();
+      const routeSets = ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      fireEvent.click(screen.getByTestId('criteria-target-duration'));
+      await submit();
+      await screen.findByTestId('routes-count');
+
+      // The routes keep the durations of the pace they were asked for: it is set in the criteria.
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 10');
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.en.estimatedPace('6:00 min/km'));
+      expect(screen.queryByTestId('routes-pace-edit')).not.toBeInTheDocument();
+      expect(routeSets).toHaveBeenCalledTimes(1);
     });
 
     it('opens the detail of a route, frames it on the map, and goes back to the list', async () => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
 import { parseCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
@@ -41,14 +41,13 @@ afterEach(() => {
 });
 
 describe('CriteriaForm', () => {
-  it('sends the defaults for a run at the default pace', () => {
+  it('sends the defaults at the default pace', () => {
     const { onSubmit, submit } = setup();
 
     submit();
 
     expect(onSubmit).toHaveBeenCalledWith({
       start: START,
-      activity: 'run',
       target: { distance: 10 },
       surface: 'any',
       pace: 6,
@@ -93,12 +92,10 @@ describe('CriteriaForm', () => {
     });
 
     it.each([
-      ['metric', 'run', 2, 50],
-      ['metric', 'hike', 2, 40],
-      ['imperial', 'run', 2, 31],
-      ['imperial', 'hike', 2, 24],
-    ])('keeps the distance slider within the API bounds in %s units, for a %s', (units, activity, min, max) => {
-      store({ units, lastActivity: activity });
+      ['metric', 2, 50],
+      ['imperial', 2, 31],
+    ])('keeps the distance slider within the API bounds in %s units', (units, min, max) => {
+      store({ units });
       setup();
 
       expect(slider('distance')).toHaveAttribute('min', `${min}`);
@@ -139,16 +136,14 @@ describe('CriteriaForm', () => {
     });
   });
 
-  it('converts the distance the slider shows when the units change, not one it had to clamp', () => {
+  it('converts the longest distance to the longest one in the new units', () => {
     render(<UnitsSwitch onSubmit={vi.fn()} />);
     fireEvent.change(slider('distance'), { target: { value: '50' } });
-    fireEvent.click(screen.getByTestId('criteria-activity-hike'));
-    expect(slider('distance')).toHaveValue('40');
 
     fireEvent.click(screen.getByTestId('imperial'));
 
-    // 40 km is 24.9 mi, which the slider shows as 25 and the hike's maximum cuts to 24.
-    expect(slider('distance')).toHaveValue('24');
+    // 50 km is 31.07 mi, which the slider shows as 31.
+    expect(slider('distance')).toHaveValue('31');
   });
 
   describe('elevation gain', () => {
@@ -211,69 +206,93 @@ describe('CriteriaForm', () => {
     });
   });
 
-  describe('activity', () => {
-    it('restores the last activity used', () => {
-      store({ lastActivity: 'hike' });
+  describe('last criteria', () => {
+    it('restores what was asked last', () => {
+      store({ lastCriteria: { target: 'duration', surface: 'unpaved', level: 'target', gain: 450 } });
       const { onSubmit, submit } = setup();
 
       submit();
 
-      expect(onSubmit.mock.calls[0][0]).toMatchObject({ activity: 'hike', pace: 60 / 4.5 });
-      expect(screen.getByTestId('criteria-activity-hike')).toHaveAttribute('aria-pressed', 'true');
+      expect(onSubmit.mock.calls[0][0]).toMatchObject({
+        target: { duration: 60 },
+        surface: 'unpaved',
+        elevationGain: 450,
+      });
+      expect(screen.getByTestId('criteria-surface-unpaved')).toBeChecked();
     });
 
-    it('stores the activity picked and uses its pace', () => {
-      store({ pace: { hike: 15 } });
-      const { onSubmit, submit } = setup();
+    it('keeps the criteria on the device as they are set, the gain in metres', () => {
+      store({ units: 'imperial' });
+      setup();
 
-      fireEvent.click(screen.getByTestId('criteria-activity-hike'));
-      submit();
+      choose('target', 'duration');
+      choose('surface', 'paved');
+      choose('elevation', 'target');
+      fireEvent.change(slider('gain'), { target: { value: '1500' } });
 
-      expect(JSON.parse(localStorage.getItem('path-finder.settings')!)).toMatchObject({ lastActivity: 'hike' });
-      expect(onSubmit.mock.calls[0][0]).toMatchObject({ activity: 'hike', pace: 15 });
+      expect(JSON.parse(localStorage.getItem('path-finder.settings')!).lastCriteria).toEqual({
+        target: 'duration',
+        surface: 'paved',
+        level: 'target',
+        gain: 457,
+      });
     });
 
-    it('brings the distance down to the longest one of a new activity', () => {
-      const { onSubmit, submit } = setup();
-      fireEvent.change(slider('distance'), { target: { value: '50' } });
+    it('shows a gain kept in metres in the units of the settings', () => {
+      store({ units: 'imperial', lastCriteria: { target: 'distance', surface: 'any', level: 'target', gain: 457 } });
+      setup();
 
-      fireEvent.click(screen.getByTestId('criteria-activity-hike'));
-      submit();
+      expect(slider('gain')).toHaveValue('1500');
+    });
 
-      expect(slider('distance')).toHaveValue('40');
-      expect(onSubmit.mock.calls[0][0].target).toEqual({ distance: 40 });
+    it('does not keep the distance or the duration', () => {
+      setup();
+      fireEvent.change(slider('distance'), { target: { value: '21' } });
+
+      cleanup();
+      setup();
+
+      expect(slider('distance')).toHaveValue('10');
     });
   });
 
-  describe('pace hint', () => {
-    const info = () => screen.queryByTestId('criteria-pace-info');
-    const link = () => screen.queryByTestId('criteria-pace-link');
+  describe('pace', () => {
+    const field = () => screen.queryByTestId('criteria-pace');
 
-    it('is not offered for a distance, which does not need the pace', () => {
+    it('is not asked for a distance, which does not need it', () => {
       setup();
 
-      expect(info()).not.toBeInTheDocument();
+      expect(field()).not.toBeInTheDocument();
     });
 
-    it('links to the settings from the info button of a duration, while the activity has no pace', () => {
-      setup();
+    it('is asked under a duration, in min/km, and saved as the slider moves', () => {
+      const { onSubmit, submit } = setup();
       choose('target', 'duration');
-      expect(link()).not.toBeInTheDocument();
+      expect(field()).toHaveValue('360');
+      expect(screen.getByTestId('criteria-pace-value')).toHaveTextContent('6:00 min/km');
+      expect(field()).toHaveAccessibleName(en.pace);
 
-      fireEvent.click(info()!);
+      fireEvent.change(field()!, { target: { value: '330' } });
+      submit();
 
-      expect(link()).toHaveAttribute('href', '#/settings');
+      expect(onSubmit.mock.calls[0][0].pace).toBe(5.5);
+      expect(JSON.parse(localStorage.getItem('path-finder.settings')!).pace).toBe(5.5);
     });
 
-    it('goes away for the activity whose pace is set, and stays for the others', () => {
-      store({ pace: { run: 5.5 } });
+    it('is shown in min/mi with imperial units', () => {
+      store({ units: 'imperial' });
       setup();
       choose('target', 'duration');
-      expect(info()).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByTestId('criteria-activity-hike'));
+      expect(screen.getByTestId('criteria-pace-value')).toHaveTextContent('9:39 min/mi');
+    });
 
-      expect(info()).toBeInTheDocument();
+    it('shows the saved pace', () => {
+      store({ pace: 5 });
+      setup();
+      choose('target', 'duration');
+
+      expect(screen.getByTestId('criteria-pace-value')).toHaveTextContent('5:00 min/km');
     });
   });
 
@@ -327,13 +346,13 @@ describe('CriteriaForm', () => {
     });
 
     it('shows chips instead of the form, highlighting the criteria that are not the default', () => {
-      store({ lastActivity: 'hike' });
+      store({ lastCriteria: { target: 'distance', surface: 'paved', level: 'any', gain: 300 } });
       setup({ compact: true });
 
       expect(screen.queryByTestId('criteria-distance')).not.toBeInTheDocument();
-      expect(screen.getByTestId('criteria-chip-activity')).toHaveAttribute('data-set');
+      expect(screen.queryByTestId('criteria-chip-activity')).not.toBeInTheDocument();
       expect(screen.getByTestId('criteria-chip-target')).not.toHaveAttribute('data-set');
-      expect(screen.getByTestId('criteria-chip-surface')).not.toHaveAttribute('data-set');
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAttribute('data-set');
     });
 
     it('names the elevation gain and surface chips while they are the default, so they are told apart', () => {
@@ -366,7 +385,6 @@ describe('CriteriaForm', () => {
     });
 
     it('shows the error inside the dialog, which covers the sheet', () => {
-      store({ lastActivity: 'run' });
       setup({ compact: true });
       fireEvent.click(screen.getByTestId('criteria-chip-elevation'));
       choose('elevation', 'target');

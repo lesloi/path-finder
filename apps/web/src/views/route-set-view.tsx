@@ -40,6 +40,7 @@ import {
   type Display,
 } from '../core/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
+import { RoutePace } from './route-pace.tsx';
 
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
@@ -55,17 +56,20 @@ const words = ({ language }: Display) => ({ ...criteriaText[language], ...routes
 /**
  * The route set the user asked for: first a list of its routes, then the detail of one, which
  * swipes (or the arrow buttons on desktops) to the next. `onSelect` hears the route shown in the
- * list or the detail, `onHover` a place the user points at on the elevation profile.
+ * list or the detail, `onHover` a place the user points at on the elevation profile. The durations of the
+ * routes are at `pace`; `onPaceChange`, when given, lets the user change it in the list.
  */
 export function RouteSetView({
   display,
   request,
   routes,
+  pace,
   snapshot,
   selected,
   detail,
   onSelect,
   onDetailChange,
+  onPaceChange,
   onBack,
   onHover,
   condensed = false,
@@ -74,6 +78,8 @@ export function RouteSetView({
   /** The criteria the routes were generated for. */
   request: RouteSetRequest;
   routes: Route[];
+  /** Minutes per km, which the durations of the routes are estimated at. */
+  pace: number;
   /** What the map showed for these routes, to draw their thumbnails over. */
   snapshot?: MapSnapshot;
   selected: number;
@@ -81,6 +87,8 @@ export function RouteSetView({
   detail: boolean;
   onSelect: (index: number) => void;
   onDetailChange: (detail: boolean) => void;
+  /** Absent when the pace cannot change the routes' durations alone, such as by duration. */
+  onPaceChange?: (pace: number) => void;
   /** Back to the criteria. */
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
@@ -93,7 +101,6 @@ export function RouteSetView({
     return (
       <RouteDetail
         display={display}
-        request={request}
         routes={routes}
         snapshot={snapshot}
         selected={selected}
@@ -137,6 +144,7 @@ export function RouteSetView({
           <span className="min-w-0 flex-1 truncate">{summary}</span>
         </div>
       )}
+      <RoutePace display={display} pace={pace} onChange={onPaceChange} />
       <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
         {routes.map((route, index) => (
           <li key={index}>
@@ -254,7 +262,6 @@ function MissMarker({ miss, text, testId }: { miss: Miss; text: string; testId: 
 
 function RouteDetail({
   display,
-  request,
   routes,
   snapshot,
   selected,
@@ -265,7 +272,6 @@ function RouteDetail({
   condensed,
 }: {
   display: Display;
-  request: RouteSetRequest;
   routes: Route[];
   snapshot?: MapSnapshot;
   selected: number;
@@ -399,7 +405,7 @@ function RouteDetail({
             data-testid="route-export"
             className={PRIMARY_BUTTON}
             // Nothing awaited before the share sheet: it needs the tap that opened it.
-            onClick={() => void saveGpx(gpxExport(route, request.activity, new Date(), display))}
+            onClick={() => void saveGpx(gpxExport(route, new Date(), display))}
           >
             <Download size={18} aria-hidden />
             {t.exportGpx}

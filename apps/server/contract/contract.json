@@ -1,8 +1,5 @@
 {
-  "activities": {
-    "run": { "maxDistanceKm": 50 },
-    "hike": { "maxDistanceKm": 40 }
-  },
+  "maxDistanceKm": 50,
   "minDistanceKm": 2,
   "durationMinutes": { "min": 15, "max": 360 },
   "maxElevationGainMetres": 2500,

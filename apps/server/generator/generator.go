@@ -35,7 +35,7 @@ const defaultCandidates = 80
 // routes the loops finished by then make, if any, and ctx's error otherwise: asking for more
 // would only take longer.
 func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, error) {
-	criteria, _, err := contract.ParseCriteria(body, true)
+	criteria, err := contract.ParseCriteria(body, true)
 	if err != nil {
 		return nil, err
 	}

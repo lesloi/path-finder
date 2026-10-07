@@ -8,7 +8,7 @@ import { RoutesFoundButton } from './routes-found-button.tsx';
 import { SearchingPanel } from './searching-panel.tsx';
 import { useRouteBrowser } from './use-route-browser.ts';
 import { RouteSetView } from './route-set-view.tsx';
-import { BASEMAPS, formatPosition, parsePosition, type Position } from '../core/index.ts';
+import { BASEMAPS, formatPosition, parsePosition, routesAtPace, type Position } from '../core/index.ts';
 import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
   StartPointMap,
@@ -56,10 +56,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const map = useRef<MapHandle>(null);
   const [mapView, setMapView] = useState<MapView>({ bearing: 0, rotated: false, movedAway: false });
   const pageWasOpen = useRef(pageOpen);
-  const [{ units, basemap }, update] = useSettings();
+  const [{ units, basemap, pace }, update] = useSettings();
   const browser = useRouteBrowser();
   const { routeSet, loading } = browser;
   const display = useMemo(() => ({ units, language }), [units, language]);
+  const atPace = useMemo(() => routeSet && routesAtPace(routeSet.request, routeSet.routes, pace), [routeSet, pace]);
   const summaries = useMemo(
     () => routeSet?.routes.map(({ distance, elevationGain }) => ({ distance, elevationGain })),
     [routeSet],
@@ -117,16 +118,19 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   }
 
   const panel =
-    routeSet && browser.showing ? (
+    atPace && routeSet && browser.showing ? (
       <RouteSetView
         display={display}
         request={routeSet.request}
-        routes={routeSet.routes}
+        routes={atPace.routes}
+        pace={atPace.pace}
         snapshot={browser.snapshot}
         selected={browser.selected}
         detail={browser.detail}
         onSelect={browser.select}
         onDetailChange={browser.openDetail}
+        // By duration, a new pace is another search, which the criteria ask for: the list only says the pace.
+        onPaceChange={'distance' in routeSet.request.target ? (value) => update({ pace: value }) : undefined}
         onBack={backToCriteria}
         onHover={browser.setHover}
         condensed={!desktop && !sheetExpanded}

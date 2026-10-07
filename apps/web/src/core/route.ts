@@ -1,11 +1,10 @@
 import type { Criteria, Miss, SurfaceStretch } from '../contract/index.ts';
 import { routesText } from '../i18n/index.ts';
-import type { Activity } from './activity.ts';
 import type { Position } from './coordinates.ts';
 import { formatHeight, type Display } from './units.ts';
 
-/** The body of a route set request: the criteria and the activity, as `parseCriteria` accepts them. */
-export type RouteSetRequest = Criteria & { activity: Activity };
+/** The body of a route set request: the criteria, as `parseCriteria` accepts them. */
+export type RouteSetRequest = Criteria;
 
 /**
  * A route of a route set as the API sends it: longitude, latitude, and height in metres on every

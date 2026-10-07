@@ -1,4 +1,12 @@
-import { formatDistance, formatDuration, formatHeight } from './units.ts';
+import {
+  formatDistance,
+  formatDuration,
+  formatHeight,
+  formatPace,
+  paceFromSeconds,
+  paceSeconds,
+  paceUnit,
+} from './units.ts';
 
 describe('formatDistance', () => {
   it.each([
@@ -27,5 +35,27 @@ describe('formatDuration', () => {
     ['to the nearest minute', 84.6, '1 h 25'],
   ])('writes a duration %s', (_, minutes, expected) => {
     expect(formatDuration(minutes, 'en')).toBe(expected);
+  });
+});
+
+describe('pace', () => {
+  it('is minutes per distance, never a speed', () => {
+    expect(paceUnit('metric')).toBe('min/km');
+    expect(paceUnit('imperial')).toBe('min/mi');
+  });
+
+  it.each([
+    ['per kilometre', 5.5, 'metric', '5:30 min/km'],
+    ['per mile', 5.5, 'imperial', '8:51 min/mi'],
+  ] as const)('writes a pace %s', (_, minPerKm, units, expected) => {
+    expect(formatPace(minPerKm, units)).toBe(expected);
+  });
+
+  it.each([
+    ['per kilometre', 330, 'metric', 5.5],
+    ['per mile', 480, 'imperial', 8 / 1.609344],
+  ] as const)('goes from seconds %s to a pace in minutes per km, and back', (_, seconds, units, minPerKm) => {
+    expect(paceFromSeconds(seconds, units)).toBeCloseTo(minPerKm, 10);
+    expect(paceSeconds(minPerKm, units)).toBe(seconds);
   });
 });

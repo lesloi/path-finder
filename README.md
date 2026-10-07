@@ -31,7 +31,7 @@
 
 - **No accounts, no analytics, no tracking.**
 - **Your routes and settings stay in your browser.**
-- **Only what a route needs is sent** to the app's own server: start point, activity,
+- **Only what a route needs is sent** to the app's own server: start point,
   target distance or duration, elevation gain, surface preference, and pace. It generates
   the routes and keeps nothing.
 - **Map tiles**, with their fonts and icons, come from the French national mapping agency

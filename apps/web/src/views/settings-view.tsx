@@ -1,17 +1,8 @@
 import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
-import { useState } from 'react';
 
-import {
-  ACTIVITY_PACES,
-  type Activity,
-  formatPace,
-  paceUnit,
-  parsePace,
-  type Theme,
-  type Units,
-} from '../core/index.ts';
+import type { Theme, Units } from '../core/index.ts';
 import { commonText, settingsText, type Language } from '../i18n/index.ts';
-import { paceFor, useSettings } from '../state/index.ts';
+import { useSettings } from '../state/index.ts';
 import { Dropdown, GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON } from '../components/index.ts';
 
 const FLAG_CLASSES = 'flex-none ring-1 ring-border';
@@ -61,18 +52,6 @@ export function SettingsView({ language }: { language: Language }) {
           />
         </div>
       </div>
-      <h2 className={GROUP_TITLE}>{t.pace}</h2>
-      <div className={LIST}>
-        {(Object.keys(ACTIVITY_PACES) as Activity[]).map((activity) => (
-          // A new key on a units change shows the pace again in the new units.
-          <PaceInput
-            key={`${activity}-${settings.units}`}
-            activity={activity}
-            language={language}
-            units={settings.units}
-          />
-        ))}
-      </div>
       <h2 className={GROUP_TITLE}>{t.about}</h2>
       <nav className={LIST}>
         {[
@@ -87,31 +66,6 @@ export function SettingsView({ language }: { language: Language }) {
         ))}
       </nav>
     </>
-  );
-}
-
-// Keeps what the user types, and saves it as soon as it reads as a pace.
-function PaceInput({ activity, language, units }: { activity: Activity; language: Language; units: Units }) {
-  const [settings, update] = useSettings();
-  const { display } = ACTIVITY_PACES[activity];
-  const shown = formatPace(paceFor(settings, activity), display, units, language);
-  const [draft, setDraft] = useState(shown);
-  return (
-    <label className={LIST_ROW}>
-      {`${commonText[language].activities[activity]} (${paceUnit(display, units)})`}
-      <input
-        data-testid={`settings-pace-${activity}`}
-        className="min-h-touch w-22 rounded-sm bg-surface-2 px-3 text-right"
-        inputMode="decimal"
-        value={draft}
-        onChange={(event) => {
-          setDraft(event.target.value);
-          const pace = parsePace(event.target.value, display, units);
-          if (pace !== undefined) update({ pace: { ...settings.pace, [activity]: pace } });
-        }}
-        onBlur={() => setDraft(shown)}
-      />
-    </label>
   );
 }
 

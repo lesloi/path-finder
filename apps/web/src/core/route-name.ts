@@ -1,13 +1,10 @@
-import type { Activity } from './activity.ts';
-import { commonText } from '../i18n/index.ts';
 import { KM_PER_MILE, METRES_PER_FOOT, type Display } from './units.ts';
 
 /**
- * The route name: the activity, the day of the export, the distance, and the elevation gain
- * when known, such as "Course · 28 sept. · 12,3 km · +340 m". Nothing names where it starts.
+ * The route name: the day of the export, the distance, and the elevation gain
+ * when known, such as "28 sept. · 12,3 km · +340 m". Nothing names where it starts.
  */
 export function routeName(
-  activity: Activity,
   date: Date,
   { distance, elevationGain }: { distance: number; elevationGain?: number },
   { units, language }: Display,
@@ -20,5 +17,5 @@ export function routeName(
     elevationGain === undefined
       ? []
       : [metric ? `+${Math.round(elevationGain)} m` : `+${Math.round(elevationGain / METRES_PER_FOOT)} ft`];
-  return [commonText[language].activities[activity], day, length, ...climb].join(' · ');
+  return [day, length, ...climb].join(' · ');
 }

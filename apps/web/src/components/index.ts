@@ -3,6 +3,7 @@ export * from './basemap-picker.tsx';
 export * from './basemap-style.ts';
 export * from './dialog.tsx';
 export * from './dropdown.tsx';
+export * from './pace-slider.tsx';
 export * from './segmented-control.tsx';
 export * from './slider.tsx';
 export * from './styles.ts';

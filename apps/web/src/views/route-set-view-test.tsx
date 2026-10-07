@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { expectNamedControls } from '../accessible-names.ts';
 import type { Route, RouteSetRequest } from '../core/index.ts';
-import { commonText, criteriaText, routesText } from '../i18n/index.ts';
+import { criteriaText, routesText } from '../i18n/index.ts';
 import { RouteSetView } from './route-set-view.tsx';
 
 const METRES_PER_DEGREE = 111_195;
@@ -42,7 +42,6 @@ const suggestion = route({
 const routes = [route(), suggestion, route({ distance: 10.5, elevationGain: 80 })];
 const request: RouteSetRequest = {
   start: [6.1294, 45.8992],
-  activity: 'run',
   target: { distance: 10 },
   elevationGain: 400,
   surface: 'any',
@@ -64,6 +63,8 @@ function View({
   onSelect = () => {},
   onBack = () => {},
   onHover = () => {},
+  onPaceChange,
+  pace = 6,
   open = false,
   condensed = false,
 }: {
@@ -73,6 +74,8 @@ function View({
   onSelect?: (index: number) => void;
   onBack?: () => void;
   onHover?: (position: unknown) => void;
+  onPaceChange?: (pace: number) => void;
+  pace?: number;
   open?: boolean;
   condensed?: boolean;
 }) {
@@ -83,6 +86,7 @@ function View({
       display={{ units, language }}
       request={request}
       routes={list}
+      pace={pace}
       selected={selected}
       detail={detail}
       onSelect={(index) => {
@@ -90,6 +94,7 @@ function View({
         onSelect(index);
       }}
       onDetailChange={setDetail}
+      onPaceChange={onPaceChange}
       onBack={onBack}
       onHover={onHover}
       condensed={condensed}
@@ -221,12 +226,52 @@ describe('RouteSetView', () => {
       const onBack = vi.fn();
       render(<View onBack={onBack} />);
 
-      const summary = `${commonText.en.activities.run} · 10.0 km · 400 m`;
+      const summary = '10.0 km · 400 m';
       expect(screen.getByTestId('routes-summary')).toHaveTextContent(summary);
       expect(screen.getByTestId('routes-change')).toHaveAccessibleName(routesText.en.changeCriteria(summary));
 
       fireEvent.click(screen.getByTestId('routes-change'));
       expect(onBack).toHaveBeenCalled();
+    });
+
+    it('says the pace the durations are estimated at, and changes it where it shows', () => {
+      const onPaceChange = vi.fn();
+      render(<View onPaceChange={onPaceChange} />);
+
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedPace('6:00 min/km'));
+      fireEvent.click(screen.getByTestId('routes-pace-edit'));
+      const slider = screen.getByTestId('routes-pace-input');
+      expect(slider).toHaveValue('360');
+      fireEvent.change(slider, { target: { value: '330' } });
+      expect(onPaceChange).toHaveBeenCalledExactlyOnceWith(5.5);
+
+      expect(screen.getByTestId('routes-pace-edit')).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('goes back to the pace line with the same pencil', () => {
+      render(<View onPaceChange={vi.fn()} />);
+      fireEvent.click(screen.getByTestId('routes-pace-edit'));
+      expect(screen.getByTestId('routes-pace-input')).toHaveFocus();
+
+      fireEvent.click(screen.getByTestId('routes-pace-edit'));
+
+      expect(screen.queryByTestId('routes-pace-input')).not.toBeInTheDocument();
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedPace('6:00 min/km'));
+      expect(screen.getByTestId('routes-pace-edit')).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByTestId('routes-pace-edit')).toHaveFocus();
+    });
+
+    it('only says the pace when it cannot be changed here', () => {
+      render(<View onPaceChange={undefined} />);
+
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedPace('6:00 min/km'));
+      expect(screen.queryByTestId('routes-pace-edit')).not.toBeInTheDocument();
+    });
+
+    it('says the pace in min/mi with imperial units, in French', () => {
+      render(<View units="imperial" language="fr" />);
+
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.fr.estimatedPace('9:39 min/mi'));
     });
 
     it('shows the figures in the units and the language of the settings', () => {
@@ -434,7 +479,7 @@ describe('RouteSetView', () => {
         fireEvent.click(screen.getByTestId('route-export'));
 
         const [{ files }] = share.mock.calls[0] as unknown as [ShareData];
-        expect(files![0].name).toMatch(/^Run-\d{4}-12km_340m\.gpx$/);
+        expect(files![0].name).toMatch(/^\d{4}-12km_340m\.gpx$/);
         const gpx = await files![0].text();
         expect(gpx).toContain('<trkpt');
         expect(gpx).toContain('OpenStreetMap');
