@@ -153,17 +153,17 @@ func OpenDir(dir string, profiles ...string) (map[string]*Engine, error) {
 
 // Route finds the cheapest route from one point to another. It returns ctx's error when ctx ends first.
 func (e *Engine) Route(ctx context.Context, from, to Point) (*Route, error) {
-	src, d, ok := e.sp.nearest(e.g, 0, from.Lat, from.Lon)
+	src, d, ok := e.sp.nearest(e.g, noSkip, from.Lat, from.Lon)
 	if !ok || d > maxSnapMeters {
 		return nil, ErrOffGraph
 	}
-	dst, d, ok := e.sp.nearest(e.g, 0, to.Lat, to.Lon)
+	dst, d, ok := e.sp.nearest(e.g, noSkip, to.Lat, to.Lon)
 	if !ok || d > maxSnapMeters {
 		return nil, ErrOffGraph
 	}
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
-	r := s.route(ctx, e, e.prof.UpPerMeter, nil, 0, 0, src, dst)
+	r := s.route(ctx, e, e.prof.UpPerMeter, nil, noSkip, 0, src, dst)
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -219,18 +219,12 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 func (e *Engine) describe(nodes, edges []uint32) *Route {
 	dist, trail, _ := measure(e.g, nodes, edges)
 	r := &Route{
-		Points:    make([]Position, len(nodes)),
-		Distance:  dist,
-		Ascent:    ascent(e.g, nodes),
-		Descent:   descent(e.g, nodes),
-		Stretches: e.stretches(edges),
+		Points:   make([]Position, len(nodes)),
+		Distance: dist,
+		Ascent:   ascent(e.g, nodes),
+		Descent:  descent(e.g, nodes),
 	}
-	for _, id := range edges {
-		if e.g.edges[id].Flags&EdgeTechnical != 0 {
-			r.Technical = true
-			break
-		}
-	}
+	r.Stretches, r.Technical = e.stretches(edges)
 	if dist > 0 {
 		r.TrailShare = trail / dist
 	}
@@ -250,10 +244,11 @@ func isUnpaved(kind, surf uint8) bool {
 	return surf == SurfaceCompact || surf == SurfaceRough
 }
 
-func (e *Engine) stretches(edges []uint32) []Stretch {
-	var out []Stretch
+// stretches tells the surface along a path of edges, and whether any of them is technical.
+func (e *Engine) stretches(edges []uint32) (out []Stretch, technical bool) {
 	for _, id := range edges {
 		ed := e.g.edges[id]
+		technical = technical || ed.Flags&EdgeTechnical != 0
 		unpaved := isUnpaved(ed.Kind, ed.Surf)
 		if n := len(out); n > 0 && out[n-1].Unpaved == unpaved {
 			out[n-1].Meters += float64(ed.Len)
@@ -261,5 +256,5 @@ func (e *Engine) stretches(edges []uint32) []Stretch {
 			out = append(out, Stretch{unpaved, float64(ed.Len)})
 		}
 	}
-	return out
+	return out, technical
 }

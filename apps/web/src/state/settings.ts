@@ -23,7 +23,7 @@ export type LastCriteria = {
   level: ElevationLevel;
   /** The target elevation gain, in metres whatever the units. */
   gain: number;
-  /** Whether to include the technical stretches. Kept whatever the surface; sent only when the surface is not paved. */
+  /** Whether to include the technical stretches. Kept whatever the surface; a paved request sends false instead. */
   includeTechnical: boolean;
 };
 

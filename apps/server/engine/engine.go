@@ -59,6 +59,9 @@ func (g *graph) hasEdgeWithout(n uint32, flags uint8) bool {
 	return false
 }
 
+// noSkip is the set of edge flags that excludes no way.
+const noSkip uint8 = 0
+
 func align16(n int) int { return (n + 15) &^ 15 }
 
 // fileID identifies the version of a file: a replaced file has another inode, a rewritten one another size or
@@ -341,12 +344,10 @@ func (s *spatial) nearest(g *graph, skip uint8, latDeg, lonDeg float64) (uint32,
 		}
 		c := y*s.nx + x
 		for _, n := range s.nodes[s.start[c]:s.start[c+1]] {
-			if skip != 0 && !g.hasEdgeWithout(n, skip) {
-				continue
-			}
 			dy := float64(g.nodes[n].Lat-lat) * 1e-7 * metersPerDegree
 			dx := float64(g.nodes[n].Lon-lon) * 1e-7 * metersPerDegree * cosl
-			if d := dx*dx + dy*dy; d < best {
+			// The edges of a node are read only when it would be the nearest.
+			if d := dx*dx + dy*dy; d < best && (skip == 0 || g.hasEdgeWithout(n, skip)) {
 				best, node, found = d, n, true
 			}
 		}

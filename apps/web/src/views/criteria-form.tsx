@@ -160,6 +160,9 @@ export function CriteriaForm({
   const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
   const gain = clamp(draft.gain, 0, bounds.gain.max);
   const level = draft.level;
+  // Only the surface preferences that can route onto technical ways get the switch. A paved request always excludes
+  // them, whatever was kept: the stored value is not touched.
+  const technicalApplies = draft.surface !== 'paved';
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
   const request: RouteSetRequest | undefined = start && {
@@ -172,8 +175,7 @@ export function CriteriaForm({
     ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
     surface: draft.surface,
     pace: settings.pace,
-    // The switch is hidden when the surface is paved: what it kept never goes with such a request.
-    includeTechnical: draft.surface !== 'paved' && draft.includeTechnical,
+    includeTechnical: technicalApplies && draft.includeTechnical,
   };
   const field = request && invalidField(request);
 
@@ -273,8 +275,7 @@ export function CriteriaForm({
             ]}
             onChange={(surface) => change({ surface })}
           />
-          {/* A paved request always excludes them (DECISIONS.md, Routing), so there is nothing to choose. */}
-          {draft.surface !== 'paved' && (
+          {technicalApplies && (
             <Switch
               testId="criteria-technical"
               label={t.includeTechnical}
