@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # The unit tests with their coverage threshold, then the built app in Chromium served by the Go server; the IGN
+  # The unit tests with their coverage threshold, then the app built (`pnpm build`, `go build`) and tested in Chromium served by the Go server; the IGN
   # is answered from fixtures (e2e/test.ts).
   web:
     runs-on: ubuntu-latest

@@ -1,20 +1,19 @@
-name: Container
+name: Release
 
 on:
   push:
     branches: [main]
-  pull_request:
 
 permissions:
   contents: read
 
-# A new push to a pull request cancels the run it replaces; runs on main all finish.
+# Every run on main finishes.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
-  # Builds the image on every run, and pushes it to GitHub Container Registry from main.
+  # Builds the multi-platform image and pushes it to GitHub Container Registry; the pull requests build the app through the e2e tests (workflow `web`).
   container:
     runs-on: ubuntu-latest
     permissions:
@@ -22,7 +21,6 @@ jobs:
       packages: write
     steps:
       - uses: docker/login-action@v4
-        if: ${{ github.event_name == 'push' }}
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -42,7 +40,7 @@ jobs:
 
       - uses: docker/build-push-action@v7
         with:
-          push: ${{ github.event_name == 'push' }}
+          push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
