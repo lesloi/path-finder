@@ -507,6 +507,8 @@ describe('CriteriaView', () => {
       fireEvent.change(screen.getByTestId('routes-pace-input'), { target: { value: '300' } });
       fireEvent.blur(screen.getByTestId('routes-pace-input'));
 
+      // The list stays while the new routes are asked for.
+      expect(screen.getByTestId('routes-list')).toBeInTheDocument();
       expect(bodies).toHaveLength(2);
       expect(bodies[1]).toMatchObject({ target: { duration: 60 }, pace: 5 });
     });

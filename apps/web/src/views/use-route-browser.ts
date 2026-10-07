@@ -42,12 +42,13 @@ export function useRouteBrowser() {
     select: setSelected,
     setHover,
     dismissError: () => setError(undefined),
-    ask(request: RouteSetRequest) {
+    /** Asks for a route set; with `keep`, the routes shown stay until the new ones come. */
+    ask(request: RouteSetRequest, keep = false) {
       setError(undefined);
       setSelected(0);
       setDetail(false);
       setShowing(true);
-      find(request);
+      find(request, keep);
     },
     /** Back to the criteria: the routes stay on the map, and can be shown again. */
     leave() {

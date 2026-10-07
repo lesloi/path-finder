@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { formatPace, KM_PER_MILE, paceUnit, type Units } from '../core/index.ts';
 import { Slider } from './slider.tsx';
@@ -9,11 +9,14 @@ const RANGE = {
   imperial: { min: 300, max: 1140, step: 10 },
 };
 
+// A pace set with the keyboard is final once the user has stopped pressing keys for this long, in ms.
+const KEY_IDLE = 500;
+
 const perUnit = (units: Units) => (units === 'metric' ? 1 : KM_PER_MILE);
 
 /**
  * A pace as a slider, in minutes per distance. What the slider shows moves with it; the pace changes once
- * the user lets go of it or leaves it, so a search that a change starts runs once.
+ * the user lets go of it, pauses on a key, or leaves it, so a search that a change starts runs once.
  */
 export function PaceSlider({
   label,
@@ -42,9 +45,13 @@ export function PaceSlider({
     setDraft(seconds);
   }
 
-  function commit() {
+  const idle = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(idle.current), []);
+
+  function commit(value = draft) {
+    clearTimeout(idle.current);
     // The same pace again is not a change: it would only start a search.
-    if (draft !== seconds) onChange(draft / 60 / perUnit(units));
+    if (value !== seconds) onChange(value / 60 / perUnit(units));
   }
 
   return (
@@ -62,8 +69,13 @@ export function PaceSlider({
         min={min}
         max={max}
         step={step}
-        onChange={setDraft}
-        onCommit={commit}
+        onChange={(value) => {
+          setDraft(value);
+          // Keys change the value a step at a time: wait for the last one.
+          clearTimeout(idle.current);
+          idle.current = setTimeout(() => commit(value), KEY_IDLE);
+        }}
+        onCommit={() => commit()}
       />
     </div>
   );

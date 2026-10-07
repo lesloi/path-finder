@@ -90,7 +90,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   function changePace(value: number) {
     update({ pace: value });
-    if (routeSet && 'duration' in routeSet.request.target) browser.ask({ ...routeSet.request, pace: value });
+    if (routeSet && 'duration' in routeSet.request.target) browser.ask({ ...routeSet.request, pace: value }, true);
   }
 
   function changeStart(position: Position) {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { PaceSlider } from './pace-slider.tsx';
 
@@ -39,17 +39,32 @@ describe('PaceSlider', () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith(5.5);
   });
 
-  it('changes the pace at the end of a key press, or when the user leaves it', () => {
-    const { slider, onChange, onDone } = setup();
+  it('changes the pace once the user pauses on a key, not at each step', () => {
+    vi.useFakeTimers();
+    const { slider, onChange } = setup();
 
-    fireEvent.change(slider, { target: { value: '300' } });
-    fireEvent.keyUp(slider, { key: 'ArrowLeft' });
-    expect(onChange).toHaveBeenCalledExactlyOnceWith(5);
+    fireEvent.change(slider, { target: { value: '355' } });
+    fireEvent.change(slider, { target: { value: '350' } });
+    fireEvent.change(slider, { target: { value: '345' } });
+    act(() => vi.advanceTimersByTime(400));
+    expect(onChange).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(200));
+
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(345 / 60);
+    vi.useRealTimers();
+  });
+
+  it('changes the pace when the user leaves the slider, and does not wait on to change it again', () => {
+    vi.useFakeTimers();
+    const { slider, onChange, onDone } = setup();
 
     fireEvent.change(slider, { target: { value: '420' } });
     fireEvent.blur(slider);
-    expect(onChange).toHaveBeenLastCalledWith(7);
+    act(() => vi.advanceTimersByTime(1_000));
+
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(7);
     expect(onDone).toHaveBeenCalledOnce();
+    vi.useRealTimers();
   });
 
   it('does not change the pace when it did not move', () => {

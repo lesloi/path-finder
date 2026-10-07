@@ -139,6 +139,40 @@ describe('useRouteSet', () => {
     expect(result.current).toMatchObject({ loading: false, routeSet: { request, routes: [route] } });
   });
 
+  it('keeps the routes in place while it asks again with keep, then holds the new ones', async () => {
+    answer(Response.json({ routes: [route] }));
+    const { result } = renderHook(() => useRouteSet(vi.fn()));
+    act(() => result.current.find(request));
+    await waitFor(() => expect(result.current.routeSet).toBeDefined());
+    let resolve!: (response: Response) => void;
+    answer(new Promise<Response>((done) => (resolve = done)));
+    const again = { ...request, pace: 5 };
+
+    act(() => result.current.find(again, true));
+
+    expect(result.current).toMatchObject({ loading: true, routeSet: { request } });
+    await act(async () => resolve(Response.json({ routes: [{ ...route, distance: 11 }] })));
+    expect(result.current.routeSet).toMatchObject({ request: again, routes: [{ distance: 11 }] });
+  });
+
+  it('keeps the routes when asking again with keep finds none, or is refused', async () => {
+    answer(Response.json({ routes: [route] }));
+    const onError = vi.fn();
+    const { result } = renderHook(() => useRouteSet(onError));
+    act(() => result.current.find(request));
+    await waitFor(() => expect(result.current.routeSet).toBeDefined());
+
+    answer(Response.json({ routes: [] }));
+    act(() => result.current.find({ ...request, pace: 5 }, true));
+    await waitFor(() => expect(onError).toHaveBeenLastCalledWith('no-routes'));
+    expect(result.current.routeSet).toMatchObject({ request });
+
+    answer(Response.json({ error: 'rate-limited' }, { status: 429 }));
+    act(() => result.current.find({ ...request, pace: 4 }, true));
+    await waitFor(() => expect(onError).toHaveBeenLastCalledWith('rate-limited'));
+    expect(result.current.routeSet).toMatchObject({ request });
+  });
+
   it('reports an error and keeps no route set', async () => {
     answer(Response.json({ error: 'rate-limited' }, { status: 429 }));
     const onError = vi.fn();
