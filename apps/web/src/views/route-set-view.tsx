@@ -12,13 +12,13 @@ import {
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
-import { useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 
 import type { Miss } from '../contract/index.ts';
 import {
   ElevationProfile,
   ICON_BUTTON,
-  PaceField,
+  PaceSlider,
   PRIMARY_BUTTON,
   ProfileSparkline,
   routeBorder,
@@ -174,17 +174,23 @@ export function RouteSetView({
 function RoutePace({ display, pace, onChange }: { display: Display; pace: number; onChange: (pace: number) => void }) {
   const t = words(display);
   const [editing, setEditing] = useState(false);
+  const editor = useRef<HTMLDivElement>(null);
+  // The slider opens where the user asked to edit, and closes when it loses the focus.
+  useEffect(() => {
+    if (editing) editor.current?.querySelector('input')?.focus();
+  }, [editing]);
   if (editing) {
     return (
-      <PaceField
-        label={t.pace}
-        pace={pace}
-        units={display.units}
-        testId="routes-pace-input"
-        autoFocus
-        onChange={onChange}
-        onDone={() => setEditing(false)}
-      />
+      <div ref={editor}>
+        <PaceSlider
+          label={t.pace}
+          pace={pace}
+          units={display.units}
+          testId="routes-pace-input"
+          onChange={onChange}
+          onDone={() => setEditing(false)}
+        />
+      </div>
     );
   }
   return (

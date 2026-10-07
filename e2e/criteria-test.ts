@@ -28,7 +28,7 @@ test.describe('the criteria form', () => {
     // The e2e server has a stand-in graph with elevation (`apps/server/internal/standin`): the elevation gain is offered.
     await expect(page.getByTestId('criteria-elevation-hilly')).toBeAttached();
     // The pace is set where it is used, under the duration.
-    await expect(page.getByTestId('criteria-pace')).toHaveValue('6:00');
+    await expect(page.getByTestId('criteria-pace')).toHaveValue('360');
   });
 
   test('keeps the pace across a reload', async ({ page, isMobile }) => {
@@ -36,12 +36,12 @@ test.describe('the criteria form', () => {
     if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
     await choose(page, 'target', 'duration');
 
-    await page.getByTestId('criteria-pace').fill('5:30');
-    await page.getByTestId('criteria-pace').blur();
+    await page.getByTestId('criteria-pace').fill('330');
+    await page.getByTestId('criteria-pace').dispatchEvent('pointerup');
     await page.reload();
     if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
 
     // The last criteria are kept too: the length is still set by duration.
-    await expect(page.getByTestId('criteria-pace')).toHaveValue('5:30');
+    await expect(page.getByTestId('criteria-pace')).toHaveValue('330');
   });
 });

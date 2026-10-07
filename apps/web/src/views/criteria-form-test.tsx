@@ -265,14 +265,17 @@ describe('CriteriaForm', () => {
       expect(field()).not.toBeInTheDocument();
     });
 
-    it('is asked under a duration, in min/km, and saved once the user leaves the field', () => {
+    it('is asked under a duration, in min/km, and saved once the user lets go of the slider', () => {
       const { onSubmit, submit } = setup();
       choose('target', 'duration');
-      expect(field()).toHaveValue('6:00');
-      expect(field()).toHaveAccessibleName(`${en.pace} (min/km)`);
+      expect(field()).toHaveValue('360');
+      expect(screen.getByTestId('criteria-pace-value')).toHaveTextContent('6:00 min/km');
+      expect(field()).toHaveAccessibleName(en.pace);
 
-      fireEvent.change(field()!, { target: { value: '5:30' } });
-      fireEvent.blur(field()!);
+      fireEvent.change(field()!, { target: { value: '330' } });
+      // Still the pace saved by the defaults, while the user slides.
+      expect(JSON.parse(localStorage.getItem('path-finder.settings') ?? '{}').pace ?? 6).toBe(6);
+      fireEvent.pointerUp(field()!);
       submit();
 
       expect(onSubmit.mock.calls[0][0].pace).toBe(5.5);
@@ -284,19 +287,15 @@ describe('CriteriaForm', () => {
       setup();
       choose('target', 'duration');
 
-      expect(field()).toHaveValue('9:39');
-      expect(field()).toHaveAccessibleName(`${en.pace} (min/mi)`);
+      expect(screen.getByTestId('criteria-pace-value')).toHaveTextContent('9:39 min/mi');
     });
 
-    it('keeps the saved pace when what is typed is not one', () => {
+    it('shows the saved pace', () => {
       store({ pace: 5 });
       setup();
       choose('target', 'duration');
 
-      fireEvent.change(field()!, { target: { value: 'fast' } });
-      fireEvent.blur(field()!);
-
-      expect(field()).toHaveValue('5:00');
+      expect(screen.getByTestId('criteria-pace-value')).toHaveTextContent('5:00 min/km');
     });
   });
 

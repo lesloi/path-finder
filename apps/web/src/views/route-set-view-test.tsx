@@ -241,8 +241,8 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedAt('6:00 min/km'));
       fireEvent.click(screen.getByTestId('routes-pace-edit'));
       const input = screen.getByTestId('routes-pace-input');
-      expect(input).toHaveValue('6:00');
-      fireEvent.change(input, { target: { value: '5:30' } });
+      expect(input).toHaveValue('360');
+      fireEvent.change(input, { target: { value: '330' } });
       expect(onPaceChange).not.toHaveBeenCalled();
       fireEvent.blur(input);
 
@@ -251,13 +251,12 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('routes-pace')).toBeInTheDocument();
     });
 
-    it('leaves the pace as it was when what is typed is not one', () => {
+    it('leaves the pace as it was when the slider did not move', () => {
       const onPaceChange = vi.fn();
       render(<View onPaceChange={onPaceChange} />);
 
       fireEvent.click(screen.getByTestId('routes-pace-edit'));
-      fireEvent.change(screen.getByTestId('routes-pace-input'), { target: { value: '5:7' } });
-      fireEvent.keyDown(screen.getByTestId('routes-pace-input'), { key: 'Enter' });
+      fireEvent.blur(screen.getByTestId('routes-pace-input'));
 
       expect(onPaceChange).not.toHaveBeenCalled();
       expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedAt('6:00 min/km'));

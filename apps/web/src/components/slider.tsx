@@ -10,6 +10,7 @@ export function Slider({
   max,
   step,
   onChange,
+  onCommit,
   testId,
 }: {
   label: string;
@@ -21,6 +22,8 @@ export function Slider({
   max: number;
   step: number;
   onChange: (value: number) => void;
+  /** The user lets go of the slider or of a key: the value is final, unlike the ones `onChange` hears on the way. */
+  onCommit?: () => void;
   /** Prefix of the test ids: the range input, then `-value` for the value shown above it. */
   testId?: string;
 }) {
@@ -42,6 +45,8 @@ export function Slider({
         max={max}
         step={step}
         onChange={(event) => onChange(Number(event.target.value))}
+        onPointerUp={onCommit}
+        onKeyUp={onCommit}
       />
     </div>
   );

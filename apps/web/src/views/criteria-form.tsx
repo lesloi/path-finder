@@ -15,7 +15,7 @@ import {
   CHIP,
   CHIP_ROW,
   Dialog,
-  PaceField,
+  PaceSlider,
   PRIMARY_BUTTON,
   SegmentedControl,
   Slider,
@@ -211,7 +211,7 @@ export function CriteriaForm({
             />
           )}
           {draft.target === 'duration' && (
-            <PaceField
+            <PaceSlider
               label={t.pace}
               pace={settings.pace}
               units={units}

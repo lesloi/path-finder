@@ -480,7 +480,7 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 18');
 
       fireEvent.click(screen.getByTestId('routes-pace-edit'));
-      fireEvent.change(screen.getByTestId('routes-pace-input'), { target: { value: '5:00' } });
+      fireEvent.change(screen.getByTestId('routes-pace-input'), { target: { value: '300' } });
       fireEvent.blur(screen.getByTestId('routes-pace-input'));
 
       expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 05');
@@ -504,7 +504,7 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 10');
 
       fireEvent.click(screen.getByTestId('routes-pace-edit'));
-      fireEvent.change(screen.getByTestId('routes-pace-input'), { target: { value: '5:00' } });
+      fireEvent.change(screen.getByTestId('routes-pace-input'), { target: { value: '300' } });
       fireEvent.blur(screen.getByTestId('routes-pace-input'));
 
       expect(bodies).toHaveLength(2);
