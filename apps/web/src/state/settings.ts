@@ -47,14 +47,17 @@ const isPace = (value: unknown): value is number => typeof value === 'number' &&
 const isGain = (value: unknown): value is number =>
   typeof value === 'number' && value >= 0 && value <= MAX_TARGET_ELEVATION_GAIN;
 
-function parseCriteria(stored: unknown): LastCriteria {
+const isTarget = (value: unknown): value is LastCriteria['target'] => value === 'distance' || value === 'duration';
+const isSurface = (value: unknown): value is LastCriteria['surface'] =>
+  SURFACES.includes(value as LastCriteria['surface']);
+const isLevel = (value: unknown): value is ElevationLevel => LEVELS.includes(value as ElevationLevel);
+
+function parseLastCriteria(stored: unknown): LastCriteria {
   const { target, surface, level, gain } = isObject(stored) ? stored : {};
   return {
-    target: target === 'duration' ? 'duration' : DEFAULT_CRITERIA.target,
-    surface: SURFACES.includes(surface as Criteria['surface'])
-      ? (surface as Criteria['surface'])
-      : DEFAULT_CRITERIA.surface,
-    level: LEVELS.includes(level as ElevationLevel) ? (level as ElevationLevel) : DEFAULT_CRITERIA.level,
+    target: isTarget(target) ? target : DEFAULT_CRITERIA.target,
+    surface: isSurface(surface) ? surface : DEFAULT_CRITERIA.surface,
+    level: isLevel(level) ? level : DEFAULT_CRITERIA.level,
     gain: isGain(gain) ? gain : DEFAULT_CRITERIA.gain,
   };
 }
@@ -75,7 +78,7 @@ function parse(raw: string | null): Settings {
     units: units === 'imperial' ? 'imperial' : 'metric',
     theme: theme === 'light' || theme === 'dark' ? theme : DEFAULT_THEME,
     basemap: BASEMAPS.includes(basemap as Basemap) ? (basemap as Basemap) : DEFAULT_BASEMAP,
-    criteria: parseCriteria(criteria),
+    criteria: parseLastCriteria(criteria),
   };
 }
 
