@@ -258,6 +258,7 @@ describe('RouteSetView', () => {
       expect(screen.queryByTestId('routes-pace-input')).not.toBeInTheDocument();
       expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedPace('6:00 min/km'));
       expect(screen.getByTestId('routes-pace-edit')).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByTestId('routes-pace-edit')).toHaveFocus();
     });
 
     it('only says the pace when it cannot be changed here', () => {

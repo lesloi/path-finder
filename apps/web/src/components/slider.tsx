@@ -5,6 +5,7 @@ export function Slider({
   label,
   value,
   shown,
+  leading,
   aside,
   min,
   max,
@@ -16,6 +17,8 @@ export function Slider({
   value: number;
   /** The value as text, with its unit. */
   shown: string;
+  /** Before the value, on the same line. */
+  leading?: ReactNode;
   aside?: ReactNode;
   min: number;
   max: number;
@@ -27,9 +30,12 @@ export function Slider({
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
-        <output data-testid={testId && `${testId}-value`} className="text-xl font-bold">
-          {shown}
-        </output>
+        <div className="flex items-center gap-2">
+          {leading}
+          <output data-testid={testId && `${testId}-value`} className="text-xl font-bold">
+            {shown}
+          </output>
+        </div>
         {aside}
       </div>
       <input

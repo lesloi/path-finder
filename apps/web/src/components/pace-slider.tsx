@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { formatPace, KM_PER_MILE, paceUnit, type Units } from '../core/index.ts';
 import { Slider } from './slider.tsx';
 
@@ -15,6 +17,7 @@ export function PaceSlider({
   pace,
   units,
   testId,
+  leading,
   onChange,
 }: {
   label: string;
@@ -22,6 +25,8 @@ export function PaceSlider({
   pace: number;
   units: Units;
   testId: string;
+  /** Before the pace shown above the slider. */
+  leading?: ReactNode;
   onChange: (pace: number) => void;
 }) {
   const { min, max, step } = RANGE[units];
@@ -29,6 +34,7 @@ export function PaceSlider({
   return (
     <Slider
       testId={testId}
+      leading={leading}
       label={label}
       value={seconds}
       shown={`${formatPace(seconds / 60 / perUnit(units), units)} ${paceUnit(units)}`}
