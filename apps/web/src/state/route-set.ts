@@ -109,9 +109,7 @@ async function requestWithRetries(request: RouteSetRequest, signal: AbortSignal)
 /**
  * The route set of the last criteria the user asked for, kept in memory only: it is gone when
  * cleared or when the app closes. `onError` hears why a request gave no routes, `no-routes` when
- * the API found none; after an error the routes shown before the request come back. A request that
- * `keep`s the routes leaves them in place until the new ones arrive, and after a refusal, or when there
- * are none.
+ * the API found none; after an error the routes shown before the request come back.
  */
 export function useRouteSet(onError: (error: RouteSetError | 'no-routes') => void) {
   const [routeSet, setRouteSet] = useState<{ request: RouteSetRequest; routes: Route[] }>();
@@ -126,12 +124,12 @@ export function useRouteSet(onError: (error: RouteSetError | 'no-routes') => voi
 
   useEffect(() => () => running.current?.abort(), []);
 
-  function find(request: RouteSetRequest, keep = false) {
+  function find(request: RouteSetRequest) {
     running.current?.abort();
     const controller = new AbortController();
     running.current = controller;
     if (routeSet) previous.current = routeSet;
-    if (!keep) setRouteSet(undefined);
+    setRouteSet(undefined);
     setLoading(true);
     requestWithRetries(request, controller.signal)
       .then((result) => {

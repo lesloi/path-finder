@@ -88,11 +88,6 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     setSheetExpanded(false);
   }
 
-  function changePace(value: number) {
-    update({ pace: value });
-    if (routeSet && 'duration' in routeSet.request.target) browser.ask({ ...routeSet.request, pace: value }, true);
-  }
-
   function changeStart(position: Position) {
     // Routes from another start point would be stale.
     if (start && (start[0] !== position[0] || start[1] !== position[1])) browser.drop();
@@ -134,7 +129,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         detail={browser.detail}
         onSelect={browser.select}
         onDetailChange={browser.openDetail}
-        onPaceChange={changePace}
+        // By duration, a new pace is another search, which the criteria ask for: the list only says the pace.
+        onPaceChange={'distance' in routeSet.request.target ? (value) => update({ pace: value }) : undefined}
         onBack={backToCriteria}
         onHover={browser.setHover}
         condensed={!desktop && !sheetExpanded}

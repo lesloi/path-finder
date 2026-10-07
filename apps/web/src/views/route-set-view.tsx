@@ -59,7 +59,7 @@ const words = ({ language }: Display) => ({ ...criteriaText[language], ...routes
  * The route set the user asked for: first a list of its routes, then the detail of one, which
  * swipes (or the arrow buttons on desktops) to the next. `onSelect` hears the route shown in the
  * list or the detail, `onHover` a place the user points at on the elevation profile. The durations of the
- * routes are at `pace`, which `onPaceChange` hears the user change in the list.
+ * routes are at `pace`; `onPaceChange`, when given, lets the user change it in the list.
  */
 export function RouteSetView({
   display,
@@ -89,7 +89,8 @@ export function RouteSetView({
   detail: boolean;
   onSelect: (index: number) => void;
   onDetailChange: (detail: boolean) => void;
-  onPaceChange: (pace: number) => void;
+  /** Absent when the pace cannot change the routes' durations alone, such as by duration. */
+  onPaceChange?: (pace: number) => void;
   /** Back to the criteria. */
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
@@ -171,7 +172,7 @@ export function RouteSetView({
 }
 
 // The pace the durations are estimated at, and a way to change it.
-function RoutePace({ display, pace, onChange }: { display: Display; pace: number; onChange: (pace: number) => void }) {
+function RoutePace({ display, pace, onChange }: { display: Display; pace: number; onChange?: (pace: number) => void }) {
   const t = words(display);
   const [editing, setEditing] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
@@ -179,7 +180,7 @@ function RoutePace({ display, pace, onChange }: { display: Display; pace: number
   useEffect(() => {
     if (editing) editor.current?.querySelector('input')?.focus();
   }, [editing]);
-  if (editing) {
+  if (editing && onChange) {
     return (
       <div ref={editor}>
         <PaceSlider
@@ -195,15 +196,21 @@ function RoutePace({ display, pace, onChange }: { display: Display; pace: number
   }
   return (
     <p data-testid="routes-pace" className="m-0 text-sm text-ink-2">
-      {t.estimatedAt(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)} ·{' '}
-      <button
-        type="button"
-        data-testid="routes-pace-edit"
-        className="min-h-touch text-accent underline"
-        onClick={() => setEditing(true)}
-      >
-        {t.editPace}
-      </button>
+      {t.estimatedAt(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)}
+      {onChange && (
+        <>
+          {' '}
+          ·{' '}
+          <button
+            type="button"
+            data-testid="routes-pace-edit"
+            className="min-h-touch text-accent underline"
+            onClick={() => setEditing(true)}
+          >
+            {t.editPace}
+          </button>
+        </>
+      )}
     </p>
   );
 }

@@ -37,7 +37,6 @@ test.describe('the criteria form', () => {
     await choose(page, 'target', 'duration');
 
     await page.getByTestId('criteria-pace').fill('330');
-    await page.getByTestId('criteria-pace').dispatchEvent('pointerup');
     await page.reload();
     if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
 

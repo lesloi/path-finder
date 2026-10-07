@@ -481,36 +481,29 @@ describe('CriteriaView', () => {
 
       fireEvent.click(screen.getByTestId('routes-pace-edit'));
       fireEvent.change(screen.getByTestId('routes-pace-input'), { target: { value: '300' } });
-      fireEvent.blur(screen.getByTestId('routes-pace-input'));
 
+      // As the slider moves, without asking again.
       expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 05');
+      expect(screen.getByTestId('routes-pace-input-value')).toHaveTextContent('5:00 min/km');
+      fireEvent.blur(screen.getByTestId('routes-pace-input'));
       expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.en.estimatedAt('5:00 min/km'));
       expect(routeSets).toHaveBeenCalledTimes(1);
     });
 
-    it('asks again with the new pace by duration, which changes the routes', async () => {
+    it('says the pace of the routes by duration, without a way to change it there', async () => {
       onDesktop();
-      const bodies: unknown[] = [];
-      vi.stubGlobal('fetch', (_: string, init: RequestInit) => {
-        bodies.push(JSON.parse(init.body as string));
-        return Promise.resolve(answer(route(0)));
-      });
+      const routeSets = ask(answer(route(0)));
       render(<CriteriaView language="en" />);
       act(() => map().fire('style.load'));
       fireEvent.click(screen.getByTestId('criteria-target-duration'));
       await submit();
       await screen.findByTestId('routes-count');
-      // The routes keep the durations of the pace they were asked for.
+
+      // The routes keep the durations of the pace they were asked for: it is set in the criteria.
       expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 10');
-
-      fireEvent.click(screen.getByTestId('routes-pace-edit'));
-      fireEvent.change(screen.getByTestId('routes-pace-input'), { target: { value: '300' } });
-      fireEvent.blur(screen.getByTestId('routes-pace-input'));
-
-      // The list stays while the new routes are asked for.
-      expect(screen.getByTestId('routes-list')).toBeInTheDocument();
-      expect(bodies).toHaveLength(2);
-      expect(bodies[1]).toMatchObject({ target: { duration: 60 }, pace: 5 });
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.en.estimatedAt('6:00 min/km'));
+      expect(screen.queryByTestId('routes-pace-edit')).not.toBeInTheDocument();
+      expect(routeSets).toHaveBeenCalledTimes(1);
     });
 
     it('opens the detail of a route, frames it on the map, and goes back to the list', async () => {

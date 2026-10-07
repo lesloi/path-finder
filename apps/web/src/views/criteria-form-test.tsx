@@ -265,7 +265,7 @@ describe('CriteriaForm', () => {
       expect(field()).not.toBeInTheDocument();
     });
 
-    it('is asked under a duration, in min/km, and saved once the user lets go of the slider', () => {
+    it('is asked under a duration, in min/km, and saved as the slider moves', () => {
       const { onSubmit, submit } = setup();
       choose('target', 'duration');
       expect(field()).toHaveValue('360');
@@ -273,9 +273,6 @@ describe('CriteriaForm', () => {
       expect(field()).toHaveAccessibleName(en.pace);
 
       fireEvent.change(field()!, { target: { value: '330' } });
-      // Still the pace saved by the defaults, while the user slides.
-      expect(JSON.parse(localStorage.getItem('path-finder.settings') ?? '{}').pace ?? 6).toBe(6);
-      fireEvent.pointerUp(field()!);
       submit();
 
       expect(onSubmit.mock.calls[0][0].pace).toBe(5.5);

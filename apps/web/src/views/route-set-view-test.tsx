@@ -63,7 +63,7 @@ function View({
   onSelect = () => {},
   onBack = () => {},
   onHover = () => {},
-  onPaceChange = () => {},
+  onPaceChange,
   pace = 6,
   open = false,
   condensed = false,
@@ -240,26 +240,21 @@ describe('RouteSetView', () => {
 
       expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedAt('6:00 min/km'));
       fireEvent.click(screen.getByTestId('routes-pace-edit'));
-      const input = screen.getByTestId('routes-pace-input');
-      expect(input).toHaveValue('360');
-      fireEvent.change(input, { target: { value: '330' } });
-      expect(onPaceChange).not.toHaveBeenCalled();
-      fireEvent.blur(input);
-
+      const slider = screen.getByTestId('routes-pace-input');
+      expect(slider).toHaveValue('360');
+      fireEvent.change(slider, { target: { value: '330' } });
       expect(onPaceChange).toHaveBeenCalledExactlyOnceWith(5.5);
+
+      fireEvent.blur(slider);
       expect(screen.queryByTestId('routes-pace-input')).not.toBeInTheDocument();
       expect(screen.getByTestId('routes-pace')).toBeInTheDocument();
     });
 
-    it('leaves the pace as it was when the slider did not move', () => {
-      const onPaceChange = vi.fn();
-      render(<View onPaceChange={onPaceChange} />);
+    it('only says the pace when it cannot be changed here', () => {
+      render(<View onPaceChange={undefined} />);
 
-      fireEvent.click(screen.getByTestId('routes-pace-edit'));
-      fireEvent.blur(screen.getByTestId('routes-pace-input'));
-
-      expect(onPaceChange).not.toHaveBeenCalled();
       expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedAt('6:00 min/km'));
+      expect(screen.queryByTestId('routes-pace-edit')).not.toBeInTheDocument();
     });
 
     it('says the pace in min/mi with imperial units, in French', () => {
