@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Builds the multi-platform image and pushes it to GitHub Container Registry; the pull requests only build it (workflow `server`).
+  # Builds the multi-platform image and pushes it to GitHub Container Registry; the pull requests build the app instead (workflow `check`).
   container:
     runs-on: ubuntu-latest
     permissions:
