@@ -32,6 +32,12 @@ describe('criteriaSummary', () => {
     expect(criteriaSummary({ ...request, surface: 'unpaved' }, metric)).toBe(`10.0 km · ${criteriaText.en.unpaved}`);
   });
 
+  it('says when technical stretches are allowed', () => {
+    expect(criteriaSummary({ ...request, includeTechnical: true }, metric)).toBe(
+      `10.0 km · ${criteriaText.en.technicalShort}`,
+    );
+  });
+
   it('follows the units and the language', () => {
     expect(
       criteriaSummary({ ...request, elevationGain: 300, surface: 'paved' }, { units: 'imperial', language: 'fr' }),

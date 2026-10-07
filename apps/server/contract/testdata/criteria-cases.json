@@ -579,5 +579,28 @@
     "expect": {
       "field": "includeTechnical"
     }
+  },
+  {
+    "name": "excludes the technical stretches of a paved request whatever it sends",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "paved",
+      "pace": 6,
+      "includeTechnical": true
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "paved",
+        "pace": 6,
+        "includeTechnical": false
+      }
+    }
   }
 ]

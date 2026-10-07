@@ -111,7 +111,8 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
       elevationGain !== undefined && { elevationGain: elevationGain as Criteria['elevationGain'] }),
     surface: surface as Criteria['surface'],
     pace,
-    includeTechnical,
+    // A paved request excludes them whatever it sends, as the server does.
+    includeTechnical: includeTechnical && surface !== 'paved',
   };
   let distance: number;
   try {

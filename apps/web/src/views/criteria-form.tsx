@@ -163,6 +163,7 @@ export function CriteriaForm({
   // Only the surface preferences that can route onto technical ways get the switch. A paved request always excludes
   // them, whatever was kept: the stored value is not touched.
   const technicalApplies = draft.surface !== 'paved';
+  const allowed = technicalApplies && draft.includeTechnical;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
   const request: RouteSetRequest | undefined = start && {
@@ -175,7 +176,7 @@ export function CriteriaForm({
     ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
     surface: draft.surface,
     pace: settings.pace,
-    includeTechnical: technicalApplies && draft.includeTechnical,
+    includeTechnical: allowed,
   };
   const field = request && invalidField(request);
 
@@ -305,10 +306,14 @@ export function CriteriaForm({
       set: level !== 'any',
     },
     surface: {
-      label: { paved: t.paved, any: t.anySurface, unpaved: t.unpaved }[draft.surface],
+      // Technical stretches that are allowed show on the chip too: the phone hides the switch behind it.
+      label: [
+        { paved: t.paved, any: t.anySurface, unpaved: t.unpaved }[draft.surface],
+        ...(allowed ? [t.technicalShort] : []),
+      ].join(' · '),
       name: t.surface,
       icon: <Layers size={18} aria-hidden />,
-      set: draft.surface !== 'any',
+      set: draft.surface !== 'any' || allowed,
     },
   };
 

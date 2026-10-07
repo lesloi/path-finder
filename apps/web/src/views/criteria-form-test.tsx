@@ -267,6 +267,15 @@ describe('CriteriaForm', () => {
       expect(onSubmit.mock.calls[0][0].includeTechnical).toBe(true);
     });
 
+    it('shows on the surface chip of the compact form once allowed', () => {
+      vi.restoreAllMocks();
+      store({ lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300, includeTechnical: true } });
+      setup({ compact: true });
+
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveAttribute('data-set');
+      expect(screen.getByTestId('criteria-chip-surface')).toHaveTextContent(en.technicalShort);
+    });
+
     it('is in the surface dialog of the compact form', () => {
       vi.restoreAllMocks();
       setup({ compact: true });

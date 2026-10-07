@@ -210,8 +210,10 @@ func TestGenerateExcludesTechnicalWaysUnlessTheCriteriaAllowThem(t *testing.T) {
 			if _, err := g.Generate(context.Background(), json.RawMessage(req)); err != nil {
 				t.Fatal(err)
 			}
-			if looper.got.ExcludeTechnical != tc.exclude {
-				t.Errorf("includeTechnical %s on %s: ExcludeTechnical = %v, want %v", tc.include, surface, looper.got.ExcludeTechnical, tc.exclude)
+			// A paved request excludes them whatever the client sends.
+			want := tc.exclude || surface == "paved"
+			if looper.got.ExcludeTechnical != want {
+				t.Errorf("includeTechnical %s on %s: ExcludeTechnical = %v, want %v", tc.include, surface, looper.got.ExcludeTechnical, want)
 			}
 		}
 	}

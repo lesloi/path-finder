@@ -44,8 +44,9 @@ func serverOn(t *testing.T, dir string) http.Handler {
 		t.Fatal(err)
 	}
 	return server.New(server.Config{
-		WebRoot:   web,
-		Generator: &generator.Generator{Engines: engines},
+		WebRoot: web,
+		// A fixed seed: what the tests assert on the routes found does not depend on chance.
+		Generator: &generator.Generator{Engines: engines, Seed: func() uint64 { return 7 }},
 	})
 }
 

@@ -163,7 +163,7 @@ func (e *Engine) Route(ctx context.Context, from, to Point) (*Route, error) {
 	}
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
-	r := s.route(ctx, e, e.prof.UpPerMeter, nil, noSkip, 0, src, dst)
+	r := s.route(ctx, e, e.prof.UpPerMeter, nil, searchLimits{}, src, dst)
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}

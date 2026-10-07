@@ -62,6 +62,8 @@ func TestClassifyWayFlagsTechnicalWaysFromT3(t *testing.T) {
 		{"mountain_hiking", false},
 		{"demanding_mountain_hiking", true},
 		{"alpine_hiking", true},
+		{"hiking;demanding_mountain_hiking", true},
+		{"hiking; mountain_hiking", false},
 		{"demanding_alpine_hiking", true},
 		{"difficult_alpine_hiking", true},
 		{"unknown", false},

@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,11 +38,11 @@ func TestSearchSkipsTechnicalWaysOnlyWhenAsked(t *testing.T) {
 	defer searcherPool.Put(s)
 	ctx := context.Background()
 
-	allowed := s.route(ctx, e, 0, nil, 0, 0, uint32(a), uint32(b))
+	allowed := s.route(ctx, e, 0, nil, searchLimits{}, uint32(a), uint32(b))
 	if allowed == nil || len(allowed.edges) != 1 || e.g.edges[allowed.edges[0]].Flags&EdgeTechnical == 0 {
 		t.Fatalf("with technical ways allowed, the route should take the direct one: %+v", allowed)
 	}
-	excluded := s.route(ctx, e, 0, nil, EdgeTechnical, 0, uint32(a), uint32(b))
+	excluded := s.route(ctx, e, 0, nil, searchLimits{skip: EdgeTechnical}, uint32(a), uint32(b))
 	if excluded == nil || len(excluded.edges) != 2 {
 		t.Fatalf("with technical ways excluded, the route should take the detour: %+v", excluded)
 	}
@@ -58,7 +59,7 @@ func TestSearchFindsNoRouteWhenTheOnlyWayIsTechnical(t *testing.T) {
 	e := openTest(t, g, false)
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
-	if r := s.route(context.Background(), e, 0, nil, EdgeTechnical, 0, uint32(a), uint32(b)); r != nil {
+	if r := s.route(context.Background(), e, 0, nil, searchLimits{skip: EdgeTechnical}, uint32(a), uint32(b)); r != nil {
 		t.Errorf("route = %+v, want none", r)
 	}
 }
@@ -163,5 +164,59 @@ func TestAGraphBeforeTheTechnicalFlagIsRefused(t *testing.T) {
 	}
 	if _, err := Open(path, "", "any"); err == nil {
 		t.Error("a graph of the previous version opened")
+	}
+}
+
+func TestAStartDoesNotSnapToAPocketTechnicalWaysCloseOff(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	// A stub of two nodes beside the start, joined to the lattice by one technical way.
+	stubA, stubB := g.addNode(10*stepM+30, 10*stepM+40, 100), g.addNode(10*stepM+30, 10*stepM+70, 100)
+	g.connect(stubA, stubB, KindPath)
+	g.connect(stubA, at(10, 10), KindPath)
+	g.edges[stubA][len(g.edges[stubA])-1].Flags = EdgeTechnical
+	g.edges[at(10, 10)][len(g.edges[at(10, 10)])-1].Flags = EdgeTechnical
+	flagAround(g, at, 10, 10, 1)
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+	req.Start = pointOf(g, stubA)
+	req.ExcludeTechnical = true
+
+	loops, err := e.Loops(context.Background(), req)
+	if err != nil || len(loops) == 0 {
+		t.Fatalf("loops = %d, err = %v: the start should move out of the pocket", len(loops), err)
+	}
+	if loops[0].Points[0].Point == pointOf(g, stubA) || loops[0].Points[0].Point == pointOf(g, stubB) {
+		t.Error("the start stayed in the pocket")
+	}
+}
+
+func TestNearestWithSkipGivesUpPastTheSnapLimit(t *testing.T) {
+	g := &testGraph{}
+	a, b := g.addNode(0, 0, 100), g.addNode(0, 200, 100)
+	g.connect(a, b, KindPath)
+	far, farB := g.addNode(0, 20_000, 100), g.addNode(0, 20_200, 100)
+	g.connect(far, farB, KindPath)
+	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
+	e := openTest(t, g, false)
+	if _, _, ok := e.sp.nearest(e.g, EdgeTechnical, baseLat, baseLon); ok {
+		t.Error("a node 20 km away was found: the search should stop near the snap limit")
+	}
+	if _, _, ok := e.sp.nearest(e.g, noSkip, baseLat, baseLon); !ok {
+		t.Error("without skip, the nearest node is found")
+	}
+}
+
+func TestCancellingStopsALoopSearchThatExcludesTechnicalWays(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	flagAround(g, at, 4, 4, 2)
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+	req.ExcludeTechnical = true
+	done, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := e.Loops(done, req); !errors.Is(err, context.Canceled) {
+		t.Errorf("err = %v, want context.Canceled", err)
 	}
 }

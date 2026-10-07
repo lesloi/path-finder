@@ -162,7 +162,8 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 	if !ok {
 		return fail("includeTechnical", "includeTechnical must be true or false")
 	}
-	c.IncludeTechnical = include
+	// A paved request excludes them whatever the client sends, as the web form does.
+	c.IncludeTechnical = include && c.Surface != "paved"
 
 	if countElevationGain {
 		c.ElevationGain = gain

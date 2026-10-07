@@ -27,7 +27,7 @@ export type LastCriteria = {
   includeTechnical: boolean;
 };
 
-/** What the user sets once and keeps on the device. Only the pace leaves it, with a route set request. */
+/** What the user sets once and keeps on the device. Only the pace and the last criteria leave it, with a route set request. */
 export type Settings = {
   /** Minutes per km on flat ground. */
   pace: number;

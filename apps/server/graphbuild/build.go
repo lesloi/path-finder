@@ -10,6 +10,7 @@ import (
 	"os"
 	"runtime"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/paulmach/osm"
@@ -72,8 +73,11 @@ func classifyWay(tags osm.Tags) (kind, surf, flags uint8, ok bool) {
 	if kind == engine.KindCycleway && !explicit && foot != "" {
 		return 0, 0, 0, false
 	}
-	if technicalScales[tags.Find("sac_scale")] {
-		flags = engine.EdgeTechnical
+	// A way can carry several scales, such as hiking;demanding_mountain_hiking: one technical value is enough.
+	for _, scale := range strings.Split(tags.Find("sac_scale"), ";") {
+		if technicalScales[strings.TrimSpace(scale)] {
+			flags = engine.EdgeTechnical
+		}
 	}
 	return kind, surfaceGroups[tags.Find("surface")], flags, true
 }

@@ -59,6 +59,33 @@ func (g *graph) hasEdgeWithout(n uint32, flags uint8) bool {
 	return false
 }
 
+// roomNodes is how many nodes a way must reach without a flagged edge to count as room to start from.
+const roomNodes = 64
+
+// hasRoom tells whether a node leads, through ways that hold none of the flags, to at least roomNodes nodes: not to a
+// pocket that technical ways close off, where a start would find no loop.
+func (g *graph) hasRoom(n uint32, flags uint8) bool {
+	if !g.hasEdgeWithout(n, flags) {
+		return false
+	}
+	seen := map[uint32]struct{}{n: {}}
+	queue := []uint32{n}
+	for len(queue) > 0 && len(seen) < roomNodes {
+		u := queue[0]
+		queue = queue[1:]
+		for e := g.off[u]; e < g.off[u+1]; e++ {
+			if g.edges[e].Flags&flags != 0 {
+				continue
+			}
+			if _, ok := seen[g.edges[e].To]; !ok {
+				seen[g.edges[e].To] = struct{}{}
+				queue = append(queue, g.edges[e].To)
+			}
+		}
+	}
+	return len(seen) >= roomNodes
+}
+
 // noSkip is the set of edge flags that excludes no way.
 const noSkip uint8 = 0
 
@@ -337,6 +364,8 @@ func (s *spatial) nearest(g *graph, skip uint8, latDeg, lonDeg float64) (uint32,
 	lat, lon := int32(latDeg*1e7), int32(lonDeg*1e7)
 	cy, cx := int(lat-s.minLat)/cellLat, int(lon-s.minLon)/cellLon
 	cosl := math.Cos(latDeg * rad)
+	// The metres a ring of cells adds at least: past the snap limit, a search with skip set has nothing to find.
+	ringMeters := math.Min(cellLat*1e-7*metersPerDegree, cellLon*1e-7*metersPerDegree*cosl)
 	best, node, found := math.Inf(1), uint32(0), false
 	visit := func(x, y int) {
 		if x < 0 || y < 0 || x >= s.nx || y >= s.ny {
@@ -347,7 +376,7 @@ func (s *spatial) nearest(g *graph, skip uint8, latDeg, lonDeg float64) (uint32,
 			dy := float64(g.nodes[n].Lat-lat) * 1e-7 * metersPerDegree
 			dx := float64(g.nodes[n].Lon-lon) * 1e-7 * metersPerDegree * cosl
 			// The edges of a node are read only when it would be the nearest.
-			if d := dx*dx + dy*dy; d < best && (skip == 0 || g.hasEdgeWithout(n, skip)) {
+			if d := dx*dx + dy*dy; d < best && (skip == 0 || g.hasRoom(n, skip)) {
 				best, node, found = d, n, true
 			}
 		}
@@ -364,6 +393,9 @@ func (s *spatial) nearest(g *graph, skip uint8, latDeg, lonDeg float64) (uint32,
 			visit(cx+r, y)
 		}
 		if found && math.Sqrt(best) <= float64(r)*200 {
+			break
+		}
+		if skip != 0 && float64(r)*ringMeters > maxSnapMeters+ringMeters {
 			break
 		}
 	}
@@ -528,13 +560,20 @@ type route struct {
 	cost         float32
 }
 
+// searchLimits bound what a search may use and do. The zero value bounds nothing.
+type searchLimits struct {
+	// skip is a set of edge flags (DECISIONS.md, Routing): an edge holding one is not used, which keeps the landmark
+	// bounds valid, since removing edges can only raise the cost of a route.
+	skip uint8
+	// maxSettled caps the nodes one search may settle (0 for no cap): a loop leg that needs more is not worth
+	// finding, and a huge search would also have to regrow its table, which cannot be interrupted.
+	maxSettled int
+}
+
 // route finds the cheapest route, or nil when there is none or ctx is cancelled.
 // The context is read every 1,024 settled nodes, so a cancellation takes effect within microseconds.
-// skip is a set of edge flags (DECISIONS.md, Routing): an edge holding one is not used, which keeps the landmark bounds valid, since
-// removing edges can only raise the cost of a route.
-// maxSettled caps the nodes one search may settle (0 for no cap): a loop leg that needs more is
-// not worth finding, and a huge search would also have to regrow its table, which cannot be interrupted.
-func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *avoidSet, skip uint8, maxSettled int, src, dst uint32) *route {
+// lim bounds the search, see searchLimits.
+func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *avoidSet, lim searchLimits, src, dst uint32) *route {
 	s.reset()
 	s.settled = 0
 	if ctx.Err() != nil { // short searches never reach the periodic check below
@@ -602,7 +641,7 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 			break
 		}
 		s.settled++
-		if maxSettled > 0 && s.settled > maxSettled {
+		if lim.maxSettled > 0 && s.settled > lim.maxSettled {
 			return nil
 		}
 		if s.settled&1023 == 0 && ctx.Err() != nil {
@@ -615,7 +654,7 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 		nu := &nodes[u]
 		for e := g.off[u]; e < g.off[u+1]; e++ {
 			ed := &edges[e]
-			if ed.Flags&skip != 0 {
+			if ed.Flags&lim.skip != 0 {
 				continue
 			}
 			nv := &nodes[ed.To]
@@ -785,7 +824,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 			if avoid.n > 0 {
 				av = avoid
 			}
-			leg := s.route(ctx, cx, climb, av, lp.skip, loopLegMaxSettled, points[j-1], points[j])
+			leg := s.route(ctx, cx, climb, av, searchLimits{lp.skip, loopLegMaxSettled}, points[j-1], points[j])
 			if leg == nil {
 				return best
 			}
