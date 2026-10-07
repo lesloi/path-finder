@@ -184,17 +184,17 @@ function RoutePace({ display, pace, onChange }: { display: Display; pace: number
   }, [editing]);
   const slider = editing && onChange;
   return (
-    <div ref={editor} data-testid="routes-pace" className="flex items-center gap-1 text-sm text-ink-2">
+    <div ref={editor} data-testid="routes-pace" className="flex items-start gap-2 text-sm text-ink-2">
       {onChange && (
         <button
           type="button"
           data-testid="routes-pace-edit"
-          className={`${ICON_BUTTON} -ml-3 flex-none aria-pressed:text-accent`}
+          className="grid size-8 flex-none place-items-center rounded-full text-ink hover:bg-surface-2 aria-pressed:text-accent"
           aria-label={t.editPace}
           aria-pressed={editing}
           onClick={() => setEditing(!editing)}
         >
-          <Pencil size={16} aria-hidden />
+          <Pencil size={18} aria-hidden />
         </button>
       )}
       {slider ? (
@@ -202,7 +202,9 @@ function RoutePace({ display, pace, onChange }: { display: Display; pace: number
           <PaceSlider label={t.pace} pace={pace} units={display.units} testId="routes-pace-input" onChange={onChange} />
         </div>
       ) : (
-        t.estimatedPace(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)
+        <span className="flex min-h-8 items-center">
+          {t.estimatedPace(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)}
+        </span>
       )}
     </div>
   );
