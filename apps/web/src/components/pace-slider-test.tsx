@@ -4,11 +4,8 @@ import { PaceSlider } from './pace-slider.tsx';
 
 function setup(props: { pace?: number; units?: 'metric' | 'imperial' } = {}) {
   const onChange = vi.fn();
-  const onDone = vi.fn();
-  render(
-    <PaceSlider label="Pace" pace={6} units="metric" testId="pace" onChange={onChange} onDone={onDone} {...props} />,
-  );
-  return { onChange, onDone, slider: screen.getByTestId('pace') };
+  render(<PaceSlider label="Pace" pace={6} units="metric" testId="pace" onChange={onChange} {...props} />);
+  return { onChange, slider: screen.getByTestId('pace') };
 }
 
 describe('PaceSlider', () => {
@@ -43,13 +40,5 @@ describe('PaceSlider', () => {
     fireEvent.change(slider, { target: { value: '480' } });
 
     expect(onChange).toHaveBeenCalledExactlyOnceWith(8 / 1.609344);
-  });
-
-  it('says when the user leaves it', () => {
-    const { slider, onDone } = setup();
-
-    fireEvent.blur(slider);
-
-    expect(onDone).toHaveBeenCalledOnce();
   });
 });

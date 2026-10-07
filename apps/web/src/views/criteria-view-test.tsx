@@ -485,8 +485,8 @@ describe('CriteriaView', () => {
       // As the slider moves, without asking again.
       expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 05');
       expect(screen.getByTestId('routes-pace-input-value')).toHaveTextContent('5:00 min/km');
-      fireEvent.blur(screen.getByTestId('routes-pace-input'));
-      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.en.estimatedAt('5:00 min/km'));
+      fireEvent.click(screen.getByTestId('routes-pace-close'));
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.en.estimatedPace('5:00 min/km'));
       expect(routeSets).toHaveBeenCalledTimes(1);
     });
 
@@ -501,7 +501,7 @@ describe('CriteriaView', () => {
 
       // The routes keep the durations of the pace they were asked for: it is set in the criteria.
       expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 10');
-      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.en.estimatedAt('6:00 min/km'));
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.en.estimatedPace('6:00 min/km'));
       expect(screen.queryByTestId('routes-pace-edit')).not.toBeInTheDocument();
       expect(routeSets).toHaveBeenCalledTimes(1);
     });

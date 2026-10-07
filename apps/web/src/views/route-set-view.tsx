@@ -10,6 +10,7 @@ import {
   SlidersHorizontal,
   Timer,
   TrendingUp,
+  X,
   type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
@@ -42,7 +43,7 @@ import {
   type RouteSetRequest,
   type Display,
 } from '../core/index.ts';
-import { criteriaText, routesText } from '../i18n/index.ts';
+import { commonText, criteriaText, routesText } from '../i18n/index.ts';
 
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
@@ -173,36 +174,45 @@ export function RouteSetView({
 
 // The pace the durations are estimated at, and a way to change it.
 function RoutePace({ display, pace, onChange }: { display: Display; pace: number; onChange?: (pace: number) => void }) {
-  const t = words(display);
+  const t = { ...commonText[display.language], ...words(display) };
   const [editing, setEditing] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
-  // The slider opens where the user asked to edit, and closes when it loses the focus.
+  const edit = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+  // The focus goes to the slider where the user asked to edit, and back to the button when they close it.
   useEffect(() => {
     if (editing) editor.current?.querySelector('input')?.focus();
+    else if (wasEditing.current) edit.current?.focus();
+    wasEditing.current = editing;
   }, [editing]);
   if (editing && onChange) {
     return (
-      <div ref={editor}>
-        <PaceSlider
-          label={t.pace}
-          pace={pace}
-          units={display.units}
-          testId="routes-pace-input"
-          onChange={onChange}
-          onDone={() => setEditing(false)}
-        />
+      <div ref={editor} className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <PaceSlider label={t.pace} pace={pace} units={display.units} testId="routes-pace-input" onChange={onChange} />
+        </div>
+        <button
+          type="button"
+          data-testid="routes-pace-close"
+          className={ICON_BUTTON}
+          aria-label={t.close}
+          onClick={() => setEditing(false)}
+        >
+          <X size={18} aria-hidden />
+        </button>
       </div>
     );
   }
   return (
     <p data-testid="routes-pace" className="m-0 text-sm text-ink-2">
-      {t.estimatedAt(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)}
+      {t.estimatedPace(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)}
       {onChange && (
         <>
           {' '}
           ·{' '}
           <button
             type="button"
+            ref={edit}
             data-testid="routes-pace-edit"
             className="min-h-touch text-accent underline"
             onClick={() => setEditing(true)}

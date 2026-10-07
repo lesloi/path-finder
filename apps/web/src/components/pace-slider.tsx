@@ -16,7 +16,6 @@ export function PaceSlider({
   units,
   testId,
   onChange,
-  onDone,
 }: {
   label: string;
   /** Minutes per km. */
@@ -24,23 +23,19 @@ export function PaceSlider({
   units: Units;
   testId: string;
   onChange: (pace: number) => void;
-  /** The user has left the slider. */
-  onDone?: () => void;
 }) {
   const { min, max, step } = RANGE[units];
   const seconds = Math.min(Math.max(Math.round(pace * perUnit(units) * 60), min), max);
   return (
-    <div onBlur={onDone}>
-      <Slider
-        testId={testId}
-        label={label}
-        value={seconds}
-        shown={`${formatPace(seconds / 60 / perUnit(units), units)} ${paceUnit(units)}`}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(value) => onChange(value / 60 / perUnit(units))}
-      />
-    </div>
+    <Slider
+      testId={testId}
+      label={label}
+      value={seconds}
+      shown={`${formatPace(seconds / 60 / perUnit(units), units)} ${paceUnit(units)}`}
+      min={min}
+      max={max}
+      step={step}
+      onChange={(value) => onChange(value / 60 / perUnit(units))}
+    />
   );
 }

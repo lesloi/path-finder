@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 import { expectNamedControls } from '../accessible-names.ts';
 import type { Route, RouteSetRequest } from '../core/index.ts';
-import { criteriaText, routesText } from '../i18n/index.ts';
+import { commonText, criteriaText, routesText } from '../i18n/index.ts';
 import { RouteSetView } from './route-set-view.tsx';
 
 const METRES_PER_DEGREE = 111_195;
@@ -238,29 +238,38 @@ describe('RouteSetView', () => {
       const onPaceChange = vi.fn();
       render(<View onPaceChange={onPaceChange} />);
 
-      expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedAt('6:00 min/km'));
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedPace('6:00 min/km'));
       fireEvent.click(screen.getByTestId('routes-pace-edit'));
       const slider = screen.getByTestId('routes-pace-input');
       expect(slider).toHaveValue('360');
       fireEvent.change(slider, { target: { value: '330' } });
       expect(onPaceChange).toHaveBeenCalledExactlyOnceWith(5.5);
 
-      fireEvent.blur(slider);
+      expect(screen.getByTestId('routes-pace-close')).toHaveAccessibleName(commonText.en.close);
+    });
+
+    it('goes back to the pace line with the cross, and the focus on the edit button', () => {
+      render(<View onPaceChange={vi.fn()} />);
+      fireEvent.click(screen.getByTestId('routes-pace-edit'));
+
+      fireEvent.click(screen.getByTestId('routes-pace-close'));
+
       expect(screen.queryByTestId('routes-pace-input')).not.toBeInTheDocument();
-      expect(screen.getByTestId('routes-pace')).toBeInTheDocument();
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedPace('6:00 min/km'));
+      expect(screen.getByTestId('routes-pace-edit')).toHaveFocus();
     });
 
     it('only says the pace when it cannot be changed here', () => {
       render(<View onPaceChange={undefined} />);
 
-      expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedAt('6:00 min/km'));
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(en.estimatedPace('6:00 min/km'));
       expect(screen.queryByTestId('routes-pace-edit')).not.toBeInTheDocument();
     });
 
     it('says the pace in min/mi with imperial units, in French', () => {
       render(<View units="imperial" language="fr" />);
 
-      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.fr.estimatedAt('9:39 min/mi'));
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.fr.estimatedPace('9:39 min/mi'));
     });
 
     it('shows the figures in the units and the language of the settings', () => {
