@@ -105,18 +105,21 @@ var profiles = map[string]*Profile{
 		p.Surf[SurfaceCompact] = 1.2
 		p.Surf[SurfaceRough] = 1.5
 	}),
-	// unpaved prefers paths and tracks: it tolerates rough surfaces and steps, and pays for paved ways. The
-	// multipliers stay at or above 1, so that the search heuristic stays admissible.
+	// unpaved prefers paths and tracks: it tolerates rough surfaces and steps, and pays for paved ways and for
+	// the kinds of way that are usually paved. Paths and tracks stay at 1, which keeps the search heuristic
+	// admissible.
 	"unpaved": derive("unpaved", func(p *Profile) {
+		p.Kind[KindFootway] = 1.3
+		p.Kind[KindPedestrian] = 1.6
+		p.Kind[KindCycleway] = 2.0
 		p.Kind[KindSteps] = 1.0
-		p.Kind[KindCycleway] = 1.8
-		p.Kind[KindLivingStreet] = 1.8
-		p.Kind[KindResidential] = 2.2
-		p.Kind[KindService] = 2.2
-		p.Kind[KindUnclassified] = 2.2
-		p.Kind[KindTertiary] = 3.5
-		p.Kind[KindSecondary] = 5
-		p.Surf[SurfacePaved] = 1.5
+		p.Kind[KindLivingStreet] = 2.2
+		p.Kind[KindResidential] = 2.6
+		p.Kind[KindService] = 2.6
+		p.Kind[KindUnclassified] = 2.6
+		p.Kind[KindTertiary] = 4
+		p.Kind[KindSecondary] = 6
+		p.Surf[SurfacePaved] = 2.0
 		p.Surf[SurfaceRough] = 1.0
 	}),
 }
