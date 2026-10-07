@@ -8,25 +8,27 @@ export type Display = { units: Units; language: Language };
 export const KM_PER_MILE = 1.609344;
 export const METRES_PER_FOOT = 0.3048;
 
+const kmPerDistanceUnit = (units: Units) => (units === 'metric' ? 1 : KM_PER_MILE);
+
 /** The unit of a pace: minutes per distance, never a speed. */
 export function paceUnit(units: Units): string {
   return units === 'metric' ? 'min/km' : 'min/mi';
 }
 
-/** A pace in minutes per km, as "5:30" (per km, or per mile in imperial units). */
-export function formatPace(minPerKm: number, units: Units): string {
-  const perUnit = units === 'metric' ? 1 : KM_PER_MILE;
-  const seconds = Math.round(minPerKm * perUnit * 60);
-  return `${Math.floor(seconds / 60)}:${`${seconds % 60}`.padStart(2, '0')}`;
+/** A pace in minutes per km as seconds per km, or per mile in imperial units. */
+export function paceSeconds(minPerKm: number, units: Units): number {
+  return Math.round(minPerKm * kmPerDistanceUnit(units) * 60);
 }
 
-/** The pace in minutes per km that `formatPace` shows as `input`, or undefined if it is not one. */
-export function parsePace(input: string, units: Units): number | undefined {
-  const perUnit = units === 'metric' ? 1 : KM_PER_MILE;
-  const match = /^(\d{1,2})(?::([0-5]\d))?$/.exec(input.trim());
-  if (!match) return undefined;
-  const minutes = Number(match[1]) + Number(match[2] ?? 0) / 60;
-  return minutes > 0 ? minutes / perUnit : undefined;
+/** Seconds per km, or per mile in imperial units, as a pace in minutes per km. */
+export function paceFromSeconds(seconds: number, units: Units): number {
+  return seconds / 60 / kmPerDistanceUnit(units);
+}
+
+/** A pace in minutes per km as "5:30 min/km", or "8:51 min/mi" in imperial units. */
+export function formatPace(minPerKm: number, units: Units): string {
+  const seconds = paceSeconds(minPerKm, units);
+  return `${Math.floor(seconds / 60)}:${`${seconds % 60}`.padStart(2, '0')} ${paceUnit(units)}`;
 }
 
 /** A distance in kilometres as "12.3 km", or "7.7 mi" in imperial units. */
