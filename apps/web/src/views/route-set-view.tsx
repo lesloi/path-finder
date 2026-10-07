@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clock,
   Download,
+  Pencil,
   Ruler,
   SlidersHorizontal,
   Timer,
@@ -204,23 +205,20 @@ function RoutePace({ display, pace, onChange }: { display: Display; pace: number
     );
   }
   return (
-    <p data-testid="routes-pace" className="m-0 text-sm text-ink-2">
-      {t.estimatedPace(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)}
+    <p data-testid="routes-pace" className="m-0 flex items-center gap-1 text-sm text-ink-2">
       {onChange && (
-        <>
-          {' '}
-          ·{' '}
-          <button
-            type="button"
-            ref={edit}
-            data-testid="routes-pace-edit"
-            className="min-h-touch text-accent underline"
-            onClick={() => setEditing(true)}
-          >
-            {t.editPace}
-          </button>
-        </>
+        <button
+          type="button"
+          ref={edit}
+          data-testid="routes-pace-edit"
+          className={ICON_BUTTON}
+          aria-label={t.editPace}
+          onClick={() => setEditing(true)}
+        >
+          <Pencil size={16} aria-hidden />
+        </button>
       )}
+      {t.estimatedPace(`${formatPace(pace, display.units)} ${paceUnit(display.units)}`)}
     </p>
   );
 }
