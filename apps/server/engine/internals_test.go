@@ -166,11 +166,11 @@ func TestLandmarkCountMustFitASearch(t *testing.T) {
 	path := g.write(t)
 	dir := t.TempDir()
 	for _, count := range []int{0, -1, 33, 40} {
-		if err := WriteLandmarks(path, filepath.Join(dir, "x.alt"), "hike", count); err == nil {
+		if err := WriteLandmarks(path, filepath.Join(dir, "x.alt"), "any", count); err == nil {
 			t.Errorf("%d landmarks: err = nil, but a search keeps %d values per node", count, maxLandmarkValues)
 		}
 	}
-	if err := WriteLandmarks(path, filepath.Join(dir, "ok.alt"), "hike", 32); err != nil {
+	if err := WriteLandmarks(path, filepath.Join(dir, "ok.alt"), "any", 32); err != nil {
 		t.Errorf("32 landmarks fit: %v", err)
 	}
 }
@@ -181,7 +181,7 @@ func TestOpenRefusesFilesThatAreShorterThanTheirHeader(t *testing.T) {
 	g.grid(6, 6, flat)
 	graph := g.write(t)
 	alt := filepath.Join(dir, "a.alt")
-	if err := WriteLandmarks(graph, alt, "hike", 4); err != nil {
+	if err := WriteLandmarks(graph, alt, "any", 4); err != nil {
 		t.Fatal(err)
 	}
 	truncate := func(from string, size int64) string {
@@ -197,13 +197,13 @@ func TestOpenRefusesFilesThatAreShorterThanTheirHeader(t *testing.T) {
 	}
 	info, _ := os.Stat(graph)
 	for _, size := range []int64{20, info.Size() / 2, info.Size() - 16} {
-		if _, err := Open(truncate(graph, size), "", "hike"); err == nil {
+		if _, err := Open(truncate(graph, size), "", "any"); err == nil {
 			t.Errorf("graph cut to %d of %d bytes: err = nil", size, info.Size())
 		}
 	}
 	info, _ = os.Stat(alt)
 	for _, size := range []int64{30, info.Size() - 2} {
-		if _, err := Open(graph, truncate(alt, size), "hike"); err == nil {
+		if _, err := Open(graph, truncate(alt, size), "any"); err == nil {
 			t.Errorf("landmarks cut to %d of %d bytes: err = nil", size, info.Size())
 		}
 	}
@@ -216,7 +216,7 @@ func TestAGraphWithoutEdgesOpensWithoutPanicking(t *testing.T) {
 	if err := b.WriteGraph(path); err != nil {
 		t.Fatal(err)
 	}
-	e, err := Open(path, "", "hike")
+	e, err := Open(path, "", "any")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +285,7 @@ func TestRoutesAcrossHighGroundAndBelowSeaLevelAreMeasuredRight(t *testing.T) {
 			if err := b.WriteGraph(path); err != nil {
 				t.Fatal(err)
 			}
-			e, err := Open(path, "", "hike")
+			e, err := Open(path, "", "any")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -316,7 +316,7 @@ func TestAGraphOfAnotherVersionIsRefused(t *testing.T) {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Open(path, "", "hike"); err == nil || !strings.Contains(err.Error(), "build-graph") {
+	if _, err := Open(path, "", "any"); err == nil || !strings.Contains(err.Error(), "build-graph") {
 		t.Errorf("err = %v, want it to say to build the graph again", err)
 	}
 }
@@ -329,7 +329,7 @@ func TestASteepWayUpIsNotRefusedForItsClimb(t *testing.T) {
 			g.connect(i-1, i, KindPath)
 		}
 	}
-	e, err := Open(g.write(t), "", "run")
+	e, err := Open(g.write(t), "", "paved")
 	if err != nil {
 		t.Fatal(err)
 	}

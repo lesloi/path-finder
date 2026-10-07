@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -30,9 +31,13 @@ func newServer(t *testing.T) http.Handler {
 
 func serverOn(t *testing.T, dir string) http.Handler {
 	t.Helper()
-	zones, err := engine.OpenZones(dir, "hike", "run")
+	zones, err := engine.OpenZones(dir, engine.ProfileNames...)
 	if err != nil {
 		t.Fatal(err)
+	}
+	engines := map[string]generator.Looper{}
+	for _, name := range engine.ProfileNames {
+		engines[name] = zones.Profile(name)
 	}
 	web := t.TempDir()
 	if err := os.WriteFile(filepath.Join(web, "build-id"), []byte("build-1"), 0o644); err != nil {
@@ -40,7 +45,7 @@ func serverOn(t *testing.T, dir string) http.Handler {
 	}
 	return server.New(server.Config{
 		WebRoot:   web,
-		Generator: &generator.Generator{Engines: map[string]generator.Looper{"hike": zones.Activity("hike"), "run": zones.Activity("run")}},
+		Generator: &generator.Generator{Engines: engines},
 	})
 }
 
@@ -196,5 +201,49 @@ func TestServesFromADirectoryOfZones(t *testing.T) {
 	code, routes, body := routeSets(t, serverOn(t, dir), criteria("run", `{"distance":10}`, ""))
 	if code != 200 || len(routes) == 0 {
 		t.Errorf("status %d, %d routes: %s", code, len(routes), body[:min(len(body), 200)])
+	}
+}
+
+// The surface preference steers the search itself: on a graph with paved ways west of the start and
+// rough tracks east of it, the same seeds find loops that are the more unpaved the more it asks for.
+func TestTheSurfacePreferenceSteersTheSearch(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := standin.Write(dir); err != nil {
+		t.Fatal(err)
+	}
+	zones, err := engine.OpenZones(dir, engine.ProfileNames...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	share := map[string]float64{}
+	for _, name := range engine.ProfileNames {
+		var unpaved, total float64
+		for seed := uint64(1); seed <= 5; seed++ {
+			loops, err := zones.Profile(name).Loops(context.Background(), engine.LoopRequest{
+				Start: engine.Point{Lat: standin.Start[1], Lon: standin.Start[0]}, Distance: 8000, Candidates: 10, Seed: seed,
+			})
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			for _, l := range loops {
+				for _, s := range l.Stretches {
+					total += s.Meters
+					if s.Unpaved {
+						unpaved += s.Meters
+					}
+				}
+			}
+		}
+		if total == 0 {
+			t.Fatalf("%s: no loop", name)
+		}
+		share[name] = unpaved / total
+	}
+	t.Logf("unpaved share of the loops: %v", share)
+	if !(share["paved"] < share["any"] && share["any"] < share["unpaved"]) {
+		t.Errorf("unpaved share by preference = %v, want paved < any < unpaved", share)
+	}
+	if share["paved"] >= 0.5 || share["unpaved"] <= 0.5 {
+		t.Errorf("unpaved share by preference = %v, want a majority of paved ways for paved and of unpaved ways for unpaved", share)
 	}
 }

@@ -26,13 +26,13 @@ type zone struct {
 	engines map[string]*Engine
 }
 
-// OpenZones maps the zones of a data directory for the activities. It fails at once on a zone that cannot be
+// OpenZones maps the zones of a data directory for the profiles. It fails at once on a zone that cannot be
 // served, or that did not finish building, rather than on the first request that needs it, or by leaving a hole
-// in the map. A zone in a directory of zones must have the landmarks of every activity: with many zones, one
+// in the map. A zone in a directory of zones must have the landmarks of every profile: with many zones, one
 // that serves slowly would go unnoticed. A directory that is one zone keeps them optional.
-func OpenZones(dir string, activities ...string) (*Zones, error) {
-	if len(activities) == 0 {
-		return nil, errors.New("engine: no activity to open")
+func OpenZones(dir string, profiles ...string) (*Zones, error) {
+	if len(profiles) == 0 {
+		return nil, errors.New("engine: no profile to open")
 	}
 	dirs, flat, err := zoneDirs(dir)
 	if err != nil {
@@ -41,17 +41,17 @@ func OpenZones(dir string, activities ...string) (*Zones, error) {
 	z := &Zones{}
 	for _, d := range dirs {
 		if !flat {
-			for _, activity := range activities {
-				if _, err := os.Stat(filepath.Join(d, LandmarksFileName(activity))); err != nil {
-					return nil, fmt.Errorf("engine: zone %s has no %s: build it with build-alt", d, LandmarksFileName(activity))
+			for _, profile := range profiles {
+				if _, err := os.Stat(filepath.Join(d, LandmarksFileName(profile))); err != nil {
+					return nil, fmt.Errorf("engine: zone %s has no %s: build it with build-alt", d, LandmarksFileName(profile))
 				}
 			}
 		}
-		engines, err := OpenDir(d, activities...)
+		engines, err := OpenDir(d, profiles...)
 		if err != nil {
 			return nil, err
 		}
-		z.zones = append(z.zones, &zone{box: engines[activities[0]].g.sp.bounds, engines: engines})
+		z.zones = append(z.zones, &zone{box: engines[profiles[0]].g.sp.bounds, engines: engines})
 	}
 	return z, nil
 }
@@ -102,16 +102,16 @@ func zoneDirs(dir string) (dirs []string, flat bool, err error) {
 // Len is the number of zones.
 func (z *Zones) Len() int { return len(z.zones) }
 
-// Activity returns the loops of one activity over all the zones, or nil when it was not opened.
-func (z *Zones) Activity(name string) *ActivityZones {
+// Profile returns the loops of one profile over all the zones, or nil when it was not opened.
+func (z *Zones) Profile(name string) *ProfileZones {
 	if len(z.zones) == 0 || z.zones[0].engines[name] == nil {
 		return nil
 	}
-	return &ActivityZones{z: z, name: name}
+	return &ProfileZones{z: z, name: name}
 }
 
-// ActivityZones generates the loops of one activity, from whichever zone holds the start point.
-type ActivityZones struct {
+// ProfileZones generates the loops of one profile, from whichever zone holds the start point.
+type ProfileZones struct {
 	z    *Zones
 	name string
 }
@@ -121,7 +121,7 @@ type ActivityZones struct {
 // next. A zone that has ways there but no loop (ErrNoLoop) is not asked again elsewhere: with the zones
 // overlapping, the one with the most room already holds every way the others have round the start, and a
 // second failing search would only take the time of the request. When none answers, the error is the first's.
-func (a *ActivityZones) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
+func (a *ProfileZones) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	type candidate struct {
 		engine *Engine
 		margin float64

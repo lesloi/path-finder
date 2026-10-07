@@ -36,7 +36,8 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   every candidate node and its whole output in memory, which does not fit in 2 GB; a zone does
   (`build-graph -bbox`, one pass over the country's extract). No routing sits in front of the servers:
   opening a zone costs no memory, since its spatial index is in `graph.bin`, and a start point is answered by
-  the zone holding it with the most room. Fixed file names, written atomically, so a server only needs the
+  the zone holding it with the most room. Fixed file names (`graph.bin`, and `any.alt`, `paved.alt`, `unpaved.alt`, one landmark file per surface
+  preference), written atomically, so a server only needs the
   directory read-only and a rebuild is a restart. Revisit if a country's graph builds in one go: zones would
   then only cost borders.
 
@@ -48,6 +49,14 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
 - **The engine is our own A\* with landmark lower bounds (ALT)** on a pedestrian graph from OSM, not
   BRouter. ALT made routes about 25 times faster, and a search only allocates in proportion to the
   nodes it reaches. The landmarks' metric includes the climb penalty, so the bound stays valid.
+- **One routing profile per surface preference, and one climb cost for all.** The user sets a length, a
+  surface preference and an elevation gain; there is no activity to route for. The target elevation gain
+  steers the climb, so the climb cost does not change with the preference, and a preference only reweights
+  way kinds and surfaces. `paved` makes paved ways cheaper and rough or usually unpaved ones dearer, and
+  `unpaved` the reverse, since the way kinds of `any` already lean towards paths and would drown a surface
+  weight alone. Every multiplier stays at least 1, so that the search heuristic stays admissible.
+  Revisit if the comparison with a reference (#131) shows that runners and walkers need different costs on the
+  same surface.
 - **Loops go through 2–4 waypoints on a circle through the start point**, each leg avoiding what the
   earlier ones used, resized up to four times, then ranked on distance, overlap and elevation gain.
   Criteria whose waypoints alone exceed the target are refused. A waypoint is moved to the nearest way

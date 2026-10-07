@@ -21,9 +21,12 @@ const (
 )
 
 // Files are what Write produced.
-type Files struct{ Graph, LandmarksHike, LandmarksRun string }
+type Files struct {
+	Graph     string
+	Landmarks map[string]string // by profile
+}
 
-// Write writes the graph and the landmarks of both activities into dir. Ways west of the start
+// Write writes the graph and the landmarks of every profile into dir. Ways west of the start
 // are paved residential streets, those east of it rough tracks, so loops cover both surfaces.
 func Write(dir string) (Files, error) {
 	var b engine.Builder
@@ -54,16 +57,15 @@ func Write(dir string) (Files, error) {
 			}
 		}
 	}
-	f := Files{
-		Graph:         filepath.Join(dir, engine.GraphFileName),
-		LandmarksHike: filepath.Join(dir, engine.LandmarksFileName("hike")),
-		LandmarksRun:  filepath.Join(dir, engine.LandmarksFileName("run")),
-	}
+	f := Files{Graph: filepath.Join(dir, engine.GraphFileName), Landmarks: map[string]string{}}
 	if err := b.WriteGraph(f.Graph); err != nil {
 		return Files{}, err
 	}
-	if err := engine.WriteLandmarks(f.Graph, f.LandmarksHike, "hike", 8); err != nil {
-		return Files{}, err
+	for _, profile := range engine.ProfileNames {
+		f.Landmarks[profile] = filepath.Join(dir, engine.LandmarksFileName(profile))
+		if err := engine.WriteLandmarks(f.Graph, f.Landmarks[profile], profile, 8); err != nil {
+			return Files{}, err
+		}
 	}
-	return f, engine.WriteLandmarks(f.Graph, f.LandmarksRun, "run", 8)
+	return f, nil
 }

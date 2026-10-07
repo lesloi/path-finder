@@ -61,7 +61,7 @@ type LoopRequest struct {
 }
 
 // Open maps a graph file, and its landmark file when landmarksPath is not empty, for the named
-// activity profile. The landmarks must have been built for the same profile.
+// surface-preference profile. The landmarks must have been built for the same profile.
 func Open(graphPath, landmarksPath, profile string) (*Engine, error) {
 	engines, err := OpenAll(graphPath, map[string]string{profile: landmarksPath})
 	if err != nil {
@@ -70,7 +70,7 @@ func Open(graphPath, landmarksPath, profile string) (*Engine, error) {
 	return engines[profile], nil
 }
 
-// OpenAll maps a graph file once and returns an engine per activity profile, keyed by name. The
+// OpenAll maps a graph file once and returns an engine per profile, keyed by name. The
 // value is the profile's landmark file, or empty for none. Engines share the graph and its index.
 func OpenAll(graphPath string, landmarks map[string]string) (map[string]*Engine, error) {
 	g, err := openGraph(graphPath)
@@ -100,22 +100,22 @@ func OpenAll(graphPath string, landmarks map[string]string) (map[string]*Engine,
 	return engines, nil
 }
 
-// Names of the files a data directory holds: the graph, and for each activity its landmarks.
+// Names of the files a data directory holds: the graph, and for each profile its landmarks.
 const GraphFileName = "graph.bin"
 
-// LandmarksFileName is the name of an activity's landmark file in a data directory.
-func LandmarksFileName(activity string) string { return activity + ".alt" }
+// LandmarksFileName is the name of a profile's landmark file in a data directory.
+func LandmarksFileName(profile string) string { return profile + ".alt" }
 
-// OpenDir opens the engines of the activities from a data directory: its graph, and the landmarks
-// of each activity when the directory holds them (a search is slower without).
-func OpenDir(dir string, activities ...string) (map[string]*Engine, error) {
-	landmarks := make(map[string]string, len(activities))
-	for _, activity := range activities {
-		path := filepath.Join(dir, LandmarksFileName(activity))
+// OpenDir opens the engines of the profiles from a data directory: its graph, and the landmarks
+// of each profile when the directory holds them (a search is slower without).
+func OpenDir(dir string, profiles ...string) (map[string]*Engine, error) {
+	landmarks := make(map[string]string, len(profiles))
+	for _, profile := range profiles {
+		path := filepath.Join(dir, LandmarksFileName(profile))
 		if _, err := os.Stat(path); err == nil {
-			landmarks[activity] = path
+			landmarks[profile] = path
 		} else if errors.Is(err, fs.ErrNotExist) {
-			landmarks[activity] = ""
+			landmarks[profile] = ""
 		} else {
 			return nil, err
 		}

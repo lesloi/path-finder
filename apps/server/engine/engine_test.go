@@ -89,7 +89,7 @@ func openTest(tb testing.TB, t *testGraph, withLandmarks bool) *Engine {
 	path := t.write(tb)
 	alt := ""
 	if withLandmarks {
-		e, err := Open(path, "", "hike")
+		e, err := Open(path, "", "any")
 		if err != nil {
 			tb.Fatal(err)
 		}
@@ -99,7 +99,7 @@ func openTest(tb testing.TB, t *testGraph, withLandmarks bool) *Engine {
 			tb.Fatal(err)
 		}
 	}
-	e, err := Open(path, alt, "hike")
+	e, err := Open(path, alt, "any")
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -363,22 +363,22 @@ func TestOpenRejectsBadInput(t *testing.T) {
 	if _, err := Open(path, "", "teleport"); err == nil {
 		t.Error("unknown profile: err = nil")
 	}
-	if _, err := Open(filepath.Join(t.TempDir(), "missing.bin"), "", "hike"); err == nil {
+	if _, err := Open(filepath.Join(t.TempDir(), "missing.bin"), "", "any"); err == nil {
 		t.Error("missing graph: err = nil")
 	}
-	if _, err := Open(path, path, "hike"); err == nil {
+	if _, err := Open(path, path, "any"); err == nil {
 		t.Error("graph file given as landmarks: err = nil")
 	}
 }
 
-func TestOpenAllSharesTheGraphBetweenActivities(t *testing.T) {
+func TestOpenAllSharesTheGraphBetweenProfiles(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(6, 6, flat)
-	engines, err := OpenAll(g.write(t), map[string]string{"hike": "", "run": ""})
+	engines, err := OpenAll(g.write(t), map[string]string{"any": "", "paved": ""})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if engines["hike"].g != engines["run"].g || engines["hike"].sp != engines["run"].sp {
+	if engines["any"].g != engines["paved"].g || engines["any"].sp != engines["paved"].sp {
 		t.Error("engines map the graph twice")
 	}
 	for name, e := range engines {
@@ -430,16 +430,16 @@ func TestOpenDirOpensTheGraphAndTheLandmarksItHolds(t *testing.T) {
 	if err := b.WriteGraph(filepath.Join(dir, GraphFileName)); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteLandmarks(filepath.Join(dir, GraphFileName), filepath.Join(dir, LandmarksFileName("hike")), "hike", 2); err != nil {
+	if err := WriteLandmarks(filepath.Join(dir, GraphFileName), filepath.Join(dir, LandmarksFileName("any")), "any", 2); err != nil {
 		t.Fatal(err)
 	}
 
-	engines, err := OpenDir(dir, "hike", "run")
+	engines, err := OpenDir(dir, "any", "paved")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if engines["hike"].alt == nil || engines["run"].alt != nil {
-		t.Errorf("landmarks: hike %v, run %v; only hike has a file", engines["hike"].alt != nil, engines["run"].alt != nil)
+	if engines["any"].alt == nil || engines["paved"].alt != nil {
+		t.Errorf("landmarks: any %v, paved %v; only any has a file", engines["any"].alt != nil, engines["paved"].alt != nil)
 	}
 	if leftovers, _ := filepath.Glob(filepath.Join(dir, "*.tmp")); len(leftovers) != 0 {
 		t.Errorf("temporary files left behind: %v", leftovers)
@@ -447,7 +447,7 @@ func TestOpenDirOpensTheGraphAndTheLandmarksItHolds(t *testing.T) {
 }
 
 func TestOpenDirFailsWithoutAGraph(t *testing.T) {
-	_, err := OpenDir(t.TempDir(), "hike")
+	_, err := OpenDir(t.TempDir(), "any")
 	if err == nil || !strings.Contains(err.Error(), "opening the data") {
 		t.Errorf("err = %v", err)
 	}
@@ -455,7 +455,7 @@ func TestOpenDirFailsWithoutAGraph(t *testing.T) {
 
 func TestAFailedWriteLeavesNoFile(t *testing.T) {
 	dir := t.TempDir()
-	if err := WriteLandmarks(filepath.Join(dir, "missing.bin"), filepath.Join(dir, "x.alt"), "hike", 2); err == nil {
+	if err := WriteLandmarks(filepath.Join(dir, "missing.bin"), filepath.Join(dir, "x.alt"), "any", 2); err == nil {
 		t.Error("landmarks of a graph that does not exist: err = nil")
 	}
 	if err := WriteLandmarks(filepath.Join(dir, "missing.bin"), filepath.Join(dir, "x.alt"), "teleport", 2); err == nil {
@@ -485,7 +485,7 @@ func TestOpenDirOnAReadOnlyDirectory(t *testing.T) {
 	if err := b.WriteGraph(graph); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName("hike")), "hike", 2); err != nil {
+	if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName("any")), "any", 2); err != nil {
 		t.Fatal(err)
 	}
 	// What a read-only volume looks like to the pod: no file and no directory can be written.
@@ -504,14 +504,14 @@ func TestOpenDirOnAReadOnlyDirectory(t *testing.T) {
 		t.Skip("the directory is writable anyway (running as root?)")
 	}
 
-	engines, err := OpenDir(dir, "hike", "run")
+	engines, err := OpenDir(dir, "any", "paved")
 	if err != nil {
 		t.Fatalf("a read-only data directory: %v", err)
 	}
-	if engines["hike"].alt == nil {
+	if engines["any"].alt == nil {
 		t.Error("the landmarks were not opened")
 	}
-	if _, err := engines["hike"].Route(context.Background(), Point{Lat: 45, Lon: 6}, Point{Lat: 45.003, Lon: 6}); err != nil {
+	if _, err := engines["any"].Route(context.Background(), Point{Lat: 45, Lon: 6}, Point{Lat: 45.003, Lon: 6}); err != nil {
 		t.Errorf("a route on a read-only graph: %v", err)
 	}
 	if now, _ := filepath.Glob(filepath.Join(dir, "*")); len(now) != len(files) {
@@ -540,14 +540,14 @@ func TestLandmarksOfAnotherGraphOfTheSameSizeAreRefused(t *testing.T) {
 	first := write("first.bin", [4]float64{100, 110, 120, 130})
 	second := write("second.bin", [4]float64{130, 120, 110, 100}) // 4 nodes and 6 edges too
 	alt := filepath.Join(dir, "first.alt")
-	if err := WriteLandmarks(first, alt, "hike", 2); err != nil {
+	if err := WriteLandmarks(first, alt, "any", 2); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := Open(first, alt, "hike"); err != nil {
+	if _, err := Open(first, alt, "any"); err != nil {
 		t.Fatalf("the landmarks of their own graph: %v", err)
 	}
-	if _, err := Open(second, alt, "hike"); err == nil || !strings.Contains(err.Error(), "another graph") {
+	if _, err := Open(second, alt, "any"); err == nil || !strings.Contains(err.Error(), "another graph") {
 		t.Errorf("landmarks of another graph: err = %v, want it to refuse them", err)
 	}
 }
@@ -557,7 +557,7 @@ func TestAnOpenedGraphUsesTheSpatialIndexOfItsFile(t *testing.T) {
 	g := &testGraph{}
 	g.grid(6, 6, flat)
 	path := g.write(t)
-	e, err := Open(path, "", "hike")
+	e, err := Open(path, "", "any")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -577,7 +577,7 @@ func TestAnOpenedGraphUsesTheSpatialIndexOfItsFile(t *testing.T) {
 	if err := os.WriteFile(path, data[:len(data)-64], 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Open(path, "", "hike"); err == nil || !strings.Contains(err.Error(), "shorter") {
+	if _, err := Open(path, "", "any"); err == nil || !strings.Contains(err.Error(), "shorter") {
 		t.Errorf("a file cut in its index: err = %v, want it to say it is too short", err)
 	}
 }
