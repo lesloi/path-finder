@@ -278,7 +278,7 @@ describe('CriteriaForm', () => {
     it('is worded in French', () => {
       setup({ language: 'fr' });
 
-      expect(technical()).toHaveAccessibleName('Inclure les passages techniques signalés');
+      expect(technical()).toHaveAccessibleName('Autoriser les passages techniques signalés');
     });
   });
 

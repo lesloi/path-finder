@@ -35,7 +35,7 @@ export const criteriaText = {
     paved: 'Paved',
     anySurface: 'Any',
     unpaved: 'Unpaved',
-    includeTechnical: 'Include flagged technical stretches',
+    includeTechnical: 'Allow flagged technical stretches',
     findRoutes: 'Find routes',
     pace: 'Pace',
     distanceError: (min: number, max: number, unit: string) =>
@@ -80,7 +80,7 @@ export const criteriaText = {
     paved: 'Goudronné',
     anySurface: 'Indifférent',
     unpaved: 'Non goudronné',
-    includeTechnical: 'Inclure les passages techniques signalés',
+    includeTechnical: 'Autoriser les passages techniques signalés',
     findRoutes: 'Trouver des parcours',
     pace: 'Allure',
     distanceError: (min: number, max: number, unit: string) =>

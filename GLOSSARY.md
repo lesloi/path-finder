@@ -53,7 +53,7 @@ _Avoid_: Road type, terrain filter
 
 **Technical stretch**:
 A way tagged as asking for the hands, ropes or chains: on foot, `sac_scale` from
-`demanding_mountain_hiking` (T3) up. T1 and T2 are ordinary hiking and trail running. The switch « Inclure les
+`demanding_mountain_hiking` (T3) up. T1 and T2 are ordinary hiking and trail running. The switch « Autoriser les
 passages techniques signalés » in the criteria is off by default, kept with the last criteria, and shown unless
 the surface preference is paved, when the form always asks to exclude them and keeps the stored value. When it is off, flagged ways are excluded outright,
 not weighted, and a start point or waypoint on one moves to the nearest way allowed. An untagged way is never
