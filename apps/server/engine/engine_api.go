@@ -82,6 +82,7 @@ func OpenAll(graphPath string, landmarks map[string]string) (map[string]*Engine,
 	for name, path := range landmarks {
 		p := profiles[name]
 		if p == nil {
+			closeEngines(engines, g)
 			return nil, fmt.Errorf("engine: unknown profile %q", name)
 		}
 		e := &Engine{g: g, sp: sp, prof: p, minMult: p.minMult()}
@@ -92,12 +93,23 @@ func OpenAll(graphPath string, landmarks map[string]string) (map[string]*Engine,
 		}
 		if path != "" {
 			if e.alt, err = openLandmarks(path, g); err != nil {
+				closeEngines(engines, g)
 				return nil, err
 			}
 		}
 		engines[name] = e
 	}
 	return engines, nil
+}
+
+// closeEngines unmaps the graph the engines share, once, and the landmarks of each. Nothing may search after.
+func closeEngines(engines map[string]*Engine, g *graph) {
+	for _, e := range engines {
+		if e.alt != nil {
+			e.alt.file.unmap()
+		}
+	}
+	g.file.unmap()
 }
 
 // Names of the files a data directory holds: the graph, and for each profile its landmarks.
@@ -117,7 +129,7 @@ func OpenDir(dir string, profiles ...string) (map[string]*Engine, error) {
 		} else if errors.Is(err, fs.ErrNotExist) {
 			landmarks[profile] = ""
 		} else {
-			return nil, err
+			return nil, transientError{err}
 		}
 	}
 	engines, err := OpenAll(filepath.Join(dir, GraphFileName), landmarks)

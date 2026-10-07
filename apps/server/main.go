@@ -95,6 +95,9 @@ type stringList []string
 func (l *stringList) String() string     { return strings.Join(*l, ",") }
 func (l *stringList) Set(v string) error { *l = append(*l, v); return nil }
 
+// reloadEvery is how often the data directory is looked at for files that replace the ones served.
+const reloadEvery = 30 * time.Second // polling needs no signal and no step in a deployment, for 30 s of delay
+
 func serve() {
 	cfg, err := server.ConfigFromEnv(os.Getenv)
 	if err != nil {
@@ -103,7 +106,7 @@ func serve() {
 	// The graph and the landmarks of each profile are built ahead of serving, by build-graph and build-alt.
 	// The port opens once the files are mapped and their headers checked.
 	opened := time.Now()
-	zones, err := engine.OpenZones(dataDir(), engine.ProfileNames...)
+	zones, err := engine.NewReloader(dataDir(), engine.ProfileNames...)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -134,6 +137,7 @@ func serve() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go zones.Watch(ctx, reloadEvery, log.Printf)
 	log.Printf("server listening on port %s", port)
 	if err := server.Serve(ctx, srv, ln, 20*time.Second); err != nil {
 		log.Fatal(err)

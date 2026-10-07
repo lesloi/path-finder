@@ -38,8 +38,14 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   opening a zone costs no memory, since its spatial index is in `graph.bin`, and a start point is answered by
   the zone holding it with the most room. Fixed file names (`graph.bin`, and `any.alt`, `paved.alt`, `unpaved.alt`, one landmark file per surface
   preference), written atomically, so a server only needs the
-  directory read-only and a rebuild is a restart. Revisit if a country's graph builds in one go: zones would
+  directory read-only. Revisit if a country's graph builds in one go: zones would
   then only cost borders.
+- **A rebuild is served without a restart, and a file is replaced by renaming over it, never written
+  in place.** A restart drops the searches in flight and closes the port for as long as it takes. The
+  files are mapped, so a swap is a new set of mappings: each set counts its searches, and the last one out
+  unmaps it, which no search can fault on. A mapping follows the inode, so a file written in place is seen
+  half done by the searches in flight, and a shorter one faults them. A reload that fails, such as a graph
+  renamed before its landmarks, keeps the zones served.
 
 ## Routing
 

@@ -46,21 +46,72 @@ type graph struct {
 	off         []uint32
 	edges       []edge
 	sp          *spatial
+	file        mapped
 }
 
 func align16(n int) int { return (n + 15) &^ 15 }
 
-func mapFile(path string) ([]byte, error) {
+// fileID identifies the version of a file: a replaced file has another inode, a rewritten one another size or
+// time.
+type fileID struct {
+	dev, ino uint64
+	size     int64
+	mtimeNs  int64
+}
+
+func fileIDOf(st os.FileInfo) fileID {
+	id := fileID{size: st.Size(), mtimeNs: st.ModTime().UnixNano()}
+	if sys, ok := st.Sys().(*syscall.Stat_t); ok {
+		id.dev, id.ino = uint64(sys.Dev), sys.Ino
+	}
+	return id
+}
+
+// transientError marks a failure of the system rather than of the content of a file (no descriptor left, no
+// memory to map, a disk error): the same files may be served at the next try.
+type transientError struct{ error }
+
+func (e transientError) Unwrap() error { return e.error }
+
+// mapped is a file mapped read-only: the bytes, the path they were mapped from and which version of it.
+type mapped struct {
+	data []byte
+	path string
+	id   fileID
+}
+
+// openMappings counts the files mapped and not yet unmapped, for the tests to see that a replaced version is
+// let go.
+var openMappings atomic.Int64
+
+// mapFile maps a file. Its version is the one of the descriptor that is mapped, not of the path, which may
+// already name another file.
+func mapFile(path string) (mapped, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return mapped{}, transientError{err}
 	}
 	defer f.Close()
 	st, err := f.Stat()
 	if err != nil {
-		return nil, err
+		return mapped{}, transientError{err}
 	}
-	return syscall.Mmap(int(f.Fd()), 0, int(st.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
+	data, err := syscall.Mmap(int(f.Fd()), 0, int(st.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
+	if err != nil {
+		return mapped{}, transientError{err}
+	}
+	openMappings.Add(1)
+	return mapped{data: data, path: path, id: fileIDOf(st)}, nil
+}
+
+// unmap releases the mapping. Nothing may read the file after: its slices would fault.
+func (m *mapped) unmap() {
+	if m.data == nil {
+		return
+	}
+	_ = syscall.Munmap(m.data)
+	m.data = nil
+	openMappings.Add(-1)
 }
 
 // maxLandmarkValues is how many landmark distances a search keeps for its target: the landmarks, twice
@@ -80,11 +131,17 @@ func view[T any](data []byte, at, count int) ([]T, error) {
 	return unsafe.Slice((*T)(unsafe.Pointer(&data[at])), count), nil
 }
 
-func openGraph(path string) (*graph, error) {
-	data, err := mapFile(path)
+func openGraph(path string) (_ *graph, err error) {
+	m, err := mapFile(path)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			m.unmap()
+		}
+	}()
+	data := m.data
 	head, ok := readGraphHead(data)
 	if !ok {
 		return nil, fmt.Errorf("%s is not a graph file of this version: build it again with build-graph", path)
@@ -93,7 +150,7 @@ func openGraph(path string) (*graph, error) {
 	nodesAt := graphHeaderSize
 	offAt := align16(nodesAt + 12*n)
 	edgesAt := align16(offAt + 4*(n+1))
-	g := &graph{n: n, e: e, fingerprint: head.fingerprint}
+	g := &graph{n: n, e: e, fingerprint: head.fingerprint, file: m}
 	if g.nodes, err = view[node](data, nodesAt, n); err != nil {
 		return nil, fmt.Errorf("%s: nodes: %w", path, err)
 	}
@@ -116,11 +173,26 @@ func openGraph(path string) (*graph, error) {
 	return g, nil
 }
 
+// warmSink keeps the reads of warm from being dropped as unused.
+var warmSink atomic.Uint32
+
+// warm reads one value in each page of the grid of the spatial index, which finding the node nearest to a
+// start reads, to bring it into the page cache.
+func (g *graph) warm() {
+	const perPage = 4096 / 4
+	var sum uint32
+	for i := 0; i < len(g.sp.start); i += perPage {
+		sum += g.sp.start[i]
+	}
+	warmSink.Add(sum)
+}
+
 func (g *graph) edgeSource(e uint32) uint32 {
 	return uint32(sort.Search(len(g.off), func(i int) bool { return g.off[i] > e }) - 1)
 }
 
 type landmarks struct {
+	file   mapped
 	l      int
 	climb  float32
 	unit   float32
@@ -128,11 +200,17 @@ type landmarks struct {
 	rows   []uint16
 }
 
-func openLandmarks(path string, g *graph) (*landmarks, error) {
-	data, err := mapFile(path)
+func openLandmarks(path string, g *graph) (_ *landmarks, err error) {
+	m, err := mapFile(path)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err != nil {
+			m.unmap()
+		}
+	}()
+	data := m.data
 	head, ok := readAltHead(data)
 	if !ok {
 		return nil, fmt.Errorf("%s is not a landmark file of this version: build it again with build-alt", path)
@@ -141,7 +219,7 @@ func openLandmarks(path string, g *graph) (*landmarks, error) {
 	if n != g.n || head.fingerprint != g.fingerprint {
 		return nil, fmt.Errorf("%s was built for another graph: build it again with build-alt", path)
 	}
-	a := &landmarks{l: l, climb: head.climb, unit: head.unit}
+	a := &landmarks{file: m, l: l, climb: head.climb, unit: head.unit}
 	a.rowLen = l
 	if a.climb > 0 {
 		a.rowLen = 2 * l
