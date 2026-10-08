@@ -134,6 +134,11 @@ function updateSettings(change: Partial<Settings>) {
   for (const listener of listeners) listener();
 }
 
+/** The units figures are shown in, in the given language: the user's pick, else the language's. */
+export function useUnits(language: Language): Units {
+  return unitsOf(useSettings()[0], language);
+}
+
 /** Calls `listener` with the current settings now and after every change, until the returned function is called. */
 export function watchSettings(listener: (settings: Settings) => void): () => void {
   const notify = () => listener(getSettings());

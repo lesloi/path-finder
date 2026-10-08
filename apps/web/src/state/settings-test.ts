@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 
-import { DEFAULT_CRITERIA, unitsOf, useSettings, watchSettings } from './settings.ts';
+import { DEFAULT_CRITERIA, unitsOf, type Settings, useSettings, watchSettings } from './settings.ts';
 
 const KEY = 'path-finder.settings';
 
@@ -12,8 +12,7 @@ const DEFAULTS = {
 };
 
 describe('unitsOf', () => {
-  const settings = (units?: 'metric' | 'imperial') =>
-    renderHook(() => (localStorage.setItem(KEY, JSON.stringify({ units })), useSettings())).result.current[0];
+  const settings = (units?: 'metric' | 'imperial'): Settings => ({ ...DEFAULTS, ...(units && { units }) }) as Settings;
 
   it.each([
     ['fr', 'metric'],

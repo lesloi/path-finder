@@ -1,7 +1,7 @@
 import { Crosshair, LocateFixed, Navigation2, Scan, Settings } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import { unitsOf, useSettings } from '../state/index.ts';
+import { useSettings, useUnits } from '../state/index.ts';
 import { CriteriaForm, useCriteriaDraft } from './criteria-form.tsx';
 import { RouteErrorToast } from './route-error-toast.tsx';
 import { RoutesFoundButton } from './routes-found-button.tsx';
@@ -56,9 +56,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const map = useRef<MapHandle>(null);
   const [mapView, setMapView] = useState<MapView>({ bearing: 0, rotated: false, movedAway: false });
   const pageWasOpen = useRef(pageOpen);
-  const [settings, update] = useSettings();
-  const { basemap, pace } = settings;
-  const units = unitsOf(settings, language);
+  const [{ basemap, pace }, update] = useSettings();
+  const units = useUnits(language);
   const browser = useRouteBrowser();
   const { routeSet, loading } = browser;
   const display = useMemo(() => ({ units, language }), [units, language]);

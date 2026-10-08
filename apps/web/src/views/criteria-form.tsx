@@ -31,7 +31,7 @@ import {
   type Units,
 } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
-import { unitsOf, useSettings, type ElevationLevel, type LastCriteria } from '../state/index.ts';
+import { unitsOf, useSettings, useUnits, type ElevationLevel, type LastCriteria } from '../state/index.ts';
 
 const CRITERIA = ['target', 'surface', 'elevation'] as const;
 
@@ -150,7 +150,7 @@ export function CriteriaForm({
   const t = { ...commonText[language], ...criteriaText[language] };
   const desktop = useDesktop();
   const [settings, update] = useSettings();
-  const units = unitsOf(settings, language);
+  const units = useUnits(language);
   const own = useCriteriaDraft(language);
   const [draft, setDraft] = kept ?? own;
   const [open, setOpen] = useState<Criterion>();
