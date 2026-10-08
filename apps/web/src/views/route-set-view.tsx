@@ -179,6 +179,8 @@ function RouteRow({
   onPreviewEnd?: (() => void) | undefined;
 }) {
   const t = words(display);
+  // A press focuses the row before its click: only the keyboard selects from the focus, not a tap.
+  const pressed = useRef(false);
   const distance = formatDistance(route.distance, display);
   const duration = formatDuration(route.estimatedDuration, display.language);
   const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, display);
@@ -204,11 +206,18 @@ function RouteRow({
         `${routeBorder(index)} hover:bg-surface-2 data-selected:bg-surface-2`
       }
       aria-label={name}
-      onClick={onOpen}
+      onPointerDown={() => (pressed.current = true)}
+      onPointerCancel={() => (pressed.current = false)}
+      onClick={() => {
+        pressed.current = false;
+        onOpen();
+      }}
       // Hovering is for desktops: a tap on a phone opens the route.
       onMouseEnter={desktop ? onPreview : undefined}
       onMouseLeave={onPreviewEnd}
-      onFocus={onPreview}
+      onFocus={() => {
+        if (!pressed.current) onPreview();
+      }}
       onBlur={onPreviewEnd}
     >
       <span className="flex w-full items-center gap-3">

@@ -610,16 +610,24 @@ export function StartPointMap({
     // The framing below runs again.
     reframe: () => setReframes((count) => count + 1),
   }));
-  useEffect(() => {
-    if (!loaded || !routes?.length) return;
+  const refit = useEffectEvent(() => {
     const map = mapRef.current!;
     // Not on every selection of a route set that has its snapshot: hovering a row of the list must not
     // move the map. A new route set is framed at once, for the snapshot that is taken of it.
-    if (snapshotTaken()) map.fitBounds(boundsOf(framedRoutes(routes, framed)), frame(map.getBearing()));
-    else map.fitBounds(boundsOf(routes), { ...frame(0), animate: false });
+    if (snapshotTaken()) map.fitBounds(boundsOf(framedRoutes(routes!, framed)), frame(map.getBearing()));
+    else map.fitBounds(boundsOf(routes!), { ...frame(0), animate: false });
     changeView({ movedAway: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `frame` reads `desktop`, a dependency
-  }, [loaded, routes, framed, desktop, followsSnapshot, reframes, sheetHeight]);
+  });
+  useEffect(() => {
+    if (loaded && routes?.length) refit();
+  }, [loaded, routes, framed, desktop, followsSnapshot, reframes]);
+  // A sheet that changes height leaves another free area, but a map the user moved stays where they put it.
+  const framedSheet = useRef(sheetHeight);
+  useEffect(() => {
+    if (framedSheet.current === sheetHeight) return;
+    framedSheet.current = sheetHeight;
+    if (loaded && routes?.length && !view.current.movedAway) refit();
+  }, [sheetHeight]); // eslint-disable-line react-hooks/exhaustive-deps -- only a new height frames again
 
   useEffect(() => {
     if (!hover) return;

@@ -4,7 +4,8 @@ import { centredCard } from '../core/index.ts';
 
 // Milliseconds a scroll has to rest before the card it stopped on is selected.
 const SETTLE_MS = 90;
-// Milliseconds after the carousel moved by itself, during which the cards it passes are not selected.
+// Milliseconds after the carousel moved by itself, at most, during which the cards it passes are not selected: the
+// end of its scroll or a touch ends it sooner.
 const MOVE_MS = 1_100;
 
 /**
@@ -72,6 +73,9 @@ export function RouteCarousel({
         'relative m-0 flex list-none snap-x snap-mandatory gap-2 overflow-x-auto p-0 pb-1 ' +
         '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
       }
+      // The user takes over from a move the carousel made by itself, or the move is over.
+      onPointerDown={() => (movingUntil.current = 0)}
+      onScrollEnd={() => (movingUntil.current = 0)}
       onScroll={() => {
         clearTimeout(settling.current);
         settling.current = setTimeout(settle, SETTLE_MS);

@@ -250,6 +250,20 @@ describe('RouteSetView', () => {
       expect(screen.queryByTestId('routes-position')).not.toBeInTheDocument();
     });
 
+    it('only brings a card to the middle on the tap that focuses it, and does not open its detail', () => {
+      const onSelect = vi.fn();
+      render(<View onSelect={onSelect} />);
+      const row = screen.getByTestId('routes-row-1');
+
+      // A press focuses the button, then clicks it.
+      fireEvent.pointerDown(row);
+      fireEvent.focus(row);
+      fireEvent.click(row);
+
+      expect(onSelect).toHaveBeenCalledExactlyOnceWith(1);
+      expect(screen.queryByTestId('route-detail')).not.toBeInTheDocument();
+    });
+
     it('brings the card of a route to the middle on a tap, and opens its detail on a tap once it is there', () => {
       const onSelect = vi.fn();
       render(<View onSelect={onSelect} />);

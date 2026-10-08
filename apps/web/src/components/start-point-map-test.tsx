@@ -862,6 +862,24 @@ describe('StartPointMap', () => {
         expect(padding().bottom).toBe(24 + 360);
       });
 
+      it('leaves the map where the user moved it when the sheet changes height', () => {
+        const { rerender } = renderRoutes({ framing: 'follow', selectedRoute: 1, sheetHeight: 200 });
+        act(() => map().fire('movestart', { originalEvent: {} }));
+        map().fitted = undefined;
+
+        rerender(
+          <StartPointMap
+            routes={routes}
+            framing="follow"
+            selectedRoute={1}
+            sheetHeight={360}
+            onStartChange={vi.fn()}
+          />,
+        );
+
+        expect(map().fitted).toBeUndefined();
+      });
+
       it('takes no room for the bar without the stylesheet', () => {
         withTopBar('');
 

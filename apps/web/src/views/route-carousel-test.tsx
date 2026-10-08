@@ -99,4 +99,42 @@ describe('RouteCarousel', () => {
 
     expect(scrollTo).not.toHaveBeenCalled();
   });
+
+  it('lets a swipe select a card right after the carousel moved by itself, once the user touches it', () => {
+    layout(0);
+    const { list, onSelect, rerender } = setup(0);
+    rerender(
+      <RouteCarousel testId="carousel" selected={2} onSelect={onSelect}>
+        {[0, 1, 2].map((index) => (
+          <button key={index}>{`card ${index}`}</button>
+        ))}
+      </RouteCarousel>,
+    );
+
+    fireEvent.pointerDown(list);
+    layout(360);
+    fireEvent.scroll(list);
+    settle();
+
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
+  it('selects again once its own move has ended', () => {
+    layout(0);
+    const { list, onSelect, rerender } = setup(0);
+    rerender(
+      <RouteCarousel testId="carousel" selected={2} onSelect={onSelect}>
+        {[0, 1, 2].map((index) => (
+          <button key={index}>{`card ${index}`}</button>
+        ))}
+      </RouteCarousel>,
+    );
+
+    fireEvent(list, new Event('scrollend', { bubbles: false }));
+    layout(360);
+    fireEvent.scroll(list);
+    settle();
+
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith(1);
+  });
 });
