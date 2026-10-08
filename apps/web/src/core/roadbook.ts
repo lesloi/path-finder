@@ -206,17 +206,16 @@ export function roadbookCues(route: Route, pois: Poi[], shown: PoiCategory[], di
       height > 0 ? text.cueClimb(...words) : text.cueDescent(...words),
     );
   }
-  const points = projectInMetres(geometry);
-  const [lon0, lat0] = geometry[0];
-  const cos = Math.cos((lat0 * Math.PI) / 180);
-  for (const { position, category, seasonal } of pois) {
-    if (!shown.includes(category)) continue;
+  const shownPois = pois.filter(({ category }) => shown.includes(category));
+  // The route and the points share one projection, so they are measured against each other.
+  const projected = projectInMetres([...geometry, ...shownPois.map(({ position }) => position)]);
+  const points = projected.slice(0, geometry.length);
+  shownPois.forEach(({ category, seasonal }, k) => {
     const label = text.cuePoi[category];
-    const metres: Metres = [(position[0] - lon0) * cos * METRES_PER_DEGREE, (position[1] - lat0) * METRES_PER_DEGREE];
-    for (const distance of passesBy(points, distances, metres)) {
+    for (const distance of passesBy(points, distances, projected[geometry.length + k])) {
       add('poi', distance, seasonal ? text.cueSeasonal(label) : label);
     }
-  }
+  });
   along.sort((a, b) => a.distance - b.distance);
 
   const cues: Cue[] = [{ kind: 'start', distance: 0, text: text.cueStart }];
