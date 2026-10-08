@@ -199,6 +199,7 @@ describe('StartPointMap', () => {
       expect(drawn).toHaveLength(2);
       expect(map().layers.map(({ id }) => id)).toEqual([
         'background',
+        'routes-others',
         'routes-casing',
         'routes-line',
         'routes-marking',
@@ -564,6 +565,7 @@ describe('StartPointMap', () => {
 
       expect(map().layers.map(({ id }) => id)).toEqual([
         'background',
+        'routes-others',
         'routes-casing',
         'routes-line',
         'routes-marking',
@@ -653,6 +655,15 @@ describe('StartPointMap', () => {
         expect(labelled('route-badges').map(({ properties }) => [properties.tag, properties.textColor])).toEqual([
           ['route-tag', '#1c1d1b'],
           ['route-tag-1', '#ffffff'],
+        ]);
+      });
+
+      it('fills every tag in its route colour while none is selected', () => {
+        renderRoutes({ routes: [out, out], summaries: [...summaries, { distance: 12.5 }] });
+
+        expect(labelled('route-badges').map(({ properties }) => properties.tag)).toEqual([
+          'route-tag-0',
+          'route-tag-1',
         ]);
       });
 

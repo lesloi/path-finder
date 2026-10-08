@@ -274,6 +274,15 @@ export function StartPointMap({
       map.addSource('routes', { type: 'geojson', data: emptyRoutes });
       // The selected route has a white casing and a dashed white marking along its line, and its own colour;
       // the others are one thin grey line, so the eye goes to the one the user looks at.
+      // The others come first, so that where they cross the selected route they pass under its casing.
+      map.addLayer({
+        id: 'routes-others',
+        type: 'line',
+        source: 'routes',
+        filter: ['!=', ['get', 'selected'], true],
+        layout: line,
+        paint: { 'line-color': ['get', 'color'], 'line-width': 2.5, 'line-opacity': 0.85 },
+      });
       map.addLayer({
         id: 'routes-casing',
         type: 'line',
@@ -286,12 +295,9 @@ export function StartPointMap({
         id: 'routes-line',
         type: 'line',
         source: 'routes',
+        filter: ['==', ['get', 'selected'], true],
         layout: line,
-        paint: {
-          'line-color': ['get', 'color'],
-          'line-width': ['case', ['get', 'selected'], 6, 2.5],
-          'line-opacity': ['case', ['get', 'selected'], 1, 0.85],
-        },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 6 },
       });
       map.addLayer({
         id: 'routes-marking',
@@ -464,13 +470,15 @@ export function StartPointMap({
           const label = summary ? [formatDistance(summary.distance, display)] : [];
           if (summary?.elevationGain !== undefined) label.push(`+${formatHeight(summary.elevationGain, display)}`);
           const selected = index === selectedRoute;
+          // As for the lines, with none selected every tag keeps its route's colour.
+          const filled = selected || selectedRoute === undefined;
           return {
             type: 'Feature' as const,
             geometry: point(anchor),
             properties: {
               label: label.join('\n'),
-              tag: selected ? routeTagId(index) : ROUTE_TAG_MUTED,
-              textColor: selected ? MAP_COLORS.white : MAP_INK,
+              tag: filled ? routeTagId(index) : ROUTE_TAG_MUTED,
+              textColor: filled ? MAP_COLORS.white : MAP_INK,
               priority: selected ? 0 : 1,
             },
           };
@@ -492,7 +500,6 @@ export function StartPointMap({
                 // A multiple of ten, then of five, keeps its place when markers crowd.
                 properties: {
                   label: String(label),
-                  color: routeColor(selectedRoute!),
                   priority: label % 10 === 0 ? 0 : label % 5 === 0 ? 1 : 2,
                 },
               };
