@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 
 import { expectNamedControls } from '../accessible-names.ts';
-import type { Route, RouteSetRequest } from '../core/index.ts';
+import type { Route } from '../core/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
 import { RouteSetView } from './route-set-view.tsx';
 
@@ -41,15 +41,6 @@ const suggestion = route({
   misses: [{ criterion: 'elevationGain', gap: 120 }],
 });
 const routes = [route(), suggestion, route({ distance: 10.5, elevationGain: 80 })];
-const request: RouteSetRequest = {
-  start: [6.1294, 45.8992],
-  target: { distance: 10 },
-  elevationGain: 400,
-  surface: 'any',
-  pace: 6,
-  includeTechnical: false,
-};
-
 const onDesktop = () =>
   vi
     .spyOn(window, 'matchMedia')
@@ -63,6 +54,7 @@ function View({
   units = 'metric',
   list = routes,
   onSelect = () => {},
+  onPreview,
   onBack = () => {},
   onHover = () => {},
   onPaceChange,
@@ -74,6 +66,7 @@ function View({
   units?: 'metric' | 'imperial';
   list?: Route[];
   onSelect?: (index: number) => void;
+  onPreview?: (index: number | undefined) => void;
   onBack?: () => void;
   onHover?: (position: unknown) => void;
   onPaceChange?: (pace: number) => void;
@@ -86,7 +79,6 @@ function View({
   return (
     <RouteSetView
       display={{ units, language }}
-      request={request}
       routes={list}
       pace={pace}
       selected={selected}
@@ -95,6 +87,7 @@ function View({
         setSelected(index);
         onSelect(index);
       }}
+      onPreview={onPreview}
       onDetailChange={setDetail}
       onPaceChange={onPaceChange}
       onBack={onBack}
@@ -211,34 +204,42 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('routes-row-0-miss-elevationGain')).toBeInTheDocument();
     });
 
-    it('selects the route of a row the pointer or the focus reaches', () => {
+    it('previews the route of a row the pointer or the focus reaches on desktops, without selecting it', () => {
       onDesktop();
-      const onSelect = vi.fn();
-      render(<View onSelect={onSelect} />);
+      const [onSelect, onPreview] = [vi.fn(), vi.fn()];
+      render(<View onSelect={onSelect} onPreview={onPreview} />);
 
       fireEvent.mouseEnter(screen.getByTestId('routes-row-1'));
+      fireEvent.mouseLeave(screen.getByTestId('routes-row-1'));
       fireEvent.focus(screen.getByTestId('routes-row-2'));
+      fireEvent.blur(screen.getByTestId('routes-row-2'));
 
-      expect(onSelect.mock.calls).toEqual([[1], [2]]);
-    });
-
-    it('leaves the selection to the focus on phones, where the pointer is a finger', () => {
-      const onSelect = vi.fn();
-      render(<View onSelect={onSelect} />);
-
-      fireEvent.mouseEnter(screen.getByTestId('routes-row-1'));
-
+      expect(onPreview.mock.calls).toEqual([[1], [undefined], [2], [undefined]]);
       expect(onSelect).not.toHaveBeenCalled();
     });
 
-    it('highlights the selected row', () => {
+    it('selects the route of a row that is clicked on desktops, and keeps the list', () => {
       onDesktop();
-      render(<View />);
+      const onSelect = vi.fn();
+      render(<View onSelect={onSelect} />);
 
-      fireEvent.mouseEnter(screen.getByTestId('routes-row-1'));
+      fireEvent.click(screen.getByTestId('routes-row-1'));
 
+      expect(onSelect).toHaveBeenCalledExactlyOnceWith(1);
       expect(screen.getByTestId('routes-row-1')).toHaveAttribute('data-selected');
       expect(screen.getByTestId('routes-row-0')).not.toHaveAttribute('data-selected');
+      expect(screen.getByTestId('routes-list')).toBeInTheDocument();
+    });
+
+    it('selects the route of a row the focus reaches on phones, where the pointer is a finger', () => {
+      const onSelect = vi.fn();
+      render(<View onSelect={onSelect} />);
+
+      fireEvent.mouseEnter(screen.getByTestId('routes-row-1'));
+      expect(onSelect).not.toHaveBeenCalled();
+      fireEvent.focus(screen.getByTestId('routes-row-2'));
+
+      expect(onSelect).toHaveBeenCalledExactlyOnceWith(2);
     });
 
     it('goes back to the criteria', () => {
@@ -250,23 +251,20 @@ describe('RouteSetView', () => {
       expect(onBack).toHaveBeenCalled();
     });
 
-    it('shows no summary of the criteria on phones', () => {
+    it('has no way back and no summary on desktops, which show the criteria beside the list', () => {
+      onDesktop();
       render(<View />);
 
+      expect(screen.queryByTestId('routes-back')).not.toBeInTheDocument();
       expect(screen.queryByTestId('routes-summary')).not.toBeInTheDocument();
     });
 
-    it('summarises the criteria on desktops, with an icon to change them', () => {
+    it('keeps to the list on desktops whatever the detail, which the dock shows', () => {
       onDesktop();
-      const onBack = vi.fn();
-      render(<View onBack={onBack} />);
+      render(<View open />);
 
-      const summary = '10.0 km · 400 m';
-      expect(screen.getByTestId('routes-summary')).toHaveTextContent(summary);
-      expect(screen.getByTestId('routes-change')).toHaveAccessibleName(routesText.en.changeCriteria(summary));
-
-      fireEvent.click(screen.getByTestId('routes-change'));
-      expect(onBack).toHaveBeenCalled();
+      expect(screen.getByTestId('routes-list')).toBeInTheDocument();
+      expect(screen.queryByTestId('route-detail')).not.toBeInTheDocument();
     });
 
     it('says the pace the durations are estimated at, and changes it where it shows', () => {
@@ -453,7 +451,7 @@ describe('RouteSetView', () => {
         expect(screen.getByTestId('route-position')).toHaveTextContent('1/3');
       });
 
-      it('ignores a drag of the mouse, which desktops leave to the arrow buttons', () => {
+      it('ignores a drag of the mouse', () => {
         open();
         const detail = screen.getByTestId('route-detail');
 
@@ -480,21 +478,6 @@ describe('RouteSetView', () => {
         expect(screen.queryByTestId('route-next')).not.toBeInTheDocument();
       });
 
-      it('shows arrow buttons on desktops, hiding the one with nowhere to go', () => {
-        onDesktop();
-        open();
-        expect(screen.queryByTestId('route-previous')).not.toBeInTheDocument();
-
-        fireEvent.click(screen.getByTestId('route-next'));
-        expect(screen.getByTestId('route-position')).toHaveTextContent('2/3');
-        expect(screen.getByTestId('route-previous')).toHaveAccessibleName(en.previous);
-
-        fireEvent.click(screen.getByTestId('route-next'));
-        expect(screen.queryByTestId('route-next')).not.toBeInTheDocument();
-        fireEvent.click(screen.getByTestId('route-previous'));
-        expect(screen.getByTestId('route-position')).toHaveTextContent('2/3');
-      });
-
       it('tells the selected route to the map', () => {
         const onSelect = vi.fn();
         render(<View open onSelect={onSelect} />);
@@ -519,17 +502,6 @@ describe('RouteSetView', () => {
         expect(gpx).toContain('<trkpt');
         expect(gpx).toContain('OpenStreetMap');
       });
-    });
-
-    it('shows the thumbnail beside the figures on phones only', () => {
-      const { unmount } = render(<View open />);
-      expect(screen.getByTestId('route-thumbnail')).toBeInTheDocument();
-      unmount();
-
-      onDesktop();
-      render(<View open />);
-
-      expect(screen.queryByTestId('route-thumbnail')).not.toBeInTheDocument();
     });
   });
 

@@ -21,6 +21,8 @@ export class Map {
   controls: unknown[] = [];
   easedTo?: unknown;
   fitted?: { bounds: unknown; options: unknown };
+  /** How many times the map was asked to fit bounds. */
+  fits = 0;
   sources: Record<string, GeoJSONSource> = {};
   layers: { id: string }[] = [];
   canvas = {
@@ -107,8 +109,14 @@ export class Map {
   addLayer(layer: { id: string }) {
     this.layers.push(layer);
   }
+  /** What the map finds under a point: tests put a route there to tell a click on it from one on the background. */
+  rendered: unknown[] = [];
+  queryRenderedFeatures() {
+    return this.rendered;
+  }
   fitBounds(bounds: unknown, options: unknown) {
     this.fitted = { bounds, options };
+    this.fits++;
   }
   addControl(control: unknown) {
     this.controls.push(control);

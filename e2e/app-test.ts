@@ -34,16 +34,21 @@ test.describe('the app', () => {
     await expect(page.locator('html')).not.toHaveAttribute('data-geolocation');
   });
 
-  test('keeps the map background picked from the button over the map across a reload', async ({ page }) => {
+  test('keeps the map background picked from the button over the map across a reload', async ({ page, isMobile }) => {
     await openMap(page);
 
-    // The button floats right over the location button.
+    // The button floats right over the location button on phones, and beside it on desktops.
     const [basemap, locate] = await Promise.all([
       page.getByTestId('criteria-basemap').boundingBox(),
       page.getByTestId('criteria-locate').boundingBox(),
     ]);
-    expect(basemap!.y + basemap!.height).toBeLessThanOrEqual(locate!.y);
-    expect(Math.abs(basemap!.x - locate!.x)).toBeLessThan(1);
+    if (isMobile) {
+      expect(basemap!.y + basemap!.height).toBeLessThanOrEqual(locate!.y);
+      expect(Math.abs(basemap!.x - locate!.x)).toBeLessThan(1);
+    } else {
+      expect(basemap!.x + basemap!.width).toBeLessThanOrEqual(locate!.x);
+      expect(Math.abs(basemap!.y - locate!.y)).toBeLessThan(1);
+    }
 
     await page.getByTestId('criteria-basemap').click();
     await page.getByTestId('criteria-basemap-minimal').click();

@@ -1,34 +1,28 @@
 import {
-  ArrowDownRight,
   ArrowLeft,
   ArrowUpRight,
-  ChevronLeft,
   ChevronRight,
   Clock,
   Download,
   Mountain,
   Ruler,
-  SlidersHorizontal,
   Timer,
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
-import { useRef, type PointerEvent, type ReactNode } from 'react';
+import { useRef, type PointerEvent } from 'react';
 
 import type { Miss } from '../contract/index.ts';
 import {
   ElevationProfile,
-  ICON_BUTTON,
   PRIMARY_BUTTON,
   ProfileSparkline,
   routeBorder,
   RouteThumbnail,
-  SURFACE_CLASSES,
   SurfaceBar,
   useDesktop,
 } from '../components/index.ts';
 import {
-  criteriaSummary,
   formatDistance,
   formatDuration,
   formatHeight,
@@ -38,21 +32,14 @@ import {
   type Position,
   type MapSnapshot,
   type Route,
-  type RouteSetRequest,
   type Display,
 } from '../core/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
+import { RouteFigures, SurfaceShare, surfaceShares } from './route-figures.tsx';
 import { RoutePace } from './route-pace.tsx';
 
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
-
-/** The unpaved share of a route, kept within 0 and 1, and the paved and unpaved shares as percentages. */
-function surfaceShares({ unpavedShare }: Route, { language }: Display) {
-  const unpaved = Math.min(1, Math.max(0, unpavedShare));
-  const percent = new Intl.NumberFormat(language, { style: 'percent' });
-  return { unpaved: percent.format(unpaved), paved: percent.format(1 - unpaved), unpavedShare: unpaved };
-}
 
 const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp } satisfies Record<
   Miss['criterion'],
@@ -63,20 +50,21 @@ const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp
 const words = ({ language }: Display) => ({ ...criteriaText[language], ...routesText[language] });
 
 /**
- * The route set the user asked for: first a list of its routes, then the detail of one, which
- * swipes (or the arrow buttons on desktops) to the next. `onSelect` hears the route shown in the
- * list or the detail, `onHover` a place the user points at on the elevation profile. The durations of the
- * routes are at `pace`; `onPaceChange`, when given, lets the user change it in the list.
+ * The route set the user asked for. On phones, first a list of its routes, then the detail of one, which swipes
+ * to the next. On desktops, the list alone: the route selected has its detail in the dock (`RouteDock`), and
+ * pointing at a row only previews its route. `onSelect` hears the route shown in the list or the detail,
+ * `onHover` a place the user points at on the elevation profile. The durations of the routes are at `pace`;
+ * `onPaceChange`, when given, lets the user change it in the list.
  */
 export function RouteSetView({
   display,
-  request,
   routes,
   pace,
   snapshot,
   selected,
   detail,
   onSelect,
+  onPreview,
   onDetailChange,
   onPaceChange,
   onBack,
@@ -84,21 +72,22 @@ export function RouteSetView({
   condensed = false,
 }: {
   display: Display;
-  /** The criteria the routes were generated for. */
-  request: RouteSetRequest;
   routes: Route[];
   /** Minutes per km, which the durations of the routes are estimated at. */
   pace: number;
   /** What the map showed for these routes, to draw their thumbnails over. */
   snapshot?: MapSnapshot;
-  selected: number;
-  /** Whether the detail of the selected route is shown rather than the list. */
+  /** Undefined while the user has picked none, as on a desktop at first. */
+  selected?: number;
+  /** Whether the detail of the selected route is shown rather than the list. Phones only. */
   detail: boolean;
   onSelect: (index: number) => void;
+  /** On desktops, the row the pointer or the focus is on, or none once it leaves. */
+  onPreview?: (index: number | undefined) => void;
   onDetailChange: (detail: boolean) => void;
   /** Absent when the pace cannot change the routes' durations alone, such as by duration. */
   onPaceChange?: (pace: number) => void;
-  /** Back to the criteria. */
+  /** Back to the criteria. Phones only: a desktop shows them beside the list. */
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
   /** On a phone with its sheet collapsed, the detail stops at the figures: the rest is for the expanded sheet. */
@@ -106,14 +95,13 @@ export function RouteSetView({
 }) {
   const desktop = useDesktop();
 
-  if (detail) {
+  if (detail && !desktop) {
     return (
       <RouteDetail
         display={display}
         routes={routes}
         snapshot={snapshot}
-        selected={selected}
-        desktop={desktop}
+        selected={selected ?? 0}
         onSelect={onSelect}
         onBack={() => onDetailChange(false)}
         onHover={onHover}
@@ -123,36 +111,22 @@ export function RouteSetView({
   }
 
   const t = words(display);
-  const summary = criteriaSummary(request, display);
   return (
     <>
       <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          data-testid="routes-back"
-          className="flex min-h-touch items-center gap-1 rounded-full pr-3 text-accent"
-          onClick={onBack}
-        >
-          <ArrowLeft size={18} aria-hidden />
-          {t.criteria}
-        </button>
-        <strong data-testid="routes-count">{t.routeCount(routes.length)}</strong>
-      </div>
-      {desktop && (
-        <div data-testid="routes-summary" className="flex items-center gap-1 rounded-md bg-surface-2 pr-3 text-sm">
-          {/* What the routes were asked for, with a way to change it. */}
+        {!desktop && (
           <button
             type="button"
-            data-testid="routes-change"
-            className={ICON_BUTTON}
-            aria-label={t.changeCriteria(summary)}
+            data-testid="routes-back"
+            className="flex min-h-touch items-center gap-1 rounded-full pr-3 text-accent"
             onClick={onBack}
           >
-            <SlidersHorizontal size={16} aria-hidden />
+            <ArrowLeft size={18} aria-hidden />
+            {t.criteria}
           </button>
-          <span className="min-w-0 flex-1 truncate">{summary}</span>
-        </div>
-      )}
+        )}
+        <strong data-testid="routes-count">{t.routeCount(routes.length)}</strong>
+      </div>
       <RoutePace display={display} pace={pace} onChange={onPaceChange} />
       <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
         {routes.map((route, index) => (
@@ -167,9 +141,11 @@ export function RouteSetView({
               desktop={desktop}
               onOpen={() => {
                 onSelect(index);
-                onDetailChange(true);
+                if (!desktop) onDetailChange(true);
               }}
-              onPreview={() => onSelect(index)}
+              // A tap on a phone opens the route; a desktop only previews it, until a click selects it.
+              onPreview={() => (desktop ? onPreview?.(index) : onSelect(index))}
+              onPreviewEnd={desktop ? () => onPreview?.(undefined) : undefined}
             />
           </li>
         ))}
@@ -188,6 +164,7 @@ function RouteRow({
   desktop,
   onOpen,
   onPreview,
+  onPreviewEnd,
 }: {
   route: Route;
   snapshot?: MapSnapshot;
@@ -199,6 +176,8 @@ function RouteRow({
   onOpen: () => void;
   /** The pointer or the focus is on the row: its route is the one the map highlights. */
   onPreview: () => void;
+  /** The pointer or the focus left the row. */
+  onPreviewEnd?: (() => void) | undefined;
 }) {
   const t = words(display);
   const distance = formatDistance(route.distance, display);
@@ -229,7 +208,9 @@ function RouteRow({
       onClick={onOpen}
       // Hovering is for desktops: a tap on a phone opens the route.
       onMouseEnter={desktop ? onPreview : undefined}
+      onMouseLeave={onPreviewEnd}
       onFocus={onPreview}
+      onBlur={onPreviewEnd}
     >
       <span className="flex w-full items-center gap-3">
         <RouteThumbnail geometry={route.geometry} index={index} {...(snapshot && { snapshot })} />
@@ -282,7 +263,6 @@ function RouteDetail({
   routes,
   snapshot,
   selected,
-  desktop,
   onSelect,
   onBack,
   onHover,
@@ -292,7 +272,6 @@ function RouteDetail({
   routes: Route[];
   snapshot?: MapSnapshot;
   selected: number;
-  desktop: boolean;
   condensed: boolean;
   onSelect: (index: number) => void;
   onBack: () => void;
@@ -303,7 +282,6 @@ function RouteDetail({
   const swipeFrom = useRef<[number, number]>(undefined);
   const hasPrevious = selected > 0;
   const hasNext = selected < routes.length - 1;
-  const shares = surfaceShares(route, display);
 
   function swipeEnd(event: PointerEvent) {
     if (!swipeFrom.current) return;
@@ -316,33 +294,12 @@ function RouteDetail({
     if (dx > 0 && hasPrevious) onSelect(selected - 1);
   }
 
-  const figures = (
-    <dl className="m-0 grid flex-1 grid-cols-2 gap-x-4 gap-y-2" data-testid="route-figures">
-      <Figure label={t.distance} testId="route-distance">
-        {formatDistance(route.distance, display)}
-      </Figure>
-      <Figure label={t.estimatedDuration} testId="route-duration">
-        {formatDuration(route.estimatedDuration, display.language)}
-      </Figure>
-      {route.elevationGain !== undefined && (
-        <Figure label={t.climb} testId="route-climb" icon={<ArrowUpRight size={16} aria-hidden />}>
-          {formatHeight(route.elevationGain, display)}
-        </Figure>
-      )}
-      {route.elevationLoss !== undefined && (
-        <Figure label={t.descent} testId="route-descent" icon={<ArrowDownRight size={16} aria-hidden />}>
-          {formatHeight(route.elevationLoss, display)}
-        </Figure>
-      )}
-    </dl>
-  );
-
   return (
     <div
       data-testid="route-detail"
       // Vertical moves stay the panel's own, to scroll it.
       className="flex touch-pan-y flex-col gap-3"
-      // A finger swipes; on desktops, the arrow buttons move between routes.
+      // A finger swipes between the routes.
       onPointerDown={(event) => {
         if (event.pointerType !== 'mouse') swipeFrom.current = [event.clientX, event.clientY];
       }}
@@ -359,44 +316,18 @@ function RouteDetail({
           <ArrowLeft size={18} aria-hidden />
           {t.routes}
         </button>
-        <div className="flex items-center">
-          {desktop && hasPrevious && (
-            <button
-              type="button"
-              data-testid="route-previous"
-              className={ICON_BUTTON}
-              aria-label={t.previous}
-              onClick={() => onSelect(selected - 1)}
-            >
-              <ChevronLeft size={20} aria-hidden />
-            </button>
-          )}
-          <strong data-testid="route-position" aria-label={t.route(selected + 1, routes.length)}>
-            {selected + 1}/{routes.length}
-          </strong>
-          {desktop && hasNext && (
-            <button
-              type="button"
-              data-testid="route-next"
-              className={ICON_BUTTON}
-              aria-label={t.next}
-              onClick={() => onSelect(selected + 1)}
-            >
-              <ChevronRight size={20} aria-hidden />
-            </button>
-          )}
-        </div>
+        <strong data-testid="route-position" aria-label={t.route(selected + 1, routes.length)}>
+          {selected + 1}/{routes.length}
+        </strong>
       </div>
       <div className="flex items-center gap-3">
-        {!desktop && (
-          <RouteThumbnail
-            testId="route-thumbnail"
-            geometry={route.geometry}
-            index={selected}
-            {...(snapshot && { snapshot })}
-          />
-        )}
-        {figures}
+        <RouteThumbnail
+          testId="route-thumbnail"
+          geometry={route.geometry}
+          index={selected}
+          {...(snapshot && { snapshot })}
+        />
+        <RouteFigures route={route} display={display} />
       </div>
       {route.misses.length > 0 && (
         <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -408,14 +339,7 @@ function RouteDetail({
       {!condensed && (
         <>
           <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
-          {/* The legend of the colours of the profile. */}
-          <p data-testid="route-surface" className="m-0 flex items-center gap-1 text-sm text-ink-2">
-            <i className={`size-2 rounded-full ${SURFACE_CLASSES.paved.dot}`} aria-hidden />
-            {t.paved} {shares.paved}
-            <span className="whitespace-pre"> · </span>
-            <i className={`size-2 rounded-full ${SURFACE_CLASSES.unpaved.dot}`} aria-hidden />
-            {t.unpaved} {shares.unpaved}
-          </p>
+          <SurfaceShare route={route} display={display} />
           <button
             type="button"
             data-testid="route-export"
@@ -428,28 +352,6 @@ function RouteDetail({
           </button>
         </>
       )}
-    </div>
-  );
-}
-
-function Figure({
-  label,
-  icon,
-  testId,
-  children,
-}: {
-  label: string;
-  icon?: ReactNode;
-  testId: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col-reverse">
-      <dt className="text-sm text-ink-2">{label}</dt>
-      <dd data-testid={testId} className="m-0 flex items-center gap-1 text-lg font-bold">
-        {icon}
-        {children}
-      </dd>
     </div>
   );
 }

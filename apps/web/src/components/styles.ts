@@ -9,12 +9,23 @@ export const FLOATING_BUTTON =
 /** A round button with an icon alone, on a surface. */
 export const ICON_BUTTON = 'grid size-touch flex-none place-items-center rounded-full text-ink hover:bg-surface-2';
 
+// A desktop panel floating over the map, as tall as its content, within the screen. One string for each height:
+// Tailwind finds a class only when it is written whole.
+const PANEL = 'fixed z-4 flex flex-col overflow-hidden rounded-md bg-surface shadow-float ';
+
 /** The desktop panel floating over the left of the map. */
-export const SIDE_COLUMN =
-  // As tall as its content, within the screen.
-  'fixed top-safe-3 left-safe-3 z-4 flex w-column flex-col overflow-hidden rounded-md bg-surface shadow-float ' +
-  // One string: Tailwind finds a class only when it is written whole.
-  'max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-(--spacing(6)))]';
+export const SIDE_COLUMN = `${PANEL}top-safe-3 left-safe-3 w-column max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-(--spacing(6)))]`;
+
+/** The desktop panel floating over the right of the map, above the dock: the routes found. */
+export const LIST_COLUMN =
+  // Under the settings button, and over the row of buttons at the bottom right.
+  `${PANEL}top-[calc(env(safe-area-inset-top)+--spacing(6)+var(--spacing-touch))] right-safe-3 w-list ` +
+  'max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-var(--dock-inset)-(--spacing(6))-var(--spacing-touch)-(--spacing(3))-(--spacing(6))-var(--spacing-touch)-(--spacing(3)))]';
+
+/** The desktop panel along the bottom of the map, from the left column to the edge: the route selected. */
+export const DOCK =
+  'fixed right-safe-3 bottom-safe-3 left-[calc(var(--column-inset)+--spacing(3))] z-4 flex h-dock rounded-md ' +
+  'bg-surface shadow-float';
 
 /** The title of a group of list rows. */
 export const GROUP_TITLE = 'mt-6 mb-2 text-sm font-semibold text-ink-2 first:mt-2';
@@ -34,7 +45,7 @@ export const LIST_ROW_CHEVRON = 'flex-none text-ink-2';
 export const TOAST =
   'fixed top-[calc(env(safe-area-inset-top)+--spacing(3)+var(--spacing-touch)+--spacing(2))] left-1/2 z-9 ' +
   'w-max max-w-[calc(100vw-2*--spacing(4))] -translate-x-1/2 cursor-pointer rounded-md bg-surface px-4 py-2 text-sm ' +
-  'text-ink shadow-float desktop:left-(--map-centre) desktop:max-w-[calc(100vw-var(--spacing-column)-3*--spacing(4))]';
+  'text-ink shadow-float desktop:left-(--map-centre) desktop:max-w-[calc(100vw-var(--spacing-column)-var(--list-inset)-3*--spacing(4))]';
 
 /** Long text: headings, paragraphs, lists, and links, as on the legal pages. */
 export const PROSE =

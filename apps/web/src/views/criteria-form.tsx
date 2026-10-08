@@ -129,6 +129,66 @@ export function useCriteriaDraft(language: Language): [Draft, (draft: Draft) => 
 }
 
 /**
+ * The request the draft asks for, with the values in the API's units, or none without a start point. Both the
+ * form and the view that compares it with the routes found build it here.
+ */
+export function criteriaRequest(
+  draft: Draft,
+  { units, pace, start }: { units: Units; pace: number; start?: Position },
+): RouteSetRequest | undefined {
+  const bounds = boundsFor(units);
+  const unit = unitsFor(units);
+  const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
+  const gain = clamp(draft.gain, 0, bounds.gain.max);
+  const level = draft.level;
+  // A paved request always excludes technical stretches, whatever was kept: the stored value is not touched.
+  const allowed = draft.surface !== 'paved' && draft.includeTechnical;
+  return (
+    start && {
+      start,
+      target:
+        draft.target === 'distance'
+          ? { distance: round(distance * unit.kmPerDistanceUnit, 2) }
+          : { duration: draft.duration },
+      ...(level === 'target' && { elevationGain: Math.round(gain * unit.metresPerGainUnit) }),
+      ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
+      surface: draft.surface,
+      pace,
+      includeTechnical: allowed,
+    }
+  );
+}
+
+/**
+ * Whether `request` asks for something other than `found`, the request of the routes shown. A distance or an
+ * elevation gain within half a step of the slider is the same one worded in other units (6 mi is 9.66 km, which
+ * a slider in km rounds to 10), and the pace of a distance only changes the durations, on the spot.
+ */
+export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest, units: Units): boolean {
+  const unit = unitsFor(units);
+  const within = (a: number, b: number, tolerance: number) => Math.abs(a - b) <= tolerance;
+  const [a, b] = [request.target, found.target];
+  const sameTarget =
+    'distance' in a && 'distance' in b
+      ? within(a.distance, b.distance, unit.kmPerDistanceUnit / 2)
+      : 'duration' in a && 'duration' in b && a.duration === b.duration;
+  const [gainA, gainB] = [request.elevationGain, found.elevationGain];
+  const sameGain =
+    typeof gainA === 'number' && typeof gainB === 'number'
+      ? within(gainA, gainB, (unit.metresPerGainUnit * unit.gainStep) / 2)
+      : gainA === gainB;
+  return !(
+    sameTarget &&
+    sameGain &&
+    request.start[0] === found.start[0] &&
+    request.start[1] === found.start[1] &&
+    request.surface === found.surface &&
+    request.includeTechnical === found.includeTechnical &&
+    ('distance' in b || request.pace === found.pace)
+  );
+}
+
+/**
  * The criteria of a route set: target distance or duration, surface, and elevation gain,
  * over the user's settings. `onSubmit` receives a request body that `parseCriteria`
  * accepts. On a phone, `compact` shows chips that each open one criterion.
@@ -168,18 +228,7 @@ export function CriteriaForm({
   const allowed = technicalApplies && draft.includeTechnical;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
-  const request: RouteSetRequest | undefined = start && {
-    start,
-    target:
-      draft.target === 'distance'
-        ? { distance: round(distance * unit.kmPerDistanceUnit, 2) }
-        : { duration: draft.duration },
-    ...(level === 'target' && { elevationGain: Math.round(gain * unit.metresPerGainUnit) }),
-    ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
-    surface: draft.surface,
-    pace: settings.pace,
-    includeTechnical: allowed,
-  };
+  const request = criteriaRequest(draft, { units, pace: settings.pace, start });
   const field = request && invalidField(request);
 
   const sections: Record<Criterion, { title: string; content: ReactNode }> = {
@@ -382,7 +431,7 @@ export function CriteriaForm({
 }
 
 // The first field `parseCriteria` rejects, as the API would.
-function invalidField(request: RouteSetRequest): CriteriaField | undefined {
+export function invalidField(request: RouteSetRequest): CriteriaField | undefined {
   try {
     parseCriteria(request);
   } catch (error) {
