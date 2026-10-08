@@ -1,5 +1,7 @@
 export * from './basemap.ts';
+export * from './carousel.ts';
 export * from './coordinates.ts';
+export * from './criteria-summary.ts';
 export * from './gpx.ts';
 export * from './gpx-save.ts';
 export * from './pace.ts';

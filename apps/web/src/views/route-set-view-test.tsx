@@ -55,24 +55,20 @@ function View({
   list = routes,
   onSelect = () => {},
   onPreview,
-  onBack = () => {},
   onHover = () => {},
   onPaceChange,
   pace = 6,
   open = false,
-  condensed = false,
 }: {
   language?: 'en' | 'fr';
   units?: 'metric' | 'imperial';
   list?: Route[];
   onSelect?: (index: number) => void;
   onPreview?: (index: number | undefined) => void;
-  onBack?: () => void;
   onHover?: (position: unknown) => void;
   onPaceChange?: (pace: number) => void;
   pace?: number;
   open?: boolean;
-  condensed?: boolean;
 }) {
   const [selected, setSelected] = useState(0);
   const [detail, setDetail] = useState(open);
@@ -90,9 +86,7 @@ function View({
       onPreview={onPreview}
       onDetailChange={setDetail}
       onPaceChange={onPaceChange}
-      onBack={onBack}
       onHover={onHover}
-      condensed={condensed}
     />
   );
 }
@@ -242,21 +236,30 @@ describe('RouteSetView', () => {
       expect(onSelect).toHaveBeenCalledExactlyOnceWith(2);
     });
 
-    it('goes back to the criteria', () => {
-      const onBack = vi.fn();
-      render(<View onBack={onBack} />);
+    it('says which route is in the middle of the carousel on phones, and not in the list of a desktop', () => {
+      const { unmount } = render(<View />);
+      expect(screen.getByTestId('routes-position')).toHaveTextContent('1/3');
+      expect(screen.getByTestId('routes-position')).toHaveAccessibleName('Route 1 of 3');
 
-      fireEvent.click(screen.getByTestId('routes-back'));
+      fireEvent.focus(screen.getByTestId('routes-row-2'));
+      expect(screen.getByTestId('routes-position')).toHaveTextContent('3/3');
 
-      expect(onBack).toHaveBeenCalled();
-    });
-
-    it('has no way back and no summary on desktops, which show the criteria beside the list', () => {
+      unmount();
       onDesktop();
       render(<View />);
+      expect(screen.queryByTestId('routes-position')).not.toBeInTheDocument();
+    });
 
-      expect(screen.queryByTestId('routes-back')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('routes-summary')).not.toBeInTheDocument();
+    it('brings the card of a route to the middle on a tap, and opens its detail on a tap once it is there', () => {
+      const onSelect = vi.fn();
+      render(<View onSelect={onSelect} />);
+
+      fireEvent.click(screen.getByTestId('routes-row-1'));
+      expect(onSelect).toHaveBeenCalledExactlyOnceWith(1);
+      expect(screen.queryByTestId('route-detail')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('routes-row-1'));
+      expect(screen.getByTestId('route-detail')).toBeInTheDocument();
     });
 
     it('keeps to the list on desktops whatever the detail, which the dock shows', () => {
@@ -322,9 +325,10 @@ describe('RouteSetView', () => {
       for (let k = 0; k < index; k++) swipe([200, 100], [100, 100]);
     };
 
-    it('opens from a row, for that route', () => {
+    it('opens from the card in the middle, for that route', () => {
       render(<View />);
 
+      fireEvent.click(screen.getByTestId('routes-row-1'));
       fireEvent.click(screen.getByTestId('routes-row-1'));
 
       expect(screen.getByTestId('route-position')).toHaveTextContent('2/3');
@@ -376,15 +380,6 @@ describe('RouteSetView', () => {
         'route-descent',
       ]);
       expect(screen.getByTestId('route-figures')).toHaveTextContent(en.estimatedDuration);
-    });
-
-    it('stops at the figures when condensed, the export included', () => {
-      render(<View open condensed />);
-
-      expect(screen.getByTestId('route-figures')).toBeInTheDocument();
-      expect(screen.queryByTestId('route-export')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('route-profile')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('route-surface')).not.toBeInTheDocument();
     });
 
     it('shows the elevation profile, and the surface breakdown that colours it', () => {

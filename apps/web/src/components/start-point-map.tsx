@@ -51,15 +51,16 @@ const MIN_FRAME = 240;
 // A width that makes a thin route easy to tap.
 const HIT_WIDTH = 22;
 
-// What the desktop panels and their margins cover of the map, as `index.css` gives it: custom properties of the
-// stylesheet, read together from one probe.
+// What the panels and their margins cover of the map, as `index.css` gives it: custom properties of the
+// stylesheet, read together from one probe. The top is the bar a phone shows over the map.
 function reservedSpace() {
   const probe = document.createElement('div');
   probe.style.paddingTop = 'var(--dock-reserved)';
   probe.style.paddingRight = 'var(--list-reserved)';
   probe.style.paddingLeft = 'var(--column-inset)';
+  probe.style.paddingBottom = 'var(--top-reserved)';
   document.body.append(probe);
-  const { paddingTop, paddingRight, paddingLeft } = getComputedStyle(probe);
+  const { paddingTop, paddingRight, paddingLeft, paddingBottom } = getComputedStyle(probe);
   probe.remove();
   const read = (value: string, fallback: number) =>
     Number.isNaN(Number.parseFloat(value)) ? fallback : Number.parseFloat(value);
@@ -67,25 +68,27 @@ function reservedSpace() {
     dock: read(paddingTop, NO_ROOM),
     list: read(paddingRight, NO_ROOM),
     column: read(paddingLeft, NO_ROOM),
+    top: read(paddingBottom, NO_ROOM),
   };
-}
-
-// The height of the bottom sheet on phones, as the sheet writes it to `--sheet-height`.
-function sheetHeight() {
-  return Number.parseFloat(document.documentElement.style.getPropertyValue('--sheet-height')) || 0;
 }
 
 // The part of the map that stays free of the left column, the sheet and the controls, shrunk by half the size
 // of what is drawn there so that all of it stays inside.
-function freeArea(map: Map, desktop: boolean, [halfWidth, halfHeight]: [number, number]): PixelRect {
+function freeArea(
+  map: Map,
+  desktop: boolean,
+  sheetHeight: number,
+  [halfWidth, halfHeight]: [number, number],
+): PixelRect {
   const { clientWidth, clientHeight } = map.getCanvas();
-  // On desktops, the route list and the dock take the right and the bottom, shown or not.
-  const space = desktop ? reservedSpace() : { column: 0, list: 0, dock: 0 };
-  const sheet = desktop ? space.dock : sheetHeight();
+  // On desktops, the route list and the dock take the right and the bottom, shown or not; on phones, the bar takes
+  // the top and the sheet the bottom.
+  const space = reservedSpace();
+  const sheet = desktop ? space.dock : sheetHeight;
   return {
-    left: space.column + FRAME_MARGIN + halfWidth,
-    top: FRAME_MARGIN + halfHeight,
-    right: clientWidth - Math.max(CONTROLS_RIGHT, space.list) - halfWidth,
+    left: (desktop ? space.column : 0) + FRAME_MARGIN + halfWidth,
+    top: FRAME_MARGIN + (desktop ? 0 : space.top) + halfHeight,
+    right: clientWidth - Math.max(CONTROLS_RIGHT, desktop ? space.list : 0) - halfWidth,
     bottom: clientHeight - sheet - CONTROLS_BOTTOM - halfHeight,
   };
 }
@@ -147,6 +150,7 @@ function boundsOf(geometries: Position[][]): [Position, Position] {
  * `pickOnClick`. With `routes`, it draws each in its colour, the selected one thicker and on top, and
  * no longer sets the start point. It labels each route with its distance. Once the detail of one is open
  * (`framing` is `selected`), it draws only that route, and marks the distance along it.
+ * On phones, the part of the map the sheet (`sheetHeight`) and the bar leave free is where it frames.
  */
 export function StartPointMap({
   basemap = DEFAULT_BASEMAP,
@@ -159,6 +163,7 @@ export function StartPointMap({
   selectedRoute,
   markedRoute,
   framing = 'all',
+  sheetHeight = 0,
   hover,
   routesInteractive = true,
   onRouteSelect,
@@ -180,8 +185,13 @@ export function StartPointMap({
   selectedRoute?: number;
   /** The route that carries distance markers while the others stay drawn, such as the one selected on a desktop. */
   markedRoute?: number;
-  /** What the map frames and draws: all the routes, or only the selected one, once its detail is open. */
-  framing?: 'all' | 'selected';
+  /**
+   * What the map frames and draws: all the routes; the selected one, the others staying drawn (`follow`, such
+   * as the carousel of a phone); or only the selected one, once its detail is open.
+   */
+  framing?: 'all' | 'follow' | 'selected';
+  /** The height in px of the bottom sheet of a phone, which the routes are framed clear of. */
+  sheetHeight?: number;
   /** A place along the selected route, such as where the user points at its elevation profile. */
   hover?: Position;
   /**
@@ -485,7 +495,7 @@ export function StartPointMap({
     const detail = framing === 'selected';
     const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
     const project = ([lon, lat]: Position) => map.project([lon, lat]);
-    const tagArea = freeArea(map, desktop, TAG_HALF);
+    const tagArea = freeArea(map, desktop, sheetHeight, TAG_HALF);
     // One tag per route, until the detail of one is open and its markers say it better. It sits on the stretch
     // of its route that is in view, and a route with none in view has no tag.
     const badges = detail
@@ -520,7 +530,7 @@ export function StartPointMap({
     const summary = marked === undefined ? undefined : summaries?.[marked];
     const geometry = marked === undefined ? undefined : drawn[marked];
     const interval = summary && markerInterval(summary.distance / kilometres);
-    const markerArea = freeArea(map, desktop, [MARKER_HALF, MARKER_HALF]);
+    const markerArea = freeArea(map, desktop, sheetHeight, [MARKER_HALF, MARKER_HALF]);
     const markers =
       geometry && interval
         ? distanceMarkers(geometry, interval * kilometres)
@@ -556,11 +566,12 @@ export function StartPointMap({
     styleVersion,
     viewVersion,
     desktop,
+    sheetHeight,
   ]);
 
   // The routes, or the selected one, in the part of the map the panel leaves free. A new route set is framed north
   // up, as its snapshot maps places to pixels without a turn; framing it again keeps the user's orientation.
-  const framed = framing === 'selected' ? selectedRoute : undefined;
+  const framed = framing === 'all' ? undefined : selectedRoute;
   const taken = drawnFor === routes;
   // The snapshot is taken after the detail of a route was opened: the map goes on to the route.
   const followsSnapshot = framed !== undefined && taken;
@@ -568,11 +579,16 @@ export function StartPointMap({
   // Counts the asks to frame the routes again.
   const [reframes, setReframes] = useState(0);
   const frame = (bearing: number) => {
-    const sheet = sheetHeight();
     if (!desktop) {
+      const { top } = reservedSpace();
       return {
         bearing,
-        padding: { top: FRAME_MARGIN, right: FRAME_MARGIN, bottom: FRAME_MARGIN + sheet, left: FRAME_MARGIN },
+        padding: {
+          top: FRAME_MARGIN + top,
+          right: FRAME_MARGIN,
+          bottom: FRAME_MARGIN + sheetHeight,
+          left: FRAME_MARGIN,
+        },
       };
     }
     // The room is kept for the route list and the dock whether they are shown or not, so the map does not move
@@ -601,7 +617,7 @@ export function StartPointMap({
     else map.fitBounds(boundsOf(routes), { ...frame(0), animate: false });
     changeView({ movedAway: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `frame` reads `desktop`, a dependency
-  }, [loaded, routes, framed, desktop, followsSnapshot, reframes]);
+  }, [loaded, routes, framed, desktop, followsSnapshot, reframes, sheetHeight]);
 
   useEffect(() => {
     if (!hover) return;

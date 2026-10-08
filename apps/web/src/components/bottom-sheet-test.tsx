@@ -4,21 +4,17 @@ import { useState, type ReactNode } from 'react';
 
 import { BottomSheet } from './bottom-sheet.tsx';
 
-// A visual viewport that the on-screen keyboard shrinks.
-function keyboardViewport(height: number) {
-  const viewport = Object.assign(new EventTarget(), { height: window.innerHeight, offsetTop: 0 });
-  Object.defineProperty(window, 'visualViewport', { value: viewport, configurable: true });
-  return () => {
-    viewport.height = window.innerHeight - height;
-    viewport.dispatchEvent(new Event('resize'));
-  };
-}
-
 // The sheet as a view holds it, keeping whether it is expanded.
-function Sheet({ children }: { children?: ReactNode }) {
+function Sheet({ children, onHeightChange }: { children?: ReactNode; onHeightChange?: (height: number) => void }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <BottomSheet testId="sheet" label="Criteria" expanded={expanded} onExpandedChange={setExpanded}>
+    <BottomSheet
+      testId="sheet"
+      label="Route"
+      expanded={expanded}
+      onExpandedChange={setExpanded}
+      {...(onHeightChange && { onHeightChange })}
+    >
       {children}
     </BottomSheet>
   );
@@ -39,7 +35,7 @@ describe('BottomSheet', () => {
     render(<Sheet />);
     const handle = screen.getByTestId('sheet-handle');
     expect(handle).toHaveAttribute('aria-expanded', 'false');
-    expect(handle).toHaveAccessibleName('Criteria');
+    expect(handle).toHaveAccessibleName('Route');
 
     fireEvent.click(handle);
     expect(handle).toHaveAttribute('aria-expanded', 'true');
@@ -62,37 +58,46 @@ describe('BottomSheet', () => {
     expect(handle).toHaveAttribute('aria-expanded', expanded);
   });
 
-  describe('with an on-screen keyboard', () => {
+  it('has a handle that is only a mark when it cannot expand', () => {
+    render(<BottomSheet testId="sheet" label="Route" />);
+
+    expect(screen.queryByTestId('sheet-handle')).not.toBeInTheDocument();
+  });
+
+  describe('its height', () => {
+    const observed: { callback: ResizeObserverCallback }[] = [];
+    const observer = window.ResizeObserver;
+    beforeEach(() => {
+      window.ResizeObserver = class {
+        constructor(callback: ResizeObserverCallback) {
+          observed.push({ callback });
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      };
+    });
     afterEach(() => {
-      Reflect.deleteProperty(window, 'visualViewport');
+      window.ResizeObserver = observer;
+      observed.length = 0;
     });
-
-    it('rises above the keyboard while one of its fields has the focus', () => {
-      const openKeyboard = keyboardViewport(300);
-      render(
-        <Sheet>
-          <input data-testid="field" />
-        </Sheet>,
-      );
-      const field = screen.getByTestId('field');
-
-      field.focus();
-      act(openKeyboard);
-
-      expect(screen.getByTestId('sheet')).toHaveStyle({ bottom: '300px' });
-    });
-
-    it('stays at the bottom when the keyboard is for something else', () => {
-      const openKeyboard = keyboardViewport(300);
-      render(
-        <Sheet>
-          <input />
-        </Sheet>,
+    const resize = (blockSize: number) =>
+      act(() =>
+        observed[0]!.callback([{ borderBoxSize: [{ blockSize }] }] as unknown as ResizeObserverEntry[], {} as never),
       );
 
-      act(openKeyboard);
+    it('is told, and left to the page for the floating buttons', () => {
+      const onHeightChange = vi.fn();
+      const { unmount } = render(<Sheet onHeightChange={onHeightChange} />);
 
-      expect(screen.getByTestId('sheet')).not.toHaveStyle({ bottom: '300px' });
+      resize(240);
+
+      expect(onHeightChange).toHaveBeenLastCalledWith(240);
+      expect(document.documentElement.style.getPropertyValue('--sheet-height')).toBe('240px');
+
+      unmount();
+      expect(onHeightChange).toHaveBeenLastCalledWith(0);
+      expect(document.documentElement.style.getPropertyValue('--sheet-height')).toBe('');
     });
   });
 });

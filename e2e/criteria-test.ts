@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 
-import { expect, test } from './test.ts';
+import { expect, openCriteria, test } from './test.ts';
 
 // The radio buttons are visually hidden: the user clicks their labels.
 const choose = (page: Page, group: string, value: string) =>
@@ -9,6 +9,7 @@ const choose = (page: Page, group: string, value: string) =>
 test.describe('the criteria form', () => {
   test('offers Find routes once a start point is set', async ({ page }) => {
     await page.goto('/');
+    await openCriteria(page);
     await expect(page.getByTestId('criteria-submit')).toBeHidden();
 
     await page.getByTestId('criteria-start').fill('45.8326, 6.8652');
@@ -17,10 +18,9 @@ test.describe('the criteria form', () => {
     await expect(page.getByTestId('criteria-submit')).toBeVisible();
   });
 
-  test('sets the criteria in the full form', async ({ page, isMobile }) => {
+  test('sets the criteria in the full form', async ({ page }) => {
     await page.goto('/');
-    // On phones, the sheet shows chips until its handle expands it to the full form.
-    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
+    await openCriteria(page);
 
     await choose(page, 'target', 'duration');
 
@@ -31,11 +31,9 @@ test.describe('the criteria form', () => {
     await expect(page.getByTestId('criteria-pace')).toHaveValue('360');
   });
 
-  test('offers the technical stretches unless the surface is paved, off by default', async ({ page, isMobile }) => {
+  test('offers the technical stretches unless the surface is paved, off by default', async ({ page }) => {
     await page.goto('/');
-    if (isMobile) {
-      await page.getByTestId('criteria-sheet-handle').click();
-    }
+    await openCriteria(page);
 
     await expect(page.getByTestId('criteria-technical')).not.toBeChecked();
     await choose(page, 'surface', 'paved');
@@ -44,14 +42,14 @@ test.describe('the criteria form', () => {
     await expect(page.getByTestId('criteria-technical')).toBeAttached();
   });
 
-  test('keeps the pace across a reload', async ({ page, isMobile }) => {
+  test('keeps the pace across a reload', async ({ page }) => {
     await page.goto('/');
-    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
+    await openCriteria(page);
     await choose(page, 'target', 'duration');
 
     await page.getByTestId('criteria-pace').fill('330');
     await page.reload();
-    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
+    await openCriteria(page);
 
     // The last criteria are kept too: the length is still set by duration.
     await expect(page.getByTestId('criteria-pace')).toHaveValue('330');

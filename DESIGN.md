@@ -13,10 +13,14 @@ Behaviour comes from native elements first (`<dialog>`, `popover`, `<input type=
 ## Layout
 
 - The map fills the screen and the controls float over it.
-- Phones: a bottom sheet holds the content. Desktops: the criteria are in a left column, the routes found in a
-  right column, and the selected route in a dock along the bottom. The column and the dock are only there when
-  there is something to show, and nothing is selected by default.
-- The map does not move when the right column or the dock come and go: the framing always keeps their room clear.
+- Phones: a bar over the top of the map sums up the criteria and opens them in a full-screen layer. A bottom sheet
+  holds the routes found: a carousel, whose card in the middle is the selected route, then the detail of that route
+  once it is opened. Desktops: the criteria are in a left column, the routes found in a right column, and the
+  selected route in a dock along the bottom. The column and the dock are only there when there is something to
+  show, and nothing is selected by default.
+- The selected route stays in the free part of the map: the framing keeps clear of the bar and the sheet on phones,
+  and of the columns and the dock on desktops. The map does not move when the right column or the dock come and
+  go: the framing always keeps their room clear.
 - Settings and legal pages are dialogs over the map: full screen on phones, centred on desktops.
 
 ## Consistency

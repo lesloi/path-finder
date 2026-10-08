@@ -9,7 +9,6 @@ export const routesText = {
   en: {
     routes: 'Routes',
     routeCount: (count: number) => (count === 1 ? '1 route' : `${count} routes`),
-    showRoutes: (count: number) => (count === 1 ? 'Show the route found' : `Show the ${count} routes found`),
     route: (index: number, count: number) => `Route ${index} of ${count}`,
     closeRoute: 'Close the route',
     cancelSearch: 'Cancel the search',
@@ -39,7 +38,6 @@ export const routesText = {
   fr: {
     routes: 'Parcours',
     routeCount: (count: number) => `${count} parcours`,
-    showRoutes: (count: number) => (count === 1 ? 'Voir le parcours trouvé' : `Voir les ${count} parcours trouvés`),
     route: (index: number, count: number) => `Parcours ${index} sur ${count}`,
     closeRoute: 'Fermer le parcours',
     cancelSearch: 'Annuler la recherche',
