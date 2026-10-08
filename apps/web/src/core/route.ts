@@ -109,14 +109,14 @@ function kmBetween([lonA, latA]: number[], [lonB, latB]: number[]): number {
 }
 
 // Kilometres from the start to each point.
-function distancesAlong(geometry: number[][]): number[] {
+export function distancesAlong(geometry: number[][]): number[] {
   const distances = [0];
   for (let k = 1; k < geometry.length; k++) distances.push(distances[k - 1] + kmBetween(geometry[k - 1], geometry[k]));
   return distances;
 }
 
 // Where `distance` falls between two points: the index of the first one, and how far towards the next (0 to 1).
-function locate(distances: number[], distance: number): [number, number] {
+export function locate(distances: number[], distance: number): [number, number] {
   const last = distances.length - 1;
   if (distance <= 0 || last === 0) return [0, 0];
   if (distance >= distances[last]) return [last, 0];
