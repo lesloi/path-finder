@@ -22,7 +22,7 @@ export function SegmentedControl<Value extends string>({
         <label
           key={option.value}
           className={
-            'flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-3 text-center ' +
+            'flex min-h-touch flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-3 text-center ' +
             'text-sm font-semibold whitespace-nowrap text-ink-2 has-checked:bg-surface has-checked:text-ink ' +
             'has-checked:shadow-float has-focus-visible:ring-2 has-focus-visible:ring-accent'
           }

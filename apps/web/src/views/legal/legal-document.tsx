@@ -7,12 +7,12 @@ import type { Section } from '../../i18n/index.ts';
 export function LegalDocument({
   testId,
   sections,
-  footer,
+  note,
 }: {
   testId: string;
   sections: Section[];
-  /** A line after the last section. */
-  footer?: string;
+  /** A line under the introduction, the section without a heading. */
+  note?: string;
 }) {
   return (
     <div className={PROSE} data-testid={testId}>
@@ -21,8 +21,8 @@ export function LegalDocument({
           {title && <h2 data-testid={`${testId}-section-${id}`}>{title}</h2>}
           {blocks.map((block, index) =>
             'paragraph' in block ? (
-              // The introduction, which has no heading, opens the page.
-              <p key={index} className={title ? undefined : LEAD}>
+              // The first paragraph of the introduction, which has no heading, opens the page.
+              <p key={index} className={!title && index === 0 ? LEAD : undefined}>
                 <RichText paragraph={block.paragraph} testId={testId} />
               </p>
             ) : (
@@ -35,9 +35,9 @@ export function LegalDocument({
               </ul>
             ),
           )}
+          {!title && note && <p className={NOTE}>{note}</p>}
         </Fragment>
       ))}
-      {footer && <p className={NOTE}>{footer}</p>}
     </div>
   );
 }
