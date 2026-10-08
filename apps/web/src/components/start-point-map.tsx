@@ -266,7 +266,7 @@ export function StartPointMap({
         id: 'routes-casing',
         type: 'line',
         source: 'routes',
-        filter: ['get', 'selected'],
+        filter: ['==', ['get', 'selected'], true],
         layout: line,
         paint: { 'line-color': MAP_COLORS.white, 'line-width': 11 },
       });
@@ -285,7 +285,7 @@ export function StartPointMap({
         id: 'routes-marking',
         type: 'line',
         source: 'routes',
-        filter: ['get', 'selected'],
+        filter: ['==', ['get', 'selected'], true],
         layout: { 'line-join': 'round' },
         paint: { 'line-color': MAP_COLORS.white, 'line-width': 2.6, 'line-dasharray': [3, 5.4] },
       });
