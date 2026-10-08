@@ -47,10 +47,11 @@ import { RoutePace } from './route-pace.tsx';
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
 
-/** The paved and unpaved shares of a route, as percentages. */
+/** The unpaved share of a route, kept within 0 and 1, and the paved and unpaved shares as percentages. */
 function surfaceShares({ unpavedShare }: Route, { language }: Display) {
+  const unpaved = Math.min(1, Math.max(0, unpavedShare));
   const percent = new Intl.NumberFormat(language, { style: 'percent' });
-  return { paved: percent.format(1 - unpavedShare), unpaved: percent.format(unpavedShare) };
+  return { unpaved: percent.format(unpaved), paved: percent.format(1 - unpaved), unpavedShare: unpaved };
 }
 
 const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp } satisfies Record<
@@ -211,6 +212,7 @@ function RouteRow({
     distance,
     ...(gain ? [`${t.elevationGain} ${gain}`] : []),
     `${t.estimatedDuration} ${duration}`,
+    surface,
     ...misses,
     ...(route.technical ? [t.technical] : []),
   ].join(', ');
@@ -256,7 +258,7 @@ function RouteRow({
         <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
         <ChevronRight size={18} aria-hidden className="ml-auto flex-none text-ink-2" />
       </span>
-      <SurfaceBar testId={`routes-row-${index}-surface`} unpavedShare={route.unpavedShare} label={surface} />
+      <SurfaceBar testId={`routes-row-${index}-surface`} unpavedShare={shares.unpavedShare} label={surface} />
     </button>
   );
 }
