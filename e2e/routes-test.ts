@@ -77,7 +77,7 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('routes-row-0')).toBeVisible();
     await expect(badge).toHaveCount(0);
 
-    await page.getByTestId('routes-back').click();
+    if (isMobile) await page.getByTestId('routes-back').click();
     // On phones, the sheet may be back to its chips.
     const handle = page.getByTestId('criteria-sheet-handle');
     if (isMobile && (await handle.getAttribute('aria-expanded')) !== 'true') await handle.click();
@@ -88,16 +88,18 @@ test.describe('the route set', () => {
     await expect(badge.first()).toBeVisible();
   });
 
-  test('goes back to the criteria, still set', async ({ page }) => {
+  test('goes back to the criteria, still set', async ({ page, isMobile }) => {
     await findRoutes(page);
 
-    await page.getByTestId('routes-back').click();
+    // A desktop shows the criteria beside the routes: there is no way back to take.
+    if (isMobile) await page.getByTestId('routes-back').click();
 
     await expect(page.getByTestId('criteria-submit')).toBeVisible();
     await expect(page.getByTestId('criteria-start')).toHaveValue('45.8992° N · 6.1294° E');
   });
 
-  test('keeps the routes found when going back to the criteria', async ({ page }) => {
+  test('keeps the routes found when going back to the criteria', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'A desktop shows the criteria and the routes together.');
     await findRoutes(page);
 
     await page.getByTestId('routes-back').click();
@@ -110,7 +112,7 @@ test.describe('the route set', () => {
     await findRoutes(page);
 
     await page.getByTestId('routes-row-0').click();
-    await expect(page.getByTestId('route-position')).toHaveText(/^1\/\d$/);
+    await expect(page.getByTestId('route-position')).toHaveText(isMobile ? /^1\/\d$/ : /1/);
     // On phones, the collapsed sheet stops at the figures: its handle expands it to the surface breakdown.
     if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
     // The stand-in graph has paved streets west of the start and rough tracks east of it: a share of each.
@@ -120,9 +122,53 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('route-profile')).toBeVisible();
 
     if (isMobile) await swipeLeft(page);
-    else await page.getByTestId('route-next').click();
+    // On desktops, the list stays beside the dock: another row moves the dock to its route.
+    else await page.getByTestId('routes-row-1').click();
 
-    await expect(page.getByTestId('route-position')).toHaveText(/^2\/\d$/);
+    await expect(page.getByTestId('route-position')).toHaveText(isMobile ? /^2\/\d$/ : /2/);
+  });
+
+  test.describe('on desktops', () => {
+    test.beforeEach(({ isMobile }) => test.skip(isMobile, 'The dock is for desktops.'));
+
+    test('selects no route at first, and opens the dock on a click', async ({ page }) => {
+      await findRoutes(page);
+      await expect(page.getByTestId('route-dock')).toHaveCount(0);
+
+      await page.getByTestId('routes-row-1').click();
+
+      await expect(page.getByTestId('route-dock')).toBeVisible();
+      // The criteria are still there to change.
+      await expect(page.getByTestId('criteria-submit')).toBeVisible();
+    });
+
+    test('closes the dock with the button, Escape and a click on the map', async ({ page }) => {
+      await findRoutes(page);
+
+      await page.getByTestId('routes-row-0').click();
+      await page.getByTestId('route-close').click();
+      await expect(page.getByTestId('route-dock')).toHaveCount(0);
+
+      await page.getByTestId('routes-row-0').click();
+      await page.keyboard.press('Escape');
+      await expect(page.getByTestId('route-dock')).toHaveCount(0);
+
+      await page.getByTestId('routes-row-0').click();
+      // Over the map under the left column, where the routes are framed clear of.
+      await page.mouse.click(200, page.viewportSize()!.height - 20);
+      await expect(page.getByTestId('route-dock')).toHaveCount(0);
+    });
+
+    test('says the routes are stale once the criteria change', async ({ page }) => {
+      await findRoutes(page);
+
+      await page.locator('label', { has: page.getByTestId('criteria-surface-unpaved') }).click();
+
+      await expect(page.getByTestId('routes-stale')).toBeVisible();
+      await page.getByTestId('routes-search-again').click();
+      await expect(page.getByTestId('routes-stale')).toHaveCount(0);
+      await expect(page.getByTestId('routes-row-0')).toBeVisible();
+    });
   });
 
   test('exports the route as a GPX file', async ({ page, isMobile }) => {

@@ -44,19 +44,30 @@ const LONG_PRESS_MS = 500;
 
 // Pixels between a framed route and the edge of the visible map: a margin (`--spacing-6`).
 const FRAME_MARGIN = 24;
-// Pixels the desktop column and its margin take from the left of the map, when the stylesheet cannot say.
-const COLUMN_INSET_FALLBACK = 380 + 12;
+// Without the stylesheet that sets the room of the desktop panels (`--column-inset`…), they take none.
+const NO_ROOM = 0;
+// The smallest part of the map, in px, that the panels leave to the routes: a narrow window shrinks their margins.
+const MIN_FRAME = 240;
 // A width that makes a thin route easy to tap.
 const HIT_WIDTH = 22;
 
-// The width the desktop column and its margin cover, as `--column-inset` in `index.css` gives it.
-function columnInset() {
+// What the desktop panels and their margins cover of the map, as `index.css` gives it: custom properties of the
+// stylesheet, read together from one probe.
+function reservedSpace() {
   const probe = document.createElement('div');
+  probe.style.paddingTop = 'var(--dock-reserved)';
+  probe.style.paddingRight = 'var(--list-reserved)';
   probe.style.paddingLeft = 'var(--column-inset)';
   document.body.append(probe);
-  const inset = Number.parseFloat(getComputedStyle(probe).paddingLeft);
+  const { paddingTop, paddingRight, paddingLeft } = getComputedStyle(probe);
   probe.remove();
-  return Number.isNaN(inset) ? COLUMN_INSET_FALLBACK : inset;
+  const read = (value: string, fallback: number) =>
+    Number.isNaN(Number.parseFloat(value)) ? fallback : Number.parseFloat(value);
+  return {
+    dock: read(paddingTop, NO_ROOM),
+    list: read(paddingRight, NO_ROOM),
+    column: read(paddingLeft, NO_ROOM),
+  };
 }
 
 // The height of the bottom sheet on phones, as the sheet writes it to `--sheet-height`.
@@ -68,12 +79,14 @@ function sheetHeight() {
 // of what is drawn there so that all of it stays inside.
 function freeArea(map: Map, desktop: boolean, [halfWidth, halfHeight]: [number, number]): PixelRect {
   const { clientWidth, clientHeight } = map.getCanvas();
-  const sheet = sheetHeight();
+  // On desktops, the route list and the dock take the right and the bottom, shown or not.
+  const space = desktop ? reservedSpace() : { column: 0, list: 0, dock: 0 };
+  const sheet = desktop ? space.dock : sheetHeight();
   return {
-    left: (desktop ? columnInset() : 0) + FRAME_MARGIN + halfWidth,
+    left: space.column + FRAME_MARGIN + halfWidth,
     top: FRAME_MARGIN + halfHeight,
-    right: clientWidth - CONTROLS_RIGHT - halfWidth,
-    bottom: clientHeight - (desktop ? 0 : sheet) - CONTROLS_BOTTOM - halfHeight,
+    right: clientWidth - Math.max(CONTROLS_RIGHT, space.list) - halfWidth,
+    bottom: clientHeight - sheet - CONTROLS_BOTTOM - halfHeight,
   };
 }
 
@@ -144,10 +157,12 @@ export function StartPointMap({
   summaries,
   display = DEFAULT_DISPLAY,
   selectedRoute,
+  markedRoute,
   framing = 'all',
   hover,
   routesInteractive = true,
   onRouteSelect,
+  onBackgroundClick,
   onSnapshot,
   onStartChange,
   onBasemapFail,
@@ -163,6 +178,8 @@ export function StartPointMap({
   /** The units of the scale, the labels and the distance markers, and the language of the labels. */
   display?: Display;
   selectedRoute?: number;
+  /** The route that carries distance markers while the others stay drawn, such as the one selected on a desktop. */
+  markedRoute?: number;
   /** What the map frames and draws: all the routes, or only the selected one, once its detail is open. */
   framing?: 'all' | 'selected';
   /** A place along the selected route, such as where the user points at its elevation profile. */
@@ -174,6 +191,8 @@ export function StartPointMap({
   routesInteractive?: boolean;
   /** A route was tapped on the map. */
   onRouteSelect?: (index: number) => void;
+  /** The map was clicked or tapped where there is no route. */
+  onBackgroundClick?: () => void;
   /**
    * The map as it framed a new route set, without the routes drawn, so thumbnails of them can show
    * the place. Undefined once there is no route set.
@@ -206,7 +225,8 @@ export function StartPointMap({
   const initialUnits = useEffectEvent(() => display.units);
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
-  const interactive = Boolean(routes?.length) && routesInteractive;
+  // Picking the start point on the map comes first: a click then is not on a route.
+  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick;
   const view = useRef<MapView>({ bearing: 0, rotated: false, movedAway: false });
   // Tells the app what changed in the view, and only when something did: the map moves many times a second.
   const changeView = useEffectEvent((change: Partial<MapView>) => {
@@ -219,6 +239,9 @@ export function StartPointMap({
     // A tap on a route selects it: it must not move the start point too.
     if (interactive) return;
     if (how === 'long-press' || pickOnClick) onStartChange([lng, lat]);
+  });
+  const clickedBackground = useEffectEvent(() => {
+    if (!pickOnClick) onBackgroundClick?.();
   });
   const basemapFailed = useEffectEvent((previous: Basemap) => onBasemapFail?.(previous));
   const selectRoute = useEffectEvent((index: number) => {
@@ -376,7 +399,11 @@ export function StartPointMap({
     map.on('mouseenter', 'routes-hit', () => (map.getCanvas().style.cursor = 'pointer'));
     map.on('mouseleave', 'routes-hit', () => (map.getCanvas().style.cursor = ''));
 
-    map.on('click', ({ lngLat }) => pick('click', lngLat));
+    map.on('click', ({ lngLat, point }) => {
+      pick('click', lngLat);
+      // A route has its own click, on its wide hit line: anywhere else is the background.
+      if (!map.queryRenderedFeatures(point, { layers: ['routes-hit'] }).length) clickedBackground();
+    });
 
     let timer: ReturnType<typeof setTimeout> | undefined;
     const press = ({ lngLat }: MapMouseEvent | MapTouchEvent) => {
@@ -464,6 +491,8 @@ export function StartPointMap({
     const badges = detail
       ? []
       : drawn.flatMap((geometry, index) => {
+          // The markers say it better for the route that has them.
+          if (index === markedRoute) return [];
           const anchor = midpointWithin(geometry, project, tagArea);
           if (!anchor) return [];
           const summary = summaries?.[index];
@@ -472,20 +501,24 @@ export function StartPointMap({
           const selected = index === selectedRoute;
           // As for the lines, with none selected every tag keeps its route's colour.
           const filled = selected || selectedRoute === undefined;
-          return {
-            type: 'Feature' as const,
-            geometry: point(anchor),
-            properties: {
-              label: label.join('\n'),
-              tag: filled ? routeTagId(index) : ROUTE_TAG_MUTED,
-              textColor: filled ? MAP_COLORS.white : MAP_INK,
-              priority: selected ? 0 : 1,
+          return [
+            {
+              type: 'Feature' as const,
+              geometry: point(anchor),
+              properties: {
+                label: label.join('\n'),
+                tag: filled ? routeTagId(index) : ROUTE_TAG_MUTED,
+                textColor: filled ? MAP_COLORS.white : MAP_INK,
+                priority: selected ? 0 : 1,
+              },
             },
-          };
+          ];
         });
     const kilometres = display.units === 'metric' ? 1 : KM_PER_MILE;
-    const summary = selectedRoute === undefined ? undefined : summaries?.[selectedRoute];
-    const geometry = detail && selectedRoute !== undefined ? drawn[selectedRoute] : undefined;
+    // The route with markers: the one of the open detail, or the one a desktop marks while it shows the others.
+    const marked = detail ? selectedRoute : markedRoute;
+    const summary = marked === undefined ? undefined : summaries?.[marked];
+    const geometry = marked === undefined ? undefined : drawn[marked];
     const interval = summary && markerInterval(summary.distance / kilometres);
     const markerArea = freeArea(map, desktop, [MARKER_HALF, MARKER_HALF]);
     const markers =
@@ -511,7 +544,19 @@ export function StartPointMap({
     ] as const) {
       (map.getSource(id) as GeoJSONSource).setData({ type: 'FeatureCollection', features });
     }
-  }, [loaded, routes, summaries, display, selectedRoute, framing, drawnFor, styleVersion, viewVersion, desktop]);
+  }, [
+    loaded,
+    routes,
+    summaries,
+    display,
+    selectedRoute,
+    markedRoute,
+    framing,
+    drawnFor,
+    styleVersion,
+    viewVersion,
+    desktop,
+  ]);
 
   // The routes, or the selected one, in the part of the map the panel leaves free. A new route set is framed north
   // up, as its snapshot maps places to pixels without a turn; framing it again keeps the user's orientation.
@@ -524,15 +569,23 @@ export function StartPointMap({
   const [reframes, setReframes] = useState(0);
   const frame = (bearing: number) => {
     const sheet = sheetHeight();
-    return {
-      bearing,
-      padding: {
-        top: FRAME_MARGIN,
-        right: FRAME_MARGIN,
-        bottom: FRAME_MARGIN + (desktop ? 0 : sheet),
-        left: FRAME_MARGIN + (desktop ? columnInset() : 0),
-      },
+    if (!desktop) {
+      return {
+        bearing,
+        padding: { top: FRAME_MARGIN, right: FRAME_MARGIN, bottom: FRAME_MARGIN + sheet, left: FRAME_MARGIN },
+      };
+    }
+    // The room is kept for the route list and the dock whether they are shown or not, so the map does not move
+    // when they come and go. A window too narrow for all of it shrinks the margins, to keep a part of the map.
+    const canvas = mapRef.current!.getCanvas();
+    const fit = (before: number, after: number, size: number) => {
+      const scale = Math.min(1, Math.max(0, size - MIN_FRAME) / (before + after));
+      return [before * scale, after * scale];
     };
+    const space = reservedSpace();
+    const [left, right] = fit(FRAME_MARGIN + space.column, FRAME_MARGIN + space.list, canvas.clientWidth);
+    const [top, bottom] = fit(FRAME_MARGIN, FRAME_MARGIN + space.dock, canvas.clientHeight);
+    return { bearing, padding: { top, right, bottom, left } };
   };
   useImperativeHandle(ref, () => ({
     resetNorth: () => mapRef.current?.resetNorth(),

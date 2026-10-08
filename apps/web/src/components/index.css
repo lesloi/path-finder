@@ -22,6 +22,9 @@
   /* Spacing keeps Tailwind's 4 px steps: 1, 2, 3, 4, 6 are 4, 8, 12, 16, 24 px. */
   --spacing-touch: 44px;
   --spacing-column: 380px;
+  /* The desktop route list on the right of the map, and the profile dock under it. */
+  --spacing-list: 340px;
+  --spacing-dock: 232px;
 
   --radius-*: initial;
   --radius-sm: 8px;
@@ -76,8 +79,16 @@
   --float: 0 1px 3px var(--float-1), 0 4px 14px var(--float-2);
   /* What the desktop left column and its margin cover from the left of the map. */
   --column-inset: calc(var(--spacing-column) + var(--spacing) * 3);
-  /* The horizontal centre of the map beside it. */
-  --map-centre: calc(50% + var(--column-inset) / 2);
+  /* What the route list and the dock cover from the right and the bottom of the map: the framing keeps them clear. */
+  --list-reserved: calc(var(--spacing-list) + var(--spacing) * 3);
+  --dock-reserved: calc(var(--spacing-dock) + var(--spacing) * 3);
+  /* The same while they are shown, which the view sets; nothing without them. */
+  --list-inset: 0px;
+  --dock-inset: 0px;
+  /* The horizontal centre of the map between the columns. */
+  --map-centre: calc(50% + (var(--column-inset) - var(--list-inset)) / 2);
+  /* Where the floating buttons of a desktop stand: above the dock, when it is shown. */
+  --edge-bottom: calc(env(safe-area-inset-bottom) + var(--dock-inset) + var(--spacing) * 6);
   /* The theme setting sets `data-theme` on <html>; without it the browser's scheme applies. */
   color-scheme: light dark;
 }
@@ -149,9 +160,8 @@
 }
 
 /*
- * The bottom left of the map holds the scale and the compact attribution. On phones they sit above the
- * sheet. On desktops the corner spans the map beside the left column: the scale stays at its left, and
- * the attribution is centred in it.
+ * The bottom left of the map holds the scale and the compact attribution. On phones they sit above the sheet.
+ * On desktops they stay in the corner of the screen, under the left column.
  */
 .maplibregl-map .maplibregl-ctrl-bottom-left {
   bottom: var(--sheet-height, 0px);
@@ -160,15 +170,6 @@
 
   @variant desktop {
     bottom: env(safe-area-inset-bottom);
-    left: var(--column-inset);
-    right: 0;
-
-    .maplibregl-ctrl-attrib {
-      position: absolute;
-      bottom: 0;
-      left: 50%;
-      translate: -50% 0;
-    }
   }
 }
 

@@ -15,6 +15,8 @@ export const criteriaText = {
     startPoint: 'Start point',
     chooseOnMap: 'Choose on the map',
     clickMap: 'Click the map',
+    pickStart: 'Click the map to set the start point',
+    cancelPick: 'Cancel',
     coordinates: 'Latitude, longitude',
     unreadable: 'Incorrect coordinates.',
     // Paris.
@@ -61,6 +63,8 @@ export const criteriaText = {
     startPoint: 'Point de départ',
     chooseOnMap: 'Choisir sur la carte',
     clickMap: 'Cliquez sur la carte',
+    pickStart: 'Cliquez sur la carte pour placer le départ',
+    cancelPick: 'Annuler',
     coordinates: 'Latitude, longitude',
     unreadable: 'Coordonnées incorrectes.',
     coordinatesHint: 'Exemple : 48.85, 2.35 (latitude, longitude)',

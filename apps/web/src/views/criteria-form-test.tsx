@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { parseCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
 import { commonText, criteriaText } from '../i18n/index.ts';
-import { CriteriaForm } from './criteria-form.tsx';
+import { CriteriaForm, criteriaChanged } from './criteria-form.tsx';
 import { useSettings } from '../state/index.ts';
-import type { Position } from '../core/index.ts';
+import type { Position, RouteSetRequest } from '../core/index.ts';
 
 const en = criteriaText.en;
 const fr = criteriaText.fr;
@@ -534,3 +534,52 @@ function UnitsSwitch({ onSubmit }: { onSubmit: () => void }) {
     </>
   );
 }
+
+describe('criteriaChanged', () => {
+  const found: RouteSetRequest = {
+    start: [6.1, 45.8],
+    target: { distance: 10 },
+    elevationGain: 300,
+    surface: 'any',
+    pace: 6,
+    includeTechnical: false,
+  };
+  const changed = (changes: Partial<RouteSetRequest>, units: 'metric' | 'imperial' = 'metric') =>
+    criteriaChanged({ ...found, ...changes }, found, units);
+
+  it('sees no change in the same request', () => {
+    expect(changed({})).toBe(false);
+  });
+
+  it.each([
+    ['the start point', { start: [6.2, 45.8] as [number, number] }],
+    ['the distance', { target: { distance: 11 } }],
+    ['the duration', { target: { duration: 60 } }],
+    ['the elevation gain', { elevationGain: 400 }],
+    ['the elevation level', { elevationGain: 'hilly' as const }],
+    ['the surface', { surface: 'paved' as const }],
+    ['the technical stretches', { includeTechnical: true }],
+  ])('sees a change of %s', (_, changes) => {
+    expect(changed(changes)).toBe(true);
+  });
+
+  it('sees a change of the pace by duration only', () => {
+    expect(changed({ pace: 5 })).toBe(false);
+    expect(
+      criteriaChanged(
+        { ...found, target: { duration: 60 }, pace: 5 },
+        { ...found, target: { duration: 60 } },
+        'metric',
+      ),
+    ).toBe(true);
+  });
+
+  it('takes a value rounded in other units for the same one, and a step for another', () => {
+    // 6 mi is 9.66 km, which a slider in miles holds for 10 km; 7 mi is not.
+    expect(changed({ target: { distance: 9.66 } }, 'imperial')).toBe(false);
+    expect(changed({ target: { distance: 11.27 } }, 'imperial')).toBe(true);
+    // 1000 ft is 305 m, which a slider in metres holds for 300 m; 1100 ft is not.
+    expect(changed({ elevationGain: 305 }, 'imperial')).toBe(false);
+    expect(changed({ elevationGain: 335 }, 'imperial')).toBe(true);
+  });
+});

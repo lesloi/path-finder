@@ -1,8 +1,9 @@
 import { Crosshair, LocateFixed, Navigation2, Scan, Settings } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useSettings, useUnits } from '../state/index.ts';
-import { CriteriaForm, useCriteriaDraft } from './criteria-form.tsx';
+import { CriteriaForm, criteriaChanged, criteriaRequest, invalidField, useCriteriaDraft } from './criteria-form.tsx';
+import { RouteDock } from './route-dock.tsx';
 import { RouteErrorToast } from './route-error-toast.tsx';
 import { RoutesFoundButton } from './routes-found-button.tsx';
 import { SearchingPanel } from './searching-panel.tsx';
@@ -18,23 +19,40 @@ import {
   BottomSheet,
   FLOATING_BUTTON,
   ICON_BUTTON,
+  LIST_COLUMN,
   SIDE_COLUMN,
   Toast,
   useToastTimeout,
   useDesktop,
 } from '../components/index.ts';
 
-// The bottom-right buttons, from the bottom: the location or reframe one, the basemap, the north. Each
-// class is written whole for Tailwind; `below` counts the buttons the one stands on.
+// The bottom-right buttons: the location or reframe one, the basemap, the north. On phones they stack up from the
+// bottom, over the sheet; on desktops they line up from the right, above the dock when it is shown (`--edge-bottom`).
+// Each class is written whole for Tailwind; `below` counts the buttons the one stands on or beside.
 const STACKED_ABOVE = [
-  'bottom-[calc(var(--sheet-height,0px)+--spacing(3))] desktop:bottom-safe-6',
+  'bottom-[calc(var(--sheet-height,0px)+--spacing(3))]',
   'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2))] ' +
-    'desktop:bottom-[calc(env(safe-area-inset-bottom)+--spacing(6)+var(--spacing-touch)+--spacing(2))]',
+    'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2))]',
   'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2)+var(--spacing-touch)+--spacing(2))] ' +
-    'desktop:bottom-[calc(env(safe-area-inset-bottom)+--spacing(6)+var(--spacing-touch)+--spacing(2)+var(--spacing-touch)+--spacing(2))]',
+    'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2)+var(--spacing-touch)+--spacing(2))]',
 ];
 const stackedAbove = (below: 0 | 1 | 2) =>
-  `right-safe-3 transition-[bottom] duration-250 ease-[ease] ${STACKED_ABOVE[below]}`;
+  `right-safe-3 transition-[bottom] duration-250 ease-[ease] desktop:bottom-(--edge-bottom) ${STACKED_ABOVE[below]}`;
+
+// Sets a custom property of the page while `shown`, as `--sheet-height` does for the sheet.
+function useRootProperty(name: string, value: string, shown: boolean) {
+  useLayoutEffect(() => {
+    if (!shown) return;
+    const root = document.documentElement.style;
+    root.setProperty(name, value);
+    return () => void root.removeProperty(name);
+  }, [name, value, shown]);
+}
+
+// A notice over the bottom of the map, centred between the columns and above the dock.
+const MAP_NOTICE =
+  'fixed bottom-[calc(var(--edge-bottom)+--spacing(8))] left-(--map-centre) z-4 w-max -translate-x-1/2 rounded-md ' +
+  'bg-surface text-sm text-ink-2 shadow-float';
 
 /**
  * The first view: where the user sets the criteria of a route set, over a full-screen map. Asking
@@ -66,9 +84,20 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     () => routeSet?.routes.map(({ distance, elevationGain }) => ({ distance, elevationGain })),
     [routeSet],
   );
-  const locateShown = !browser.showing && !loading && (desktop || !sheetExpanded);
+  // A desktop shows the route set beside the criteria for as long as there is one; a phone, in place of them.
+  const routesShown = desktop ? Boolean(routeSet) : browser.showing;
+  const listShown = desktop && (loading || Boolean(routeSet));
+  // Nothing is selected until the user picks a route; a phone opens the first one's detail from its list.
+  const selected = desktop ? browser.selected : (browser.selected ?? 0);
+  const dockRoute = desktop ? atPace?.routes[selected ?? -1] : undefined;
+  const dockShown = Boolean(dockRoute);
+  const current = desktop ? criteriaRequest(draft[0], { units, pace, start }) : undefined;
+  const stale = Boolean(routeSet && current && criteriaChanged(current, routeSet.request, units));
+  useRootProperty('--list-inset', 'var(--list-reserved)', listShown);
+  useRootProperty('--dock-inset', 'var(--dock-reserved)', dockShown);
+  const locateShown = !routesShown && !loading && (desktop || !sheetExpanded);
   // In the place of the location button, which the routes hide.
-  const reframeShown = browser.showing && mapView.movedAway && (desktop || !sheetExpanded);
+  const reframeShown = routesShown && mapView.movedAway && (desktop || !sheetExpanded);
 
   // A button that puts the map back goes away once it has: the focus goes on from the settings.
   function putBack(action: 'resetNorth' | 'reframe') {
@@ -83,6 +112,23 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   }, [pageOpen]);
 
   useToastTimeout(toast, () => setToast(undefined));
+
+  // Escape steps back on a desktop: first out of picking the start point on the map, then out of the route selected.
+  const deselect = () => {
+    browser.select(undefined);
+    browser.setPreview(undefined);
+    browser.setHover(undefined);
+  };
+  const onKey = useEffectEvent((event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    if (picking) setPicking(false);
+    else if (dockShown) deselect();
+  });
+  useEffect(() => {
+    if (!desktop || pageOpen) return;
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [desktop, pageOpen]);
 
   function backToCriteria() {
     browser.leave();
@@ -118,17 +164,17 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     );
   }
 
-  const panel =
-    atPace && routeSet && browser.showing ? (
+  const routeSetView =
+    atPace && routeSet && routesShown ? (
       <RouteSetView
         display={display}
-        request={routeSet.request}
         routes={atPace.routes}
         pace={atPace.pace}
         snapshot={browser.snapshot}
-        selected={browser.selected}
+        selected={selected}
         detail={browser.detail}
         onSelect={browser.select}
+        onPreview={browser.setPreview}
         onDetailChange={browser.openDetail}
         // By duration, a new pace is another search, which the criteria ask for: the list only says the pace.
         onPaceChange={'distance' in routeSet.request.target ? (value) => update({ pace: value }) : undefined}
@@ -136,9 +182,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         onHover={browser.setHover}
         condensed={!desktop && !sheetExpanded}
       />
-    ) : (
-      loading && <SearchingPanel language={language} />
-    );
+    ) : undefined;
+  const panel = routeSetView ?? (loading && <SearchingPanel language={language} />);
   // The criteria came back with the routes still found: a way to see them again.
   const found = routeSet && !browser.showing && (
     <RoutesFoundButton language={language} count={routeSet.routes.length} onClick={browser.show} />
@@ -157,11 +202,15 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         routes={browser.geometries}
         summaries={summaries}
         display={display}
-        selectedRoute={browser.selected}
-        framing={browser.detail ? 'selected' : 'all'}
-        {...(browser.detail && browser.hover && { hover: browser.hover })}
-        routesInteractive={browser.showing}
+        // A desktop highlights the route it points at in the list, and marks the one selected.
+        selectedRoute={desktop ? (browser.preview ?? selected) : selected}
+        {...(desktop && { markedRoute: selected })}
+        // A desktop never reframes on a selection: the map stays where it is as the dock opens and closes.
+        framing={browser.detail && !desktop ? 'selected' : 'all'}
+        {...((desktop ? selected !== undefined : browser.detail) && browser.hover && { hover: browser.hover })}
+        routesInteractive={routesShown}
         onRouteSelect={browser.select}
+        {...(desktop && { onBackgroundClick: deselect })}
         onSnapshot={browser.setSnapshot}
         onStartChange={changeStart}
         onBasemapFail={(previous) => update({ basemap: previous })}
@@ -206,10 +255,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <button
           type="button"
           data-testid="criteria-locate"
-          className={
-            `${FLOATING_BUTTON} fixed right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3))] z-5 ` +
-            'transition-[bottom] duration-250 ease-[ease] desktop:bottom-safe-6'
-          }
+          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(0)}`}
           aria-label={t.myLocation}
           onClick={locate}
         >
@@ -220,10 +266,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <button
           type="button"
           data-testid="criteria-reframe"
-          className={
-            `${FLOATING_BUTTON} fixed right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3))] z-5 ` +
-            'transition-[bottom] duration-250 ease-[ease] desktop:bottom-safe-6'
-          }
+          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(0)}`}
           aria-label={t.reframe}
           onClick={() => putBack('reframe')}
         >
@@ -231,47 +274,84 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         </button>
       )}
       {desktop ? (
-        <aside className={SIDE_COLUMN}>
-          <div data-testid="criteria-title" className="flex items-center gap-2 px-4 pt-4 text-lg font-bold">
-            <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
-            Path finder
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-            {panel || (
-              <>
-                {found}
-                <StartPointField
-                  start={start}
-                  language={language}
-                  picking={picking}
-                  onStartChange={moveStart}
-                  onUnreadable={() => warn('unreadable')}
+        <>
+          <aside className={SIDE_COLUMN}>
+            <div data-testid="criteria-title" className="flex items-center gap-2 px-4 pt-4 text-lg font-bold">
+              <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
+              Path finder
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+              <StartPointField
+                start={start}
+                language={language}
+                picking={picking}
+                onStartChange={moveStart}
+                onUnreadable={() => warn('unreadable')}
+              >
+                <button
+                  type="button"
+                  data-testid="criteria-start-pick"
+                  className={`${ICON_BUTTON} aria-pressed:text-accent`}
+                  aria-label={t.chooseOnMap}
+                  aria-pressed={picking}
+                  onClick={() => setPicking(!picking)}
                 >
+                  <Crosshair size={20} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className={ICON_BUTTON}
+                  data-testid="criteria-start-locate"
+                  aria-label={t.myLocation}
+                  onClick={locate}
+                >
+                  <LocateFixed size={20} aria-hidden />
+                </button>
+              </StartPointField>
+              <CriteriaForm language={language} start={start} draft={draft} onSubmit={browser.ask} />
+            </div>
+          </aside>
+          {listShown && (
+            <aside className={LIST_COLUMN} aria-label={t.routes}>
+              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+                {stale && (
+                  <div
+                    role="status"
+                    data-testid="routes-stale"
+                    className="flex flex-col gap-2 rounded-md bg-accent-soft p-3 text-sm"
+                  >
+                    <span>
+                      <strong>{t.stale}.</strong> {t.staleHint}
+                    </span>
+                    {/* Asking is only for criteria the form would let through. */}
+                    {current && !invalidField(current) && (
+                      <button
+                        type="button"
+                        data-testid="routes-search-again"
+                        // Not a second primary button: the form's own is the view's.
+                        className="min-h-touch rounded-full font-semibold text-accent"
+                        onClick={() => browser.ask(current)}
+                      >
+                        {t.searchAgain}
+                      </button>
+                    )}
+                  </div>
+                )}
+                {panel}
+                {loading && (
                   <button
                     type="button"
-                    data-testid="criteria-start-pick"
-                    className={`${ICON_BUTTON} aria-pressed:text-accent`}
-                    aria-label={t.chooseOnMap}
-                    aria-pressed={picking}
-                    onClick={() => setPicking(!picking)}
+                    data-testid="routes-cancel"
+                    className="min-h-touch rounded-full text-accent"
+                    onClick={browser.drop}
                   >
-                    <Crosshair size={20} aria-hidden />
+                    {t.cancelSearch}
                   </button>
-                  <button
-                    type="button"
-                    className={ICON_BUTTON}
-                    data-testid="criteria-start-locate"
-                    aria-label={t.myLocation}
-                    onClick={locate}
-                  >
-                    <LocateFixed size={20} aria-hidden />
-                  </button>
-                </StartPointField>
-                <CriteriaForm language={language} start={start} draft={draft} onSubmit={browser.ask} />
-              </>
-            )}
-          </div>
-        </aside>
+                )}
+              </div>
+            </aside>
+          )}
+        </>
       ) : (
         <BottomSheet
           testId="criteria-sheet"
@@ -303,6 +383,29 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             </>
           )}
         </BottomSheet>
+      )}
+      {dockRoute && atPace && selected !== undefined && (
+        <RouteDock
+          display={display}
+          route={dockRoute}
+          index={selected}
+          count={atPace.routes.length}
+          onClose={deselect}
+          onHover={browser.setHover}
+        />
+      )}
+      {desktop && picking && (
+        <div data-testid="criteria-pick-bar" className={`${MAP_NOTICE} flex items-center gap-3 py-1 pr-1 pl-4`}>
+          {t.pickStart}
+          <button
+            type="button"
+            data-testid="criteria-pick-cancel"
+            className="min-h-touch rounded-full px-3 font-semibold text-accent"
+            onClick={() => setPicking(false)}
+          >
+            {t.cancelPick}
+          </button>
+        </div>
       )}
       {browser.error && <RouteErrorToast language={language} error={browser.error} onDismiss={browser.dismissError} />}
       {toast && toast.start === start && (

@@ -5,13 +5,16 @@ import type { MapSnapshot, Position, RouteSetRequest } from '../core/index.ts';
 import { useRouteSet, type RouteSetError } from '../state/index.ts';
 
 /**
- * What the user does with a route set: asking for it, the route selected, whether its detail is open,
- * and the place they point at on its elevation profile. The route set is gone once cleared.
+ * What the user does with a route set: asking for it, the route selected (none until they pick one), the route
+ * they point at in the list, whether the detail of the selected one is open (on phones), and the place they point
+ * at on its elevation profile. The route set is gone once cleared.
  */
 export function useRouteBrowser() {
   const [error, setError] = useState<RouteSetError | 'no-routes'>();
   const { routeSet, loading, find, clear } = useRouteSet(setError);
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState<number>();
+  // The route a pointer or the focus is on in the list: the map highlights it without selecting it.
+  const [preview, setPreview] = useState<number>();
   const [detail, setDetail] = useState(false);
   const [hover, setHover] = useState<Position>();
   // Whether the route set is shown rather than the criteria: leaving it for the criteria keeps it.
@@ -36,15 +39,18 @@ export function useRouteBrowser() {
     loading,
     error,
     selected,
+    preview,
     detail,
     hover,
     geometries,
     select: setSelected,
+    setPreview,
     setHover,
     dismissError: () => setError(undefined),
     ask(request: RouteSetRequest) {
       setError(undefined);
-      setSelected(0);
+      setSelected(undefined);
+      setPreview(undefined);
       setDetail(false);
       setShowing(true);
       find(request);
@@ -58,9 +64,11 @@ export function useRouteBrowser() {
     show() {
       setShowing(true);
     },
-    /** Forgets the route set, such as when a new start point makes it stale. */
+    /** Forgets the route set, and any search under way, such as when a new start point makes it stale. */
     drop() {
       clear();
+      setSelected(undefined);
+      setPreview(undefined);
       setShowing(false);
       setDetail(false);
       setHover(undefined);

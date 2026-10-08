@@ -627,6 +627,15 @@ describe('StartPointMap', () => {
         expect(labels('route-badges')).toEqual([]);
       });
 
+      it('marks the distance along the route marked while every route stays drawn, as on a desktop', () => {
+        renderRoutes({ routes: [out, out], summaries: [...summaries, summaries[0]], selectedRoute: 0, markedRoute: 0 });
+
+        expect(labels('route-markers')).toHaveLength(13);
+        // Its own label gives way to the markers; the other route keeps its.
+        expect(labels('route-badges')).toEqual(['14.0 km\n+340 m']);
+        expect(features()).toHaveLength(2);
+      });
+
       it('marks every mile in imperial units, and gives a multiple of ten the first place', () => {
         renderRoutes({
           routes: [out],
@@ -774,17 +783,21 @@ describe('StartPointMap', () => {
       expect(onRouteSelect).not.toHaveBeenCalled();
     });
 
-    it('keeps the start point while routes are shown', () => {
+    it('keeps the start point while routes are shown, until a click is armed to pick one', () => {
       const onStartChange = vi.fn();
-      renderRoutes({ pickOnClick: true, onStartChange });
+      const { rerender } = renderRoutes({ onStartChange });
 
       act(() => {
         map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } });
         map().fire('touchstart', { lngLat: { lng: 6.2, lat: 45.8 }, originalEvent: touch });
         vi.advanceTimersByTime(600);
       });
-
       expect(onStartChange).not.toHaveBeenCalled();
+
+      rerender(<StartPointMap routes={routes} pickOnClick onStartChange={onStartChange} />);
+      act(() => map().fire('click', { lngLat: { lng: 6.3, lat: 45.9 } }));
+
+      expect(onStartChange).toHaveBeenCalledExactlyOnceWith([6.3, 45.9]);
     });
 
     it('frames every route, clear of the sheet on phones', () => {
@@ -818,6 +831,72 @@ describe('StartPointMap', () => {
       rerender(<StartPointMap routes={routes} selectedRoute={2} onStartChange={vi.fn()} />);
 
       expect(map().fitted).toBe(before);
+    });
+
+    describe('the background', () => {
+      it('hears a click where there is no route', () => {
+        const onBackgroundClick = vi.fn();
+        renderRoutes({ onBackgroundClick });
+
+        act(() => map().fire('click', { lngLat: { lng: 6, lat: 45 } }));
+
+        expect(onBackgroundClick).toHaveBeenCalledOnce();
+      });
+
+      it('does not hear a click on a route, nor one that picks the start point', () => {
+        const onBackgroundClick = vi.fn();
+        const { rerender } = renderRoutes({ onBackgroundClick });
+
+        map().rendered = [{}];
+        act(() => map().fire('click', { lngLat: { lng: 6, lat: 45 } }));
+        map().rendered = [];
+        rerender(
+          <StartPointMap routes={routes} pickOnClick onBackgroundClick={onBackgroundClick} onStartChange={vi.fn()} />,
+        );
+        act(() => map().fire('click', { lngLat: { lng: 6, lat: 45 } }));
+
+        expect(onBackgroundClick).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('on desktops', () => {
+      const matchMedia = window.matchMedia;
+      beforeEach(() => {
+        window.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) as never;
+      });
+      afterEach(() => {
+        window.matchMedia = matchMedia;
+      });
+      const padding = () => (map().fitted!.options as { padding: Record<string, number> }).padding;
+      // The stylesheet gives the room of the panels as lengths, which jsdom cannot compute.
+      const withRoom = (room: { paddingTop: string; paddingRight: string; paddingLeft: string }) =>
+        vi.spyOn(window, 'getComputedStyle').mockReturnValue(room as CSSStyleDeclaration);
+
+      it('leaves the room of the route list and the dock, whether they are shown or not', () => {
+        withRoom({ paddingTop: '100px', paddingRight: '120px', paddingLeft: '140px' });
+
+        renderRoutes();
+
+        expect(padding()).toEqual({ top: 24, left: 24 + 140, right: 24 + 120, bottom: 24 + 100 });
+      });
+
+      it('shrinks the room in a window too narrow for it, to keep a part of the map', () => {
+        withRoom({ paddingTop: '700px', paddingRight: '900px', paddingLeft: '900px' });
+
+        renderRoutes();
+
+        // The mock canvas is 800 by 600 px.
+        expect(800 - padding().left - padding().right).toBeGreaterThanOrEqual(240 - 1e-9);
+        expect(600 - padding().top - padding().bottom).toBeGreaterThanOrEqual(240 - 1e-9);
+      });
+
+      it('takes no room without the stylesheet', () => {
+        withRoom({ paddingTop: '', paddingRight: '', paddingLeft: '' });
+
+        renderRoutes();
+
+        expect(padding()).toEqual({ top: 24, left: 24, right: 24, bottom: 24 });
+      });
     });
 
     it('clears the routes', () => {

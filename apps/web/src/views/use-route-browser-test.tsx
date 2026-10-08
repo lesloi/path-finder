@@ -46,11 +46,12 @@ afterEach(() => {
 });
 
 describe('useRouteBrowser', () => {
-  it('shows the routes it asked for, the first one selected', async () => {
+  it('shows the routes it asked for, none of them selected', async () => {
     const { result } = await browse();
 
     expect(result.current.showing).toBe(true);
-    expect(result.current.selected).toBe(0);
+    expect(result.current.selected).toBeUndefined();
+    expect(result.current.preview).toBeUndefined();
     expect(result.current.detail).toBe(false);
     expect(result.current.geometries).toHaveLength(2);
   });
@@ -66,13 +67,35 @@ describe('useRouteBrowser', () => {
     expect(result.current.showing).toBe(true);
   });
 
-  it('forgets the routes when dropped', async () => {
+  it('forgets the routes when dropped, and the selection with them', async () => {
     const { result } = await browse();
+    act(() => result.current.select(1));
 
     act(() => result.current.drop());
 
     expect(result.current.routeSet).toBeUndefined();
     expect(result.current.showing).toBe(false);
+    expect(result.current.selected).toBeUndefined();
+  });
+
+  it('selects and deselects a route, and previews another without selecting it', async () => {
+    const { result } = await browse();
+
+    act(() => result.current.select(1));
+    act(() => result.current.setPreview(0));
+    expect(result.current).toMatchObject({ selected: 1, preview: 0 });
+
+    act(() => result.current.select(undefined));
+    expect(result.current.selected).toBeUndefined();
+  });
+
+  it('starts from no selection again with a new request', async () => {
+    const { result } = await browse();
+    act(() => result.current.select(1));
+
+    act(() => result.current.ask(request));
+
+    expect(result.current.selected).toBeUndefined();
   });
 
   it('forgets the place pointed at when the detail opens or closes', async () => {
