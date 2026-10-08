@@ -24,6 +24,7 @@ import {
   routeBorder,
   RouteThumbnail,
   SURFACE_CLASSES,
+  SurfaceBar,
   useDesktop,
 } from '../components/index.ts';
 import {
@@ -45,6 +46,13 @@ import { RoutePace } from './route-pace.tsx';
 
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
+
+/** The unpaved share of a route, kept within 0 and 1, and the paved and unpaved shares as percentages. */
+function surfaceShares({ unpavedShare }: Route, { language }: Display) {
+  const unpaved = Math.min(1, Math.max(0, unpavedShare));
+  const percent = new Intl.NumberFormat(language, { style: 'percent' });
+  return { unpaved: percent.format(unpaved), paved: percent.format(1 - unpaved), unpavedShare: unpaved };
+}
 
 const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp } satisfies Record<
   Miss['criterion'],
@@ -197,11 +205,14 @@ function RouteRow({
   const duration = formatDuration(route.estimatedDuration, display.language);
   const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, display);
   const misses = route.misses.map((miss) => missText(miss, route, display));
+  const shares = surfaceShares(route, display);
+  const surface = `${t.paved} ${shares.paved} · ${t.unpaved} ${shares.unpaved}`;
   const name = [
     t.route(index + 1, count),
     distance,
     ...(gain ? [`${t.elevationGain} ${gain}`] : []),
     `${t.estimatedDuration} ${duration}`,
+    surface,
     ...misses,
     ...(route.technical ? [t.technical] : []),
   ].join(', ');
@@ -211,7 +222,7 @@ function RouteRow({
       data-testid={`routes-row-${index}`}
       data-selected={selected ? '' : undefined}
       className={
-        `flex min-h-13 w-full items-center gap-3 rounded-md border border-l-4 border-border p-2 text-left ` +
+        `flex min-h-13 w-full flex-col gap-2 rounded-md border border-l-4 border-border p-2 text-left ` +
         `${routeBorder(index)} hover:bg-surface-2 data-selected:bg-surface-2`
       }
       aria-label={name}
@@ -220,31 +231,34 @@ function RouteRow({
       onMouseEnter={desktop ? onPreview : undefined}
       onFocus={onPreview}
     >
-      <RouteThumbnail geometry={route.geometry} index={index} {...(snapshot && { snapshot })} />
-      <span className="flex min-w-0 flex-none flex-col gap-1">
-        <strong data-testid={`routes-row-${index}-distance`} className="text-lg">
-          {distance}
-        </strong>
-        <span className="flex items-center gap-3 text-sm text-ink-2">
-          {gain && (
-            <span data-testid={`routes-row-${index}-gain`} className="flex items-center gap-1">
-              <ArrowUpRight size={14} aria-hidden />
-              {gain}
+      <span className="flex w-full items-center gap-3">
+        <RouteThumbnail geometry={route.geometry} index={index} {...(snapshot && { snapshot })} />
+        <span className="flex min-w-0 flex-none flex-col gap-1">
+          <strong data-testid={`routes-row-${index}-distance`} className="text-lg">
+            {distance}
+          </strong>
+          <span className="flex items-center gap-3 text-sm text-ink-2">
+            {gain && (
+              <span data-testid={`routes-row-${index}-gain`} className="flex items-center gap-1">
+                <ArrowUpRight size={14} aria-hidden />
+                {gain}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Clock size={14} aria-hidden />
+              {duration}
             </span>
-          )}
-          <span className="flex items-center gap-1">
-            <Clock size={14} aria-hidden />
-            {duration}
           </span>
+          {route.misses.map((miss, k) => (
+            <MissMarker key={miss.criterion} miss={miss} text={misses[k]} testId={`routes-row-${index}-miss`} />
+          ))}
+          {route.technical && <Marker icon={Mountain} text={t.technical} testId={`routes-row-${index}-technical`} />}
         </span>
-        {route.misses.map((miss, k) => (
-          <MissMarker key={miss.criterion} miss={miss} text={misses[k]} testId={`routes-row-${index}-miss`} />
-        ))}
-        {route.technical && <Marker icon={Mountain} text={t.technical} testId={`routes-row-${index}-technical`} />}
+        {/* The empty width of the row: where the route climbs, at a glance. */}
+        <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
+        <ChevronRight size={18} aria-hidden className="ml-auto flex-none text-ink-2" />
       </span>
-      {/* The empty width of the row: where the route climbs, at a glance. */}
-      <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
-      <ChevronRight size={18} aria-hidden className="ml-auto flex-none text-ink-2" />
+      <SurfaceBar testId={`routes-row-${index}-surface`} unpavedShare={shares.unpavedShare} label={surface} />
     </button>
   );
 }
@@ -289,8 +303,7 @@ function RouteDetail({
   const swipeFrom = useRef<[number, number]>(undefined);
   const hasPrevious = selected > 0;
   const hasNext = selected < routes.length - 1;
-  const percent = new Intl.NumberFormat(display.language, { style: 'percent' });
-  const unpaved = route.unpavedShare;
+  const shares = surfaceShares(route, display);
 
   function swipeEnd(event: PointerEvent) {
     if (!swipeFrom.current) return;
@@ -398,10 +411,10 @@ function RouteDetail({
           {/* The legend of the colours of the profile. */}
           <p data-testid="route-surface" className="m-0 flex items-center gap-1 text-sm text-ink-2">
             <i className={`size-2 rounded-full ${SURFACE_CLASSES.paved.dot}`} aria-hidden />
-            {t.paved} {percent.format(1 - unpaved)}
+            {t.paved} {shares.paved}
             <span className="whitespace-pre"> · </span>
             <i className={`size-2 rounded-full ${SURFACE_CLASSES.unpaved.dot}`} aria-hidden />
-            {t.unpaved} {percent.format(unpaved)}
+            {t.unpaved} {shares.unpaved}
           </p>
           <button
             type="button"
