@@ -107,6 +107,7 @@ const TAG_HALF: [number, number] = [56, 28];
 // Half the size of a distance marker.
 const MARKER_HALF = 16;
 
+const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
 const emptyRoutes = { type: 'FeatureCollection', features: [] } as const;
 
 // The font stack the IGN style serves glyphs for.
@@ -391,6 +392,19 @@ export function StartPointMap({
         // White figures on a dark disc: they read over the route and over any map.
         paint: { 'text-color': MAP_COLORS.white },
       });
+      // The place hovered on the elevation profile, over everything else.
+      map.addSource('route-hover', { type: 'geojson', data: emptyRoutes });
+      map.addLayer({
+        id: 'route-hover',
+        type: 'circle',
+        source: 'route-hover',
+        paint: {
+          'circle-radius': 6,
+          'circle-color': MAP_INK,
+          'circle-stroke-color': MAP_COLORS.white,
+          'circle-stroke-width': 4,
+        },
+      });
       setLoaded(true);
       setStyleVersion((version) => version + 1);
     });
@@ -493,7 +507,6 @@ export function StartPointMap({
     if (!loaded || !map?.getSource('route-badges')) return;
     const drawn = drawnFor === routes ? (routes ?? []) : [];
     const detail = framing === 'selected';
-    const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
     const project = ([lon, lat]: Position) => map.project([lon, lat]);
     // Read once: it asks the browser for a layout.
     const space = reservedSpace();
@@ -630,14 +643,13 @@ export function StartPointMap({
   }, [sheetHeight]); // eslint-disable-line react-hooks/exhaustive-deps -- only a new height frames again
 
   useEffect(() => {
-    if (!hover) return;
-    const element = document.createElement('div');
-    element.className = 'size-4 rounded-full border-4 border-white bg-ink shadow-float';
-    const marker = new Marker({ element }).setLngLat(hover).addTo(mapRef.current!);
-    return () => {
-      marker.remove();
-    };
-  }, [hover]);
+    // A new style drops the source until it has loaded; `styleVersion` brings the effect back then.
+    const source = loaded ? (mapRef.current!.getSource('route-hover') as GeoJSONSource | undefined) : undefined;
+    source?.setData({
+      type: 'FeatureCollection',
+      features: hover ? [{ type: 'Feature', properties: {}, geometry: point(hover) }] : [],
+    });
+  }, [loaded, hover, styleVersion]);
 
   // The basemap stays light in dark mode. MapLibre makes its container `position: relative`
   // from outside Tailwind's layers, so a wrapper pins it to the screen.

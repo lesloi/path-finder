@@ -854,11 +854,13 @@ describe('CriteriaView', () => {
       const plot = screen.getByTestId('route-profile-plot');
       plot.getBoundingClientRect = () => ({ left: 0, width: 100 }) as DOMRect;
 
+      const dot = () => (map().getSource('route-hover') as { data: { features: unknown[] } }).data.features;
+
       fireEvent.pointerMove(plot, { clientX: 50 });
-      expect(markers.filter((marker) => marker.shown)).toHaveLength(2);
+      expect(dot()).toHaveLength(1);
 
       fireEvent.pointerLeave(plot);
-      expect(markers.filter((marker) => marker.shown)).toHaveLength(1);
+      expect(dot()).toEqual([]);
     });
 
     it('opens the dock of a route tapped on the map', async () => {

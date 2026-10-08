@@ -206,6 +206,7 @@ describe('StartPointMap', () => {
         'routes-hit',
         'route-badges',
         'route-markers',
+        'route-hover',
       ]);
       act(() => map().fire('click', { features: [{ properties: { index: 1 } }] }, 'routes-hit'));
       expect(onRouteSelect).toHaveBeenCalledExactlyOnceWith(1);
@@ -572,6 +573,7 @@ describe('StartPointMap', () => {
         'routes-hit',
         'route-badges',
         'route-markers',
+        'route-hover',
       ]);
     });
 
@@ -984,12 +986,33 @@ describe('StartPointMap', () => {
 
     it('shows a dot where the profile is hovered', () => {
       const { rerender } = renderRoutes();
+      const dot = () =>
+        (map().getSource('route-hover') as GeoJSONSource & { data: { features: unknown[] } }).data.features;
+      const point = { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [6.05, 45.1] } };
 
       rerender(<StartPointMap routes={routes} hover={[6.05, 45.1]} onStartChange={vi.fn()} />);
-      expect(markers.filter((marker) => marker.shown)).toEqual([expect.objectContaining({ position: [6.05, 45.1] })]);
+      expect(dot()).toEqual([point]);
+      expect(
+        map()
+          .layers.map((layer) => layer.id)
+          .at(-1),
+      ).toBe('route-hover');
 
       rerender(<StartPointMap routes={routes} onStartChange={vi.fn()} />);
-      expect(markers.filter((marker) => marker.shown)).toEqual([]);
+      expect(dot()).toEqual([]);
+    });
+
+    it('shows the dot again once a new style has loaded', () => {
+      const { rerender } = renderRoutes();
+      // A new style drops the sources until it has loaded.
+      delete map().sources['route-hover'];
+
+      rerender(<StartPointMap routes={routes} hover={[6.05, 45.1]} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
+
+      expect(
+        (map().getSource('route-hover') as GeoJSONSource & { data: { features: unknown[] } }).data.features,
+      ).toHaveLength(1);
     });
   });
 });
