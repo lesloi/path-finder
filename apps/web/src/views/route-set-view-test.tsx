@@ -239,7 +239,7 @@ describe('RouteSetView', () => {
     it('says which route is in the middle of the carousel on phones, and not in the list of a desktop', () => {
       const { unmount } = render(<View />);
       expect(screen.getByTestId('routes-position')).toHaveTextContent('1/3');
-      expect(screen.getByTestId('routes-position')).toHaveAccessibleName('Route 1 of 3');
+      expect(screen.getByTestId('routes-position')).toHaveTextContent('Route 1 of 3');
 
       fireEvent.focus(screen.getByTestId('routes-row-2'));
       expect(screen.getByTestId('routes-position')).toHaveTextContent('3/3');

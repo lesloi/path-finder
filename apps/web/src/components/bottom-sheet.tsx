@@ -46,7 +46,7 @@ export function BottomSheet({
     };
   }, []);
 
-  const mark = 'before:mx-auto before:block before:h-1 before:w-10 before:rounded-full before:bg-border';
+  const mark = 'before:block before:h-1 before:w-10 before:rounded-full before:bg-border';
   return (
     <div
       ref={sheet}
@@ -61,7 +61,8 @@ export function BottomSheet({
         <button
           type="button"
           data-testid={testId && `${testId}-handle`}
-          className={`h-7 w-full flex-none cursor-grab touch-none ${mark}`}
+          // As tall as a touch target, with the mark in the middle.
+          className={`grid h-touch w-full flex-none cursor-grab place-items-center touch-none ${mark}`}
           aria-label={label}
           aria-expanded={expanded}
           onPointerDown={(event) => {

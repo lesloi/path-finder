@@ -129,8 +129,11 @@ export function RouteSetView({
       <div className="flex items-center justify-between gap-2">
         <strong data-testid="routes-count">{t.routeCount(routes.length)}</strong>
         {!desktop && selected !== undefined && (
-          <span data-testid="routes-position" aria-label={t.route(selected + 1, routes.length)}>
-            {selected + 1}/{routes.length}
+          <span data-testid="routes-position">
+            <span aria-hidden>
+              {selected + 1}/{routes.length}
+            </span>
+            <span className="sr-only">{t.route(selected + 1, routes.length)}</span>
           </span>
         )}
       </div>
