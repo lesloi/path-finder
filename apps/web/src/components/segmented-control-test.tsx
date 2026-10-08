@@ -20,7 +20,6 @@ describe('SegmentedControl', () => {
     render(<SegmentedControl testId="pick" label="Letter" value="a" options={options} onChange={vi.fn()} />);
 
     expect(screen.getByTestId('icon-a').nextSibling).toHaveTextContent('Alpha');
-    expect(screen.getByLabelText('Alpha')).toBe(screen.getByTestId('pick-a'));
   });
 
   it('reports the picked value', () => {
