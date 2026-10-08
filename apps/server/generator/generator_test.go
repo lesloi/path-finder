@@ -259,3 +259,13 @@ func TestStretchesFollowEachOtherAndCoverTheRoute(t *testing.T) {
 		t.Errorf("stretches end at %v km, want the route's 10", end)
 	}
 }
+
+func TestStretchesDropTheOnesWithoutLengthAndMergeTheirNeighbours(t *testing.T) {
+	r := engineLoop(0)
+	r.Distance = 10_000
+	r.Stretches = []engine.Stretch{{Meters: 3000}, {Unpaved: true, Meters: 0.2}, {Meters: 7000}}
+	want := []contract.SurfaceStretch{{Surface: "paved", From: 0, To: 10}}
+	if got := toCandidate(r).surfaces; !reflect.DeepEqual(got, want) {
+		t.Errorf("surfaces = %+v, want %+v", got, want)
+	}
+}

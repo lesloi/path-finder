@@ -92,7 +92,7 @@ func TestRouteSetOfTheDefaultCriteria(t *testing.T) {
 		}
 		var end float64
 		for _, s := range r.Surfaces {
-			if s.From != end || s.To < s.From {
+			if s.From != end || s.To <= s.From {
 				t.Errorf("route %d: stretch %+v does not follow the previous one, which ends at %v", i, s, end)
 			}
 			end = s.To

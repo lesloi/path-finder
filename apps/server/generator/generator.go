@@ -137,9 +137,9 @@ func toCandidate(l *engine.Route) *candidate {
 		geometry: geometry, distance: round(l.Distance/1000, 3), elevationGain: &gain, elevationLoss: &loss,
 		unpavedShare: unpaved / total, technical: l.Technical,
 	}
-	// Consecutive stretches of one surface are already merged. Each one starts where the previous
-	// ends, and the last ends at the route's distance, so they cover it without gaps.
-	c.surfaces = make([]contract.SurfaceStretch, len(l.Stretches))
+	// Each stretch starts where the previous ends, and the last ends at the route's distance, so
+	// they cover it without gaps. One that rounds to no length is dropped, and the stretches of one
+	// surface it then leaves side by side are merged.
 	var from, coveredMeters float64
 	for i, s := range l.Stretches {
 		surface := "paved"
@@ -151,7 +151,14 @@ func toCandidate(l *engine.Route) *candidate {
 			coveredMeters += s.Meters
 			to = round(coveredMeters/total*c.distance, 3)
 		}
-		c.surfaces[i] = contract.SurfaceStretch{Surface: surface, From: from, To: to}
+		if to == from {
+			continue
+		}
+		if n := len(c.surfaces); n > 0 && c.surfaces[n-1].Surface == surface {
+			c.surfaces[n-1].To = to
+		} else {
+			c.surfaces = append(c.surfaces, contract.SurfaceStretch{Surface: surface, From: from, To: to})
+		}
 		from = to
 	}
 	return c
