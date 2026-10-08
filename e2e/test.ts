@@ -22,7 +22,8 @@ export const test = base.extend<{ privacyGuard: void; metricUnits: void }>({
     async ({ context }, use) => {
       await context.addInitScript(() => {
         const key = 'path-finder.settings';
-        if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ units: 'metric' }));
+        const stored = JSON.parse(localStorage.getItem(key) ?? '{}');
+        if (!stored.units) localStorage.setItem(key, JSON.stringify({ ...stored, units: 'metric' }));
       });
       await use();
     },
