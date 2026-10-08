@@ -47,6 +47,12 @@ import { RoutePace } from './route-pace.tsx';
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
 
+/** The paved and unpaved shares of a route, as percentages. */
+function surfaceShares({ unpavedShare }: Route, { language }: Display) {
+  const percent = new Intl.NumberFormat(language, { style: 'percent' });
+  return { paved: percent.format(1 - unpavedShare), unpaved: percent.format(unpavedShare) };
+}
+
 const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp } satisfies Record<
   Miss['criterion'],
   LucideIcon
@@ -198,8 +204,8 @@ function RouteRow({
   const duration = formatDuration(route.estimatedDuration, display.language);
   const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, display);
   const misses = route.misses.map((miss) => missText(miss, route, display));
-  const percent = new Intl.NumberFormat(display.language, { style: 'percent' });
-  const surface = `${t.paved} ${percent.format(1 - route.unpavedShare)} · ${t.unpaved} ${percent.format(route.unpavedShare)}`;
+  const shares = surfaceShares(route, display);
+  const surface = `${t.paved} ${shares.paved} · ${t.unpaved} ${shares.unpaved}`;
   const name = [
     t.route(index + 1, count),
     distance,
@@ -295,8 +301,7 @@ function RouteDetail({
   const swipeFrom = useRef<[number, number]>(undefined);
   const hasPrevious = selected > 0;
   const hasNext = selected < routes.length - 1;
-  const percent = new Intl.NumberFormat(display.language, { style: 'percent' });
-  const unpaved = route.unpavedShare;
+  const shares = surfaceShares(route, display);
 
   function swipeEnd(event: PointerEvent) {
     if (!swipeFrom.current) return;
@@ -404,10 +409,10 @@ function RouteDetail({
           {/* The legend of the colours of the profile. */}
           <p data-testid="route-surface" className="m-0 flex items-center gap-1 text-sm text-ink-2">
             <i className={`size-2 rounded-full ${SURFACE_CLASSES.paved.dot}`} aria-hidden />
-            {t.paved} {percent.format(1 - unpaved)}
+            {t.paved} {shares.paved}
             <span className="whitespace-pre"> · </span>
             <i className={`size-2 rounded-full ${SURFACE_CLASSES.unpaved.dot}`} aria-hidden />
-            {t.unpaved} {percent.format(unpaved)}
+            {t.unpaved} {shares.unpaved}
           </p>
           <button
             type="button"
