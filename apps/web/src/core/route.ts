@@ -190,6 +190,15 @@ export function midpoint(geometry: Route['geometry']): Position {
 /** A rectangle of the screen, in pixels from its top left. */
 export type PixelRect = { left: number; top: number; right: number; bottom: number };
 
+/** Where a position falls on the screen, in pixels from its top left. */
+export type Projection = (position: Position) => { x: number; y: number };
+
+/** Whether `project` puts the position inside `rect`. */
+export function isWithin(position: Position, project: Projection, rect: PixelRect): boolean {
+  const { x, y } = project(position);
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
 // Places tried along a route when it is not all inside the rectangle: enough to find a stretch that is.
 const VISIBLE_SAMPLES = 101;
 
@@ -199,7 +208,7 @@ const VISIBLE_SAMPLES = 101;
  */
 export function midpointWithin(
   geometry: Route['geometry'],
-  project: (position: Position) => { x: number; y: number },
+  project: Projection,
   rect: PixelRect,
 ): Position | undefined {
   const distances = distancesAlong(geometry);
@@ -208,22 +217,11 @@ export function midpointWithin(
   for (let step = 0; step < VISIBLE_SAMPLES; step++) {
     const fraction = step / (VISIBLE_SAMPLES - 1);
     const position = positionAlong(geometry, distances, fraction * total);
-    const { x, y } = project(position);
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+    if (!isWithin(position, project, rect)) continue;
     const offset = Math.abs(fraction - 0.5);
     if (!best || offset < best.offset) best = { position, offset };
   }
   return best?.position;
-}
-
-/** Whether `project` puts the position inside `rect`. */
-export function isWithin(
-  position: Position,
-  project: (position: Position) => { x: number; y: number },
-  rect: PixelRect,
-): boolean {
-  const { x, y } = project(position);
-  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
 /** A mark `count` steps along a route, such as the 3rd kilometre. */
