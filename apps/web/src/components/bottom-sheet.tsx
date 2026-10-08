@@ -7,7 +7,7 @@ const SWIPE_PX = 30;
  * The phone panel over the bottom of the map. It is as tall as its content, up to 40 % of the screen; once
  * `expanded` (such as for the detail of a route), it takes 60 % of it. The handle toggles that, from a tap or a
  * swipe; without `onExpandedChange`, the handle is only a mark. `onHeightChange` hears the height of the sheet in
- * px, so the map is framed clear of it.
+ * px, so the map is framed clear of it and the buttons over the map stand above it.
  */
 export function BottomSheet({
   label,
@@ -30,20 +30,10 @@ export function BottomSheet({
   const swiped = useRef(false);
   const heightChanged = useEffectEvent((height: number) => onHeightChange?.(height));
 
-  // The floating buttons and the map attribution sit above the sheet, whatever its height.
   useLayoutEffect(() => {
-    const root = document.documentElement.style;
-    const observer = new ResizeObserver(([entry]) => {
-      const height = entry.borderBoxSize[0].blockSize;
-      root.setProperty('--sheet-height', `${height}px`);
-      heightChanged(height);
-    });
+    const observer = new ResizeObserver(([entry]) => heightChanged(entry.borderBoxSize[0].blockSize));
     observer.observe(sheet.current!);
-    return () => {
-      observer.disconnect();
-      root.removeProperty('--sheet-height');
-      heightChanged(0);
-    };
+    return () => observer.disconnect();
   }, []);
 
   const mark = 'before:block before:h-1 before:w-10 before:rounded-full before:bg-border';

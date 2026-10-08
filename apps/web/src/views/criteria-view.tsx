@@ -49,7 +49,7 @@ const STACKED_ABOVE = [
 const stackedAbove = (below: 0 | 1 | 2) =>
   `right-safe-3 transition-[bottom] duration-250 ease-[ease] desktop:bottom-(--edge-bottom) ${STACKED_ABOVE[below]}`;
 
-// Sets a custom property of the page while `shown`, as `--sheet-height` does for the sheet.
+// Sets a custom property of the page while `shown`.
 function useRootProperty(name: string, value: string, shown: boolean) {
   useLayoutEffect(() => {
     if (!shown) return;
@@ -112,6 +112,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const stale = Boolean(routeSet && current && criteriaChanged(current, routeSet.request, units));
   useRootProperty('--list-inset', 'var(--list-reserved)', listShown);
   useRootProperty('--dock-inset', 'var(--dock-reserved)', dockShown);
+  // The floating buttons and the map attribution sit above the sheet, whatever its height.
+  useRootProperty('--sheet-height', `${sheetHeight}px`, !desktop && sheetHeight > 0);
   // The detail of a route takes more than half of a phone's screen: the buttons over the map leave it room.
   const detailOpen = !desktop && browser.detail;
   const locateShown = !routesShown && !loading && !detailOpen;

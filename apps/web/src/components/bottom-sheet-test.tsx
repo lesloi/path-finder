@@ -86,18 +86,13 @@ describe('BottomSheet', () => {
         observed[0]!.callback([{ borderBoxSize: [{ blockSize }] }] as unknown as ResizeObserverEntry[], {} as never),
       );
 
-    it('is told, and left to the page for the floating buttons', () => {
+    it('is told as it changes', () => {
       const onHeightChange = vi.fn();
-      const { unmount } = render(<Sheet onHeightChange={onHeightChange} />);
+      render(<Sheet onHeightChange={onHeightChange} />);
 
       resize(240);
 
       expect(onHeightChange).toHaveBeenLastCalledWith(240);
-      expect(document.documentElement.style.getPropertyValue('--sheet-height')).toBe('240px');
-
-      unmount();
-      expect(onHeightChange).toHaveBeenLastCalledWith(0);
-      expect(document.documentElement.style.getPropertyValue('--sheet-height')).toBe('');
     });
   });
 });
