@@ -16,6 +16,8 @@ jobs:
   # Builds the multi-platform image and pushes it to GitHub Container Registry; the pull requests build the app through the e2e tests (workflow `web`).
   container:
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     permissions:
       contents: read
       packages: write
@@ -38,7 +40,8 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha
 
-      - uses: docker/build-push-action@v7
+      - id: build
+        uses: docker/build-push-action@v7
         with:
           push: true
           platforms: linux/amd64,linux/arm64
@@ -46,3 +49,31 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Rolls the pushed image out to the cluster by its digest; it waits for the variable K8S_NAMESPACE, so nothing fails before
+  # the cluster exists.
+  deploy:
+    needs: container
+    if: vars.K8S_NAMESPACE != ''
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      NAMESPACE: ${{ vars.K8S_NAMESPACE }}
+      DEPLOYMENT: ${{ vars.K8S_DEPLOYMENT }}
+      CONTAINER: ${{ vars.K8S_CONTAINER }}
+      KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
+      IMAGE: ghcr.io/${{ github.repository }}@${{ needs.container.outputs.digest }}
+    steps:
+      - name: Write the kubeconfig
+        run: |
+          (umask 077 && printf '%s' "$KUBECONFIG_DATA" > "$RUNNER_TEMP/kubeconfig")
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      # A rollout that is not ready in time is undone.
+      - name: Roll out
+        run: |
+          kubectl --namespace "$NAMESPACE" set image "deployment/$DEPLOYMENT" "$CONTAINER=${IMAGE,,}"
+          if ! kubectl --namespace "$NAMESPACE" rollout status "deployment/$DEPLOYMENT" --timeout=5m; then
+            kubectl --namespace "$NAMESPACE" rollout undo "deployment/$DEPLOYMENT"
+            exit 1
+          fi

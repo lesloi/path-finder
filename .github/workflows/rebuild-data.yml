@@ -1,0 +1,40 @@
+name: Rebuild data
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  # Starts the cluster's data CronJob now, for a release that changes the format of the graph.
+  rebuild:
+    if: vars.K8S_NAMESPACE != '' && vars.K8S_CRONJOB != ''
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      NAMESPACE: ${{ vars.K8S_NAMESPACE }}
+      CRONJOB: ${{ vars.K8S_CRONJOB }}
+      KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
+    steps:
+      - name: Write the kubeconfig
+        run: |
+          (umask 077 && printf '%s' "$KUBECONFIG_DATA" > "$RUNNER_TEMP/kubeconfig")
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Refuse a second build
+        run: |
+          running=$(kubectl --namespace "$NAMESPACE" get jobs --output json |
+            jq --raw-output --arg cron "$CRONJOB" \
+              '.items[] | select(any(.metadata.ownerReferences[]?; .name == $cron) and (.status.active // 0) > 0) | .metadata.name')
+          if [ -n "$running" ]; then
+            echo "::error::A build is already running: $running"
+            exit 1
+          fi
+
+      - name: Start the build
+        run: kubectl --namespace "$NAMESPACE" create job "rebuild-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" --from="cronjob/$CRONJOB"
