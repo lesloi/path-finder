@@ -15,11 +15,13 @@
       "surfaces": [
         {
           "surface": "paved",
-          "share": 0.6
+          "from": 0,
+          "to": 6.12
         },
         {
           "surface": "unpaved",
-          "share": 0.4
+          "from": 6.12,
+          "to": 10.2
         }
       ],
       "technical": true
@@ -42,7 +44,8 @@
       "surfaces": [
         {
           "surface": "paved",
-          "share": 1
+          "from": 0,
+          "to": 12.9
         }
       ],
       "technical": false

@@ -78,7 +78,7 @@ func TestGenerateSpellsOutTheContract(t *testing.T) {
 	if got := r.Geometry[0]; len(got) != 3 || got[0] != 6.1294 || got[1] != 45.8992 || got[2] != 450.1 {
 		t.Errorf("first point = %v, want longitude, latitude and a height to the decimetre", got)
 	}
-	if len(r.Surfaces) != 2 || r.Surfaces[0] != (contract.SurfaceStretch{Surface: "paved", Share: 0.75}) {
+	if len(r.Surfaces) != 2 || r.Surfaces[0] != (contract.SurfaceStretch{Surface: "paved", From: 0, To: 7.5}) {
 		t.Errorf("surfaces = %+v", r.Surfaces)
 	}
 	if _, err := json.Marshal(map[string]any{"routes": routes}); err != nil {

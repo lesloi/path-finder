@@ -68,12 +68,12 @@ func TestRouteSetMatchesTheWebAppsSample(t *testing.T) {
 			Geometry: [][]float64{{6.1294, 45.8992, 450.5}, {6.13, 45.9, 455}}, Distance: 10.2,
 			ElevationGain: &gain, ElevationLoss: &loss, EstimatedDuration: 62, Kind: "match",
 			Misses: []Miss{}, UnpavedShare: 0.4, Technical: true,
-			Surfaces: []SurfaceStretch{{"paved", 0.6}, {"unpaved", 0.4}},
+			Surfaces: []SurfaceStretch{{"paved", 0, 6.12}, {"unpaved", 6.12, 10.2}},
 		},
 		{
 			Geometry: [][]float64{{6.1294, 45.8992}, {6.13, 45.9}}, Distance: 12.9, EstimatedDuration: 80,
 			Kind: "suggestion", Misses: []Miss{{"distance", 2.9}}, UnpavedShare: 0,
-			Surfaces: []SurfaceStretch{{"paved", 1}},
+			Surfaces: []SurfaceStretch{{"paved", 0, 12.9}},
 		},
 	}
 	got, err := json.Marshal(map[string]any{"routes": routes})

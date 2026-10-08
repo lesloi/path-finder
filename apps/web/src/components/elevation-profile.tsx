@@ -120,7 +120,7 @@ export function ElevationProfile({
             ))}
             {profile.slice(0, -1).map((from, k) => {
               const to = profile[k + 1];
-              const surface = surfaceAt(route.surfaces, total ? (from.distance + to.distance) / 2 / total : 0);
+              const surface = surfaceAt(route.surfaces, (from.distance + to.distance) / 2);
               const [x0, x1] = [x(from.distance), x(to.distance)];
               return (
                 <g key={k} data-surface={surface}>

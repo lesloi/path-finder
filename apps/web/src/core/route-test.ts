@@ -35,8 +35,8 @@ const route: Route = {
   misses: [],
   unpavedShare: 0.3,
   surfaces: [
-    { surface: 'paved', share: 0.7 },
-    { surface: 'unpaved', share: 0.3 },
+    { surface: 'paved', from: 0, to: 7 },
+    { surface: 'unpaved', from: 7, to: 10 },
   ],
   technical: false,
 };
@@ -73,7 +73,7 @@ describe('parseRoutes', () => {
     ['a technical flag that is not a boolean', { routes: [{ ...route, technical: 'yes' }] }],
     ['an unknown kind', { routes: [{ ...route, kind: 'perfect' }] }],
     ['an unknown missed criterion', { routes: [{ ...route, misses: [{ criterion: 'surface', gap: 1 }] }] }],
-    ['an unknown surface', { routes: [{ ...route, surfaces: [{ surface: 'ice', share: 1 }] }] }],
+    ['an unknown surface', { routes: [{ ...route, surfaces: [{ surface: 'ice', from: 0, to: 10 }] }] }],
   ])('refuses an answer with %s', (_, body) => {
     expect(parseRoutes(body)).toBeUndefined();
   });
@@ -137,21 +137,21 @@ describe('gradeAt', () => {
 
 describe('surfaceAt', () => {
   const surfaces: SurfaceStretch[] = [
-    { surface: 'paved', share: 0.7 },
-    { surface: 'unpaved', share: 0.3 },
+    { surface: 'paved', from: 0, to: 7 },
+    { surface: 'unpaved', from: 7, to: 10 },
   ];
 
   it.each([
     ['at the start', 0, 'paved'],
-    ['in the first stretch', 0.5, 'paved'],
-    ['in the second stretch', 0.85, 'unpaved'],
-    ['at the end', 1, 'unpaved'],
-  ])('gives the surface %s', (_, fraction, expected) => {
-    expect(surfaceAt(surfaces, fraction)).toBe(expected);
+    ['in the first stretch', 5, 'paved'],
+    ['in the second stretch', 8.5, 'unpaved'],
+    ['at the end', 10, 'unpaved'],
+  ])('gives the surface %s', (_, distance, expected) => {
+    expect(surfaceAt(surfaces, distance)).toBe(expected);
   });
 
-  it('keeps the last surface when the shares fall short of the end', () => {
-    expect(surfaceAt([{ surface: 'unpaved', share: 0.4 }], 0.9)).toBe('unpaved');
+  it('keeps the last surface when the stretches fall short of the end', () => {
+    expect(surfaceAt([{ surface: 'unpaved', from: 0, to: 4 }], 9)).toBe('unpaved');
   });
 
   it('is paved when nothing is known', () => {
