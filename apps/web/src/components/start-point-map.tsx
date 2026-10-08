@@ -78,12 +78,12 @@ function freeArea(
   map: Map,
   desktop: boolean,
   sheetHeight: number,
+  space: ReturnType<typeof reservedSpace>,
   [halfWidth, halfHeight]: [number, number],
 ): PixelRect {
   const { clientWidth, clientHeight } = map.getCanvas();
   // On desktops, the route list and the dock take the right and the bottom, shown or not; on phones, the bar takes
   // the top and the sheet the bottom.
-  const space = reservedSpace();
   const sheet = desktop ? space.dock : sheetHeight;
   return {
     left: (desktop ? space.column : 0) + FRAME_MARGIN + halfWidth,
@@ -495,7 +495,9 @@ export function StartPointMap({
     const detail = framing === 'selected';
     const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
     const project = ([lon, lat]: Position) => map.project([lon, lat]);
-    const tagArea = freeArea(map, desktop, sheetHeight, TAG_HALF);
+    // Read once: it asks the browser for a layout.
+    const space = reservedSpace();
+    const tagArea = freeArea(map, desktop, sheetHeight, space, TAG_HALF);
     // One tag per route, until the detail of one is open and its markers say it better. It sits on the stretch
     // of its route that is in view, and a route with none in view has no tag.
     const badges = detail
@@ -530,7 +532,7 @@ export function StartPointMap({
     const summary = marked === undefined ? undefined : summaries?.[marked];
     const geometry = marked === undefined ? undefined : drawn[marked];
     const interval = summary && markerInterval(summary.distance / kilometres);
-    const markerArea = freeArea(map, desktop, sheetHeight, [MARKER_HALF, MARKER_HALF]);
+    const markerArea = freeArea(map, desktop, sheetHeight, space, [MARKER_HALF, MARKER_HALF]);
     const markers =
       geometry && interval
         ? distanceMarkers(geometry, interval * kilometres)
