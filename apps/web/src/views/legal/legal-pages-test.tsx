@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react';
 
+import { LEAD } from '../../components/index.ts';
 import { expectNamedControls } from '../../accessible-names.ts';
-import { legalText, LINKS, type Language } from '../../i18n/index.ts';
+import { legalText, LINKS, privacyUpdatedLine, type Language } from '../../i18n/index.ts';
 import { CreditsPage } from './credits-page.tsx';
 import { LegalNoticePage } from './legal-notice-page.tsx';
 import { PrivacyPolicyPage } from './privacy-policy-page.tsx';
@@ -38,6 +39,14 @@ describe.each(languages)('legal pages in %s', (language) => {
     expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(/hash/);
   });
 
+  it('sets the introduction of the privacy policy apart, and no other paragraph', () => {
+    render(<PrivacyPolicyPage language={language} />);
+
+    const [intro, ...others] = screen.getByTestId('privacy-policy-page').querySelectorAll('p');
+    expect(intro).toHaveClass(...LEAD.split(' '));
+    for (const paragraph of others) expect(paragraph).not.toHaveClass('border-ink');
+  });
+
   it('names the publisher and the host in the legal notice', () => {
     render(<LegalNoticePage language={language} />);
 
@@ -65,6 +74,13 @@ describe.each(languages)('legal pages in %s', (language) => {
     for (const { id, title } of sections) {
       if (title) expect(screen.getByTestId(`${testId}-section-${id}`)).toHaveTextContent(title);
     }
+  });
+
+  it('puts the date of the privacy policy right under its introduction', () => {
+    render(<PrivacyPolicyPage language={language} />);
+
+    const [intro] = screen.getByTestId('privacy-policy-page').querySelectorAll('p');
+    expect(intro.nextElementSibling).toHaveTextContent(privacyUpdatedLine(language));
   });
 
   it('dates the privacy policy in the language', () => {

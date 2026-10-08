@@ -1,18 +1,18 @@
 import { Fragment } from 'react';
 
-import { PROSE, RichText } from '../../components/index.ts';
+import { LEAD, NOTE, PROSE, RichText } from '../../components/index.ts';
 import type { Section } from '../../i18n/index.ts';
 
 /** A legal page: its sections as headings, paragraphs and lists. Ids are `<testId>`, `<testId>-section-<id>` and `<testId>-<link>`. */
 export function LegalDocument({
   testId,
   sections,
-  footer,
+  note,
 }: {
   testId: string;
   sections: Section[];
-  /** A line after the last section. */
-  footer?: string;
+  /** A line under the introduction, the section without a heading. */
+  note?: string;
 }) {
   return (
     <div className={PROSE} data-testid={testId}>
@@ -21,7 +21,8 @@ export function LegalDocument({
           {title && <h2 data-testid={`${testId}-section-${id}`}>{title}</h2>}
           {blocks.map((block, index) =>
             'paragraph' in block ? (
-              <p key={index}>
+              // The first paragraph of the introduction, which has no heading, opens the page.
+              <p key={index} className={!title && index === 0 ? LEAD : undefined}>
                 <RichText paragraph={block.paragraph} testId={testId} />
               </p>
             ) : (
@@ -34,9 +35,9 @@ export function LegalDocument({
               </ul>
             ),
           )}
+          {!title && note && <p className={NOTE}>{note}</p>}
         </Fragment>
       ))}
-      {footer && <p>{footer}</p>}
     </div>
   );
 }

@@ -1,9 +1,10 @@
-import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import type { Theme, Units } from '../core/index.ts';
 import { commonText, settingsText, type Language } from '../i18n/index.ts';
 import { useSettings } from '../state/index.ts';
-import { Dropdown, GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON } from '../components/index.ts';
+import { GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON, SegmentedControl } from '../components/index.ts';
 
 const FLAG_CLASSES = 'flex-none ring-1 ring-border';
 
@@ -14,21 +15,21 @@ export function SettingsView({ language }: { language: Language }) {
     <>
       <h2 className={GROUP_TITLE}>{t.display}</h2>
       <div className={LIST}>
-        <div className={LIST_ROW}>
-          <Dropdown
+        <SettingRow label={t.theme}>
+          <SegmentedControl
             testId="settings-theme"
             label={t.theme}
             value={settings.theme}
             options={[
-              { value: 'system', label: t.system, icon: <Monitor size={18} aria-hidden /> },
-              { value: 'light', label: t.light, icon: <Sun size={18} aria-hidden /> },
-              { value: 'dark', label: t.dark, icon: <Moon size={18} aria-hidden /> },
+              { value: 'system', label: t.system },
+              { value: 'light', label: t.light },
+              { value: 'dark', label: t.dark },
             ]}
             onChange={(theme: Theme) => update({ theme })}
           />
-        </div>
-        <div className={LIST_ROW}>
-          <Dropdown
+        </SettingRow>
+        <SettingRow label={t.language}>
+          <SegmentedControl
             testId="settings-language"
             label={t.language}
             value={language}
@@ -38,9 +39,9 @@ export function SettingsView({ language }: { language: Language }) {
             ]}
             onChange={(picked) => update({ language: picked })}
           />
-        </div>
-        <div className={LIST_ROW}>
-          <Dropdown
+        </SettingRow>
+        <SettingRow label={t.units}>
+          <SegmentedControl
             testId="settings-units"
             label={t.units}
             value={settings.units}
@@ -50,7 +51,7 @@ export function SettingsView({ language }: { language: Language }) {
             ]}
             onChange={(units: Units) => update({ units })}
           />
-        </div>
+        </SettingRow>
       </div>
       <h2 className={GROUP_TITLE}>{t.about}</h2>
       <nav className={LIST}>
@@ -66,6 +67,16 @@ export function SettingsView({ language }: { language: Language }) {
         ))}
       </nav>
     </>
+  );
+}
+
+/** A label and its control; the control wraps under the label when the row is too narrow, or the text too large. */
+function SettingRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className={`${LIST_ROW} flex-wrap py-2`}>
+      <span className="font-semibold">{label}</span>
+      {children}
+    </div>
   );
 }
 

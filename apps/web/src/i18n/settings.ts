@@ -9,8 +9,8 @@ export const settingsText = {
     dark: 'Dark',
     language: 'Language',
     units: 'Units',
-    metric: 'Metric (km, m)',
-    imperial: 'Imperial (mi, ft)',
+    metric: 'km, m',
+    imperial: 'mi, ft',
     about: 'About',
   },
   fr: {
@@ -21,8 +21,8 @@ export const settingsText = {
     dark: 'Sombre',
     language: 'Langue',
     units: 'Unités',
-    metric: 'Métriques (km, m)',
-    imperial: 'Impériales (mi, ft)',
+    metric: 'km, m',
+    imperial: 'mi, ft',
     about: 'À propos',
   },
 } satisfies Record<Language, unknown>;

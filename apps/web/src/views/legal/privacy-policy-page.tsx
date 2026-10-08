@@ -6,7 +6,7 @@ export function PrivacyPolicyPage({ language }: { language: Language }) {
     <LegalDocument
       testId="privacy-policy-page"
       sections={legalText[language].privacy}
-      footer={privacyUpdatedLine(language)}
+      note={privacyUpdatedLine(language)}
     />
   );
 }

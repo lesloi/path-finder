@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 
 /** Exclusive choices side by side, as native radio buttons; the label names the group. */
 export function SegmentedControl<Value extends string>({
@@ -10,7 +10,7 @@ export function SegmentedControl<Value extends string>({
 }: {
   label: string;
   value: Value;
-  options: { value: Value; label: string }[];
+  options: { value: Value; label: string; /** Decorative, before the label. */ icon?: ReactNode }[];
   onChange: (value: Value) => void;
   /** Prefix of the test ids: the group, then `-<value>` for each radio button. */
   testId?: string;
@@ -22,8 +22,8 @@ export function SegmentedControl<Value extends string>({
         <label
           key={option.value}
           className={
-            'flex min-h-9 flex-1 cursor-pointer items-center justify-center rounded-full px-3 text-center ' +
-            'text-sm font-semibold text-ink-2 has-checked:bg-surface has-checked:text-ink ' +
+            'flex min-h-touch flex-1 cursor-pointer items-center justify-center gap-2 rounded-full px-3 text-center ' +
+            'text-sm font-semibold whitespace-nowrap text-ink-2 has-checked:bg-surface has-checked:text-ink ' +
             'has-checked:shadow-float has-focus-visible:ring-2 has-focus-visible:ring-accent'
           }
         >
@@ -36,6 +36,7 @@ export function SegmentedControl<Value extends string>({
             checked={option.value === value}
             onChange={() => onChange(option.value)}
           />
+          {option.icon}
           {option.label}
         </label>
       ))}
