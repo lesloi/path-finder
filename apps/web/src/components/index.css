@@ -60,15 +60,15 @@
 
 :root {
   /* Each UI colour is declared once as light-dark(light, dark), resolved by `color-scheme` below. */
-  --accent: light-dark(#2b6f9e, #6fb0dd);
-  --accent-hover: light-dark(#235b82, #8ac0e4);
-  --on-accent: light-dark(#ffffff, #0b1a26);
-  --accent-soft: light-dark(#e4eef6, #1b3246);
-  --surface: light-dark(#ffffff, #1c1e1d);
-  --surface-2: light-dark(#f3f4f2, #272a28);
-  --ink: light-dark(#1c1d1b, #eeefec);
-  --ink-2: light-dark(#5d615c, #a3a7a2);
-  --border: light-dark(#e1e3df, #363937);
+  --accent: light-dark(#0f1a14, #ececee);
+  --accent-hover: light-dark(#2a3b30, #ffffff);
+  --on-accent: light-dark(#ffffff, #0a0d0b);
+  --accent-soft: light-dark(#e6ebe0, #262e29);
+  --surface: light-dark(#fbfcf8, #101412);
+  --surface-2: light-dark(#f0f4ea, #181e1a);
+  --ink: light-dark(#1c2a22, #ececee);
+  --ink-2: light-dark(#5b695f, #9ba39e);
+  --border: light-dark(#dde4d6, #212823);
   --scrim: rgb(0 0 0 / 0.35);
   --float-1: light-dark(rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.4));
   --float-2: light-dark(rgb(0 0 0 / 0.14), rgb(0 0 0 / 0.45));
@@ -122,6 +122,7 @@
   body {
     font-size: var(--text-base);
     line-height: 1.4;
+    font-variant-numeric: tabular-nums;
     color: var(--color-ink);
     background: var(--color-surface);
     -webkit-tap-highlight-color: transparent;
