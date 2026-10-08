@@ -75,7 +75,10 @@ function parseRoute(value: unknown): Route | undefined {
     Array.isArray(surfaces) &&
     surfaces.every(
       (stretch) =>
-        isObject(stretch) && SURFACES.includes(stretch.surface as SurfaceStretch['surface']) && isNumber(stretch.share),
+        isObject(stretch) &&
+        SURFACES.includes(stretch.surface as SurfaceStretch['surface']) &&
+        isNumber(stretch.from) &&
+        isNumber(stretch.to),
     );
   if (!validMisses || !validSurfaces) return undefined;
   return {
@@ -87,7 +90,7 @@ function parseRoute(value: unknown): Route | undefined {
     kind,
     misses: (misses as Miss[]).map(({ criterion, gap }) => ({ criterion, gap })),
     unpavedShare,
-    surfaces: (surfaces as SurfaceStretch[]).map(({ surface, share }) => ({ surface, share })),
+    surfaces: (surfaces as SurfaceStretch[]).map(({ surface, from, to }) => ({ surface, from, to })),
     technical,
   };
 }
@@ -158,14 +161,10 @@ export function gradeAt(profile: ProfilePoint[], fraction: number): number {
   return b.distance === a.distance ? 0 : ((b.height - a.height) / ((b.distance - a.distance) * 1000)) * 100;
 }
 
-/** The surface of the route at `fraction` (0 to 1) of its length, from its stretches in order. */
-export function surfaceAt(surfaces: SurfaceStretch[], fraction: number): SurfaceStretch['surface'] {
-  let end = 0;
-  for (const { surface, share } of surfaces) {
-    end += share;
-    if (fraction <= end) return surface;
-  }
-  return surfaces.at(-1)?.surface ?? 'paved';
+/** The surface of the route `distance` kilometres along it, from its stretches in order. */
+export function surfaceAt(surfaces: SurfaceStretch[], distance: number): SurfaceStretch['surface'] {
+  const stretch = surfaces.find(({ to }) => distance <= to) ?? surfaces.at(-1);
+  return stretch?.surface ?? 'paved';
 }
 
 // The position `distance` kilometres along a route whose distances along are known.

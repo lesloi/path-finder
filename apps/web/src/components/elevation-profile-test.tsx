@@ -15,7 +15,7 @@ const route: Route = {
   kind: 'match',
   misses: [],
   unpavedShare: 0,
-  surfaces: [{ surface: 'paved', share: 1 }],
+  surfaces: [{ surface: 'paved', from: 0, to: 1.2 }],
   technical: false,
 };
 
@@ -87,8 +87,8 @@ describe('ElevationProfile', () => {
         route={{
           ...route,
           surfaces: [
-            { surface: 'paved', share: 0.5 },
-            { surface: 'unpaved', share: 0.5 },
+            { surface: 'paved', from: 0, to: 0.6 },
+            { surface: 'unpaved', from: 0.6, to: 1.2 },
           ],
         }}
         display={{ units: 'metric', language: 'en' }}

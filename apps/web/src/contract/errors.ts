@@ -11,8 +11,8 @@ export type ErrorCode =
 export type ApiError =
   { error: Exclude<ErrorCode, 'invalid-criteria'> } | { error: 'invalid-criteria'; field: CriteriaField };
 
-/** A part of a route on one surface, with its share of the route's length (0 to 1). */
-export type SurfaceStretch = { surface: 'paved' | 'unpaved'; share: number };
+/** A part of a route on one surface, `from` and `to` in kilometres along the route, in order and without gaps. */
+export type SurfaceStretch = { surface: 'paved' | 'unpaved'; from: number; to: number };
 
 /** `gap` is in the criterion's unit: kilometres, minutes, or metres. */
 export type Miss = { criterion: 'distance' | 'duration' | 'elevationGain'; gap: number };

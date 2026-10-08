@@ -49,10 +49,12 @@ type Miss struct {
 	Gap       float64 `json:"gap"`
 }
 
-// SurfaceStretch is a part of a route on one surface, with its share of the route's length (0 to 1).
+// SurfaceStretch is a part of a route on one surface, from and to in kilometres along the route.
+// The stretches of a route are in order and cover it from 0 to its distance without gaps.
 type SurfaceStretch struct {
 	Surface string  `json:"surface"` // paved or unpaved
-	Share   float64 `json:"share"`
+	From    float64 `json:"from"`
+	To      float64 `json:"to"`
 }
 
 // Route is one route of a route set. A geometry point is longitude, latitude and, with elevation

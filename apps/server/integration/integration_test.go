@@ -90,13 +90,16 @@ func TestRouteSetOfTheDefaultCriteria(t *testing.T) {
 		if len(first) != 3 || first[0] != last[0] || first[1] != last[1] {
 			t.Errorf("route %d: first %v, last %v: a loop with heights on every point", i, first, last)
 		}
-		var sum float64
+		var end float64
 		for _, s := range r.Surfaces {
-			sum += s.Share
+			if s.From != end || s.To <= s.From {
+				t.Errorf("route %d: stretch %+v does not follow the previous one, which ends at %v", i, s, end)
+			}
+			end = s.To
 			paved, unpaved = paved || s.Surface == "paved", unpaved || s.Surface == "unpaved"
 		}
-		if sum < 0.999 || sum > 1.001 {
-			t.Errorf("route %d: surface shares add up to %v", i, sum)
+		if end != r.Distance {
+			t.Errorf("route %d: stretches end at %v km, the route at %v", i, end, r.Distance)
 		}
 	}
 	if !paved || !unpaved {

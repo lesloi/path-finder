@@ -31,7 +31,7 @@ func ptr(v float64) *float64 { return &v }
 func cand(mutate func(*candidate)) *candidate {
 	c := &candidate{
 		geometry: loop(0), distance: 10, elevationGain: ptr(300), unpavedShare: 0.5,
-		surfaces: []contract.SurfaceStretch{{Surface: "paved", Share: 0.5}, {Surface: "unpaved", Share: 0.5}},
+		surfaces: []contract.SurfaceStretch{{Surface: "paved", From: 0, To: 5}, {Surface: "unpaved", From: 5, To: 10}},
 	}
 	if mutate != nil {
 		mutate(c)

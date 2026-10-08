@@ -19,8 +19,8 @@ function route(overrides: Partial<Route> = {}): Route {
     misses: [],
     unpavedShare: 0.3,
     surfaces: [
-      { surface: 'paved', share: 0.7 },
-      { surface: 'unpaved', share: 0.3 },
+      { surface: 'paved', from: 0, to: 7 },
+      { surface: 'unpaved', from: 7, to: 10 },
     ],
     technical: false,
     ...overrides,
