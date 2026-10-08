@@ -50,30 +50,37 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Rolls the pushed image out to the cluster by its digest; it waits for the variable K8S_NAMESPACE, so nothing fails before
-  # the cluster exists.
+  # Writes the digest of the pushed image in the infrastructure repository, which Flux applies to the cluster; it waits for
+  # the variable INFRA_REPOSITORY, so nothing fails before that repository exists.
   deploy:
     needs: container
-    if: vars.K8S_NAMESPACE != ''
+    if: vars.INFRA_REPOSITORY != ''
     runs-on: ubuntu-latest
-    environment: production
-    env:
-      NAMESPACE: ${{ vars.K8S_NAMESPACE }}
-      DEPLOYMENT: ${{ vars.K8S_DEPLOYMENT }}
-      CONTAINER: ${{ vars.K8S_CONTAINER }}
-      KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
-      IMAGE: ghcr.io/${{ github.repository }}@${{ needs.container.outputs.digest }}
     steps:
-      - name: Write the kubeconfig
-        run: |
-          (umask 077 && printf '%s' "$KUBECONFIG_DATA" > "$RUNNER_TEMP/kubeconfig")
-          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ vars.INFRA_REPOSITORY }}
+          ssh-key: ${{ secrets.INFRA_DEPLOY_KEY }}
+          path: infra
 
-      # A rollout that is not ready in time is undone.
-      - name: Roll out
+      - name: Write the digest
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}
+          DIGEST: ${{ needs.container.outputs.digest }}
         run: |
-          kubectl --namespace "$NAMESPACE" set image "deployment/$DEPLOYMENT" "$CONTAINER=${IMAGE,,}"
-          if ! kubectl --namespace "$NAMESPACE" rollout status "deployment/$DEPLOYMENT" --timeout=5m; then
-            kubectl --namespace "$NAMESPACE" rollout undo "deployment/$DEPLOYMENT"
-            exit 1
-          fi
+          cat > infra/overlays/prod/image/kustomization.yaml <<EOF
+          apiVersion: kustomize.config.k8s.io/v1alpha1
+          kind: Component
+          images:
+            - name: ${IMAGE,,}
+              digest: $DIGEST
+          EOF
+
+      - name: Push
+        working-directory: infra
+        run: |
+          git diff --quiet && exit 0
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit --all --message "chore: run ${GITHUB_SHA::7}"
+          git push || { git pull --rebase && git push; }
