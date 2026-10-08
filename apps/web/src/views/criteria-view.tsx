@@ -1,7 +1,7 @@
 import { Crosshair, LocateFixed, Navigation2, Scan, Settings } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import { useSettings } from '../state/index.ts';
+import { useSettings, useUnits } from '../state/index.ts';
 import { CriteriaForm, useCriteriaDraft } from './criteria-form.tsx';
 import { RouteErrorToast } from './route-error-toast.tsx';
 import { RoutesFoundButton } from './routes-found-button.tsx';
@@ -44,7 +44,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const t = { ...commonText[language], ...criteriaText[language], ...routesText[language] };
   const desktop = useDesktop();
   // Kept here: the form is mounted in the column or in the sheet, whichever the screen shows.
-  const draft = useCriteriaDraft();
+  const draft = useCriteriaDraft(language);
   const [start, setStart] = useState<Position>();
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
@@ -56,7 +56,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const map = useRef<MapHandle>(null);
   const [mapView, setMapView] = useState<MapView>({ bearing: 0, rotated: false, movedAway: false });
   const pageWasOpen = useRef(pageOpen);
-  const [{ units, basemap, pace }, update] = useSettings();
+  const [{ basemap, pace }, update] = useSettings();
+  const units = useUnits(language);
   const browser = useRouteBrowser();
   const { routeSet, loading } = browser;
   const display = useMemo(() => ({ units, language }), [units, language]);

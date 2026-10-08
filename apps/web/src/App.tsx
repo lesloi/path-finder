@@ -1,8 +1,8 @@
 import { useEffect, type ComponentType } from 'react';
 
 import { SubPage } from './components/index.ts';
-import { browserLanguage, commonText, type Language } from './i18n/index.ts';
-import { goTo, useHash, useSettings } from './state/index.ts';
+import { commonText, type Language } from './i18n/index.ts';
+import { goTo, languageOf, useHash, useSettings } from './state/index.ts';
 import { CreditsPage, CriteriaView, LegalNoticePage, PrivacyPolicyPage, SettingsView } from './views/index.ts';
 // Each page by its hash, with its title and where its back arrow goes.
 const pages: Record<
@@ -33,7 +33,7 @@ const pages: Record<
 export function App() {
   const hash = useHash();
   const [settings] = useSettings();
-  const language = settings.language ?? browserLanguage(navigator.languages);
+  const language = languageOf(settings);
   const page = pages[hash];
 
   useEffect(() => {

@@ -12,7 +12,9 @@ const fr = criteriaText.fr;
 
 const START: Position = [6.1294, 45.8992];
 
-const store = (settings: object) => localStorage.setItem('path-finder.settings', JSON.stringify(settings));
+// The tests read metric figures, whatever the language, unless they pick other units.
+const store = (settings: object) =>
+  localStorage.setItem('path-finder.settings', JSON.stringify({ units: 'metric', ...settings }));
 const onDesktop = () =>
   vi
     .spyOn(window, 'matchMedia')
@@ -33,6 +35,7 @@ const choose = (group: 'target' | 'elevation' | 'surface', value: string) =>
   fireEvent.click(screen.getByTestId(`criteria-${group}-${value}`));
 
 beforeEach(() => {
+  store({});
   onDesktop();
 });
 
@@ -101,6 +104,19 @@ describe('CriteriaForm', () => {
 
       expect(slider('distance')).toHaveAttribute('min', `${min}`);
       expect(slider('distance')).toHaveAttribute('max', `${max}`);
+    });
+
+    it.each([
+      ['en', 'imperial', 'mi'],
+      ['fr', 'metric', 'km'],
+    ] as const)('asks the distance in the units of the %s language by default: %s', (language, units, unit) => {
+      localStorage.clear();
+      const { onSubmit, submit } = setup({ language });
+
+      expect(screen.getByTestId('criteria-distance')).toHaveAttribute('max', units === 'metric' ? '50' : '31');
+      expect(screen.getByTestId('criteria-distance-value')).toHaveTextContent(new RegExp(`\\d+ ${unit}$`));
+      submit();
+      expect(() => parseCriteria(onSubmit.mock.calls[0][0])).not.toThrow();
     });
 
     it('keeps the duration slider within the API bounds', () => {

@@ -13,11 +13,23 @@ const pick = (control: 'theme' | 'language' | 'units', option: string) =>
   fireEvent.click(screen.getByTestId(`settings-${control}-${option}`));
 
 describe('SettingsView', () => {
-  it('shows the metric units by default', () => {
-    renderView();
+  it.each([
+    ['en', 'imperial', en],
+    ['fr', 'metric', fr],
+  ] as const)('shows the units of the %s language by default: %s', (language, units, text) => {
+    renderView(language);
 
-    expect(screen.getByTestId('settings-units')).toHaveAccessibleName(en.units);
+    expect(screen.getByTestId('settings-units')).toHaveAccessibleName(text.units);
+    expect(screen.getByTestId(`settings-units-${units}`)).toBeChecked();
+  });
+
+  it('keeps the units picked in front of the language', () => {
+    renderView('en');
+
+    pick('units', 'metric');
+
     expect(screen.getByTestId('settings-units-metric')).toBeChecked();
+    expect(saved().units).toBe('metric');
   });
 
   it('saves the picked theme', () => {
@@ -57,7 +69,7 @@ describe('SettingsView', () => {
   });
 
   it('saves the units the user picks', () => {
-    renderView();
+    renderView('fr');
 
     pick('units', 'imperial');
 

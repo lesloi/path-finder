@@ -21,6 +21,8 @@ const onDesktop = () =>
     );
 
 beforeEach(() => {
+  // The tests read metric figures, whatever the language.
+  localStorage.setItem('path-finder.settings', JSON.stringify({ units: 'metric' }));
   maps.length = 0;
   markers.length = 0;
 });

@@ -139,7 +139,8 @@ _Avoid_: Sync, upload
 
 **Settings**:
 The user's preferences kept on the device: pace, language (English or French,
-the browser's until the user picks one), units, the last criteria (surface preference,
+the browser's until the user picks one), units (those of the language until the user picks some: miles and feet in English,
+kilometres and metres in French), the last criteria (surface preference,
 elevation gain, technical stretches, whether the length is a distance or a duration), and which POI categories the map shows. Lost if the user clears the site's data.
 _Avoid_: Profile, account
 

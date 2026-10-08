@@ -31,7 +31,7 @@ import {
   type Units,
 } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
-import { useSettings, type ElevationLevel, type LastCriteria } from '../state/index.ts';
+import { unitsOf, useSettings, useUnits, type ElevationLevel, type LastCriteria } from '../state/index.ts';
 
 const CRITERIA = ['target', 'surface', 'elevation'] as const;
 
@@ -94,8 +94,10 @@ const round = (value: number, decimals: number) => Math.round(value * 10 ** deci
  * visit; the rest is what they asked for last, kept on the device. It follows a change of units made in the
  * settings while the view stays mounted.
  */
-export function useCriteriaDraft(): [Draft, (draft: Draft) => void] {
-  const [{ units, lastCriteria }, update] = useSettings();
+export function useCriteriaDraft(language: Language): [Draft, (draft: Draft) => void] {
+  const [settings, update] = useSettings();
+  const { lastCriteria } = settings;
+  const units = unitsOf(settings, language);
   const [lengths, setLengths] = useState(() => ({
     distance: defaultDistance(units),
     duration: DURATION_DEFAULT,
@@ -148,8 +150,8 @@ export function CriteriaForm({
   const t = { ...commonText[language], ...criteriaText[language] };
   const desktop = useDesktop();
   const [settings, update] = useSettings();
-  const { units } = settings;
-  const own = useCriteriaDraft();
+  const units = useUnits(language);
+  const own = useCriteriaDraft(language);
   const [draft, setDraft] = kept ?? own;
   const [open, setOpen] = useState<Criterion>();
   // The sheet expanded behind the dialog.

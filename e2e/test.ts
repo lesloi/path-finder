@@ -16,7 +16,19 @@ const TRANSPARENT_PNG = Buffer.from(
  * Playwright's `test`, with two guards on every test: the IGN Géoplateforme is answered from
  * committed fixtures, never from the network, and a request to any other host fails the test.
  */
-export const test = base.extend<{ privacyGuard: void }>({
+export const test = base.extend<{ privacyGuard: void; metricUnits: void }>({
+  // Chromium runs in en-US, whose units are imperial: the tests read kilometres unless they pick other units.
+  metricUnits: [
+    async ({ context }, use) => {
+      await context.addInitScript(() => {
+        const key = 'path-finder.settings';
+        const stored = JSON.parse(localStorage.getItem(key) ?? '{}');
+        if (!stored.units) localStorage.setItem(key, JSON.stringify({ ...stored, units: 'metric' }));
+      });
+      await use();
+    },
+    { auto: true },
+  ],
   privacyGuard: [
     async ({ context, baseURL }, use) => {
       const allowed = new Set([new URL(baseURL!).origin, IGN]);
