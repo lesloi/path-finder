@@ -18,4 +18,5 @@ export * from './route-thumbnail.tsx';
 export * from './toast.tsx';
 export * from './use-toast-timeout.ts';
 export * from './surface-colors.ts';
+export * from './surface-bar.tsx';
 export * from './profile-sparkline.tsx';

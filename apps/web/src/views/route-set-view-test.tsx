@@ -145,6 +145,22 @@ describe('RouteSetView', () => {
       expect(screen.queryByTestId('routes-row-1-profile')).not.toBeInTheDocument();
     });
 
+    it('draws the surface of a route as a bar of its paved and unpaved shares', () => {
+      render(<View />);
+
+      const bar = screen.getByTestId('routes-row-0-surface');
+      expect(bar).toHaveAccessibleName('Paved 70% · Unpaved 30%');
+      expect(screen.getByTestId('routes-row-0-surface-paved')).toHaveStyle({ width: '70%' });
+      expect(screen.getByTestId('routes-row-0-surface-unpaved')).toHaveStyle({ width: '30%' });
+    });
+
+    it('leaves out the empty segment of a route all on one surface', () => {
+      render(<View list={[route({ unpavedShare: 0 })]} />);
+
+      expect(screen.getByTestId('routes-row-0-surface')).toHaveAccessibleName('Paved 100% · Unpaved 0%');
+      expect(screen.queryByTestId('routes-row-0-surface-unpaved')).not.toBeInTheDocument();
+    });
+
     it('marks a missed criterion on the suggestion, with its gap', () => {
       render(<View />);
 
