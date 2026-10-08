@@ -47,26 +47,23 @@ function projectInMetres(geometry: number[][]): Metres[] {
   return geometry.map(([lon, lat]) => [(lon - lon0) * cos * METRES_PER_DEGREE, (lat - lat0) * METRES_PER_DEGREE]);
 }
 
-// The route sampled every `TURN_SAMPLE_STEP`, with the kilometres along it of each sample.
-function resample(points: Metres[], distances: number[]): { points: Metres[]; distances: number[] } {
+// The route sampled every `TURN_SAMPLE_STEP` kilometres from its start.
+function resample(points: Metres[], distances: number[]): Metres[] {
   const total = distances[distances.length - 1];
   const samples: Metres[] = [];
-  const along: number[] = [];
   for (let step = 0; step * TURN_SAMPLE_STEP <= total; step++) {
-    const distance = step * TURN_SAMPLE_STEP;
-    const [k, t] = locate(distances, distance);
+    const [k, t] = locate(distances, step * TURN_SAMPLE_STEP);
     const [a, b] = [points[k], points[k + 1] ?? points[k]];
     samples.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]);
-    along.push(distance);
   }
-  return { points: samples, distances: along };
+  return samples;
 }
 
 type Turn = { distance: number; side: 'left' | 'right' };
 
 // The clear turns of a route, once smoothed, none within `TURN_MIN_SPACING` of the one before.
 function findTurns(geometry: number[][], distances: number[]): Turn[] {
-  const { points, distances: along } = resample(projectInMetres(geometry), distances);
+  const points = resample(projectInMetres(geometry), distances);
   const span = Math.round(TURN_SPAN / TURN_SAMPLE_STEP);
   const peaks: { distance: number; angle: number }[] = [];
   let peak: { distance: number; angle: number } | undefined;
@@ -81,7 +78,7 @@ function findTurns(geometry: number[][], distances: number[]): Turn[] {
       (Math.atan2(before[0] * after[1] - before[1] * after[0], before[0] * after[0] + before[1] * after[1]) * 180) /
       Math.PI;
     if (Math.abs(angle) >= TURN_MIN_ANGLE) {
-      if (!peak || Math.abs(angle) > Math.abs(peak.angle)) peak = { distance: along[k], angle };
+      if (!peak || Math.abs(angle) > Math.abs(peak.angle)) peak = { distance: k * TURN_SAMPLE_STEP, angle };
     } else if (peak) {
       peaks.push(peak);
       peak = undefined;
