@@ -29,7 +29,14 @@ import {
 import { basemapStyle } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
 import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
-import { ROUTE_TAG_RATIO, ROUTE_TAG_STRETCH, routeTagImage } from './route-tag-image.ts';
+import {
+  ROUTE_TAG_MUTED,
+  ROUTE_TAG_PADDING,
+  ROUTE_TAG_RATIO,
+  ROUTE_TAG_STRETCH,
+  routeTagId,
+  routeTagImage,
+} from './route-tag-image.ts';
 import { useDesktop } from './use-desktop.ts';
 import { NORTH_EPSILON, useRouteSnapshot } from './use-route-snapshot.ts';
 
@@ -52,11 +59,16 @@ function columnInset() {
   return Number.isNaN(inset) ? COLUMN_INSET_FALLBACK : inset;
 }
 
+// The height of the bottom sheet on phones, as the sheet writes it to `--sheet-height`.
+function sheetHeight() {
+  return Number.parseFloat(document.documentElement.style.getPropertyValue('--sheet-height')) || 0;
+}
+
 // The part of the map that stays free of the left column, the sheet and the controls, shrunk by half the size
 // of what is drawn there so that all of it stays inside.
 function freeArea(map: Map, desktop: boolean, [halfWidth, halfHeight]: [number, number]): PixelRect {
   const { clientWidth, clientHeight } = map.getCanvas();
-  const sheet = Number.parseFloat(document.documentElement.style.getPropertyValue('--sheet-height')) || 0;
+  const sheet = sheetHeight();
   return {
     left: (desktop ? columnInset() : 0) + FRAME_MARGIN + halfWidth,
     top: FRAME_MARGIN + halfHeight,
@@ -304,17 +316,10 @@ export function StartPointMap({
       };
       // A tag is a rounded box that fits its text: white with a grey rim, or filled in the colour of the
       // selected route.
-      const tagImages: [string, string, string][] = [
-        ['route-tag', MAP_COLORS.white, MAP_COLORS.routeMuted],
-        ...ROUTE_COLORS.map((color, index): [string, string, string] => [
-          `route-tag-${index}`,
-          color,
-          MAP_COLORS.white,
-        ]),
-      ];
-      for (const [id, fill, border] of tagImages) {
+      const addTag = (id: string, fill: string, border: string) =>
         map.addImage(id, routeTagImage(fill, border), { pixelRatio: ROUTE_TAG_RATIO, ...ROUTE_TAG_STRETCH });
-      }
+      addTag(ROUTE_TAG_MUTED, MAP_COLORS.white, MAP_COLORS.routeMuted);
+      ROUTE_COLORS.forEach((color, index) => addTag(routeTagId(index), color, MAP_COLORS.white));
       map.addSource('route-badges', { type: 'geojson', data: emptyRoutes });
       map.addLayer({
         id: 'route-badges',
@@ -324,7 +329,7 @@ export function StartPointMap({
           ...label,
           'icon-image': ['get', 'tag'],
           'icon-text-fit': 'both',
-          'icon-text-fit-padding': [3, 8, 3, 8],
+          'icon-text-fit-padding': ROUTE_TAG_PADDING,
           'icon-allow-overlap': false,
           'text-field': ['get', 'label'],
           'text-size': 13,
@@ -464,7 +469,7 @@ export function StartPointMap({
             geometry: point(anchor),
             properties: {
               label: label.join('\n'),
-              tag: selected ? `route-tag-${index % ROUTE_COLORS.length}` : 'route-tag',
+              tag: selected ? routeTagId(index) : ROUTE_TAG_MUTED,
               textColor: selected ? MAP_COLORS.white : MAP_INK,
               priority: selected ? 0 : 1,
             },
@@ -511,7 +516,7 @@ export function StartPointMap({
   // Counts the asks to frame the routes again.
   const [reframes, setReframes] = useState(0);
   const frame = (bearing: number) => {
-    const sheet = Number.parseFloat(document.documentElement.style.getPropertyValue('--sheet-height')) || 0;
+    const sheet = sheetHeight();
     return {
       bearing,
       padding: {

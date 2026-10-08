@@ -1,3 +1,5 @@
+import { ROUTE_COLORS } from './route-colors.ts';
+
 // The rounded box behind a route's tag, drawn pixel by pixel like the distance markers' disc: the
 // map takes raw RGBA data, and a canvas would need a browser.
 const SIZE = 36;
@@ -7,15 +9,21 @@ const BORDER = 2;
 /** Pixels per CSS pixel of the image: it is drawn at twice its size for sharp screens. */
 export const ROUTE_TAG_RATIO = 2;
 
-/**
- * Where the box stretches to fit its text: the middle, so that the rounded corners keep their shape.
- * `content` is the area the text fits in, inside the border.
- */
+/** Where the box stretches to fit its text: the middle, so that the rounded corners keep their shape. */
 export const ROUTE_TAG_STRETCH = {
-  stretchX: [[RADIUS, SIZE - RADIUS]] as [number, number][],
-  stretchY: [[RADIUS, SIZE - RADIUS]] as [number, number][],
-  content: [RADIUS / 2, RADIUS / 2, SIZE - RADIUS / 2, SIZE - RADIUS / 2] as [number, number, number, number],
+  stretchX: [[RADIUS, SIZE - RADIUS]] satisfies [number, number][],
+  stretchY: [[RADIUS, SIZE - RADIUS]] satisfies [number, number][],
+  content: [RADIUS / 2, RADIUS / 2, SIZE - RADIUS / 2, SIZE - RADIUS / 2] satisfies [number, number, number, number],
 };
+
+/** Pixels around the text, on top of the box's own border: top, right, bottom, left. */
+export const ROUTE_TAG_PADDING: [number, number, number, number] = [3, 8, 3, 8];
+
+/** The image of the white tag of a route that is not selected. */
+export const ROUTE_TAG_MUTED = 'route-tag';
+
+/** The image of the tag of the selected route at this position, filled in the route's colour. */
+export const routeTagId = (index: number) => `route-tag-${index % ROUTE_COLORS.length}`;
 
 // The red, green and blue of a `#rrggbb` colour.
 const rgb = (hex: string) => [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));

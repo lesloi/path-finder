@@ -199,8 +199,8 @@ export function isWithin(position: Position, project: Projection, rect: PixelRec
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
-// Places tried along a route when it is not all inside the rectangle: enough to find a stretch that is.
-const VISIBLE_SAMPLES = 101;
+// Places tried on either side of the midpoint of a route that is not all inside the rectangle.
+const VISIBLE_STEPS = 50;
 
 /**
  * The place on the route nearest its midpoint, along the route, that `project` puts inside `rect`:
@@ -213,15 +213,14 @@ export function midpointWithin(
 ): Position | undefined {
   const distances = distancesAlong(geometry);
   const total = distances[distances.length - 1];
-  let best: { position: Position; offset: number } | undefined;
-  for (let step = 0; step < VISIBLE_SAMPLES; step++) {
-    const fraction = step / (VISIBLE_SAMPLES - 1);
-    const position = positionAlong(geometry, distances, fraction * total);
-    if (!isWithin(position, project, rect)) continue;
-    const offset = Math.abs(fraction - 0.5);
-    if (!best || offset < best.offset) best = { position, offset };
+  // Outward from the middle, so that the common case, a midpoint in view, is one projection.
+  for (let step = 0; step <= VISIBLE_STEPS; step++) {
+    for (const fraction of [0.5 - step / (2 * VISIBLE_STEPS), 0.5 + step / (2 * VISIBLE_STEPS)]) {
+      const position = positionAlong(geometry, distances, fraction * total);
+      if (isWithin(position, project, rect)) return position;
+    }
   }
-  return best?.position;
+  return undefined;
 }
 
 /** A mark `count` steps along a route, such as the 3rd kilometre. */
