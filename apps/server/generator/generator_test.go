@@ -239,3 +239,23 @@ func TestGenerateTellsWhichRoutesHoldATechnicalStretch(t *testing.T) {
 		t.Errorf("%d technical routes and %d plain ones out of %d, want one each", flagged, unflagged, len(routes))
 	}
 }
+
+func TestStretchesFollowEachOtherAndCoverTheRoute(t *testing.T) {
+	r := engineLoop(0)
+	r.Distance = 9_999.7
+	r.Stretches = []engine.Stretch{{Meters: 3333}, {Unpaved: true, Meters: 3333}, {Meters: 3333.7}}
+	got := toCandidate(r).surfaces
+	if len(got) != 3 {
+		t.Fatalf("surfaces = %+v", got)
+	}
+	var end float64
+	for _, s := range got {
+		if s.From != end || s.To < s.From {
+			t.Errorf("stretch %+v does not follow the previous one, which ends at %v", s, end)
+		}
+		end = s.To
+	}
+	if end != 10 {
+		t.Errorf("stretches end at %v km, want the route's 10", end)
+	}
+}
