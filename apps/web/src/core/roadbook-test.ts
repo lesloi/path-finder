@@ -290,19 +290,21 @@ describe('roadbookCues', () => {
     it('marks a sustained climb where it starts', () => {
       const cues = roadbookCues(climbing([100, 100, 100, 130, 160, 190, 190, 190]), [], [], metric);
 
-      expect(cues.map(({ kind, distance, text }) => [kind, distance, text])).toEqual([
-        ['start', 0, 'Start'],
-        ['climb', 0.2, 'Climb: +90 m over 0.3 km (30%)'],
-        ['finish', 0.7, 'Finish: back at the start'],
+      expect(cues.map(({ kind, text }) => [kind, text])).toEqual([
+        ['start', 'Start'],
+        ['climb', 'Climb: +90 m over 0.3 km (30%)'],
+        ['finish', 'Finish: back at the start'],
       ]);
+      expect(cues[1].distance).toBeCloseTo(0.2, 3);
     });
 
     it('marks a sustained descent', () => {
       const cues = roadbookCues(climbing([190, 190, 160, 130, 100, 100]), [], [], metric);
 
-      expect(cues.filter(({ kind }) => kind !== 'start' && kind !== 'finish')).toEqual([
-        { kind: 'descent', distance: 0.1, text: 'Descent: -90 m over 0.3 km (30%)' },
-      ]);
+      const [, descent, ...rest] = cues;
+      expect(descent).toMatchObject({ kind: 'descent', text: 'Descent: -90 m over 0.3 km (30%)' });
+      expect(descent.distance).toBeCloseTo(0.1, 3);
+      expect(kinds(rest)).toEqual(['finish']);
     });
 
     it('marks a descent that follows a climb', () => {
@@ -488,5 +490,46 @@ describe('roadbookCues', () => {
 
       expect(kinds(roadbookCues(route, [water(0, 1995)], ['water'], metric)).at(-1)).toBe('finish');
     });
+  });
+
+  describe('degenerate routes', () => {
+    it('holds the start and the finish of a route without geometry', () => {
+      const empty = routeThrough([[0, 0]], undefined, { geometry: [], distance: 0, technical: true });
+
+      expect(kinds(roadbookCues(empty, [water(0, 0)], ['water'], metric))).toEqual(['start', 'technical', 'finish']);
+    });
+
+    it('handles a route of a single place, with a point on it', () => {
+      const place = routeThrough([
+        [0, 0],
+        [0, 0],
+      ]);
+
+      expect(kinds(roadbookCues(place, [water(10, 0)], ['water'], metric))).toEqual(['start', 'poi', 'finish']);
+    });
+  });
+
+  it('puts the cues of the geometry on the scale of the route length, as the surface stretches are', () => {
+    const route = routeThrough(
+      [
+        [0, 0],
+        [0, 1000],
+        [1000, 1000],
+      ],
+      undefined,
+      {
+        distance: 2.2,
+        surfaces: [
+          { surface: 'paved', from: 0, to: 1.6 },
+          { surface: 'unpaved', from: 1.6, to: 2.2 },
+        ],
+      },
+    );
+
+    const cues = roadbookCues(route, [], [], metric);
+
+    expect(kinds(cues)).toEqual(['start', 'turn', 'surface', 'finish']);
+    expect(cues[1].distance).toBeCloseTo(1.1, 1);
+    expect(cues[2].distance).toBe(1.6);
   });
 });

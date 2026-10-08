@@ -141,16 +141,22 @@ function slopes(profile: ProfilePoint[]): Slope[] {
   return legs.map(([from, to]) => ({ from: profile[from], to: profile[to] }));
 }
 
+type SustainedSlope = Slope & { length: number; height: number; grade: number };
+
 // The sustained climbs and descents of a route: steep enough, long enough, and with enough height.
-function sustainedSlopes(geometry: Route['geometry']): Slope[] {
+// The grade is a fraction, the height is signed.
+function sustainedSlopes(geometry: Route['geometry']): SustainedSlope[] {
   const profile = elevationProfile(geometry);
   if (!profile) return [];
-  return slopes(profile).filter(({ from, to }) => {
-    const [length, height] = [to.distance - from.distance, Math.abs(to.height - from.height)];
-    return (
-      length >= SLOPE_MIN_LENGTH && height >= SLOPE_MIN_HEIGHT && (height / (length * 1000)) * 100 >= SLOPE_MIN_GRADE
+  return slopes(profile)
+    .map(({ from, to }) => {
+      const [length, height] = [to.distance - from.distance, to.height - from.height];
+      return { from, to, length, height, grade: Math.abs(height) / (length * 1000) };
+    })
+    .filter(
+      ({ length, height, grade }) =>
+        length >= SLOPE_MIN_LENGTH && Math.abs(height) >= SLOPE_MIN_HEIGHT && grade * 100 >= SLOPE_MIN_GRADE,
     );
-  });
 }
 
 // Each pass of the route by a point: a run of segments within `POI_MAX_DISTANCE`, at its closest point.
@@ -159,10 +165,17 @@ function passesBy(points: Metres[], distances: number[], [x, y]: Metres): number
   let best: { offset: number; distance: number } | undefined;
   for (let k = 0; k + 1 < points.length; k++) {
     const [a, b] = [points[k], points[k + 1]];
+    // A segment whose box is further than the limit is skipped without projecting the point on it.
+    const reach = POI_MAX_DISTANCE * 1000;
+    const far =
+      x < Math.min(a[0], b[0]) - reach ||
+      x > Math.max(a[0], b[0]) + reach ||
+      y < Math.min(a[1], b[1]) - reach ||
+      y > Math.max(a[1], b[1]) + reach;
     const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
     const squared = dx * dx + dy * dy;
     const t = squared ? Math.min(Math.max(((x - a[0]) * dx + (y - a[1]) * dy) / squared, 0), 1) : 0;
-    const offset = Math.hypot(x - (a[0] + t * dx), y - (a[1] + t * dy)) / 1000;
+    const offset = far ? Infinity : Math.hypot(x - (a[0] + t * dx), y - (a[1] + t * dy)) / 1000;
     if (offset <= POI_MAX_DISTANCE) {
       if (!best || offset < best.offset)
         best = { offset, distance: distances[k] + t * (distances[k + 1] - distances[k]) };
@@ -184,22 +197,31 @@ function passesBy(points: Metres[], distances: number[], [x, y]: Metres): number
 export function roadbookCues(route: Route, pois: Poi[], shown: PoiCategory[], display: Display): Cue[] {
   const text = roadbookText[display.language];
   const { geometry } = route;
+  const start: Cue = { kind: 'start', distance: 0, text: text.cueStart };
+  const technical: Cue[] = route.technical ? [{ kind: 'technical', distance: 0, text: text.cueTechnical }] : [];
+  const finish = (distance: number): Cue => ({ kind: 'finish', distance, text: text.cueFinish });
+  if (geometry.length === 0) return [start, ...technical, finish(route.distance)];
+
   const distances = distancesAlong(geometry);
+  // Distances along the geometry are scaled to the route's own length, as the surface stretches are.
+  const total = distances[distances.length - 1];
+  const scale = total > 0 ? route.distance / total : 1;
   const along: Cue[] = [];
   const add = (kind: CueKind, distance: number, words: string) => along.push({ kind, distance, text: words });
 
-  for (const { distance, side } of findTurns(geometry, distances)) add('turn', distance, text.cueTurn[side]);
+  for (const { distance, side } of findTurns(geometry, distances)) add('turn', distance * scale, text.cueTurn[side]);
   for (const { distance, surface } of surfaceChanges(route.surfaces))
     add('surface', distance, text.cueSurface[surface]);
-  for (const { from, to } of sustainedSlopes(geometry)) {
-    const [length, height] = [to.distance - from.distance, to.height - from.height];
-    const grade = new Intl.NumberFormat(display.language, { style: 'percent', maximumFractionDigits: 0 }).format(
-      Math.abs(height) / (length * 1000),
-    );
-    const words = [formatHeight(Math.abs(height), display), formatDistance(length, display), grade] as const;
+  for (const { from, length, height, grade } of sustainedSlopes(geometry)) {
+    const percent = new Intl.NumberFormat(display.language, { style: 'percent', maximumFractionDigits: 0 });
+    const words = [
+      formatHeight(Math.abs(height), display),
+      formatDistance(length * scale, display),
+      percent.format(grade),
+    ] as const;
     add(
       height > 0 ? 'climb' : 'descent',
-      from.distance,
+      from.distance * scale,
       height > 0 ? text.cueClimb(...words) : text.cueDescent(...words),
     );
   }
@@ -210,13 +232,10 @@ export function roadbookCues(route: Route, pois: Poi[], shown: PoiCategory[], di
   shownPois.forEach(({ category, seasonal }, k) => {
     const label = text.cuePoi[category];
     for (const distance of passesBy(points, distances, projected[geometry.length + k])) {
-      add('poi', distance, seasonal ? text.cueSeasonal(label) : label);
+      add('poi', distance * scale, seasonal ? text.cueSeasonal(label) : label);
     }
   });
   along.sort((a, b) => a.distance - b.distance);
 
-  const cues: Cue[] = [{ kind: 'start', distance: 0, text: text.cueStart }];
-  if (route.technical) cues.push({ kind: 'technical', distance: 0, text: text.cueTechnical });
-  const finish = Math.max(route.distance, along.at(-1)?.distance ?? 0);
-  return [...cues, ...along, { kind: 'finish', distance: finish, text: text.cueFinish }];
+  return [start, ...technical, ...along, finish(Math.max(route.distance, along.at(-1)?.distance ?? 0))];
 }

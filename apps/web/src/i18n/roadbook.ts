@@ -8,6 +8,7 @@ export const roadbookText = {
     cueTechnical: 'Technical stretches on this route',
     cueTurn: { left: 'Turn left', right: 'Turn right' },
     cueSurface: { paved: 'Paved section', unpaved: 'Unpaved section' },
+    // The signs are written here: the figures come unsigned.
     cueClimb: (gain: string, length: string, grade: string) => `Climb: +${gain} over ${length} (${grade})`,
     cueDescent: (loss: string, length: string, grade: string) => `Descent: -${loss} over ${length} (${grade})`,
     cuePoi: { water: 'Water point', viewpoint: 'Viewpoint' },
@@ -19,6 +20,7 @@ export const roadbookText = {
     cueTechnical: 'Passages techniques sur le parcours',
     cueTurn: { left: 'Tourner à gauche', right: 'Tourner à droite' },
     cueSurface: { paved: 'Section goudronnée', unpaved: 'Section non goudronnée' },
+    // The signs are written here: the figures come unsigned.
     cueClimb: (gain: string, length: string, grade: string) => `Montée : +${gain} sur ${length} (${grade})`,
     cueDescent: (loss: string, length: string, grade: string) => `Descente : -${loss} sur ${length} (${grade})`,
     cuePoi: { water: 'Point d’eau', viewpoint: 'Point de vue' },
