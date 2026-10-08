@@ -617,8 +617,9 @@ export function StartPointMap({
   }, [loaded, routes, framed, desktop, followsSnapshot, reframes]);
 
   useEffect(() => {
-    if (!loaded) return;
-    (mapRef.current!.getSource('route-hover') as GeoJSONSource).setData({
+    // A new style drops the source until it has loaded; `styleVersion` brings the effect back then.
+    const source = loaded ? (mapRef.current!.getSource('route-hover') as GeoJSONSource | undefined) : undefined;
+    source?.setData({
       type: 'FeatureCollection',
       features: hover ? [{ type: 'Feature', properties: {}, geometry: point(hover) }] : [],
     });

@@ -926,5 +926,18 @@ describe('StartPointMap', () => {
       rerender(<StartPointMap routes={routes} onStartChange={vi.fn()} />);
       expect(dot()).toEqual([]);
     });
+
+    it('shows the dot again once a new style has loaded', () => {
+      const { rerender } = renderRoutes();
+      // A new style drops the sources until it has loaded.
+      delete map().sources['route-hover'];
+
+      rerender(<StartPointMap routes={routes} hover={[6.05, 45.1]} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
+
+      expect(
+        (map().getSource('route-hover') as GeoJSONSource & { data: { features: unknown[] } }).data.features,
+      ).toHaveLength(1);
+    });
   });
 });
