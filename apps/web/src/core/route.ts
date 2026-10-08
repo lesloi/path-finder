@@ -187,6 +187,42 @@ export function midpoint(geometry: Route['geometry']): Position {
   return positionAlong(geometry, distances, distances[distances.length - 1] / 2);
 }
 
+/** A rectangle of the screen, in pixels from its top left. */
+export type PixelRect = { left: number; top: number; right: number; bottom: number };
+
+/** Where a position falls on the screen, in pixels from its top left. */
+export type Projection = (position: Position) => { x: number; y: number };
+
+/** Whether `project` puts the position inside `rect`. */
+export function isWithin(position: Position, project: Projection, rect: PixelRect): boolean {
+  const { x, y } = project(position);
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+// Places tried on either side of the midpoint of a route that is not all inside the rectangle.
+const VISIBLE_STEPS = 50;
+
+/**
+ * The place on the route nearest its midpoint, along the route, that `project` puts inside `rect`:
+ * where a label stays in view. Undefined when no place of the route is inside.
+ */
+export function midpointWithin(
+  geometry: Route['geometry'],
+  project: Projection,
+  rect: PixelRect,
+): Position | undefined {
+  const distances = distancesAlong(geometry);
+  const total = distances[distances.length - 1];
+  // Outward from the middle, so that the common case, a midpoint in view, is one projection.
+  for (let step = 0; step <= VISIBLE_STEPS; step++) {
+    for (const fraction of [0.5 - step / (2 * VISIBLE_STEPS), 0.5 + step / (2 * VISIBLE_STEPS)]) {
+      const position = positionAlong(geometry, distances, fraction * total);
+      if (isWithin(position, project, rect)) return position;
+    }
+  }
+  return undefined;
+}
+
 /** A mark `count` steps along a route, such as the 3rd kilometre. */
 export type DistanceMarker = { position: Position; count: number };
 

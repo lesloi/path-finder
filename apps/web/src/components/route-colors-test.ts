@@ -15,6 +15,7 @@ describe('route colours', () => {
   it('match the white and start tokens for the other colours the map paints', () => {
     expect(new RegExp(`--color-white: ${MAP_COLORS.white};`).test(css)).toBe(true);
     expect(new RegExp(`--color-start: ${MAP_COLORS.start};`).test(css)).toBe(true);
+    expect(new RegExp(`--color-route-muted: ${MAP_COLORS.routeMuted};`).test(css)).toBe(true);
   });
 
   it('give a route its colour and its border by its position, wrapping past the last', () => {

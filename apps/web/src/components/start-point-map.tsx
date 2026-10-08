@@ -17,8 +17,10 @@ import {
   formatDistance,
   formatHeight,
   KM_PER_MILE,
+  isWithin,
   markerInterval,
-  midpoint,
+  midpointWithin,
+  type PixelRect,
   type Basemap,
   type Display,
   type MapSnapshot,
@@ -26,7 +28,15 @@ import {
 } from '../core/index.ts';
 import { basemapStyle } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
-import { MAP_COLORS, routeColor } from './route-colors.ts';
+import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
+import {
+  ROUTE_TAG_MUTED,
+  ROUTE_TAG_PADDING,
+  ROUTE_TAG_RATIO,
+  ROUTE_TAG_STRETCH,
+  routeTagId,
+  routeTagImage,
+} from './route-tag-image.ts';
 import { useDesktop } from './use-desktop.ts';
 import { NORTH_EPSILON, useRouteSnapshot } from './use-route-snapshot.ts';
 
@@ -49,10 +59,37 @@ function columnInset() {
   return Number.isNaN(inset) ? COLUMN_INSET_FALLBACK : inset;
 }
 
+// The height of the bottom sheet on phones, as the sheet writes it to `--sheet-height`.
+function sheetHeight() {
+  return Number.parseFloat(document.documentElement.style.getPropertyValue('--sheet-height')) || 0;
+}
+
+// The part of the map that stays free of the left column, the sheet and the controls, shrunk by half the size
+// of what is drawn there so that all of it stays inside.
+function freeArea(map: Map, desktop: boolean, [halfWidth, halfHeight]: [number, number]): PixelRect {
+  const { clientWidth, clientHeight } = map.getCanvas();
+  const sheet = sheetHeight();
+  return {
+    left: (desktop ? columnInset() : 0) + FRAME_MARGIN + halfWidth,
+    top: FRAME_MARGIN + halfHeight,
+    right: clientWidth - CONTROLS_RIGHT - halfWidth,
+    bottom: clientHeight - (desktop ? 0 : sheet) - CONTROLS_BOTTOM - halfHeight,
+  };
+}
+
 // The routes the map frames: all of them, or the selected one.
 function framedRoutes(routes: Position[][], framed: number | undefined) {
   return framed === undefined ? routes : [routes[framed] ?? routes[0]];
 }
+
+// Pixels the controls take from the right of the map (the floating buttons and their margin).
+const CONTROLS_RIGHT = 72;
+// Pixels the scale and the attribution take from the bottom of the map.
+const CONTROLS_BOTTOM = 40;
+// Half the width and height of a route's tag, which has to stay inside the map.
+const TAG_HALF: [number, number] = [56, 28];
+// Half the size of a distance marker.
+const MARKER_HALF = 16;
 
 const emptyRoutes = { type: 'FeatureCollection', features: [] } as const;
 
@@ -159,6 +196,8 @@ export function StartPointMap({
   const [loaded, setLoaded] = useState(false);
   // Counts the styles loaded: a new style drops the routes' source and layers, which are made again.
   const [styleVersion, setStyleVersion] = useState(0);
+  // Counts the times the map settled or was resized: the tags are placed in the part of it that is in view.
+  const [viewVersion, setViewVersion] = useState(0);
   const shownBasemap = useRef(basemap);
   // The basemap a style swap is going back to if the new style fails to load; unset once it has loaded.
   const swappedFrom = useRef<Basemap>(undefined);
@@ -213,6 +252,7 @@ export function StartPointMap({
     scale.current = new ScaleControl({ unit: initialUnits() });
     map.addControl(scale.current, 'bottom-left');
     mapRef.current = map;
+    for (const type of ['moveend', 'resize'] as const) map.on(type, () => setViewVersion((version) => version + 1));
     map.on('move', () => {
       const bearing = map.getBearing();
       changeView({ bearing, rotated: Math.abs(bearing) > NORTH_EPSILON });
@@ -232,28 +272,40 @@ export function StartPointMap({
       );
       const line = { 'line-join': 'round', 'line-cap': 'round' } as const;
       map.addSource('routes', { type: 'geojson', data: emptyRoutes });
-      // A white casing keeps a route readable over any background; the selected one is thicker.
+      // The selected route has a white casing and a dashed white marking along its line, and its own colour;
+      // the others are one thin grey line, so the eye goes to the one the user looks at.
+      // The others come first, so that where they cross the selected route they pass under its casing.
+      map.addLayer({
+        id: 'routes-others',
+        type: 'line',
+        source: 'routes',
+        filter: ['!=', ['get', 'selected'], true],
+        layout: line,
+        paint: { 'line-color': ['get', 'color'], 'line-width': 2.5, 'line-opacity': 0.85 },
+      });
       map.addLayer({
         id: 'routes-casing',
         type: 'line',
         source: 'routes',
+        filter: ['==', ['get', 'selected'], true],
         layout: line,
-        paint: {
-          'line-color': MAP_COLORS.white,
-          'line-width': ['case', ['get', 'selected'], 10, 6],
-          'line-opacity': ['case', ['get', 'selected'], 1, 0.7],
-        },
+        paint: { 'line-color': MAP_COLORS.white, 'line-width': 11 },
       });
       map.addLayer({
         id: 'routes-line',
         type: 'line',
         source: 'routes',
+        filter: ['==', ['get', 'selected'], true],
         layout: line,
-        paint: {
-          'line-color': ['get', 'color'],
-          'line-width': ['case', ['get', 'selected'], 6, 3],
-          'line-opacity': ['case', ['get', 'selected'], 1, 0.55],
-        },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 6 },
+      });
+      map.addLayer({
+        id: 'routes-marking',
+        type: 'line',
+        source: 'routes',
+        filter: ['==', ['get', 'selected'], true],
+        layout: { 'line-join': 'round' },
+        paint: { 'line-color': MAP_COLORS.white, 'line-width': 2.6, 'line-dasharray': [3, 5.4] },
       });
       map.addLayer({
         id: 'routes-hit',
@@ -268,18 +320,27 @@ export function StartPointMap({
         'text-allow-overlap': false,
         'symbol-sort-key': ['get', 'priority'],
       };
-      const halo: SymbolLayerSpecification['paint'] = {
-        'text-halo-color': MAP_COLORS.white,
-        'text-halo-width': 3,
-        'text-color': ['get', 'color'],
-      };
+      // A tag is a rounded box that fits its text: white with a grey rim, or filled in the colour of the
+      // selected route.
+      const addTag = (id: string, fill: string, border: string) =>
+        map.addImage(id, routeTagImage(fill, border), { pixelRatio: ROUTE_TAG_RATIO, ...ROUTE_TAG_STRETCH });
+      addTag(ROUTE_TAG_MUTED, MAP_COLORS.white, MAP_COLORS.routeMuted);
+      ROUTE_COLORS.forEach((color, index) => addTag(routeTagId(index), color, MAP_COLORS.white));
       map.addSource('route-badges', { type: 'geojson', data: emptyRoutes });
       map.addLayer({
         id: 'route-badges',
         type: 'symbol',
         source: 'route-badges',
-        layout: { ...label, 'text-field': ['get', 'label'], 'text-size': 14 },
-        paint: halo,
+        layout: {
+          ...label,
+          'icon-image': ['get', 'tag'],
+          'icon-text-fit': 'both',
+          'icon-text-fit-padding': ROUTE_TAG_PADDING,
+          'icon-allow-overlap': false,
+          'text-field': ['get', 'label'],
+          'text-size': 13,
+        },
+        paint: { 'text-color': ['get', 'textColor'] },
       });
       map.addImage('distance-marker', distanceMarkerImage(), { pixelRatio: DISTANCE_MARKER_RATIO });
       map.addSource('route-markers', { type: 'geojson', data: emptyRoutes });
@@ -371,7 +432,12 @@ export function StartPointMap({
       .map((geometry, index) => ({
         type: 'Feature' as const,
         geometry: { type: 'LineString' as const, coordinates: geometry },
-        properties: { index, selected: index === selectedRoute, color: routeColor(index) },
+        properties: {
+          index,
+          selected: index === selectedRoute,
+          // Grey unless it is the selected one; with none selected, every route keeps its colour.
+          color: selectedRoute === undefined || index === selectedRoute ? routeColor(index) : MAP_COLORS.routeMuted,
+        },
       }))
       // Once the detail of a route is open, the others are left out: they are not drawn, nor tappable.
       .filter(({ properties }) => framing !== 'selected' || properties.selected);
@@ -391,20 +457,29 @@ export function StartPointMap({
     const drawn = drawnFor === routes ? (routes ?? []) : [];
     const detail = framing === 'selected';
     const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
-    // One label per route, until the detail of one is open and its markers say it better.
+    const project = ([lon, lat]: Position) => map.project([lon, lat]);
+    const tagArea = freeArea(map, desktop, TAG_HALF);
+    // One tag per route, until the detail of one is open and its markers say it better. It sits on the stretch
+    // of its route that is in view, and a route with none in view has no tag.
     const badges = detail
       ? []
-      : drawn.map((geometry, index) => {
+      : drawn.flatMap((geometry, index) => {
+          const anchor = midpointWithin(geometry, project, tagArea);
+          if (!anchor) return [];
           const summary = summaries?.[index];
           const label = summary ? [formatDistance(summary.distance, display)] : [];
           if (summary?.elevationGain !== undefined) label.push(`+${formatHeight(summary.elevationGain, display)}`);
+          const selected = index === selectedRoute;
+          // As for the lines, with none selected every tag keeps its route's colour.
+          const filled = selected || selectedRoute === undefined;
           return {
             type: 'Feature' as const,
-            geometry: point(midpoint(geometry)),
+            geometry: point(anchor),
             properties: {
               label: label.join('\n'),
-              color: routeColor(index),
-              priority: index === selectedRoute ? 0 : 1,
+              tag: filled ? routeTagId(index) : ROUTE_TAG_MUTED,
+              textColor: filled ? MAP_COLORS.white : MAP_INK,
+              priority: selected ? 0 : 1,
             },
           };
         });
@@ -412,21 +487,23 @@ export function StartPointMap({
     const summary = selectedRoute === undefined ? undefined : summaries?.[selectedRoute];
     const geometry = detail && selectedRoute !== undefined ? drawn[selectedRoute] : undefined;
     const interval = summary && markerInterval(summary.distance / kilometres);
+    const markerArea = freeArea(map, desktop, [MARKER_HALF, MARKER_HALF]);
     const markers =
       geometry && interval
-        ? distanceMarkers(geometry, interval * kilometres).map(({ position, count }) => {
-            const label = count * interval;
-            return {
-              type: 'Feature' as const,
-              geometry: point(position),
-              // A multiple of ten, then of five, keeps its place when markers crowd.
-              properties: {
-                label: String(label),
-                color: routeColor(selectedRoute!),
-                priority: label % 10 === 0 ? 0 : label % 5 === 0 ? 1 : 2,
-              },
-            };
-          })
+        ? distanceMarkers(geometry, interval * kilometres)
+            .filter(({ position }) => isWithin(position, project, markerArea))
+            .map(({ position, count }) => {
+              const label = count * interval;
+              return {
+                type: 'Feature' as const,
+                geometry: point(position),
+                // A multiple of ten, then of five, keeps its place when markers crowd.
+                properties: {
+                  label: String(label),
+                  priority: label % 10 === 0 ? 0 : label % 5 === 0 ? 1 : 2,
+                },
+              };
+            })
         : [];
     for (const [id, features] of [
       ['route-badges', badges],
@@ -434,7 +511,7 @@ export function StartPointMap({
     ] as const) {
       (map.getSource(id) as GeoJSONSource).setData({ type: 'FeatureCollection', features });
     }
-  }, [loaded, routes, summaries, display, selectedRoute, framing, drawnFor, styleVersion]);
+  }, [loaded, routes, summaries, display, selectedRoute, framing, drawnFor, styleVersion, viewVersion, desktop]);
 
   // The routes, or the selected one, in the part of the map the panel leaves free. A new route set is framed north
   // up, as its snapshot maps places to pixels without a turn; framing it again keeps the user's orientation.
@@ -446,7 +523,7 @@ export function StartPointMap({
   // Counts the asks to frame the routes again.
   const [reframes, setReframes] = useState(0);
   const frame = (bearing: number) => {
-    const sheet = Number.parseFloat(document.documentElement.style.getPropertyValue('--sheet-height')) || 0;
+    const sheet = sheetHeight();
     return {
       bearing,
       padding: {
