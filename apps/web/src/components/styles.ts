@@ -38,10 +38,16 @@ export const TOAST =
 
 /** Long text: headings, paragraphs, lists, and links, as on the legal pages. */
 export const PROSE =
-  '[&_a]:text-accent [&_a]:underline [&_h2]:mt-6 [&_h2]:mb-2 [&_h2]:text-lg [&_h2]:font-bold [&_li]:my-1 ' +
+  '[&_a]:font-semibold [&_a]:text-accent [&_a]:underline [&_a]:underline-offset-2 [&_h2]:mt-6 [&_h2]:mb-2 ' +
+  '[&_h2]:text-lg [&_h2]:font-semibold [&_li]:my-1 ' +
   '[&_p]:my-3 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 ' +
   // The same room above and below as a page of list rows.
   '[&>:first-child]:mt-2 [&>:last-child]:mb-0';
+
+/** The opening paragraph of a long text, boxed. */
+export const LEAD = 'rounded-md border border-ink bg-surface-2 px-4 py-3 font-semibold';
+/** A small line of long text, such as its date. */
+export const NOTE = 'text-sm text-ink-2';
 
 /** The view's main action: one per view. */
 export const PRIMARY_BUTTON =

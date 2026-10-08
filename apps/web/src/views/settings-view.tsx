@@ -1,10 +1,12 @@
-import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 import type { Theme, Units } from '../core/index.ts';
 import { commonText, settingsText, type Language } from '../i18n/index.ts';
 import { useSettings } from '../state/index.ts';
-import { Dropdown, GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON } from '../components/index.ts';
+import { GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON, SegmentedControl } from '../components/index.ts';
 
+// The control wraps under its label when the row is too narrow, or the text too large.
+const SETTING_ROW = `${LIST_ROW} flex-wrap py-2`;
 const FLAG_CLASSES = 'flex-none ring-1 ring-border';
 
 export function SettingsView({ language }: { language: Language }) {
@@ -14,21 +16,23 @@ export function SettingsView({ language }: { language: Language }) {
     <>
       <h2 className={GROUP_TITLE}>{t.display}</h2>
       <div className={LIST}>
-        <div className={LIST_ROW}>
-          <Dropdown
+        <div className={SETTING_ROW}>
+          <span className="font-semibold">{t.theme}</span>
+          <SegmentedControl
             testId="settings-theme"
             label={t.theme}
             value={settings.theme}
             options={[
-              { value: 'system', label: t.system, icon: <Monitor size={18} aria-hidden /> },
-              { value: 'light', label: t.light, icon: <Sun size={18} aria-hidden /> },
-              { value: 'dark', label: t.dark, icon: <Moon size={18} aria-hidden /> },
+              { value: 'system', label: t.system },
+              { value: 'light', label: t.light },
+              { value: 'dark', label: t.dark },
             ]}
             onChange={(theme: Theme) => update({ theme })}
           />
         </div>
-        <div className={LIST_ROW}>
-          <Dropdown
+        <div className={SETTING_ROW}>
+          <span className="font-semibold">{t.language}</span>
+          <SegmentedControl
             testId="settings-language"
             label={t.language}
             value={language}
@@ -39,8 +43,9 @@ export function SettingsView({ language }: { language: Language }) {
             onChange={(picked) => update({ language: picked })}
           />
         </div>
-        <div className={LIST_ROW}>
-          <Dropdown
+        <div className={SETTING_ROW}>
+          <span className="font-semibold">{t.units}</span>
+          <SegmentedControl
             testId="settings-units"
             label={t.units}
             value={settings.units}

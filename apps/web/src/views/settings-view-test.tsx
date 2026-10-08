@@ -9,16 +9,15 @@ const en = { ...commonText.en, ...settingsText.en };
 const fr = { ...commonText.fr, ...settingsText.fr };
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);
 const saved = () => renderHook(() => useSettings()).result.current[0];
-const pick = (dropdown: 'theme' | 'language' | 'units', option: string) => {
-  fireEvent.click(screen.getByTestId(`settings-${dropdown}`));
-  fireEvent.click(screen.getByTestId(`settings-${dropdown}-${option}`));
-};
+const pick = (control: 'theme' | 'language' | 'units', option: string) =>
+  fireEvent.click(screen.getByTestId(`settings-${control}-${option}`));
 
 describe('SettingsView', () => {
   it('shows the metric units by default', () => {
     renderView();
 
-    expect(screen.getByTestId('settings-units')).toHaveAccessibleName(`${en.units} ${en.metric}`);
+    expect(screen.getByTestId('settings-units')).toHaveAccessibleName(en.units);
+    expect(screen.getByTestId('settings-units-metric')).toBeChecked();
   });
 
   it('saves the picked theme', () => {
@@ -26,15 +25,15 @@ describe('SettingsView', () => {
 
     pick('theme', 'dark');
 
-    expect(screen.getByTestId('settings-theme')).toHaveAccessibleName(`${en.theme} ${en.dark}`);
+    expect(screen.getByTestId('settings-theme-dark')).toBeChecked();
     expect(saved().theme).toBe('dark');
   });
 
   it('shows the theme first in the display group', () => {
     renderView();
 
-    expect(screen.getByTestId('settings-theme')).toHaveAccessibleName(`${en.theme} ${en.system}`);
-    expect(screen.getAllByRole('button')[0]).toBe(screen.getByTestId('settings-theme'));
+    expect(screen.getByTestId('settings-theme-system')).toBeChecked();
+    expect(screen.getAllByRole('radio')[0]).toBe(screen.getByTestId('settings-theme-system'));
   });
 
   it('shows the display and about groups in this order, and no pace', () => {
@@ -83,7 +82,8 @@ describe('SettingsView', () => {
     renderView('fr');
 
     expect(screen.getAllByRole('heading', { level: 2 })[0]).toHaveTextContent(fr.display);
-    expect(screen.getByTestId('settings-language')).toHaveAccessibleName(`${fr.language} Français`);
-    expect(screen.getByTestId('settings-units')).toHaveAccessibleName(`${fr.units} ${fr.metric}`);
+    expect(screen.getByTestId('settings-language')).toHaveAccessibleName(fr.language);
+    expect(screen.getByTestId('settings-language-fr')).toBeChecked();
+    expect(screen.getByTestId('settings-units')).toHaveAccessibleName(fr.units);
   });
 });

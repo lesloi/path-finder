@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 
+import { LEAD } from '../../components/index.ts';
 import { expectNamedControls } from '../../accessible-names.ts';
 import { legalText, LINKS, type Language } from '../../i18n/index.ts';
 import { CreditsPage } from './credits-page.tsx';
@@ -36,6 +37,14 @@ describe.each(languages)('legal pages in %s', (language) => {
     expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(/IGN/);
     expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(/Scaleway/);
     expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(/hash/);
+  });
+
+  it('sets the introduction of the privacy policy apart, and no other paragraph', () => {
+    render(<PrivacyPolicyPage language={language} />);
+
+    const [intro, ...others] = screen.getByTestId('privacy-policy-page').querySelectorAll('p');
+    expect(intro).toHaveClass(...LEAD.split(' '));
+    for (const paragraph of others) expect(paragraph).not.toHaveClass('border-ink');
   });
 
   it('names the publisher and the host in the legal notice', () => {
