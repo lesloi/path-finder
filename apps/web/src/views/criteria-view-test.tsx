@@ -90,11 +90,11 @@ describe('CriteriaView', () => {
   });
 
   describe('accessibility', () => {
-    it.each(['en', 'fr'] as const)('names every control on phones in %s, sheet collapsed then expanded', (language) => {
+    it.each(['en', 'fr'] as const)('names every control on phones in %s, with the criteria layer open', (language) => {
       const { container } = render(<CriteriaView language={language} />);
       expectNamedControls(container);
 
-      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
+      fireEvent.click(screen.getByTestId('criteria-bar'));
 
       expectNamedControls(container);
     });
@@ -108,19 +108,11 @@ describe('CriteriaView', () => {
   });
 
   describe('on phones', () => {
-    it('hides the floating My location button while the sheet is expanded', () => {
-      render(<CriteriaView language="en" />);
-
-      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
-
-      // The floating one would cover the settings button.
-      expect(screen.queryByTestId('criteria-locate')).not.toBeInTheDocument();
-    });
-
     it('invites a long press in the sheet until the start point is set', () => {
       vi.useFakeTimers();
       render(<CriteriaView language="en" />);
-      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'false');
+      // Nothing to expand before there are routes.
+      expect(screen.queryByTestId('criteria-sheet-handle')).not.toBeInTheDocument();
       expect(screen.getByTestId('criteria-long-press')).toBeInTheDocument();
       expect(screen.getByTestId('criteria-locate')).toBeInTheDocument();
       expect(screen.queryByTestId('criteria-start-locate')).not.toBeInTheDocument();
@@ -135,8 +127,9 @@ describe('CriteriaView', () => {
       expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
     });
 
-    it('sets the start point from coordinates typed in the sheet', () => {
+    it('sets the start point from coordinates typed in the criteria layer', () => {
       render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-bar'));
 
       fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
       fireEvent.keyDown(field(), { key: 'Enter' });
@@ -146,15 +139,70 @@ describe('CriteriaView', () => {
   });
 
   describe('criteria', () => {
-    it('shows chips in the collapsed sheet, and the full form once it is expanded', () => {
+    it('sums them up in a bar over the map on phones, with the start point once it is set', () => {
+      localStorage.setItem(
+        'path-finder.settings',
+        JSON.stringify({
+          units: 'metric',
+          lastCriteria: { target: 'distance', surface: 'unpaved', level: 'hilly', gain: 300 },
+        }),
+      );
       render(<CriteriaView language="en" />);
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName(`${en.surface}: ${en.anySurface}`);
+      const bar = screen.getByTestId('criteria-bar');
+      expect(bar).toHaveTextContent('10.0 km · Hilly · Unpaved');
+      expect(bar).not.toHaveTextContent('45.');
+
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByTestId('sub-page-back'));
+
+      expect(screen.getByTestId('criteria-bar')).toHaveTextContent('45.8');
+    });
+
+    it('opens the criteria in a layer over the map, from the bar or from the sheet, and closes it', () => {
+      render(<CriteriaView language="en" />);
       expect(screen.queryByTestId('criteria-distance')).not.toBeInTheDocument();
 
-      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
-
-      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'true');
+      fireEvent.click(screen.getByTestId('criteria-open'));
+      expect(screen.getByTestId('sub-page-title')).toHaveTextContent(en.criteria);
       expect(screen.getByTestId('criteria-distance')).toHaveAccessibleName(en.distance);
+
+      fireEvent.click(screen.getByTestId('sub-page-back'));
+      expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      fireEvent(screen.getByTestId('sub-page'), new Event('cancel', { cancelable: true }));
+      expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument();
+    });
+
+    it('asks for routes from the layer, which closes', async () => {
+      const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => new Promise(() => {}));
+      vi.stubGlobal('fetch', fetchMock);
+      render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument();
+      expect(screen.getByTestId('routes-loading')).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    it('picks the start point with a tap on the map once the layer sends the user there', () => {
+      render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+
+      fireEvent.click(screen.getByTestId('criteria-start-pick'));
+      expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-pick-bar')).toHaveTextContent(en.pickStartTouch);
+
+      act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
+
+      expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
+      expect(screen.queryByTestId('criteria-pick-bar')).not.toBeInTheDocument();
     });
 
     it('shows the full form in the desktop column and passes the criteria on', () => {
@@ -178,7 +226,7 @@ describe('CriteriaView', () => {
 
   it('keeps the criteria when the screen changes from a phone to a desktop', () => {
     const { rerender } = render(<CriteriaView language="en" />);
-    fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
+    fireEvent.click(screen.getByTestId('criteria-bar'));
     fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
 
     onDesktop();
@@ -860,25 +908,6 @@ describe('CriteriaView', () => {
       expect(routesSource()).toHaveLength(1);
     });
 
-    it('offers to show the routes found again from the criteria on phones', async () => {
-      ask(answer(route(0), route(1)));
-      render(<CriteriaView language="en" />);
-      act(() => map().fire('style.load'));
-      await submit();
-      fireEvent.click(await screen.findByTestId('routes-row-1'));
-      await settle();
-      fireEvent.click(screen.getByTestId('route-back'));
-      fireEvent.click(screen.getByTestId('routes-back'));
-
-      const button = screen.getByTestId('criteria-routes');
-      expect(button).toHaveAccessibleName(routesText.en.showRoutes(2));
-      fireEvent.click(button);
-
-      expect(screen.getByTestId('routes-count')).toHaveTextContent('2 routes');
-      expect(screen.getByTestId('routes-row-1')).toHaveAttribute('data-selected');
-      expect(screen.queryByTestId('criteria-routes')).not.toBeInTheDocument();
-    });
-
     it('drops the routes found, and the dock, when the start point changes', async () => {
       onDesktop();
       ask(answer(route(0)));
@@ -910,34 +939,159 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('routes-list')).toBeInTheDocument();
     });
 
-    it('shows the way back to the routes in the sheet on phones', async () => {
-      ask(answer(route(0)));
-      render(<CriteriaView language="en" />);
-      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
-      fireEvent.keyDown(field(), { key: 'Enter' });
-      fireEvent.click(screen.getByTestId('criteria-submit'));
-      fireEvent.click(await screen.findByTestId('routes-back'));
+    async function submitOnPhone() {
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      await submit();
+    }
 
-      expect(screen.getByTestId('criteria-routes')).toBeInTheDocument();
+    it('shows the routes as a carousel in the sheet on phones, the first one in the middle', async () => {
+      ask(answer(route(0), route(1)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      await submitOnPhone();
+
+      expect(await screen.findByTestId('routes-count')).toHaveTextContent('2 routes');
+      expect(screen.getByTestId('routes-row-0')).toHaveAttribute('data-selected');
+      expect(screen.getByTestId('routes-position')).toHaveTextContent('1/2');
+      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAccessibleName(routesText.en.routes);
+      // The criteria stay a tap away, in the bar.
+      expect(screen.getByTestId('criteria-bar')).toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-open')).not.toBeInTheDocument();
     });
 
-    it('shows the route set in the sheet on phones', async () => {
+    it('selects the route of the card tapped, and opens the detail of the one in the middle', async () => {
+      ask(answer(route(0), route(1)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      await submitOnPhone();
+      fireEvent.click(await screen.findByTestId('routes-row-1'));
+      await settle();
+
+      expect(screen.getByTestId('routes-row-1')).toHaveAttribute('data-selected');
+      expect(screen.queryByTestId('route-detail')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('routes-row-1'));
+
+      expect(screen.getByTestId('route-detail')).toBeInTheDocument();
+      expect(screen.getByTestId('route-position')).toHaveTextContent('2/2');
+      expect(screen.getByTestId('route-profile')).toBeInTheDocument();
+      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('opens and closes the detail of the selected route from the handle of the sheet', async () => {
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
       act(() => map().fire('style.load'));
-      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
-      fireEvent.keyDown(field(), { key: 'Enter' });
-      fireEvent.click(screen.getByTestId('criteria-submit'));
+      await submitOnPhone();
+      await screen.findByTestId('routes-count');
 
-      expect(await screen.findByTestId('routes-count')).toBeInTheDocument();
-      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'false');
-      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAccessibleName(routesText.en.routes);
-      fireEvent.click(screen.getByTestId('routes-row-0'));
-      expect(screen.getByTestId('route-detail')).toBeInTheDocument();
-      // The collapsed sheet shows the top of the detail only; its handle expands it to the rest.
-      expect(screen.queryByTestId('route-profile')).not.toBeInTheDocument();
       fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
-      expect(screen.getByTestId('route-profile')).toBeInTheDocument();
+      expect(screen.getByTestId('route-detail')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
+      expect(screen.getByTestId('routes-count')).toBeInTheDocument();
+      expect(screen.queryByTestId('route-detail')).not.toBeInTheDocument();
+    });
+
+    it('goes back to the carousel from the detail', async () => {
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      await submitOnPhone();
+      await screen.findByTestId('routes-count');
+      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
+
+      fireEvent.click(screen.getByTestId('route-back'));
+
+      expect(screen.getByTestId('routes-list')).toBeInTheDocument();
+      expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('hides the floating buttons over the map while the detail is open, which takes the room', async () => {
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      await submitOnPhone();
+      await screen.findByTestId('routes-count');
+      expect(screen.getByTestId('criteria-basemap')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
+
+      expect(screen.queryByTestId('criteria-basemap')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-locate')).not.toBeInTheDocument();
+    });
+
+    it('moves the carousel to the route tapped on the map', async () => {
+      ask(answer(route(0), route(1)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      await submitOnPhone();
+      await screen.findByTestId('routes-count');
+      await settle();
+
+      act(() => map().fire('click', { features: [{ properties: { index: 1 } }] }, 'routes-hit'));
+
+      expect(screen.getByTestId('routes-row-1')).toHaveAttribute('data-selected');
+      expect(screen.getByTestId('routes-position')).toHaveTextContent('2/2');
+    });
+
+    it('frames the route selected clear of the sheet, which draws the others as well', async () => {
+      ask(answer(route(0), route(1)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      await submitOnPhone();
+      await screen.findByTestId('routes-count');
+      await settle();
+
+      fireEvent.click(screen.getByTestId('routes-row-1'));
+      await settle();
+
+      expect(routesSource()).toHaveLength(2);
+      expect(map().fitted?.options).toMatchObject({ padding: expect.objectContaining({ top: 24, bottom: 24 }) });
+    });
+
+    it('calls the routes stale in the sheet once the criteria changed, and searches again from there', async () => {
+      const routeSets = ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      await submitOnPhone();
+      await screen.findByTestId('routes-count');
+      expect(screen.queryByTestId('routes-stale')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
+      fireEvent.click(screen.getByTestId('sub-page-back'));
+      expect(screen.getByTestId('routes-stale')).toHaveTextContent(routesText.en.stale);
+      expect(screen.getByTestId('routes-row-0')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('routes-search-again'));
+
+      expect(routeSets).toHaveBeenCalledTimes(2);
+    });
+
+    it('cancels a search from the sheet', async () => {
+      ask(new Promise(() => {}));
+      render(<CriteriaView language="en" />);
+      await submitOnPhone();
+
+      expect(screen.getByTestId('routes-loading')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('routes-cancel'));
+
+      expect(screen.queryByTestId('routes-loading')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-open')).toBeInTheDocument();
+    });
+
+    it('drops the routes found when a new start point is typed in the layer', async () => {
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      await submitOnPhone();
+      await screen.findByTestId('routes-count');
+
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      fireEvent.change(field(), { target: { value: '45.9, 6.3' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByTestId('sub-page-back'));
+
+      expect(screen.queryByTestId('routes-list')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-open')).toBeInTheDocument();
     });
 
     it.each([
@@ -970,10 +1124,14 @@ describe('CriteriaView', () => {
     it.each(['en', 'fr'] as const)('names every control of the route set in %s', async (language) => {
       ask(answer(route(0)));
       const { container } = render(<CriteriaView language={language} />);
+      fireEvent.click(screen.getByTestId('criteria-bar'));
       fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
       fireEvent.keyDown(field(), { key: 'Enter' });
       fireEvent.click(screen.getByTestId('criteria-submit'));
       await screen.findByTestId('routes-count');
+      expectNamedControls(container);
+
+      fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
 
       expectNamedControls(container);
     });

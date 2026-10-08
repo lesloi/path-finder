@@ -9,6 +9,7 @@ window.ResizeObserver = class {
   disconnect() {}
 };
 Element.prototype.setPointerCapture = () => {};
+Element.prototype.scrollTo = () => {};
 // jsdom has no object URLs.
 let objectUrls = 0;
 URL.createObjectURL = () => `blob:object-${++objectUrls}`;

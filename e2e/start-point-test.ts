@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 
 import { criteriaText } from '../apps/web/src/i18n/index.ts';
-import { expect, openMap, test } from './test.ts';
+import { expect, openCriteria, openMap, test } from './test.ts';
 
 // Longer than the map's 500 ms long press.
 const LONG_PRESS_HOLD_MS = 700;
@@ -13,7 +13,7 @@ const myLocationButton = (page: Page) => page.getByTestId('criteria-locate');
 // A touch on phones, a mouse press on desktops. Playwright's touchscreen only taps, hence the DevTools protocol.
 async function longPress(page: Page, isMobile: boolean) {
   const { width, height } = page.viewportSize()!;
-  // Over the map, clear of the left column and of the bottom sheet.
+  // Over the map, clear of the left column, the bar at the top and the bottom sheet.
   const x = width * 0.7;
   const y = height * 0.35;
   if (isMobile) {
@@ -35,6 +35,7 @@ test.describe('the start point', () => {
 
     await longPress(page, isMobile);
 
+    await openCriteria(page);
     await expect(startPoint(page)).toHaveValue(/° N · .*° E$/);
   });
 
@@ -45,11 +46,13 @@ test.describe('the start point', () => {
 
     await myLocationButton(page).click();
 
+    await openCriteria(page);
     await expect(startPoint(page)).toHaveValue('45.8326° N · 6.8652° E');
   });
 
   test('is set by typed coordinates', async ({ page }) => {
     await page.goto('/');
+    await openCriteria(page);
 
     await startPoint(page).fill('45.8326, 6.8652');
     await startPoint(page).press('Enter');

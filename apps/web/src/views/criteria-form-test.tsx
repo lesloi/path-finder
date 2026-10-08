@@ -1,8 +1,8 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 
 import { parseCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
-import { commonText, criteriaText } from '../i18n/index.ts';
+import { criteriaText } from '../i18n/index.ts';
 import { CriteriaForm, criteriaChanged } from './criteria-form.tsx';
 import { useSettings } from '../state/index.ts';
 import type { Position, RouteSetRequest } from '../core/index.ts';
@@ -15,15 +15,8 @@ const START: Position = [6.1294, 45.8992];
 // The tests read metric figures, whatever the language, unless they pick other units.
 const store = (settings: object) =>
   localStorage.setItem('path-finder.settings', JSON.stringify({ units: 'metric', ...settings }));
-const onDesktop = () =>
-  vi
-    .spyOn(window, 'matchMedia')
-    .mockImplementation(
-      (query) => ({ media: query, matches: true, addEventListener() {}, removeEventListener() {} }) as never,
-    );
 
-// The form is the full one, as on desktops, unless a test asks for the compact one.
-function setup(props: { start?: Position; compact?: boolean; language?: 'en' | 'fr' } = {}) {
+function setup(props: { start?: Position; language?: 'en' | 'fr' } = {}) {
   const onSubmit = vi.fn();
   render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} {...props} />);
   const submit = () => fireEvent.click(screen.getByTestId('criteria-submit'));
@@ -36,7 +29,6 @@ const choose = (group: 'target' | 'elevation' | 'surface', value: string) =>
 
 beforeEach(() => {
   store({});
-  onDesktop();
 });
 
 afterEach(() => {
@@ -283,23 +275,6 @@ describe('CriteriaForm', () => {
       expect(onSubmit.mock.calls[0][0].includeTechnical).toBe(true);
     });
 
-    it('shows on the surface chip of the compact form once allowed', () => {
-      vi.restoreAllMocks();
-      store({ lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300, includeTechnical: true } });
-      setup({ compact: true });
-
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAttribute('data-set');
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveTextContent(en.technicalShort);
-    });
-
-    it('is in the surface dialog of the compact form', () => {
-      vi.restoreAllMocks();
-      setup({ compact: true });
-      fireEvent.click(screen.getByTestId('criteria-chip-surface'));
-
-      expect(within(screen.getByTestId('criteria-dialog')).getByTestId('criteria-technical')).toBeInTheDocument();
-    });
-
     it('is worded in French', () => {
       setup({ language: 'fr' });
 
@@ -428,96 +403,6 @@ describe('CriteriaForm', () => {
       choose('elevation', 'target');
 
       expectNamedControls(container);
-    });
-
-    it.each(['en', 'fr'] as const)('names every chip and the dialog of the compact form in %s', (language) => {
-      vi.restoreAllMocks();
-      const { container } = render(<CriteriaForm language={language} start={START} compact onSubmit={vi.fn()} />);
-      expectNamedControls(container);
-
-      fireEvent.click(screen.getByTestId('criteria-chip-surface'));
-
-      expectNamedControls(container);
-    });
-  });
-
-  describe('compact', () => {
-    // Compact is for phones.
-    beforeEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it('shows chips instead of the form, highlighting the criteria that are not the default', () => {
-      store({ lastCriteria: { target: 'distance', surface: 'paved', level: 'any', gain: 300 } });
-      setup({ compact: true });
-
-      expect(screen.queryByTestId('criteria-distance')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('criteria-chip-activity')).not.toBeInTheDocument();
-      expect(screen.getByTestId('criteria-chip-target')).not.toHaveAttribute('data-set');
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAttribute('data-set');
-    });
-
-    it('names the elevation gain and surface chips while they are the default, so they are told apart', () => {
-      setup({ compact: true });
-
-      expect(screen.getByTestId('criteria-chip-elevation')).toHaveAccessibleName(`${en.elevationGain}: ${en.any}`);
-      expect(screen.getByTestId('criteria-chip-elevation')).toHaveTextContent(en.elevationChip);
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName(`${en.surface}: ${en.anySurface}`);
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveTextContent(en.surface);
-
-      fireEvent.click(screen.getByTestId('criteria-chip-surface'));
-      choose('surface', 'paved');
-
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAccessibleName(`${en.surface}: ${en.paved}`);
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveTextContent(en.paved);
-    });
-
-    it('opens one criterion in a dialog and applies its changes as they are made', () => {
-      const { onSubmit, submit } = setup({ compact: true });
-
-      fireEvent.click(screen.getByTestId('criteria-chip-surface'));
-      expect(screen.getByTestId('criteria-dialog')).toHaveAccessibleName(en.surface);
-      choose('surface', 'paved');
-
-      expect(screen.getByTestId('criteria-chip-surface')).toHaveAttribute('data-set');
-      fireEvent.click(screen.getByTestId('criteria-dialog-close'));
-      expect(screen.queryByTestId('criteria-dialog')).not.toBeInTheDocument();
-      submit();
-      expect(onSubmit.mock.calls[0][0].surface).toBe('paved');
-    });
-
-    it('shows the error inside the dialog, which covers the sheet', () => {
-      setup({ compact: true });
-      fireEvent.click(screen.getByTestId('criteria-chip-elevation'));
-      choose('elevation', 'target');
-      fireEvent.change(slider('gain'), { target: { value: '2000' } });
-      fireEvent.click(screen.getByTestId('criteria-dialog-close'));
-      fireEvent.click(screen.getByTestId('criteria-chip-target'));
-
-      choose('target', 'duration');
-      fireEvent.change(slider('duration'), { target: { value: '30' } });
-
-      expect(within(screen.getByTestId('criteria-dialog')).getByTestId('criteria-error')).toHaveTextContent(
-        en.durationError,
-      );
-    });
-
-    it('shows the target as a duration with its own chip', () => {
-      setup({ compact: true });
-
-      fireEvent.click(screen.getByTestId('criteria-chip-target'));
-      choose('target', 'duration');
-
-      expect(screen.getByTestId('criteria-chip-target')).toHaveAccessibleName(
-        `${en.target}: 1 ${commonText.en.hour} 00`,
-      );
-      expect(screen.getByTestId('criteria-chip-target')).toHaveAttribute('data-set');
-    });
-
-    it('hides Find routes until a start point is set', () => {
-      setup({ compact: true, start: undefined });
-
-      expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
     });
   });
 });

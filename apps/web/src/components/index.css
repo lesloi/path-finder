@@ -82,6 +82,8 @@
   /* What the route list and the dock cover from the right and the bottom of the map: the framing keeps them clear. */
   --list-reserved: calc(var(--spacing-list) + var(--spacing) * 3);
   --dock-reserved: calc(var(--spacing-dock) + var(--spacing) * 3);
+  /* What the bar over the top of the map covers on a phone, from the top edge: the framing keeps it clear. */
+  --top-reserved: calc(env(safe-area-inset-top) + var(--spacing) * 3 + var(--spacing-touch));
   /* The same while they are shown, which the view sets; nothing without them. */
   --list-inset: 0px;
   --dock-inset: 0px;

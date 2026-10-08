@@ -713,14 +713,10 @@ describe('StartPointMap', () => {
         });
 
         it('keeps clear of the sheet on phones', () => {
-          document.documentElement.style.setProperty('--sheet-height', '500px');
-          try {
-            renderRoutes({ routes: [out], summaries });
-            // The route is at 250 to 300 px from the top: the sheet leaves 600 - 500 - 40 - 28 = 32 px.
-            expect(labelled('route-badges')).toEqual([]);
-          } finally {
-            document.documentElement.style.removeProperty('--sheet-height');
-          }
+          renderRoutes({ routes: [out], summaries, sheetHeight: 500 });
+
+          // The route is at 250 to 300 px from the top: the sheet leaves 600 - 500 - 40 - 28 = 32 px.
+          expect(labelled('route-badges')).toEqual([]);
         });
 
         it('leaves out the distance markers that are out of view', () => {
@@ -803,8 +799,7 @@ describe('StartPointMap', () => {
     });
 
     it('frames every route, clear of the sheet on phones', () => {
-      document.documentElement.style.setProperty('--sheet-height', '300px');
-      renderRoutes();
+      renderRoutes({ sheetHeight: 300 });
 
       expect(map().fitted).toEqual({
         bounds: [
@@ -813,7 +808,87 @@ describe('StartPointMap', () => {
         ],
         options: expect.objectContaining({ padding: expect.objectContaining({ bottom: 300 + 24 }) }),
       });
-      document.documentElement.style.removeProperty('--sheet-height');
+    });
+
+    describe('following the selection on phones', () => {
+      afterEach(() => vi.restoreAllMocks());
+      const padding = () => (map().fitted!.options as { padding: Record<string, number> }).padding;
+      const withTopBar = (top: string) =>
+        vi
+          .spyOn(window, 'getComputedStyle')
+          .mockReturnValue({ paddingTop: '', paddingRight: '', paddingLeft: '', paddingBottom: top } as never);
+
+      it('draws every route and frames the selected one alone', () => {
+        renderRoutes({ framing: 'follow', selectedRoute: 1 });
+
+        expect(features()).toHaveLength(3);
+        expect(map().fitted?.bounds).toEqual([
+          [7, 45],
+          [7.1, 45.2],
+        ]);
+      });
+
+      it('moves to the route selected next, and keeps the others drawn', () => {
+        const { rerender } = renderRoutes({ framing: 'follow', selectedRoute: 0 });
+
+        rerender(<StartPointMap routes={routes} framing="follow" selectedRoute={2} onStartChange={vi.fn()} />);
+
+        expect(map().fitted?.bounds).toEqual([
+          [8, 45],
+          [8.1, 45.2],
+        ]);
+        expect(features()).toHaveLength(3);
+      });
+
+      it('keeps the route clear of the sheet and of the bar over the map', () => {
+        withTopBar('80px');
+
+        renderRoutes({ framing: 'follow', selectedRoute: 1, sheetHeight: 260 });
+
+        expect(padding()).toEqual({ top: 24 + 80, left: 24, right: 24, bottom: 24 + 260 });
+      });
+
+      it('frames the route again when the sheet changes height', () => {
+        const { rerender } = renderRoutes({ framing: 'follow', selectedRoute: 1, sheetHeight: 200 });
+
+        rerender(
+          <StartPointMap
+            routes={routes}
+            framing="follow"
+            selectedRoute={1}
+            sheetHeight={360}
+            onStartChange={vi.fn()}
+          />,
+        );
+
+        expect(padding().bottom).toBe(24 + 360);
+      });
+
+      it('leaves the map where the user moved it when the sheet changes height', () => {
+        const { rerender } = renderRoutes({ framing: 'follow', selectedRoute: 1, sheetHeight: 200 });
+        act(() => map().fire('movestart', { originalEvent: {} }));
+        map().fitted = undefined;
+
+        rerender(
+          <StartPointMap
+            routes={routes}
+            framing="follow"
+            selectedRoute={1}
+            sheetHeight={360}
+            onStartChange={vi.fn()}
+          />,
+        );
+
+        expect(map().fitted).toBeUndefined();
+      });
+
+      it('takes no room for the bar without the stylesheet', () => {
+        withTopBar('');
+
+        renderRoutes({ framing: 'follow', selectedRoute: 1 });
+
+        expect(padding().top).toBe(24);
+      });
     });
 
     it('frames the selected route alone when asked to', () => {

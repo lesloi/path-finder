@@ -57,6 +57,15 @@ export const test = base.extend<{ privacyGuard: void; metricUnits: void }>({
   ],
 });
 
+/**
+ * Opens the criteria where they are not already shown: on a phone, the layer over the map that the bar at the top
+ * opens, unless it is open already. A desktop has them in its left column.
+ */
+export async function openCriteria(page: Page) {
+  const bar = page.getByTestId('criteria-bar');
+  if ((await bar.isVisible()) && !(await page.getByTestId('sub-page').isVisible())) await bar.click();
+}
+
 /** Opens the map view once the map has loaded its style, tiles and glyphs. */
 export async function openMap(page: Page) {
   await page.goto('/');

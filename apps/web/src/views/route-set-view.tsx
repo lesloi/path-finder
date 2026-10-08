@@ -36,6 +36,7 @@ import {
 } from '../core/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
 import { RouteFigures, SurfaceShare, surfaceShares } from './route-figures.tsx';
+import { RouteCarousel } from './route-carousel.tsx';
 import { RoutePace } from './route-pace.tsx';
 
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
@@ -50,11 +51,12 @@ const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp
 const words = ({ language }: Display) => ({ ...criteriaText[language], ...routesText[language] });
 
 /**
- * The route set the user asked for. On phones, first a list of its routes, then the detail of one, which swipes
- * to the next. On desktops, the list alone: the route selected has its detail in the dock (`RouteDock`), and
- * pointing at a row only previews its route. `onSelect` hears the route shown in the list or the detail,
- * `onHover` a place the user points at on the elevation profile. The durations of the routes are at `pace`;
- * `onPaceChange`, when given, lets the user change it in the list.
+ * The route set the user asked for. On phones, first a carousel of its routes, where settling on a card selects
+ * its route and a tap on the selected card opens its detail, which swipes to the next. On desktops, the list
+ * alone: the route selected has its detail in the dock (`RouteDock`), and pointing at a row only previews its
+ * route. `onSelect` hears the route shown in the carousel, the list or the detail, `onHover` a place the user
+ * points at on the elevation profile. The durations of the routes are at `pace`; `onPaceChange`, when given,
+ * lets the user change it in the list.
  */
 export function RouteSetView({
   display,
@@ -67,9 +69,7 @@ export function RouteSetView({
   onPreview,
   onDetailChange,
   onPaceChange,
-  onBack,
   onHover,
-  condensed = false,
 }: {
   display: Display;
   routes: Route[];
@@ -87,11 +87,7 @@ export function RouteSetView({
   onDetailChange: (detail: boolean) => void;
   /** Absent when the pace cannot change the routes' durations alone, such as by duration. */
   onPaceChange?: (pace: number) => void;
-  /** Back to the criteria. Phones only: a desktop shows them beside the list. */
-  onBack: () => void;
   onHover: (position: Position | undefined) => void;
-  /** On a phone with its sheet collapsed, the detail stops at the figures: the rest is for the expanded sheet. */
-  condensed?: boolean;
 }) {
   const desktop = useDesktop();
 
@@ -105,51 +101,54 @@ export function RouteSetView({
         onSelect={onSelect}
         onBack={() => onDetailChange(false)}
         onHover={onHover}
-        condensed={condensed}
       />
     );
   }
 
   const t = words(display);
+  const rows = routes.map((route, index) => (
+    <RouteRow
+      key={index}
+      route={route}
+      snapshot={snapshot}
+      index={index}
+      count={routes.length}
+      selected={index === selected}
+      display={display}
+      desktop={desktop}
+      // A tap opens the detail of the route on the card in the middle, and brings another card there; a click on
+      // a desktop selects the route.
+      onOpen={() => (!desktop && index === selected ? onDetailChange(true) : onSelect(index))}
+      // The focus on a card of a phone selects it; a desktop only previews a row, until a click selects it.
+      onPreview={() => (desktop ? onPreview?.(index) : onSelect(index))}
+      onPreviewEnd={desktop ? () => onPreview?.(undefined) : undefined}
+    />
+  ));
   return (
     <>
       <div className="flex items-center justify-between gap-2">
-        {!desktop && (
-          <button
-            type="button"
-            data-testid="routes-back"
-            className="flex min-h-touch items-center gap-1 rounded-full pr-3 text-accent"
-            onClick={onBack}
-          >
-            <ArrowLeft size={18} aria-hidden />
-            {t.criteria}
-          </button>
-        )}
         <strong data-testid="routes-count">{t.routeCount(routes.length)}</strong>
+        {!desktop && selected !== undefined && (
+          <span data-testid="routes-position">
+            <span aria-hidden>
+              {selected + 1}/{routes.length}
+            </span>
+            <span className="sr-only">{t.route(selected + 1, routes.length)}</span>
+          </span>
+        )}
       </div>
       <RoutePace display={display} pace={pace} onChange={onPaceChange} />
-      <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
-        {routes.map((route, index) => (
-          <li key={index}>
-            <RouteRow
-              route={route}
-              snapshot={snapshot}
-              index={index}
-              count={routes.length}
-              selected={index === selected}
-              display={display}
-              desktop={desktop}
-              onOpen={() => {
-                onSelect(index);
-                if (!desktop) onDetailChange(true);
-              }}
-              // A tap on a phone opens the route; a desktop only previews it, until a click selects it.
-              onPreview={() => (desktop ? onPreview?.(index) : onSelect(index))}
-              onPreviewEnd={desktop ? () => onPreview?.(undefined) : undefined}
-            />
-          </li>
-        ))}
-      </ul>
+      {desktop ? (
+        <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
+          {rows.map((row, index) => (
+            <li key={index}>{row}</li>
+          ))}
+        </ul>
+      ) : (
+        <RouteCarousel testId="routes-list" selected={selected} onSelect={onSelect}>
+          {rows}
+        </RouteCarousel>
+      )}
     </>
   );
 }
@@ -180,6 +179,8 @@ function RouteRow({
   onPreviewEnd?: (() => void) | undefined;
 }) {
   const t = words(display);
+  // A press focuses the row before its click: only the keyboard selects from the focus, not a tap.
+  const pressed = useRef(false);
   const distance = formatDistance(route.distance, display);
   const duration = formatDuration(route.estimatedDuration, display.language);
   const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, display);
@@ -205,11 +206,18 @@ function RouteRow({
         `${routeBorder(index)} hover:bg-surface-2 data-selected:bg-surface-2`
       }
       aria-label={name}
-      onClick={onOpen}
+      onPointerDown={() => (pressed.current = true)}
+      onPointerCancel={() => (pressed.current = false)}
+      onClick={() => {
+        pressed.current = false;
+        onOpen();
+      }}
       // Hovering is for desktops: a tap on a phone opens the route.
       onMouseEnter={desktop ? onPreview : undefined}
       onMouseLeave={onPreviewEnd}
-      onFocus={onPreview}
+      onFocus={() => {
+        if (!pressed.current) onPreview();
+      }}
       onBlur={onPreviewEnd}
     >
       <span className="flex w-full items-center gap-3">
@@ -266,13 +274,11 @@ function RouteDetail({
   onSelect,
   onBack,
   onHover,
-  condensed,
 }: {
   display: Display;
   routes: Route[];
   snapshot?: MapSnapshot;
   selected: number;
-  condensed: boolean;
   onSelect: (index: number) => void;
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
@@ -336,22 +342,18 @@ function RouteDetail({
           ))}
         </div>
       )}
-      {!condensed && (
-        <>
-          <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
-          <SurfaceShare route={route} display={display} />
-          <button
-            type="button"
-            data-testid="route-export"
-            className={PRIMARY_BUTTON}
-            // Nothing awaited before the share sheet: it needs the tap that opened it.
-            onClick={() => void saveGpx(gpxExport(route, new Date(), display))}
-          >
-            <Download size={18} aria-hidden />
-            {t.exportGpx}
-          </button>
-        </>
-      )}
+      <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
+      <SurfaceShare route={route} display={display} />
+      <button
+        type="button"
+        data-testid="route-export"
+        className={PRIMARY_BUTTON}
+        // Nothing awaited before the share sheet: it needs the tap that opened it.
+        onClick={() => void saveGpx(gpxExport(route, new Date(), display))}
+      >
+        <Download size={18} aria-hidden />
+        {t.exportGpx}
+      </button>
     </div>
   );
 }

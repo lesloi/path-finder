@@ -1,4 +1,3 @@
-import { Layers, Ruler, Timer, TrendingUp } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import {
@@ -11,17 +10,7 @@ import {
   type Criteria,
   type CriteriaField,
 } from '../contract/index.ts';
-import {
-  CHIP,
-  CHIP_ROW,
-  Dialog,
-  PaceSlider,
-  PRIMARY_BUTTON,
-  SegmentedControl,
-  Slider,
-  Switch,
-  useDesktop,
-} from '../components/index.ts';
+import { PaceSlider, PRIMARY_BUTTON, SegmentedControl, Slider, Switch } from '../components/index.ts';
 import {
   formatDuration,
   KM_PER_MILE,
@@ -191,31 +180,25 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
 /**
  * The criteria of a route set: target distance or duration, surface, and elevation gain,
  * over the user's settings. `onSubmit` receives a request body that `parseCriteria`
- * accepts. On a phone, `compact` shows chips that each open one criterion.
+ * accepts.
  */
 export function CriteriaForm({
   language,
   start,
   draft: kept,
-  compact = false,
   onSubmit,
 }: {
   language: Language;
   start?: Position;
   /** From `useCriteriaDraft`, for a view that mounts the form in more than one place and keeps what was set. */
   draft?: ReturnType<typeof useCriteriaDraft>;
-  compact?: boolean;
   onSubmit: (request: RouteSetRequest) => void;
 }) {
   const t = { ...commonText[language], ...criteriaText[language] };
-  const desktop = useDesktop();
   const [settings, update] = useSettings();
   const units = useUnits(language);
   const own = useCriteriaDraft(language);
   const [draft, setDraft] = kept ?? own;
-  const [open, setOpen] = useState<Criterion>();
-  // The sheet expanded behind the dialog.
-  if (open && !(compact && !desktop)) setOpen(undefined);
 
   const bounds = boundsFor(units);
   const unit = unitsFor(units);
@@ -225,7 +208,6 @@ export function CriteriaForm({
   // Only the surface preferences that can route onto technical ways get the switch. A paved request always excludes
   // them, whatever was kept: the stored value is not touched.
   const technicalApplies = draft.surface !== 'paved';
-  const allowed = technicalApplies && draft.includeTechnical;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
   const request = criteriaRequest(draft, { units, pace: settings.pace, start });
@@ -340,34 +322,6 @@ export function CriteriaForm({
     },
   };
 
-  const TargetIcon = draft.target === 'distance' ? Ruler : Timer;
-  // `name` stands for the value on a chip that is the default, so two "Any" chips are told apart.
-  const chips: Record<Criterion, { label: string; name?: string; icon?: ReactNode; set: boolean }> = {
-    target: {
-      label: draft.target === 'distance' ? `${distance} ${unit.distance}` : formatDuration(draft.duration, language),
-      icon: <TargetIcon size={18} aria-hidden />,
-      set:
-        draft.target === 'duration' ||
-        distance !== clamp(defaultDistance(units), bounds.distance.min, bounds.distance.max),
-    },
-    elevation: {
-      label: level === 'target' ? `${gain} ${unit.gain}` : { any: t.any, flat: t.flat, hilly: t.hilly }[level],
-      name: t.elevationChip,
-      icon: <TrendingUp size={18} aria-hidden />,
-      set: level !== 'any',
-    },
-    surface: {
-      // Technical stretches that are allowed show on the chip too: the phone hides the switch behind it.
-      label: [
-        { paved: t.paved, any: t.anySurface, unpaved: t.unpaved }[draft.surface],
-        ...(allowed ? [t.technicalShort] : []),
-      ].join(' · '),
-      name: t.surface,
-      icon: <Layers size={18} aria-hidden />,
-      set: draft.surface !== 'any' || allowed,
-    },
-  };
-
   const findRoutes = request && !field && (
     <button type="button" className={PRIMARY_BUTTON} data-testid="criteria-submit" onClick={() => onSubmit(request)}>
       {t.findRoutes}
@@ -378,43 +332,6 @@ export function CriteriaForm({
       {message(field, draft.target, { language, distance: bounds.distance, gain: bounds.gain, unit })}
     </p>
   );
-
-  if (compact && !desktop) {
-    return (
-      <>
-        <div className={CHIP_ROW}>
-          {CRITERIA.map((criterion) => (
-            <button
-              key={criterion}
-              type="button"
-              className={CHIP}
-              data-testid={`criteria-chip-${criterion}`}
-              data-set={chips[criterion].set ? '' : undefined}
-              aria-label={`${sections[criterion].title}: ${chips[criterion].label}`}
-              onClick={() => setOpen(criterion)}
-            >
-              {chips[criterion].icon}
-              {chips[criterion].set ? chips[criterion].label : (chips[criterion].name ?? chips[criterion].label)}
-            </button>
-          ))}
-        </div>
-        {error}
-        {findRoutes}
-        {open && (
-          <Dialog
-            testId="criteria-dialog"
-            title={sections[open].title}
-            closeLabel={t.close}
-            onClose={() => setOpen(undefined)}
-          >
-            {sections[open].content}
-            {/* The sheet is behind the dialog, and changes apply as they are made. */}
-            {error && <div className="mt-2">{error}</div>}
-          </Dialog>
-        )}
-      </>
-    );
-  }
 
   return (
     <>

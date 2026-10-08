@@ -2,14 +2,22 @@ import { Crosshair, LocateFixed, Navigation2, Scan, Settings } from 'lucide-reac
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { useSettings, useUnits } from '../state/index.ts';
+import { CriteriaBar } from './criteria-bar.tsx';
 import { CriteriaForm, criteriaChanged, criteriaRequest, invalidField, useCriteriaDraft } from './criteria-form.tsx';
 import { RouteDock } from './route-dock.tsx';
 import { RouteErrorToast } from './route-error-toast.tsx';
-import { RoutesFoundButton } from './routes-found-button.tsx';
 import { SearchingPanel } from './searching-panel.tsx';
 import { useRouteBrowser } from './use-route-browser.ts';
 import { RouteSetView } from './route-set-view.tsx';
-import { BASEMAPS, formatPosition, parsePosition, routesAtPace, type Position } from '../core/index.ts';
+import {
+  BASEMAPS,
+  criteriaSummary,
+  formatPosition,
+  parsePosition,
+  routesAtPace,
+  type Position,
+  type RouteSetRequest,
+} from '../core/index.ts';
 import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
   StartPointMap,
@@ -20,7 +28,9 @@ import {
   FLOATING_BUTTON,
   ICON_BUTTON,
   LIST_COLUMN,
+  PRIMARY_BUTTON,
   SIDE_COLUMN,
+  SubPage,
   Toast,
   useToastTimeout,
   useDesktop,
@@ -39,7 +49,7 @@ const STACKED_ABOVE = [
 const stackedAbove = (below: 0 | 1 | 2) =>
   `right-safe-3 transition-[bottom] duration-250 ease-[ease] desktop:bottom-(--edge-bottom) ${STACKED_ABOVE[below]}`;
 
-// Sets a custom property of the page while `shown`, as `--sheet-height` does for the sheet.
+// Sets a custom property of the page while `shown`.
 function useRootProperty(name: string, value: string, shown: boolean) {
   useLayoutEffect(() => {
     if (!shown) return;
@@ -49,10 +59,16 @@ function useRootProperty(name: string, value: string, shown: boolean) {
   }, [name, value, shown]);
 }
 
-// A notice over the bottom of the map, centred between the columns and above the dock.
+// A notice over the map: on desktops at the bottom, centred between the columns and above the dock; on phones
+// under the bar at the top.
 const MAP_NOTICE =
-  'fixed bottom-[calc(var(--edge-bottom)+--spacing(8))] left-(--map-centre) z-4 w-max -translate-x-1/2 rounded-md ' +
-  'bg-surface text-sm text-ink-2 shadow-float';
+  'fixed z-4 w-max -translate-x-1/2 rounded-md bg-surface text-sm text-ink-2 shadow-float ' +
+  'top-[calc(var(--top-reserved)+--spacing(2))] left-1/2 max-w-[calc(100vw-2*--spacing(4))] ' +
+  'desktop:top-auto desktop:bottom-[calc(var(--edge-bottom)+--spacing(8))] desktop:left-(--map-centre) ' +
+  'desktop:max-w-none';
+
+// The start point of a request that is not there yet, for the summary of the criteria alone.
+const NO_START: Position = [0, 0];
 
 /**
  * The first view: where the user sets the criteria of a route set, over a full-screen map. Asking
@@ -67,7 +83,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
   const [picking, setPicking] = useState(false);
-  const [sheetExpanded, setSheetExpanded] = useState(false);
+  // On phones, the criteria are a layer over the map; the height of the sheet is what the routes are framed clear of.
+  const [layerOpen, setLayerOpen] = useState(false);
+  const [sheetHeight, setSheetHeight] = useState(0);
   // What went wrong, and the start point then: setting a new one drops the toast.
   const [toast, setToast] = useState<{ problem: 'unavailable' | 'unreadable'; start?: Position }>();
   const settingsLink = useRef<HTMLAnchorElement>(null);
@@ -84,20 +102,23 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     () => routeSet?.routes.map(({ distance, elevationGain }) => ({ distance, elevationGain })),
     [routeSet],
   );
-  // A desktop shows the route set beside the criteria for as long as there is one; a phone, in place of them.
-  const routesShown = desktop ? Boolean(routeSet) : browser.showing;
+  const routesShown = Boolean(routeSet);
   const listShown = desktop && (loading || Boolean(routeSet));
   // Nothing is selected until the user picks a route; a phone opens the first one's detail from its list.
   const selected = desktop ? browser.selected : (browser.selected ?? 0);
   const dockRoute = desktop ? atPace?.routes[selected ?? -1] : undefined;
   const dockShown = Boolean(dockRoute);
-  const current = desktop ? criteriaRequest(draft[0], { units, pace, start }) : undefined;
+  const current = criteriaRequest(draft[0], { units, pace, start });
   const stale = Boolean(routeSet && current && criteriaChanged(current, routeSet.request, units));
   useRootProperty('--list-inset', 'var(--list-reserved)', listShown);
   useRootProperty('--dock-inset', 'var(--dock-reserved)', dockShown);
-  const locateShown = !routesShown && !loading && (desktop || !sheetExpanded);
+  // The floating buttons and the map attribution sit above the sheet, whatever its height.
+  useRootProperty('--sheet-height', `${sheetHeight}px`, !desktop && sheetHeight > 0);
+  // The detail of a route takes more than half of a phone's screen: the buttons over the map leave it room.
+  const detailOpen = !desktop && browser.detail;
+  const locateShown = !routesShown && !loading && !detailOpen;
   // In the place of the location button, which the routes hide.
-  const reframeShown = routesShown && mapView.movedAway && (desktop || !sheetExpanded);
+  const reframeShown = routesShown && mapView.movedAway && !detailOpen;
 
   // A button that puts the map back goes away once it has: the focus goes on from the settings.
   function putBack(action: 'resetNorth' | 'reframe') {
@@ -129,11 +150,6 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [desktop, pageOpen]);
-
-  function backToCriteria() {
-    browser.leave();
-    setSheetExpanded(false);
-  }
 
   function changeStart(position: Position) {
     // Routes from another start point would be stale.
@@ -178,15 +194,57 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         onDetailChange={browser.openDetail}
         // By duration, a new pace is another search, which the criteria ask for: the list only says the pace.
         onPaceChange={'distance' in routeSet.request.target ? (value) => update({ pace: value }) : undefined}
-        onBack={backToCriteria}
         onHover={browser.setHover}
-        condensed={!desktop && !sheetExpanded}
       />
     ) : undefined;
   const panel = routeSetView ?? (loading && <SearchingPanel language={language} />);
-  // The criteria came back with the routes still found: a way to see them again.
-  const found = routeSet && !browser.showing && (
-    <RoutesFoundButton language={language} count={routeSet.routes.length} onClick={browser.show} />
+  // Asking is only for criteria the form would let through.
+  const staleNotice = stale && (
+    <div role="status" data-testid="routes-stale" className="flex flex-col gap-2 rounded-md bg-accent-soft p-3 text-sm">
+      <span>
+        <strong>{t.stale}.</strong> {t.staleHint}
+      </span>
+      {current && !invalidField(current) && (
+        <button
+          type="button"
+          data-testid="routes-search-again"
+          // Not a second primary button: the form's own, or the sheet's, is the view's.
+          className="min-h-touch rounded-full font-semibold text-accent"
+          onClick={() => browser.ask(current)}
+        >
+          {t.searchAgain}
+        </button>
+      )}
+    </div>
+  );
+  const cancelButton = loading && (
+    <button
+      type="button"
+      data-testid="routes-cancel"
+      className="min-h-touch rounded-full text-accent"
+      onClick={browser.drop}
+    >
+      {t.cancelSearch}
+    </button>
+  );
+  const criteriaFields = (
+    <CriteriaFields
+      start={start}
+      language={language}
+      picking={picking}
+      draft={draft}
+      onStartChange={moveStart}
+      onUnreadable={() => warn('unreadable')}
+      onPick={() => {
+        setPicking(!picking);
+        setLayerOpen(false);
+      }}
+      onLocate={locate}
+      onSubmit={(request) => {
+        setLayerOpen(false);
+        browser.ask(request);
+      }}
+    />
   );
 
   return (
@@ -197,8 +255,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         basemap={basemap}
         start={start}
         focus={focus}
-        // On desktops, the start point block also arms a click.
-        pickOnClick={desktop && picking}
+        // The start point field also arms a click, or a tap.
+        pickOnClick={picking}
         routes={browser.geometries}
         summaries={summaries}
         display={display}
@@ -206,7 +264,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         selectedRoute={desktop ? (browser.preview ?? selected) : selected}
         {...(desktop && { markedRoute: selected })}
         // A desktop never reframes on a selection: the map stays where it is as the dock opens and closes.
-        framing={browser.detail && !desktop ? 'selected' : 'all'}
+        // A phone's carousel moves the map to the route in the middle; its detail draws that route alone.
+        framing={desktop ? 'all' : browser.detail ? 'selected' : 'follow'}
+        sheetHeight={desktop ? 0 : sheetHeight}
         {...((desktop ? selected !== undefined : browser.detail) && browser.hover && { hover: browser.hover })}
         routesInteractive={routesShown}
         onRouteSelect={browser.select}
@@ -226,7 +286,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       >
         <Settings size={20} aria-hidden />
       </a>
-      {(desktop || !sheetExpanded) && (
+      {!detailOpen && (
         <>
           <BasemapPicker
             // Over the location button, or in its place while that one is hidden.
@@ -280,109 +340,59 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
               Path finder
             </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-              <StartPointField
-                start={start}
-                language={language}
-                picking={picking}
-                onStartChange={moveStart}
-                onUnreadable={() => warn('unreadable')}
-              >
-                <button
-                  type="button"
-                  data-testid="criteria-start-pick"
-                  className={`${ICON_BUTTON} aria-pressed:text-accent`}
-                  aria-label={t.chooseOnMap}
-                  aria-pressed={picking}
-                  onClick={() => setPicking(!picking)}
-                >
-                  <Crosshair size={20} aria-hidden />
-                </button>
-                <button
-                  type="button"
-                  className={ICON_BUTTON}
-                  data-testid="criteria-start-locate"
-                  aria-label={t.myLocation}
-                  onClick={locate}
-                >
-                  <LocateFixed size={20} aria-hidden />
-                </button>
-              </StartPointField>
-              <CriteriaForm language={language} start={start} draft={draft} onSubmit={browser.ask} />
-            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">{criteriaFields}</div>
           </aside>
           {listShown && (
             <aside className={LIST_COLUMN} aria-label={t.routes}>
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-                {stale && (
-                  <div
-                    role="status"
-                    data-testid="routes-stale"
-                    className="flex flex-col gap-2 rounded-md bg-accent-soft p-3 text-sm"
-                  >
-                    <span>
-                      <strong>{t.stale}.</strong> {t.staleHint}
-                    </span>
-                    {/* Asking is only for criteria the form would let through. */}
-                    {current && !invalidField(current) && (
-                      <button
-                        type="button"
-                        data-testid="routes-search-again"
-                        // Not a second primary button: the form's own is the view's.
-                        className="min-h-touch rounded-full font-semibold text-accent"
-                        onClick={() => browser.ask(current)}
-                      >
-                        {t.searchAgain}
-                      </button>
-                    )}
-                  </div>
-                )}
+                {staleNotice}
                 {panel}
-                {loading && (
-                  <button
-                    type="button"
-                    data-testid="routes-cancel"
-                    className="min-h-touch rounded-full text-accent"
-                    onClick={browser.drop}
-                  >
-                    {t.cancelSearch}
-                  </button>
-                )}
+                {cancelButton}
               </div>
             </aside>
           )}
         </>
       ) : (
-        <BottomSheet
-          testId="criteria-sheet"
-          label={routeSet ? t.routes : t.criteria}
-          expanded={sheetExpanded}
-          onExpandedChange={setSheetExpanded}
-        >
-          {panel || (
-            <>
-              {found}
-              {!start && (
-                <p data-testid="criteria-long-press" className="text-center text-sm text-ink-2">
-                  {t.longPress}
-                </p>
-              )}
-              <StartPointField
-                start={start}
-                language={language}
-                onStartChange={moveStart}
-                onUnreadable={() => warn('unreadable')}
-              />
-              <CriteriaForm
-                language={language}
-                start={start}
-                draft={draft}
-                compact={!sheetExpanded}
-                onSubmit={browser.ask}
-              />
-            </>
+        <>
+          <CriteriaBar
+            language={language}
+            summary={criteriaSummary(criteriaRequest(draft[0], { units, pace, start: start ?? NO_START })!, display)}
+            start={start && formatPosition(start, language)}
+            onClick={() => setLayerOpen(true)}
+          />
+          <BottomSheet
+            testId="criteria-sheet"
+            label={t.routes}
+            expanded={browser.detail}
+            {...(routeSetView && { onExpandedChange: browser.openDetail })}
+            onHeightChange={setSheetHeight}
+          >
+            {!browser.detail && staleNotice}
+            {panel || (
+              <>
+                {!start && (
+                  <p data-testid="criteria-long-press" className="text-center text-sm text-ink-2">
+                    {t.longPress}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  data-testid="criteria-open"
+                  className={PRIMARY_BUTTON}
+                  onClick={() => setLayerOpen(true)}
+                >
+                  {t.setCriteria}
+                </button>
+              </>
+            )}
+            {cancelButton}
+          </BottomSheet>
+          {layerOpen && (
+            <SubPage title={t.criteria} back="#/" language={language} navigate={() => setLayerOpen(false)}>
+              <div className="flex flex-col gap-3">{criteriaFields}</div>
+            </SubPage>
           )}
-        </BottomSheet>
+        </>
       )}
       {dockRoute && atPace && selected !== undefined && (
         <RouteDock
@@ -394,9 +404,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           onHover={browser.setHover}
         />
       )}
-      {desktop && picking && (
+      {picking && (
         <div data-testid="criteria-pick-bar" className={`${MAP_NOTICE} flex items-center gap-3 py-1 pr-1 pl-4`}>
-          {t.pickStart}
+          {desktop ? t.pickStart : t.pickStartTouch}
           <button
             type="button"
             data-testid="criteria-pick-cancel"
@@ -415,6 +425,63 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           {toast.problem === 'unreadable' ? t.coordinatesHint : desktop ? t.pickHintDesktop : t.pickHint}
         </Toast>
       )}
+    </>
+  );
+}
+
+// The start point and the criteria, in the left column of a desktop or in the layer of a phone.
+function CriteriaFields({
+  start,
+  language,
+  picking,
+  draft,
+  onStartChange,
+  onUnreadable,
+  onPick,
+  onLocate,
+  onSubmit,
+}: {
+  start?: Position | undefined;
+  language: Language;
+  picking: boolean;
+  draft: ReturnType<typeof useCriteriaDraft>;
+  onStartChange: (start: Position) => void;
+  onUnreadable: () => void;
+  onPick: () => void;
+  onLocate: () => void;
+  onSubmit: (request: RouteSetRequest) => void;
+}) {
+  const t = criteriaText[language];
+  return (
+    <>
+      <StartPointField
+        start={start}
+        language={language}
+        picking={picking}
+        onStartChange={onStartChange}
+        onUnreadable={onUnreadable}
+      >
+        <button
+          type="button"
+          data-testid="criteria-start-pick"
+          className={`${ICON_BUTTON} aria-pressed:text-accent`}
+          aria-label={t.chooseOnMap}
+          aria-pressed={picking}
+          onClick={onPick}
+        >
+          <Crosshair size={20} aria-hidden />
+        </button>
+        <button
+          type="button"
+          className={ICON_BUTTON}
+          data-testid="criteria-start-locate"
+          aria-label={t.myLocation}
+          onClick={onLocate}
+        >
+          <LocateFixed size={20} aria-hidden />
+        </button>
+      </StartPointField>
+      <CriteriaForm language={language} start={start} draft={draft} onSubmit={onSubmit} />
     </>
   );
 }

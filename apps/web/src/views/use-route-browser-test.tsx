@@ -49,22 +49,11 @@ describe('useRouteBrowser', () => {
   it('shows the routes it asked for, none of them selected', async () => {
     const { result } = await browse();
 
-    expect(result.current.showing).toBe(true);
+    expect(result.current.routeSet).toBeDefined();
     expect(result.current.selected).toBeUndefined();
     expect(result.current.preview).toBeUndefined();
     expect(result.current.detail).toBe(false);
     expect(result.current.geometries).toHaveLength(2);
-  });
-
-  it('keeps the routes when leaving for the criteria, and shows them again', async () => {
-    const { result } = await browse();
-
-    act(() => result.current.leave());
-    expect(result.current.showing).toBe(false);
-    expect(result.current.routeSet).toBeDefined();
-
-    act(() => result.current.show());
-    expect(result.current.showing).toBe(true);
   });
 
   it('forgets the routes when dropped, and the selection with them', async () => {
@@ -74,7 +63,6 @@ describe('useRouteBrowser', () => {
     act(() => result.current.drop());
 
     expect(result.current.routeSet).toBeUndefined();
-    expect(result.current.showing).toBe(false);
     expect(result.current.selected).toBeUndefined();
   });
 

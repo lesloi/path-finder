@@ -1,22 +1,27 @@
 import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
-import { expect, test } from './test.ts';
+import { expect, openCriteria, test } from './test.ts';
 
 // Annecy: the stand-in graph (`apps/server/internal/standin`) covers it, with rolling hills for the elevation gain.
 const START = '45.8992, 6.1294';
 
-async function findRoutes(page: Page) {
-  await page.goto('/');
+async function search(page: Page) {
+  await openCriteria(page);
   await page.getByTestId('criteria-start').fill(START);
   await page.getByTestId('criteria-start').press('Enter');
   await page.getByTestId('criteria-submit').click();
   await expect(page.getByTestId('routes-count')).toBeVisible();
 }
 
-// A swipe with a finger over the detail, through the DevTools protocol: Playwright's touchscreen only taps.
-async function swipeLeft(page: Page) {
-  const box = (await page.getByTestId('route-figures').boundingBox())!;
+async function findRoutes(page: Page) {
+  await page.goto('/');
+  await search(page);
+}
+
+// A swipe with a finger over an element, through the DevTools protocol: Playwright's touchscreen only taps.
+async function swipeLeft(page: Page, testId: string) {
+  const box = (await page.getByTestId(testId).boundingBox())!;
   const y = box.y + box.height / 2;
   const [from, to] = [box.x + box.width * 0.9, box.x + box.width * 0.2];
   const devTools = await page.context().newCDPSession(page);
@@ -60,68 +65,69 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('routes-row-0-profile')).toBeVisible();
   });
 
-  test('badges the routes with a technical stretch only once they are included', async ({ page, isMobile }) => {
+  test('badges the routes with a technical stretch only once they are included', async ({ page }) => {
     const badge = page.locator('[data-testid^="routes-row-"][data-testid$="-technical"]');
-    const find = async () => {
-      await page.getByTestId('criteria-start').fill(START);
-      await page.getByTestId('criteria-start').press('Enter');
-      await page.getByTestId('criteria-submit').click();
-      await expect(page.getByTestId('routes-count')).toBeVisible();
-    };
     await page.goto('/');
-    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
+    await openCriteria(page);
     await page.locator('label', { has: page.getByTestId('criteria-surface-unpaved') }).click();
 
     // The stand-in graph tags the tracks 1.2 km east of the start as technical.
-    await find();
+    await search(page);
     await expect(page.getByTestId('routes-row-0')).toBeVisible();
     await expect(badge).toHaveCount(0);
 
-    if (isMobile) await page.getByTestId('routes-back').click();
-    // On phones, the sheet may be back to its chips.
-    const handle = page.getByTestId('criteria-sheet-handle');
-    if (isMobile && (await handle.getAttribute('aria-expanded')) !== 'true') await handle.click();
+    await openCriteria(page);
     await page.locator('label', { has: page.getByTestId('criteria-technical') }).click();
-    await find();
+    await search(page);
 
     await expect(page.getByTestId('routes-row-0')).toBeVisible();
     await expect(badge.first()).toBeVisible();
   });
 
-  test('goes back to the criteria, still set', async ({ page, isMobile }) => {
+  test('shows the criteria, still set', async ({ page }) => {
     await findRoutes(page);
 
-    // A desktop shows the criteria beside the routes: there is no way back to take.
-    if (isMobile) await page.getByTestId('routes-back').click();
+    // A desktop shows the criteria beside the routes; a phone, in a layer over them.
+    await openCriteria(page);
 
     await expect(page.getByTestId('criteria-submit')).toBeVisible();
     await expect(page.getByTestId('criteria-start')).toHaveValue('45.8992° N · 6.1294° E');
   });
 
-  test('keeps the routes found when going back to the criteria', async ({ page, isMobile }) => {
+  test('keeps the routes found under the criteria layer of a phone', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'A desktop shows the criteria and the routes together.');
     await findRoutes(page);
 
-    await page.getByTestId('routes-back').click();
-    await page.getByTestId('criteria-routes').click();
+    await openCriteria(page);
+    await page.getByTestId('sub-page-back').click();
 
     await expect(page.getByTestId('routes-row-0')).toBeVisible();
+  });
+
+  test('selects the route a swipe settles on in the carousel of a phone', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'The carousel is for phones.');
+    await findRoutes(page);
+    await expect(page.getByTestId('routes-position')).toContainText(/^1\/\d/);
+
+    await swipeLeft(page, 'routes-list');
+
+    await expect(page.getByTestId('routes-position')).toContainText(/^2\/\d/);
+    await expect(page.getByTestId('routes-row-1')).toHaveAttribute('data-selected', '');
   });
 
   test('opens the detail of a route and moves to the next one', async ({ page, isMobile }) => {
     await findRoutes(page);
 
+    // On phones, the first card is in the middle: a tap on it opens its detail.
     await page.getByTestId('routes-row-0').click();
     await expect(page.getByTestId('route-position')).toHaveText(isMobile ? /^1\/\d$/ : /1/);
-    // On phones, the collapsed sheet stops at the figures: its handle expands it to the surface breakdown.
-    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
     // The stand-in graph has paved streets west of the start and rough tracks east of it: a share of each.
     await expect(page.getByTestId('route-surface')).toContainText(/\d+%/);
     await expect(page.getByTestId('route-climb')).toBeVisible();
     await expect(page.getByTestId('route-descent')).toBeVisible();
     await expect(page.getByTestId('route-profile')).toBeVisible();
 
-    if (isMobile) await swipeLeft(page);
+    if (isMobile) await swipeLeft(page, 'route-figures');
     // On desktops, the list stays beside the dock: another row moves the dock to its route.
     else await page.getByTestId('routes-row-1').click();
 
@@ -171,11 +177,9 @@ test.describe('the route set', () => {
     });
   });
 
-  test('exports the route as a GPX file', async ({ page, isMobile }) => {
+  test('exports the route as a GPX file', async ({ page }) => {
     await findRoutes(page);
     await page.getByTestId('routes-row-0').click();
-    // On phones, the collapsed sheet stops at the figures: its handle expands it to the export.
-    if (isMobile) await page.getByTestId('criteria-sheet-handle').click();
 
     const download = page.waitForEvent('download');
     await page.getByTestId('route-export').click();
