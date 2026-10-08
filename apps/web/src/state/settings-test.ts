@@ -1,16 +1,32 @@
 import { act, renderHook } from '@testing-library/react';
 
-import { DEFAULT_CRITERIA, useSettings, watchSettings } from './settings.ts';
+import { DEFAULT_CRITERIA, unitsOf, useSettings, watchSettings } from './settings.ts';
 
 const KEY = 'path-finder.settings';
 
 const DEFAULTS = {
   pace: 6,
-  units: 'metric',
   theme: 'system',
   basemap: 'plan',
   lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300, includeTechnical: false },
 };
+
+describe('unitsOf', () => {
+  const settings = (units?: 'metric' | 'imperial') =>
+    renderHook(() => (localStorage.setItem(KEY, JSON.stringify({ units })), useSettings())).result.current[0];
+
+  it.each([
+    ['fr', 'metric'],
+    ['en', 'imperial'],
+  ] as const)('follows the %s language when the user picked no units: %s', (language, units) => {
+    expect(unitsOf(settings(), language)).toBe(units);
+  });
+
+  it.each(['fr', 'en'] as const)('keeps the units the user picked, in %s', (language) => {
+    expect(unitsOf(settings('metric'), language)).toBe('metric');
+    expect(unitsOf(settings('imperial'), language)).toBe('imperial');
+  });
+});
 
 describe('useSettings', () => {
   it('starts from the defaults', () => {

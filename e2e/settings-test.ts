@@ -4,6 +4,7 @@ test.describe('the settings', () => {
   test('survive a reload', async ({ page }) => {
     await page.goto('/#/settings');
 
+    await expect(page.getByTestId('settings-units-metric')).toBeChecked();
     await page.locator('label', { has: page.getByTestId('settings-units-imperial') }).click();
     await page.locator('label', { has: page.getByTestId('settings-language-fr') }).click();
     await page.reload();

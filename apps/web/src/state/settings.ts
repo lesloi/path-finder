@@ -10,7 +10,7 @@ import {
   type Theme,
   type Units,
 } from '../core/index.ts';
-import type { Language } from '../i18n/index.ts';
+import { browserLanguage, type Language } from '../i18n/index.ts';
 
 /** How the elevation gain is asked for: no preference, a shortcut, or a target in metres. */
 export type ElevationLevel = 'any' | 'flat' | 'hilly' | 'target';
@@ -33,7 +33,8 @@ export type Settings = {
   pace: number;
   /** Absent until the user picks one: the app follows the browser. */
   language?: Language;
-  units: Units;
+  /** Absent until the user picks one: the units follow the language. */
+  units?: Units;
   theme: Theme;
   basemap: Basemap;
   lastCriteria: LastCriteria;
@@ -84,7 +85,7 @@ function parse(raw: string | null): Settings {
   return {
     pace: isPace(pace) ? pace : DEFAULT_PACE,
     ...((language === 'fr' || language === 'en') && { language }),
-    units: units === 'imperial' ? 'imperial' : 'metric',
+    ...((units === 'metric' || units === 'imperial') && { units }),
     theme: theme === 'light' || theme === 'dark' ? theme : DEFAULT_THEME,
     basemap: BASEMAPS.includes(basemap as Basemap) ? (basemap as Basemap) : DEFAULT_BASEMAP,
     lastCriteria: parseLastCriteria(lastCriteria),
@@ -98,6 +99,16 @@ function readRaw(): string | null {
   } catch {
     return null;
   }
+}
+
+/** The language the app is shown in: the user's, else the browser's. */
+export function languageOf({ language }: Settings): Language {
+  return language ?? browserLanguage(navigator.languages);
+}
+
+/** The units figures are shown in: the user's, else the language's (miles and feet in English, kilometres and metres in French). */
+export function unitsOf({ units }: Settings, language: Language): Units {
+  return units ?? (language === 'en' ? 'imperial' : 'metric');
 }
 
 const listeners = new Set<() => void>();
