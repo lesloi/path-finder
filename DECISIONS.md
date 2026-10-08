@@ -46,6 +46,11 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   unmaps it, which no search can fault on. A mapping follows the inode, so a file written in place is seen
   half done by the searches in flight, and a shorter one faults them. A reload that fails, such as a graph
   renamed before its landmarks, keeps the zones served.
+- **A route carries its surfaces as ordered stretches, and the roadbook is worked out on the device.**
+  The server alone knows the surface of each way, so it returns `{surface, from, to}` in kilometres along
+  the route, covering it without gaps. A cue then needs nothing else from the server: turns, climbs and
+  points of interest come from the geometry and the POI tiles the app already holds, so nothing more about
+  the user leaves the device.
 
 ## Routing
 
