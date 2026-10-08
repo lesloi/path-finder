@@ -201,6 +201,7 @@ describe('StartPointMap', () => {
         'background',
         'routes-casing',
         'routes-line',
+        'routes-marking',
         'routes-hit',
         'route-badges',
         'route-markers',
@@ -283,13 +284,23 @@ describe('StartPointMap', () => {
     const features = () =>
       (map().getSource('routes') as GeoJSONSource & { data: { features: { properties: object }[] } }).data.features;
 
-    it('draws every route in its colour, the selected one last', () => {
+    it('draws the selected route in its colour, last, and the others in grey', () => {
       renderRoutes({ selectedRoute: 0 });
 
       expect(features().map(({ properties }) => properties)).toEqual([
-        { index: 1, selected: false, color: '#2563eb' },
-        { index: 2, selected: false, color: '#7a3fc4' },
+        { index: 1, selected: false, color: '#9aa595' },
+        { index: 2, selected: false, color: '#9aa595' },
         { index: 0, selected: true, color: '#e0115f' },
+      ]);
+    });
+
+    it('keeps every route in its colour while none is selected', () => {
+      renderRoutes();
+
+      expect(features().map(({ properties }) => (properties as { color: string }).color)).toEqual([
+        '#e0115f',
+        '#2563eb',
+        '#7a3fc4',
       ]);
     });
 
@@ -555,6 +566,7 @@ describe('StartPointMap', () => {
         'background',
         'routes-casing',
         'routes-line',
+        'routes-marking',
         'routes-hit',
         'route-badges',
         'route-markers',
@@ -570,8 +582,11 @@ describe('StartPointMap', () => {
       ];
       const summaries = [{ distance: 14, elevationGain: 340 }];
       const labelled = (id: 'route-badges' | 'route-markers') =>
-        (map().getSource(id) as GeoJSONSource & { data: { features: { properties: Record<string, unknown> }[] } }).data
-          .features;
+        (
+          map().getSource(id) as GeoJSONSource & {
+            data: { features: { properties: Record<string, unknown>; geometry: { coordinates: Position } }[] };
+          }
+        ).data.features;
       const labels = (id: 'route-badges' | 'route-markers') => labelled(id).map(({ properties }) => properties.label);
 
       it('labels each route with its distance and elevation gain', () => {
@@ -623,6 +638,78 @@ describe('StartPointMap', () => {
         expect(labelled('route-markers').map(({ properties }) => properties.priority)).toEqual([
           2, 2, 2, 2, 1, 2, 2, 2,
         ]);
+      });
+
+      it('draws each tag in a box the map has an image for, white or in the colour of a route', () => {
+        renderRoutes({ routes: [out], summaries });
+
+        expect(map().images['route-tag']).toMatchObject({ width: 36, height: 36 });
+        expect(Object.keys(map().images).filter((id) => id.startsWith('route-tag-'))).toHaveLength(5);
+      });
+
+      it('fills the tag of the selected route in its colour and leaves the others white', () => {
+        renderRoutes({ routes: [out, out], summaries: [...summaries, { distance: 12.5 }], selectedRoute: 1 });
+
+        expect(labelled('route-badges').map(({ properties }) => [properties.tag, properties.textColor])).toEqual([
+          ['route-tag', '#1c1d1b'],
+          ['route-tag-1', '#ffffff'],
+        ]);
+      });
+
+      describe('inside the map', () => {
+        // East along the latitude of the centre: the map shows longitudes 5.92 to 6.67 in its free area.
+        const long: Position[] = [
+          [5.9, 45],
+          [7, 45],
+        ];
+        const anchor = () => labelled('route-badges')[0];
+
+        it('moves the tag along its route to where the map shows it', () => {
+          renderRoutes({ routes: [long], summaries });
+
+          const [lon] = anchor().geometry.coordinates;
+          // The midpoint, at 6.45, is under the controls on the right.
+          expect(lon).toBeGreaterThan(6.2);
+          expect(lon).toBeLessThan(6.32);
+        });
+
+        it('places it again once the map settles somewhere else', () => {
+          renderRoutes({ routes: [long], summaries });
+          map().project = ([lng, lat]) => ({ x: 400 + (lng - 6.6) * 1000, y: 300 - (lat - 45) * 1000 });
+          act(() => map().fire('moveend'));
+
+          // The midpoint is in view now: the tag goes back to it.
+          expect(anchor().geometry.coordinates[0]).toBeCloseTo(6.45, 2);
+        });
+
+        it('leaves the tag out of a route that is not in view', () => {
+          renderRoutes({ routes: [long], summaries });
+          map().project = () => ({ x: 5000, y: 5000 });
+          act(() => map().fire('moveend'));
+
+          expect(labelled('route-badges')).toEqual([]);
+        });
+
+        it('keeps clear of the sheet on phones', () => {
+          document.documentElement.style.setProperty('--sheet-height', '500px');
+          try {
+            renderRoutes({ routes: [out], summaries });
+            // The route is at 250 to 300 px from the top: the sheet leaves 600 - 500 - 40 - 28 = 32 px.
+            expect(labelled('route-badges')).toEqual([]);
+          } finally {
+            document.documentElement.style.removeProperty('--sheet-height');
+          }
+        });
+
+        it('leaves out the distance markers that are out of view', () => {
+          renderRoutes({ routes: [long], summaries: [{ distance: 20 }], selectedRoute: 0, framing: 'selected' });
+
+          const lons = labelled('route-markers').map(({ geometry }) => geometry.coordinates[0]);
+          expect(lons.length).toBeGreaterThan(0);
+          // The route is some 85 km long, a marker every kilometre.
+          expect(lons.length).toBeLessThan(60);
+          expect(Math.max(...lons)).toBeLessThan(6.32);
+        });
       });
 
       it('draws each marker on a dark disc the map has an image for', () => {

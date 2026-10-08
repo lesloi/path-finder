@@ -187,6 +187,45 @@ export function midpoint(geometry: Route['geometry']): Position {
   return positionAlong(geometry, distances, distances[distances.length - 1] / 2);
 }
 
+/** A rectangle of the screen, in pixels from its top left. */
+export type PixelRect = { left: number; top: number; right: number; bottom: number };
+
+// Places tried along a route when it is not all inside the rectangle: enough to find a stretch that is.
+const VISIBLE_SAMPLES = 101;
+
+/**
+ * The place on the route nearest its midpoint, along the route, that `project` puts inside `rect`:
+ * where a label stays in view. Undefined when no place of the route is inside.
+ */
+export function midpointWithin(
+  geometry: Route['geometry'],
+  project: (position: Position) => { x: number; y: number },
+  rect: PixelRect,
+): Position | undefined {
+  const distances = distancesAlong(geometry);
+  const total = distances[distances.length - 1];
+  let best: { position: Position; offset: number } | undefined;
+  for (let step = 0; step < VISIBLE_SAMPLES; step++) {
+    const fraction = step / (VISIBLE_SAMPLES - 1);
+    const position = positionAlong(geometry, distances, fraction * total);
+    const { x, y } = project(position);
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+    const offset = Math.abs(fraction - 0.5);
+    if (!best || offset < best.offset) best = { position, offset };
+  }
+  return best?.position;
+}
+
+/** Whether `project` puts the position inside `rect`. */
+export function isWithin(
+  position: Position,
+  project: (position: Position) => { x: number; y: number },
+  rect: PixelRect,
+): boolean {
+  const { x, y } = project(position);
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
 /** A mark `count` steps along a route, such as the 3rd kilometre. */
 export type DistanceMarker = { position: Position; count: number };
 

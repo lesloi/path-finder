@@ -1,4 +1,5 @@
 import type { SurfaceStretch } from '../contract/index.ts';
+import type { Position } from './coordinates.ts';
 import {
   elevationProfile,
   missText,
@@ -6,7 +7,9 @@ import {
   projectOnSnapshot,
   toMercator,
   positionAt,
+  isWithin,
   midpoint,
+  midpointWithin,
   markerInterval,
   distanceMarkers,
   projectRoute,
@@ -181,6 +184,39 @@ describe('midpoint', () => {
 
     expect(lon).toBeCloseTo(6.1294);
     expect(lat).toBeCloseTo(45.8992 + 200 / METRES_PER_DEGREE, 6);
+  });
+});
+
+describe('midpointWithin', () => {
+  // A route heading east along the equator, a pixel per hundredth of a degree.
+  const line: Position[] = [0, 1, 2, 3, 4].map((lon) => [lon, 0]);
+  const project = ([lon]: Position) => ({ x: lon * 100, y: 50 });
+  const screen = { left: 0, top: 0, right: 400, bottom: 100 };
+
+  it('is the midpoint when it is inside', () => {
+    expect(midpointWithin(line, project, screen)).toEqual([2, 0]);
+  });
+
+  it('moves along the route to the nearest place that is inside', () => {
+    const [lon] = midpointWithin(line, project, { ...screen, left: 250 })!;
+
+    expect(lon).toBeCloseTo(2.5, 1);
+    expect(lon).toBeGreaterThanOrEqual(2.5);
+  });
+
+  it('is undefined when no place of the route is inside', () => {
+    expect(midpointWithin(line, project, { ...screen, top: 60 })).toBeUndefined();
+  });
+});
+
+describe('isWithin', () => {
+  const project = ([lon, lat]: Position) => ({ x: lon, y: lat });
+  const rect = { left: 0, top: 0, right: 10, bottom: 10 };
+
+  it('tells whether a position projects inside the rectangle, edges included', () => {
+    expect(isWithin([10, 0], project, rect)).toBe(true);
+    expect(isWithin([11, 5], project, rect)).toBe(false);
+    expect(isWithin([5, -1], project, rect)).toBe(false);
   });
 });
 
