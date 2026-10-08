@@ -137,6 +137,17 @@ A GPX file for one route, sent to the device share sheet when the browser suppor
 otherwise downloaded, so the user can open it in their watch vendor's app.
 _Avoid_: Sync, upload
 
+**Roadbook**:
+The story of one route told in order, from the start to the finish: its cues, each with the distance
+covered so far. Worked out on the device from the route, never saved. It can be printed.
+_Avoid_: Itinerary, directions, turn-by-turn
+
+**Cue**:
+One line of a roadbook: a clear turn, the start of a change of surface, a sustained climb or descent,
+a technical stretch, or a point of interest the route passes (only the categories the user shows on the map).
+The start and the finish are always cues. There are no street names: the map data holds none.
+_Avoid_: Step, instruction, stage, étape
+
 **Settings**:
 The user's preferences kept on the device: pace, language (English or French,
 the browser's until the user picks one), units, the last criteria (surface preference,
