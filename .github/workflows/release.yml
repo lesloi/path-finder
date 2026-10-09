@@ -61,6 +61,7 @@ jobs:
       NAMESPACE: ${{ vars.K8S_NAMESPACE }}
       DEPLOYMENT: ${{ vars.K8S_DEPLOYMENT }}
       CONTAINER: ${{ vars.K8S_CONTAINER }}
+      CRONJOB: ${{ vars.K8S_CRONJOB }}
       KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
       IMAGE: ghcr.io/${{ github.repository }}@${{ needs.container.outputs.digest }}
     steps:
@@ -68,6 +69,10 @@ jobs:
         run: |
           (umask 077 && printf '%s' "$KUBECONFIG_DATA" > "$RUNNER_TEMP/kubeconfig")
           echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      # The data job runs the same image, so a release that changes the graph format rebuilds it with the new binary.
+      - name: Update the data job
+        run: kubectl --namespace "$NAMESPACE" set image "cronjob/$CRONJOB" "*=${IMAGE,,}"
 
       # A rollout that is not ready in time is undone.
       - name: Roll out
