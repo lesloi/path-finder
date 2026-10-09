@@ -27,7 +27,7 @@ By default:
 
 ## Decisions
 
-[DECISIONS.md](./DECISIONS.md) holds the lasting choices and their reasons, by theme. Read the section
+[DECISIONS.md](./docs/DECISIONS.md) holds the lasting choices and their reasons, by theme. Read the section
 of the subject you touch. A decision can be questioned: if it no longer holds, say so, propose an
 alternative with your arguments, and rewrite its entry once the owner agrees. Add an entry only for a
 choice that is costly to reverse and whose reason the code does not show.

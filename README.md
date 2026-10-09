@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="./INSTALL.md">Install</a> ·
+  <a href="./docs/INSTALL.md">Install</a> ·
   <a href="./CONTRIBUTING.md">Contribute</a> ·
   <a href="https://github.com/lesloi/path-finder/issues">Issues</a>
 </p>
@@ -41,7 +41,7 @@
 
 **Requirements:** [Go 1.27](https://go.dev/dl/), [Node.js 26](https://nodejs.org/) and
 [pnpm](https://pnpm.io/installation), plus the routing graph, which you build once from OpenStreetMap
-and BD ALTI data (see [INSTALL.md](./INSTALL.md)).
+and BD ALTI data (see [INSTALL.md](./docs/INSTALL.md)).
 
 ```sh
 git clone https://github.com/lesloi/path-finder.git
@@ -52,7 +52,7 @@ DATA_DIR=$PWD/data pnpm dev
 
 Then open **http://localhost:5173**.
 
-To build the graph, tune the server, or host the app, see [INSTALL.md](./INSTALL.md).
+To build the graph, tune the server, or host the app, see [INSTALL.md](./docs/INSTALL.md).
 
 ## Contributing
 
