@@ -116,7 +116,7 @@ export const legalText = {
         blocks: [
           {
             list: [
-              { text: 'Scaleway, our host, runs our server in France and processes this data only on our behalf.' },
+              { text: 'OVHcloud, our host, runs our server in France and processes this data only on our behalf.' },
               {
                 text: 'IGN (the French national institute of geographic and forest information), a French public body: your browser loads the map, with its fonts and icons, straight from the IGN Géoplateforme, which therefore receives your IP address and the map area you view. Our pages do not send their address (no referrer) to IGN.',
               },
@@ -163,8 +163,8 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Scaleway SAS, 8 rue de la Ville l’Évêque, 75008 Paris, France. Phone: +33 1 84 13 00 00. {scaleway}',
-              links: { scaleway: 'www.scaleway.com' },
+              text: 'OVH SAS, 2 rue Kellermann, 59100 Roubaix, France. Legal notice: {ovh}',
+              links: { ovh: 'www.ovhcloud.com/fr/terms-and-conditions' },
             },
           },
         ],
@@ -265,7 +265,7 @@ export const legalText = {
           {
             list: [
               {
-                text: 'Scaleway, notre hébergeur, fait tourner notre serveur en France et ne traite ces données que pour notre compte.',
+                text: 'OVHcloud, notre hébergeur, fait tourner notre serveur en France et ne traite ces données que pour notre compte.',
               },
               {
                 text: 'L’IGN (Institut national de l’information géographique et forestière), organisme public français : votre navigateur charge la carte, avec ses polices et ses icônes, directement depuis la Géoplateforme de l’IGN, qui reçoit donc votre adresse IP et la zone de carte affichée. Nos pages n’envoient pas leur adresse (aucun « referrer ») à l’IGN.',
@@ -313,8 +313,8 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Scaleway SAS, 8 rue de la Ville l’Évêque, 75008 Paris, France. Téléphone : +33 1 84 13 00 00. {scaleway}',
-              links: { scaleway: 'www.scaleway.com' },
+              text: 'OVH SAS, 2 rue Kellermann, 59100 Roubaix, France. Mentions légales : {ovh}',
+              links: { ovh: 'www.ovhcloud.com/fr/terms-and-conditions' },
             },
           },
         ],

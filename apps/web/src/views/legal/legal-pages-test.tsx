@@ -31,11 +31,11 @@ describe.each(languages)('legal pages in %s', (language) => {
     expectNamedControls(container);
   });
 
-  it('names IGN, Scaleway, and the rate-limit hash in the privacy policy', () => {
+  it('names IGN, OVHcloud, and the rate-limit hash in the privacy policy', () => {
     render(<PrivacyPolicyPage language={language} />);
 
     expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(/IGN/);
-    expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(/Scaleway/);
+    expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(/OVHcloud/);
     expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(/hash/);
   });
 
@@ -51,7 +51,7 @@ describe.each(languages)('legal pages in %s', (language) => {
     render(<LegalNoticePage language={language} />);
 
     expect(screen.getByTestId('legal-notice-page')).toHaveTextContent(/lesloi/);
-    expect(screen.getByTestId('legal-notice-page')).toHaveTextContent(/Scaleway SAS/);
+    expect(screen.getByTestId('legal-notice-page')).toHaveTextContent(/OVH SAS/);
   });
 
   it.each([

@@ -6,7 +6,7 @@ export const LINKS = {
   source: 'https://github.com/lesloi/path-finder',
   publisher: 'https://github.com/lesloi',
   contact: 'https://github.com/lesloi/path-finder/issues',
-  scaleway: 'https://www.scaleway.com',
+  ovh: 'https://www.ovhcloud.com/fr/terms-and-conditions/',
   cnil: 'https://www.cnil.fr/fr/plaintes',
 };
 
