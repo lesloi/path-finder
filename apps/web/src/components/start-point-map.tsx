@@ -24,7 +24,9 @@ import {
   type Basemap,
   type Display,
   type MapSnapshot,
+  type CoverageCell,
   type Position,
+  veilPolygon,
 } from '../core/index.ts';
 import { commonText } from '../i18n/index.ts';
 import { basemapStyle } from './basemap-style.ts';
@@ -49,6 +51,8 @@ const FRAME_MARGIN = 24;
 const NO_ROOM = 0;
 // The smallest part of the map, in px, that the panels leave to the routes: a narrow window shrinks their margins.
 const MIN_FRAME = 240;
+// How much of the map shows through the veil over the places with no routes.
+const VEIL_OPACITY = 0.35;
 // A width that makes a thin route easy to tap.
 const HIT_WIDTH = 22;
 
@@ -167,6 +171,7 @@ export function StartPointMap({
   pickOnClick = false,
   routes,
   summaries,
+  coverage,
   display = DEFAULT_DISPLAY,
   selectedRoute,
   markedRoute,
@@ -188,6 +193,8 @@ export function StartPointMap({
   routes?: Position[][];
   /** The distance and elevation gain of each route, in the same order, for its label. */
   summaries?: RouteSummary[];
+  /** The cells where the server can route: the rest of the map is veiled. None draws no veil. */
+  coverage?: CoverageCell[] | undefined;
   /** The units of the scale, the labels and the distance markers, and the language of the labels. */
   display?: Display;
   selectedRoute?: number;
@@ -314,6 +321,14 @@ export function StartPointMap({
         { id: 'background', type: 'background', paint: { 'background-color': MAP_COLORS.white } },
         map.getStyle().layers[0].id,
       );
+      // Under the routes, and no outline: with one, the edges that two covered cells share would show as lines.
+      map.addSource('coverage', { type: 'geojson', data: emptyRoutes });
+      map.addLayer({
+        id: 'coverage-veil',
+        type: 'fill',
+        source: 'coverage',
+        paint: { 'fill-color': MAP_COLORS.veil, 'fill-opacity': VEIL_OPACITY, 'fill-antialias': false },
+      });
       const line = { 'line-join': 'round', 'line-cap': 'round' } as const;
       map.addSource('routes', { type: 'geojson', data: emptyRoutes });
       // The selected route has a white casing and a dashed white marking along its line, and its own colour;
@@ -506,6 +521,13 @@ export function StartPointMap({
     features.sort((a, b) => Number(a.properties.selected) - Number(b.properties.selected));
     source.setData({ type: 'FeatureCollection', features });
   }, [loaded, routes, selectedRoute, framing, drawnFor, styleVersion]);
+
+  // The veil is a world with a hole for each cell covered; a new style drops it, so it is set again.
+  useEffect(() => {
+    const source = mapRef.current?.getSource('coverage') as GeoJSONSource | undefined;
+    if (!loaded || !source) return;
+    source.setData(coverage?.length ? veilPolygon(coverage) : emptyRoutes);
+  }, [loaded, coverage, styleVersion]);
 
   useEffect(() => {
     scale.current?.setUnit(display.units);

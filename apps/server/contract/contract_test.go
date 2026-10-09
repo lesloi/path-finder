@@ -122,3 +122,25 @@ func TestCriteriaErrorSaysWhatIsWrong(t *testing.T) {
 		t.Errorf("err = %#v", err)
 	}
 }
+
+// The web app reads the same sample, and the same cell size, to draw the veil.
+func TestCoverageMatchesTheWebAppsSample(t *testing.T) {
+	if got := CoverageCellsPerDegree(); got != 10 {
+		t.Errorf("cells per degree = %d, want 10 (0.1°)", got)
+	}
+	data, err := os.ReadFile("testdata/coverage.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var c Coverage
+	if err := json.Unmarshal(data, &c); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := json.Marshal(c)
+	var gotAny, wantAny any
+	_ = json.Unmarshal(again, &gotAny)
+	_ = json.Unmarshal(data, &wantAny)
+	if len(c.Cells) == 0 || !reflect.DeepEqual(gotAny, wantAny) {
+		t.Errorf("coverage JSON changed; testdata/coverage.json is what the web app reads: %s", again)
+	}
+}

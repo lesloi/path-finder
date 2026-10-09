@@ -1,7 +1,7 @@
 import { act, render } from '@testing-library/react';
 import { createRef } from 'react';
 
-import type { Position } from '../core/index.ts';
+import type { CoverageCell, Position } from '../core/index.ts';
 import { commonText } from '../i18n/index.ts';
 import { maps, markers, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
 import { basemapStyle } from './basemap-style.ts';
@@ -23,6 +23,28 @@ afterEach(() => {
 });
 
 describe('StartPointMap', () => {
+  it('veils the places the server cannot route, once the style has loaded', () => {
+    const coverage: CoverageCell[] = [[6, 45.8, 6.1, 45.9]];
+    render(<StartPointMap coverage={coverage} onStartChange={vi.fn()} />);
+    act(() => map().fire('style.load'));
+
+    const veil = map().getSource('coverage') as GeoJSONSource & { data: { geometry: { coordinates: unknown[] } } };
+    expect(veil.data.geometry.coordinates).toHaveLength(2); // the world, and a hole
+    expect(map().layers.map(({ id }) => id)).toContain('coverage-veil');
+  });
+
+  it('draws no veil when the coverage is unknown, and draws it again on a new style', () => {
+    const view = render(<StartPointMap onStartChange={vi.fn()} />);
+    act(() => map().fire('style.load'));
+    expect((map().getSource('coverage') as GeoJSONSource).data).toEqual({ type: 'FeatureCollection', features: [] });
+
+    view.rerender(<StartPointMap coverage={[[6, 45.8, 6.1, 45.9]]} onStartChange={vi.fn()} />);
+    view.rerender(<StartPointMap coverage={[[6, 45.8, 6.1, 45.9]]} basemap="aerial" onStartChange={vi.fn()} />);
+    act(() => map().fire('style.load'));
+
+    expect((map().getSource('coverage') as GeoJSONSource).data).toHaveProperty('geometry');
+  });
+
   it('sets the start point on a long press', () => {
     const onStartChange = vi.fn();
     render(<StartPointMap onStartChange={onStartChange} />);
@@ -218,6 +240,7 @@ describe('StartPointMap', () => {
       expect(drawn).toHaveLength(2);
       expect(map().layers.map(({ id }) => id)).toEqual([
         'background',
+        'coverage-veil',
         'routes-others',
         'routes-casing',
         'routes-line',
@@ -585,6 +608,7 @@ describe('StartPointMap', () => {
 
       expect(map().layers.map(({ id }) => id)).toEqual([
         'background',
+        'coverage-veil',
         'routes-others',
         'routes-casing',
         'routes-line',

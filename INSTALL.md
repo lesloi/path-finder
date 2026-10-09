@@ -44,6 +44,10 @@ The server binary builds its own graph, and the landmarks that speed up searches
 Run them ahead of serving, never while it serves. They write into the **data directory**, set by
 `DATA_DIR` (`data` by default): `graph.bin`, then `any.alt`, `paved.alt` and `unpaved.alt`, one per surface preference.
 
+The area where routes can start is that of the extracts you build the graph from, and of the BD ALTI tiles under them. The server
+finds it by itself from the graph (and from each zone of `DATA_DIR`), with nothing to configure: the web app greys out the rest
+of the map, and disables the search from a start point there.
+
 ```sh
 cd apps/server
 CGO_ENABLED=0 go build -o path-finder .

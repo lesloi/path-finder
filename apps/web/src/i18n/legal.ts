@@ -100,6 +100,11 @@ export const legalText = {
           },
           {
             paragraph: {
+              text: 'When the app opens, it also asks our server which areas it can generate routes in, to grey out the others on the map. This request holds nothing about you: your IP address, as with any connection, and no location.',
+            },
+          },
+          {
+            paragraph: {
               text: 'To limit abuse, it keeps in memory a hash of your IP address, salted with a secret that changes every day. The hash is never written to disk and is gone by the next day at the latest.',
             },
           },
@@ -244,6 +249,11 @@ export const legalText = {
           {
             paragraph: {
               text: 'Quand vous demandez des itinéraires, notre serveur reçoit vos critères (coordonnées du point de départ, allure, distance ou durée visée, dénivelé, préférence de revêtement) et, comme pour toute connexion, votre adresse IP. Il s’en sert uniquement pour calculer les itinéraires et les oublie dès la réponse envoyée. Il n’écrit aucun journal contenant une position ou une adresse IP.',
+            },
+          },
+          {
+            paragraph: {
+              text: 'À l’ouverture, l’application demande aussi à notre serveur dans quelles zones il peut calculer des itinéraires, pour griser les autres sur la carte. Cette requête ne contient rien sur vous : votre adresse IP, comme pour toute connexion, et aucune position.',
             },
           },
           {

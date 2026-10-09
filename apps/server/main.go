@@ -134,6 +134,7 @@ func serve() {
 		gen.Seed = func() uint64 { return seed }
 	}
 	cfg.Generator = gen
+	cfg.Coverage = zones
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 

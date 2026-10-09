@@ -27,11 +27,18 @@ type RouteSetGenerator interface {
 	Generate(ctx context.Context, body json.RawMessage) (routes any, err error)
 }
 
+// CoverageSource lists the cells of the grid of contract.json where the server can route.
+type CoverageSource interface {
+	Coverage() [][4]float64
+}
+
 // Config is what New needs; the zero value of an optional field is its default.
 type Config struct {
 	// WebRoot holds the built web app, with the `build-id` file its build writes.
 	WebRoot   string
 	Generator RouteSetGenerator
+	// Coverage answers GET /api/v1/coverage; without it the route is not served.
+	Coverage CoverageSource
 	// Limits turns on the rate limit and the cap on concurrent generations; off in development.
 	Limits bool
 	// LoopLimit caps the generations running at once (default 1, which main replaces with one that follows
@@ -88,6 +95,9 @@ func New(cfg Config) http.Handler {
 		routeSets = routeSets.With(throttle(cfg.LoopLimit))
 	}
 	routeSets.Post("/api/v1/route-sets", a.routeSets)
+	if cfg.Coverage != nil {
+		r.With(a.checkBuild).Get("/api/v1/coverage", a.coverage)
+	}
 	r.NotFound(staticFiles(cfg.WebRoot).ServeHTTP)
 	return r
 }
@@ -186,6 +196,16 @@ func (a *app) routeSets(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusOK, map[string]any{"routes": routes})
 	}
+}
+
+// coverage answers the cells where the graph served has a way. Nothing in it is about the user.
+func (a *app) coverage(w http.ResponseWriter, _ *http.Request) {
+	cells := a.cfg.Coverage.Coverage()
+	if cells == nil {
+		cells = [][4]float64{}
+	}
+	w.Header().Set("Cache-Control", "no-cache") // the data can be reloaded: ask again, the answer is small
+	writeJSON(w, http.StatusOK, contract.Coverage{Cells: cells})
 }
 
 // readBuildID returns the ID written by each web app build, or none when the web app is not built.

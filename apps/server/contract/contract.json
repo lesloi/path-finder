@@ -5,6 +5,7 @@
   "maxElevationGainMetres": 2500,
   "climbPerEffortKm": 100,
   "hillyMatchPerKm": 10,
+  "coverageCellDegrees": 0.1,
   "surfaces": ["paved", "unpaved", "any"],
   "errorCodes": ["invalid-json", "invalid-criteria", "stale-build", "rate-limited", "overloaded", "generation-timeout"]
 }
