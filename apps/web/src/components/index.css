@@ -176,6 +176,39 @@
 }
 
 /*
+ * The compact attribution is a touch target like any other control: MapLibre sizes its button and its links for a
+ * mouse (24 px, one text line), so both grow to the touch size, the bubble with them.
+ */
+.maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact {
+  min-height: var(--spacing-touch);
+  margin: 0 0 calc(var(--spacing) * 2);
+  padding: 0 var(--spacing-touch) 0 0;
+  border-radius: calc(var(--spacing-touch) / 2);
+}
+.maplibregl-map .maplibregl-ctrl-bottom-left > .maplibregl-ctrl-attrib.maplibregl-compact-show {
+  padding: 0 calc(var(--spacing) * 3) 0 var(--spacing-touch);
+}
+.maplibregl-map .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button {
+  width: var(--spacing-touch);
+  height: var(--spacing-touch);
+  border-radius: calc(var(--spacing-touch) / 2);
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.maplibregl-map .maplibregl-ctrl-attrib-inner a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--spacing-touch);
+  min-height: var(--spacing-touch);
+}
+
+/*
  * The scale is a bare ruler, legible over any map thanks to a white halo. The map stays light in dark mode,
  * and a `light-dark()` colour would not follow it here: the ink is the light theme's.
  */

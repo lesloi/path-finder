@@ -34,6 +34,25 @@ test.describe('the app', () => {
     await expect(page.locator('html')).not.toHaveAttribute('data-geolocation');
   });
 
+  test('gives the attribution touch targets, collapsed and open', async ({ page }) => {
+    await openMap(page);
+    const attribution = page.locator('.maplibregl-ctrl-attrib');
+    const toggle = attribution.locator('.maplibregl-ctrl-attrib-button');
+    const links = attribution.locator('a');
+
+    // Wide maps open it by themselves, narrow ones keep it collapsed: check both states.
+    for (const open of [true, false]) {
+      if ((await attribution.evaluate((element) => element.classList.contains('maplibregl-compact-show'))) !== open) {
+        await toggle.click();
+      }
+      for (const target of open ? [toggle, ...(await links.all())] : [toggle]) {
+        const box = await target.boundingBox();
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+      }
+    }
+  });
+
   test('keeps the map background picked from the button over the map across a reload', async ({ page, isMobile }) => {
     await openMap(page);
 

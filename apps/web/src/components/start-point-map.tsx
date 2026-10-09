@@ -101,7 +101,7 @@ function framedRoutes(routes: Position[][], framed: number | undefined) {
 // Pixels the controls take from the right of the map (the floating buttons and their margin).
 const CONTROLS_RIGHT = 72;
 // Pixels the scale and the attribution take from the bottom of the map.
-const CONTROLS_BOTTOM = 40;
+const CONTROLS_BOTTOM = 58;
 // Half the width and height of a route's tag, which has to stay inside the map.
 const TAG_HALF: [number, number] = [56, 28];
 // Half the size of a distance marker.
