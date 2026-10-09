@@ -28,6 +28,8 @@ async function swipeLeft(page: Page, testId: string) {
   await devTools.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from, y }] });
   await devTools.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: (from + to) / 2, y }] });
   await devTools.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: to, y }] });
+  // The finger rests before it leaves: no fling, so the snap goes to the card nearest to where the finger stopped.
+  await page.waitForTimeout(150);
   await devTools.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
