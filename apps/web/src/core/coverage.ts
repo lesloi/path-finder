@@ -45,10 +45,13 @@ export function veilPolygon(cells: CoverageCell[]) {
   if (cells.length === 0) {
     rings.push(ring(-180, -MAX_LATITUDE, 180, MAX_LATITUDE));
   } else {
-    const west = Math.min(...cells.map((cell) => cell[0]));
-    const south = Math.min(...cells.map((cell) => cell[1]));
-    const east = Math.max(...cells.map((cell) => cell[2]));
-    const north = Math.max(...cells.map((cell) => cell[3]));
+    let [west, south, east, north] = cells[0];
+    for (const cell of cells) {
+      west = Math.min(west, cell[0]);
+      south = Math.min(south, cell[1]);
+      east = Math.max(east, cell[2]);
+      north = Math.max(north, cell[3]);
+    }
     rings.push(
       ring(-180, -MAX_LATITUDE, west, MAX_LATITUDE),
       ring(east, -MAX_LATITUDE, 180, MAX_LATITUDE),
@@ -56,9 +59,8 @@ export function veilPolygon(cells: CoverageCell[]) {
       ring(west, north, east, MAX_LATITUDE),
     );
     // The grid is that of the first cell: whole numbers of cells from the south west corner of the box.
-    const [w0, s0, e0, n0] = cells[0];
-    const width = e0 - w0;
-    const height = n0 - s0;
+    const width = cells[0][2] - cells[0][0];
+    const height = cells[0][3] - cells[0][1];
     const column = (lon: number) => Math.round((lon - west) / width);
     const columns = column(east);
     const rows = Math.round((north - south) / height);
