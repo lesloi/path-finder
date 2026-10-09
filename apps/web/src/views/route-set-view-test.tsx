@@ -222,6 +222,8 @@ describe('RouteSetView', () => {
       expect(onSelect).toHaveBeenCalledExactlyOnceWith(1);
       expect(screen.getByTestId('routes-row-1')).toHaveAttribute('data-selected');
       expect(screen.getByTestId('routes-row-0')).not.toHaveAttribute('data-selected');
+      expect(screen.getByTestId('routes-row-1')).toHaveAttribute('aria-current', 'true');
+      expect(screen.getByTestId('routes-row-0')).not.toHaveAttribute('aria-current');
       expect(screen.getByTestId('routes-list')).toBeInTheDocument();
     });
 

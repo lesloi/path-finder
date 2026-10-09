@@ -254,6 +254,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   return (
     <>
+      {/* Always there, and empty while the search goes on, which has its own status: a region that comes with its
+          text is not announced. Its text changes when the routes arrive, even for a count that did not. */}
+      <p role="status" className="sr-only" data-testid="routes-announcement">
+        {routeSet && !loading ? t.routeCount(routeSet.routes.length) : ''}
+      </p>
       <StartPointMap
         ref={map}
         onViewChange={setMapView}
