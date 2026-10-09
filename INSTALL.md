@@ -5,10 +5,10 @@ How to run Path finder on your own machine, for development or to host it yourse
 Path finder is one Go server that also serves the web app. It routes on a graph built ahead of
 serving from these data, next to the code:
 
-| Piece                               | What for                                  | Where it comes from                                                       |
-| ----------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------- |
-| OpenStreetMap extracts (`.osm.pbf`) | The ways routes follow, and their surface | [download.geofabrik.de](https://download.geofabrik.de/europe/france.html) |
-| IGN BD ALTI 25 m (`.asc`)           | Elevation of every node of the graph      | [IGN Géoplateforme](https://data.geopf.fr/telechargement/resource/BDALTI) |
+| Piece                               | What for                                  | Where it comes from                                                                      |
+| ----------------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| OpenStreetMap extracts (`.osm.pbf`) | The ways routes follow, and their surface | [download.geofabrik.de](https://download.geofabrik.de/europe/france.html)                |
+| IGN BD ALTI 25 m (`.asc`)           | Elevation of every node of the graph      | [IGN, cartes.gouv.fr](https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_BD-ALTI) |
 
 Map tiles (Plan IGN) are loaded by the browser from the IGN Géoplateforme: there is
 nothing to install for them.
@@ -33,9 +33,9 @@ The steps below put the data under `data/` in the repository. Any other director
 1. Download the OpenStreetMap extracts covering your area, such as `rhone-alpes-latest.osm.pbf`
    from [Geofabrik](https://download.geofabrik.de/europe/france.html), into `data/osm`. Extracts
    are rebuilt daily; download them again to update the map.
-2. Download the BD ALTI 25 m **ASC** archive of each department you need (about 30 MB each, about
+2. Download the BD ALTI 25 m **ASC** archive (`.7z`) of each department you need (about 30 MB each, about
    3 GB for metropolitan France) from
-   [data.geopf.fr/telechargement/resource/BDALTI](https://data.geopf.fr/telechargement/resource/BDALTI),
+   [cartes.gouv.fr](https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_BD-ALTI),
    and extract them all below `data/bdalti-asc`. Tiles on a department border are merged.
 
 ## 3. Build the graph
