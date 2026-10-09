@@ -24,9 +24,9 @@ export function Switch({
       <span
         aria-hidden
         className={
-          'relative h-6 w-10 flex-none rounded-full bg-surface-2 ring-1 ring-border transition-colors ' +
+          'relative h-6 w-10 flex-none rounded-full bg-surface-2 ring-1 ring-border transition-colors motion-reduce:transition-none ' +
           'after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-ink-2 ' +
-          'after:transition-transform peer-checked:bg-accent peer-checked:after:translate-x-4 ' +
+          'after:transition-transform motion-reduce:after:transition-none peer-checked:bg-accent peer-checked:after:translate-x-4 ' +
           'peer-checked:after:bg-surface peer-focus-visible:ring-2 peer-focus-visible:ring-accent'
         }
       />

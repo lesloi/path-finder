@@ -47,7 +47,7 @@ const STACKED_ABOVE = [
     'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2)+var(--spacing-touch)+--spacing(2))]',
 ];
 const stackedAbove = (below: 0 | 1 | 2) =>
-  `right-safe-3 transition-[bottom] duration-250 ease-[ease] desktop:bottom-(--edge-bottom) ${STACKED_ABOVE[below]}`;
+  `right-safe-3 transition-[bottom] duration-250 ease-[ease] motion-reduce:transition-none desktop:bottom-(--edge-bottom) ${STACKED_ABOVE[below]}`;
 
 // Sets a custom property of the page while `shown`.
 function useRootProperty(name: string, value: string, shown: boolean) {
