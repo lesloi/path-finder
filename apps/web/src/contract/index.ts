@@ -4,7 +4,6 @@ export { CriteriaError, parseCriteria, type Criteria, type CriteriaField, type P
 export type { ApiError, ErrorCode, Miss, SurfaceStretch } from './errors.ts';
 export {
   CLIMB_PER_EFFORT_KM,
-  COVERAGE_CELLS_PER_DEGREE,
   ERROR_CODES,
   MAX_TARGET_DISTANCE,
   MAX_TARGET_ELEVATION_GAIN,

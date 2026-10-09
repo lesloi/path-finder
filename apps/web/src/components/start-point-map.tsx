@@ -194,7 +194,7 @@ export function StartPointMap({
   /** The distance and elevation gain of each route, in the same order, for its label. */
   summaries?: RouteSummary[];
   /** The cells where the server can route: the rest of the map is veiled. None draws no veil. */
-  coverage?: CoverageCell[];
+  coverage?: CoverageCell[] | undefined;
   /** The units of the scale, the labels and the distance markers, and the language of the labels. */
   display?: Display;
   selectedRoute?: number;

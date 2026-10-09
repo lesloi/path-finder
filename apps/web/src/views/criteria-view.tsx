@@ -83,7 +83,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const [start, setStart] = useState<Position>();
   // Where the server can route; unknown until it says, or if it cannot: then the server's own refusal stands.
   const coverage = useCoverage();
-  const startUncovered = Boolean(start && coverage && !isCovered(coverage, start));
+  const startUncovered = useMemo(() => Boolean(start && coverage && !isCovered(coverage, start)), [start, coverage]);
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
   const [picking, setPicking] = useState(false);
@@ -274,7 +274,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         pickOnClick={picking}
         routes={browser.geometries}
         summaries={summaries}
-        {...(coverage && { coverage })}
+        coverage={coverage}
         display={display}
         // A desktop highlights the route it points at in the list, and marks the one selected.
         selectedRoute={desktop ? (browser.preview ?? selected) : selected}
