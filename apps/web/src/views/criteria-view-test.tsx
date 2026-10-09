@@ -755,6 +755,43 @@ describe('CriteriaView', () => {
       expect(screen.queryByTestId('routes-stale')).not.toBeInTheDocument();
     });
 
+    describe('the criteria kept', () => {
+      const kept = () => JSON.parse(localStorage.getItem('path-finder.settings')!).lastCriteria;
+
+      it('are kept once a search is made, the distance in kilometres and the gain in metres', async () => {
+        onDesktop();
+        localStorage.setItem('path-finder.settings', JSON.stringify({ units: 'imperial' }));
+        vi.stubGlobal('fetch', () => Promise.resolve(answer(route(0))));
+        render(<CriteriaView language="en" />);
+        fireEvent.change(screen.getByTestId('criteria-distance'), { target: { value: '21' } });
+        fireEvent.click(screen.getByTestId('criteria-surface-paved'));
+        fireEvent.click(screen.getByTestId('criteria-elevation-target'));
+        fireEvent.change(screen.getByTestId('criteria-gain'), { target: { value: '1500' } });
+
+        expect(kept()).toBeUndefined();
+
+        await submit();
+        await screen.findByTestId('routes-count');
+
+        expect(kept()).toMatchObject({ distance: 21 * 1.609344, surface: 'paved', level: 'target', gain: 457 });
+      });
+
+      it('are kept by a new search from the stale notice too', async () => {
+        onDesktop();
+        vi.stubGlobal('fetch', () => Promise.resolve(answer(route(0))));
+        render(<CriteriaView language="en" />);
+        await submit();
+        await screen.findByTestId('routes-count');
+
+        fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
+        fireEvent.change(screen.getByTestId('criteria-distance'), { target: { value: '21' } });
+        expect(kept()).toBeUndefined();
+        fireEvent.click(screen.getByTestId('routes-search-again'));
+
+        expect(kept()).toMatchObject({ surface: 'unpaved', distance: 21 });
+      });
+    });
+
     it('compares the criteria to the routes still shown after a search that failed', async () => {
       onDesktop();
       const answers = [answer(route(0)), Response.json({ error: 'rate-limited' }, { status: 429 })];

@@ -109,6 +109,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const dockRoute = desktop ? atPace?.routes[selected ?? -1] : undefined;
   const dockShown = Boolean(dockRoute);
   const current = criteriaRequest(draft[0], { units, pace, start });
+  // Every search keeps the criteria it was made with, whichever button asked for it.
+  const search = (request: RouteSetRequest) => {
+    draft[2]();
+    browser.ask(request);
+  };
   const stale = Boolean(routeSet && current && criteriaChanged(current, routeSet.request, units));
   useRootProperty('--list-inset', 'var(--list-reserved)', listShown);
   useRootProperty('--dock-inset', 'var(--dock-reserved)', dockShown);
@@ -210,7 +215,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           data-testid="routes-search-again"
           // Not a second primary button: the form's own, or the sheet's, is the view's.
           className="min-h-touch rounded-full font-semibold text-accent"
-          onClick={() => browser.ask(current)}
+          onClick={() => search(current)}
         >
           {t.searchAgain}
         </button>
@@ -242,7 +247,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       onLocate={locate}
       onSubmit={(request) => {
         setLayerOpen(false);
-        browser.ask(request);
+        search(request);
       }}
     />
   );

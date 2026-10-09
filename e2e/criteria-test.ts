@@ -51,7 +51,8 @@ test.describe('the criteria form', () => {
     await page.reload();
     await openCriteria(page);
 
-    // The last criteria are kept too: the length is still set by duration.
+    // The criteria are kept only once a search is made: the length is set by distance again.
+    await choose(page, 'target', 'duration');
     await expect(page.getByTestId('criteria-pace')).toHaveValue('330');
   });
 });
