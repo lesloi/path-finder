@@ -79,6 +79,8 @@
   --float-1: light-dark(rgb(0 0 0 / 0.12), rgb(0 0 0 / 0.4));
   --float-2: light-dark(rgb(0 0 0 / 0.14), rgb(0 0 0 / 0.45));
   --float: 0 1px 3px var(--float-1), 0 4px 14px var(--float-2);
+  /* The gap between the map's controls and the screen edges. */
+  --map-margin: calc(var(--spacing) * 3);
   /* What the desktop left column and its margin cover from the left of the map. */
   --column-inset: calc(var(--spacing-column) + var(--spacing) * 3);
   /* What the route list and the dock cover from the right and the bottom of the map: the framing keeps them clear. */
@@ -164,12 +166,12 @@
 }
 
 /*
- * The bottom left of the map holds the scale and the compact attribution. On phones they sit above the sheet.
- * On desktops they stay in the corner of the screen, under the left column.
+ * The bottom left of the map holds the scale and the compact attribution, kept a margin away from the screen edges.
+ * On phones they sit above the sheet. On desktops they stay in the corner of the screen, under the left column.
  */
 .maplibregl-map .maplibregl-ctrl-bottom-left {
-  bottom: var(--sheet-height, 0px);
-  left: env(safe-area-inset-left);
+  bottom: calc(var(--sheet-height, 0px) + var(--map-margin));
+  left: calc(env(safe-area-inset-left) + var(--map-margin));
   transition: bottom 0.25s ease;
 
   @media (prefers-reduced-motion: reduce) {
@@ -177,19 +179,30 @@
   }
 
   @variant desktop {
-    bottom: env(safe-area-inset-bottom);
+    bottom: calc(env(safe-area-inset-bottom) + var(--map-margin));
   }
+}
+.maplibregl-map .maplibregl-ctrl-bottom-left .maplibregl-ctrl {
+  margin: 0 0 var(--spacing) 0;
+}
+/* The basemap and its markers stay light in dark mode; the controls, siblings of the canvas, follow the theme. */
+.maplibregl-map .maplibregl-canvas-container {
+  color-scheme: light;
 }
 
 /*
  * The compact attribution is a touch target like any other control: MapLibre sizes its button and its links for a
- * mouse (24 px, one text line), so both grow to the touch size, the bubble with them.
+ * mouse (24 px, one text line), so both grow to the touch size, the bubble with them. It wears the UI colours, not
+ * MapLibre's white, and its "i" is a mask so that it follows the ink.
  */
 .maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact {
   min-height: var(--spacing-touch);
-  margin: 0 0 calc(var(--spacing) * 2);
+  margin: 0;
   padding: 0 var(--spacing-touch) 0 0;
   border-radius: calc(var(--spacing-touch) / 2);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--float);
 }
 .maplibregl-map .maplibregl-ctrl-bottom-left > .maplibregl-ctrl-attrib.maplibregl-compact-show {
   padding: 0 calc(var(--spacing) * 3) 0 var(--spacing-touch);
@@ -198,8 +211,34 @@
   width: var(--spacing-touch);
   height: var(--spacing-touch);
   border-radius: calc(var(--spacing-touch) / 2);
-  background-position: center;
-  background-repeat: no-repeat;
+  background: transparent;
+  color: var(--color-ink);
+}
+/* MapLibre greys the button while the bubble is open; the bubble is one surface, so it stays transparent. */
+.maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button {
+  background-color: transparent;
+}
+@media (hover: hover) {
+  .maplibregl-map .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button:hover {
+    background-color: var(--color-surface-2);
+  }
+}
+.maplibregl-map .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--spacing-touch) - 20px) / 2);
+  background-color: currentcolor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4M12 8h.01'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 16v-4M12 8h.01'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+/* Forced colours override background colours, so the masked icon takes a system colour. */
+@media (forced-colors: active) {
+  .maplibregl-map .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button::before {
+    forced-color-adjust: none;
+    background-color: ButtonText;
+  }
 }
 .maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
   display: flex;
@@ -212,6 +251,8 @@
   justify-content: center;
   min-width: var(--spacing-touch);
   min-height: var(--spacing-touch);
+  padding: 0 calc(var(--spacing) * 2);
+  color: var(--color-ink-2);
 }
 
 /*
