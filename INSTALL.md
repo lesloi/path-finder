@@ -36,7 +36,7 @@ The steps below put the data under `data/` in the repository. Any other director
 2. Download the BD ALTI 25 m **ASC** archive (`.7z`) of each department you need (about 30 MB each, about
    3 GB for metropolitan France) from
    [cartes.gouv.fr](https://cartes.gouv.fr/rechercher-une-donnee/dataset/IGNF_BD-ALTI),
-   and extract them all below `data/bdalti-asc`. Tiles on a department border are merged.
+   and extract them all below `data/bdalti-asc`. Tiles on a department border are merged. The build reads tiles gzipped too (`.asc.gz`, about 3.4 times smaller); keep the copies on a border, they complete each other.
 
 ## 3. Build the graph
 

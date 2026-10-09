@@ -1,6 +1,8 @@
 package elevation
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"math"
 	"os"
@@ -21,7 +23,19 @@ func writeTile(t *testing.T, dir, name string, xll, yll float64, f func(c, r int
 		}
 		b.WriteString("\n")
 	}
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(b.String()), 0o644); err != nil {
+	data := []byte(b.String())
+	if strings.HasSuffix(strings.ToLower(name), ".gz") {
+		var z bytes.Buffer
+		w := gzip.NewWriter(&z)
+		if _, err := w.Write(data); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		data = z.Bytes()
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), data, 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -154,7 +168,7 @@ func TestLoadWithinReadsOnlyTheTilesOfTheBox(t *testing.T) {
 	dir := t.TempDir()
 	paris := [2]float64{48.85, 2.35}
 	lyon := [2]float64{45.76, 4.84}
-	for name, at := range map[string][2]float64{"paris.asc": paris, "lyon.asc": lyon} {
+	for name, at := range map[string][2]float64{"paris.asc.gz": paris, "lyon.asc": lyon} {
 		x, y := Lambert93(at[0], at[1])
 		writeTile(t, dir, name, math.Floor(x/100)*100-50, math.Floor(y/100)*100-50, func(c, r int) float64 { return 100 })
 	}
@@ -198,5 +212,68 @@ func TestATileHeaderMustSayWhereItIs(t *testing.T) {
 	}
 	if _, err := LoadWithin(dir, 45, 2, 49, 5); err == nil {
 		t.Error("LoadWithin: err = nil")
+	}
+}
+
+func TestGzippedTilesReadLikePlainOnes(t *testing.T) {
+	height := func(c, r int) float64 { return float64(100 + 10*c + r) }
+	plain, gz := t.TempDir(), t.TempDir()
+	writeTile(t, plain, "a.asc", 800_000, 6_500_000, height)
+	writeTile(t, gz, "a.asc.gz", 800_000, 6_500_000, height)
+	// An upper-case name, a tile of the next département, and files that are not tiles.
+	writeTile(t, gz, "B.ASC.GZ", 800_100, 6_500_000, height)
+	writeTile(t, plain, "b.asc", 800_100, 6_500_000, height)
+	for _, name := range []string{"a.asc.gz.tmp", "a.gz", "notes.txt"} {
+		if err := os.WriteFile(filepath.Join(gz, name), []byte("not a tile"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := Load(plain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(gz)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Tiles() != want.Tiles() {
+		t.Fatalf("%d tiles, want %d", got.Tiles(), want.Tiles())
+	}
+	for _, x := range []float64{800_012.5, 800_050, 800_137.5} {
+		if a, b := got.elevationL93(x, 6_500_050), want.elevationL93(x, 6_500_050); a != b {
+			t.Errorf("height at x=%v is %v from gzip, %v from plain", x, a, b)
+		}
+	}
+}
+
+func TestADamagedGzippedTileNamesItsFile(t *testing.T) {
+	good := t.TempDir()
+	writeTile(t, good, "a.asc.gz", 800_000, 6_500_000, func(c, r int) float64 { return 100 })
+	data, err := os.ReadFile(filepath.Join(good, "a.asc.gz"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	flipped := bytes.Clone(data)
+	flipped[len(flipped)-6] ^= 0xff // inside the checksum: every value still parses
+	for name, bad := range map[string][]byte{
+		"cut.asc.gz":     data[:len(data)/2],
+		"flipped.asc.gz": flipped,
+		"header.asc.gz":  []byte("this is not gzip"),
+	} {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, name), bad, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), name) {
+			t.Errorf("%s: Load err = %v, want it to name the file", name, err)
+		}
+	}
+	// The header is all CountWithin reads: it fails on a file that is not gzip, and not on a tile that is cut or damaged further in.
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "header.asc.gz"), []byte("this is not gzip"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CountWithin(dir, 45, 2, 49, 5); err == nil || !strings.Contains(err.Error(), "header.asc.gz") {
+		t.Errorf("CountWithin err = %v, want it to name the file", err)
 	}
 }
