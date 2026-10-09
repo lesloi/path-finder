@@ -10,15 +10,15 @@
     "format": "prettier --write .",
     "check": "prettier --check . && pnpm check:web && pnpm check:server",
     "check:web": "eslint apps e2e && pnpm -r typecheck",
-    "check:server": "apps/server/check.sh",
+    "check:server": "scripts/check-server.sh",
     "test": "pnpm test:web && pnpm test:server",
     "test:web": "vitest run",
-    "test:server": "apps/server/test.sh unit",
-    "test:integration": "apps/server/test.sh integration",
+    "test:server": "scripts/test-server.sh unit",
+    "test:integration": "scripts/test-server.sh integration",
     "test:e2e": "pnpm --filter @path-finder/e2e test",
     "coverage": "pnpm coverage:web && pnpm coverage:server",
     "coverage:web": "vitest run --coverage",
-    "coverage:server": "apps/server/coverage.sh"
+    "coverage:server": "scripts/coverage-server.sh"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^5.0.3",

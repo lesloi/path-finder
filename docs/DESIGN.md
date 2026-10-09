@@ -1,11 +1,11 @@
 # Design
 
-Tailwind classes limited to the tokens of [`components/index.css`](./apps/web/src/components/index.css),
+Tailwind classes limited to the tokens of [`components/index.css`](../apps/web/src/components/index.css),
 and [lucide-react](https://lucide.dev) icons. No component library.
 
 ## Reuse
 
-The components already exist in [`apps/web/src/components`](./apps/web/src/components): look there before
+The components already exist in [`apps/web/src/components`](../apps/web/src/components): look there before
 drawing anything. Shared class strings (buttons, list rows, chips, toast…) are in `components/styles.ts`.
 Need something slightly different? Extend the existing component or add a variant, rather than a copy.
 Behaviour comes from native elements first (`<dialog>`, `popover`, `<input type="range">`).

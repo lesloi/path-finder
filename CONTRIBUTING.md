@@ -5,10 +5,10 @@ Thanks for your interest in Path finder. Issues and pull requests are welcome on
 
 ## Getting started
 
-- [INSTALL.md](./INSTALL.md) builds the routing graph from OSM and the elevation data.
+- [INSTALL.md](./docs/INSTALL.md) builds the routing graph from OSM and the elevation data.
 - [GLOSSARY.md](./GLOSSARY.md) holds the domain vocabulary to use.
-- [DECISIONS.md](./DECISIONS.md) explains the lasting choices; you can question one with an issue.
-- [DESIGN.md](./DESIGN.md) guides the interface.
+- [DECISIONS.md](./docs/DECISIONS.md) explains the lasting choices; you can question one with an issue.
+- [DESIGN.md](./docs/DESIGN.md) guides the interface.
 
 From the root (the server needs Go, built with `CGO_ENABLED=0`):
 
@@ -65,8 +65,8 @@ server. Follow the neighbouring code for the rest. What they cannot check:
   decimetres in the graph files. Say any other unit in the name.
 - Go: wrap errors with `%w` and add context, pass a `context.Context` first to anything that can run
   long, and keep `CGO_ENABLED=0`.
-- Comments explain why. A lasting choice points to its section of [DECISIONS.md](./DECISIONS.md).
-- Styles follow [DESIGN.md](./DESIGN.md).
+- Comments explain why. A lasting choice points to its section of [DECISIONS.md](./docs/DECISIONS.md).
+- Styles follow [DESIGN.md](./docs/DESIGN.md).
 
 ## Tests
 
