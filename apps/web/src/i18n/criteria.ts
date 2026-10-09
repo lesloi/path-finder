@@ -42,6 +42,8 @@ export const criteriaText = {
     includeTechnical: 'Allow flagged technical stretches',
     technicalShort: 'Technical',
     findRoutes: 'Find routes',
+    uncoveredStart:
+      'Routes are not available around this start point. Choose a start point in the clear part of the map.',
     pace: 'Pace',
     distanceError: (min: number, max: number, unit: string) =>
       `The distance must be between ${min} and ${max} ${unit}.`,
@@ -92,6 +94,8 @@ export const criteriaText = {
     includeTechnical: 'Autoriser les passages techniques signalés',
     technicalShort: 'Technique',
     findRoutes: 'Trouver des parcours',
+    uncoveredStart:
+      'Les parcours ne sont pas disponibles autour de ce point de départ. Choisissez un point de départ dans la partie dégagée de la carte.',
     pace: 'Allure',
     distanceError: (min: number, max: number, unit: string) =>
       `La distance doit être comprise entre ${min} et ${max} ${unit}.`,

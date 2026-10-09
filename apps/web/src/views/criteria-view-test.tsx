@@ -1,4 +1,4 @@
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 
 import { CriteriaView } from './criteria-view.tsx';
 import { expectNamedControls } from '../accessible-names.ts';
@@ -19,6 +19,14 @@ const onDesktop = () =>
     .mockImplementation(
       (query) => ({ media: query, matches: true, addEventListener() {}, removeEventListener() {} }) as never,
     );
+
+// Stands in for the API's route sets. The coverage is another request, which most tests leave unanswered:
+// the map then greys nothing.
+function stubFetch(routeSets: (...args: never[]) => Promise<Response>) {
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit) =>
+    url === '/api/v1/coverage' ? Promise.reject(new Error('No coverage')) : routeSets(...([url, init] as never[])),
+  );
+}
 
 beforeEach(() => {
   // The tests read metric figures, whatever the language.
@@ -178,7 +186,7 @@ describe('CriteriaView', () => {
 
     it('asks for routes from the layer, which closes', async () => {
       const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => new Promise(() => {}));
-      vi.stubGlobal('fetch', fetchMock);
+      stubFetch(fetchMock);
       render(<CriteriaView language="en" />);
       fireEvent.click(screen.getByTestId('criteria-bar'));
       fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
@@ -189,6 +197,81 @@ describe('CriteriaView', () => {
       expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument();
       expect(screen.getByTestId('routes-loading')).toBeInTheDocument();
       expect(fetchMock).toHaveBeenCalledOnce();
+    });
+
+    describe('where the server cannot route', () => {
+      const covered = [[6, 45.8, 6.1, 45.9]];
+      const cover = (cells: unknown) =>
+        vi.stubGlobal('fetch', (url: string) =>
+          url === '/api/v1/coverage' ? Promise.resolve(Response.json({ cells })) : new Promise(() => {}),
+        );
+
+      it('disables the search, and says why without the coordinates', async () => {
+        cover(covered);
+        render(<CriteriaView language="en" />);
+        fireEvent.click(screen.getByTestId('criteria-bar'));
+        fireEvent.change(field(), { target: { value: '48.8, 2.3' } });
+        fireEvent.keyDown(field(), { key: 'Enter' });
+
+        const submit = await screen.findByTestId('criteria-submit');
+        await waitFor(() => expect(submit).toBeDisabled());
+        const message = screen.getByTestId('criteria-uncovered');
+        expect(message).toHaveTextContent(en.uncoveredStart);
+        expect(message).not.toHaveTextContent(/48|2\.3/);
+        expect(submit).toHaveAccessibleDescription(en.uncoveredStart);
+      });
+
+      it('says it in French', async () => {
+        cover(covered);
+        render(<CriteriaView language="fr" />);
+        fireEvent.click(screen.getByTestId('criteria-bar'));
+        fireEvent.change(field(), { target: { value: '48.8, 2.3' } });
+        fireEvent.keyDown(field(), { key: 'Enter' });
+
+        expect(await screen.findByTestId('criteria-uncovered')).toHaveTextContent(fr.uncoveredStart);
+      });
+
+      it('lets a start point inside the cells search again', async () => {
+        cover(covered);
+        render(<CriteriaView language="en" />);
+        fireEvent.click(screen.getByTestId('criteria-bar'));
+        fireEvent.change(field(), { target: { value: '48.8, 2.3' } });
+        fireEvent.keyDown(field(), { key: 'Enter' });
+        await waitFor(() => expect(screen.getByTestId('criteria-submit')).toBeDisabled());
+
+        fireEvent.change(field(), { target: { value: '45.85, 6.05' } });
+        fireEvent.keyDown(field(), { key: 'Enter' });
+
+        expect(screen.getByTestId('criteria-submit')).toBeEnabled();
+        expect(screen.queryByTestId('criteria-uncovered')).not.toBeInTheDocument();
+      });
+
+      it('lets the search run when the coverage is unknown', async () => {
+        stubFetch(() => new Promise(() => {}));
+        render(<CriteriaView language="en" />);
+        fireEvent.click(screen.getByTestId('criteria-bar'));
+        fireEvent.change(field(), { target: { value: '48.8, 2.3' } });
+        fireEvent.keyDown(field(), { key: 'Enter' });
+
+        await act(async () => {});
+        expect(screen.getByTestId('criteria-submit')).toBeEnabled();
+      });
+
+      it('checks a start point that was set before the coverage arrived', async () => {
+        let answer: (response: Response) => void = () => {};
+        vi.stubGlobal('fetch', (url: string) =>
+          url === '/api/v1/coverage' ? new Promise<Response>((resolve) => (answer = resolve)) : new Promise(() => {}),
+        );
+        render(<CriteriaView language="en" />);
+        fireEvent.click(screen.getByTestId('criteria-bar'));
+        fireEvent.change(field(), { target: { value: '48.8, 2.3' } });
+        fireEvent.keyDown(field(), { key: 'Enter' });
+        expect(screen.getByTestId('criteria-submit')).toBeEnabled();
+
+        await act(async () => answer(Response.json({ cells: covered })));
+
+        expect(screen.getByTestId('criteria-submit')).toBeDisabled();
+      });
     });
 
     it('picks the start point with a tap on the map once the layer sends the user there', () => {
@@ -208,7 +291,7 @@ describe('CriteriaView', () => {
     it('shows the full form in the desktop column and passes the criteria on', () => {
       onDesktop();
       const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => new Promise(() => {}));
-      vi.stubGlobal('fetch', fetchMock);
+      stubFetch(fetchMock);
       render(<CriteriaView language="en" />);
       expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
 
@@ -477,7 +560,7 @@ describe('CriteriaView', () => {
 
     function ask(response: Promise<Response> | Response) {
       const routeSets = vi.fn(() => Promise.resolve(response));
-      vi.stubGlobal('fetch', () => routeSets());
+      stubFetch(() => routeSets());
       return routeSets;
     }
     async function submit() {
@@ -752,7 +835,7 @@ describe('CriteriaView', () => {
       onDesktop();
       // A response body is read once: each search gets its own.
       const routeSets = vi.fn(() => Promise.resolve(answer(route(0))));
-      vi.stubGlobal('fetch', () => routeSets());
+      stubFetch(() => routeSets());
       render(<CriteriaView language="en" />);
       act(() => map().fire('style.load'));
       await submit();
@@ -777,7 +860,7 @@ describe('CriteriaView', () => {
       it('are kept once a search is made, the distance in kilometres and the gain in metres', async () => {
         onDesktop();
         localStorage.setItem('path-finder.settings', JSON.stringify({ units: 'imperial' }));
-        vi.stubGlobal('fetch', () => Promise.resolve(answer(route(0))));
+        stubFetch(() => Promise.resolve(answer(route(0))));
         render(<CriteriaView language="en" />);
         fireEvent.change(screen.getByTestId('criteria-distance'), { target: { value: '21' } });
         fireEvent.click(screen.getByTestId('criteria-surface-paved'));
@@ -794,7 +877,7 @@ describe('CriteriaView', () => {
 
       it('are kept by a new search from the stale notice too', async () => {
         onDesktop();
-        vi.stubGlobal('fetch', () => Promise.resolve(answer(route(0))));
+        stubFetch(() => Promise.resolve(answer(route(0))));
         render(<CriteriaView language="en" />);
         await submit();
         await screen.findByTestId('routes-count');
@@ -811,7 +894,7 @@ describe('CriteriaView', () => {
     it('compares the criteria to the routes still shown after a search that failed', async () => {
       onDesktop();
       const answers = [answer(route(0)), Response.json({ error: 'rate-limited' }, { status: 429 })];
-      vi.stubGlobal('fetch', () => Promise.resolve(answers.shift()!));
+      stubFetch(() => Promise.resolve(answers.shift()!));
       render(<CriteriaView language="en" />);
       await submit();
       await screen.findByTestId('routes-count');

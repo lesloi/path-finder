@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -44,7 +45,8 @@ func serverOn(t *testing.T, dir string) http.Handler {
 		t.Fatal(err)
 	}
 	return server.New(server.Config{
-		WebRoot: web,
+		WebRoot:  web,
+		Coverage: zones,
 		// A fixed seed: what the tests assert on the routes found does not depend on chance.
 		Generator: &generator.Generator{Engines: engines, Seed: func() uint64 { return 7 }},
 	})
@@ -287,5 +289,40 @@ func TestACriteriaWithoutTheTechnicalSwitchIsRefused(t *testing.T) {
 	code, _, body := routeSets(t, newServer(t), `{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"any","pace":6}`)
 	if code != http.StatusBadRequest || !strings.Contains(body, "includeTechnical") {
 		t.Errorf("status %d: %s", code, body)
+	}
+}
+
+// The cells the stand-in graph covers are in the sample answer that the web app's tests read too.
+func TestCoverageIsTheSampleAnswer(t *testing.T) {
+	h := newServer(t)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/coverage", nil))
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	sample, err := os.ReadFile("../contract/testdata/coverage.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got, want any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(sample, &want); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("coverage %s, want %s", rec.Body, sample)
+	}
+}
+
+func TestCoverageRefusesAStaleBuild(t *testing.T) {
+	h := newServer(t)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/coverage", nil)
+	req.Header.Set("X-Build-Id", "build-0")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUpgradeRequired {
+		t.Errorf("status %d, want 426", rec.Code)
 	}
 }

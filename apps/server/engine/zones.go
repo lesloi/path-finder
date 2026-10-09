@@ -29,6 +29,9 @@ type Zones struct {
 	// again from 0, which is when the files are unmapped, once (see acquire and release).
 	refs      atomic.Int64
 	closeOnce sync.Once
+	// cov is the area covered, computed on the first Coverage; covMu guards it.
+	covMu sync.Mutex
+	cov   *coverage
 }
 
 type zone struct {

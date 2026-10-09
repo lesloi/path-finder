@@ -1,7 +1,7 @@
 import { Crosshair, LocateFixed, Navigation2, Scan, Settings } from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import { useSettings, useUnits } from '../state/index.ts';
+import { useCoverage, useSettings, useUnits } from '../state/index.ts';
 import { CriteriaBar } from './criteria-bar.tsx';
 import { CriteriaForm, criteriaChanged, criteriaRequest, invalidField, useCriteriaDraft } from './criteria-form.tsx';
 import { RouteDock } from './route-dock.tsx';
@@ -13,6 +13,7 @@ import {
   BASEMAPS,
   criteriaSummary,
   formatPosition,
+  isCovered,
   parsePosition,
   routesAtPace,
   type Position,
@@ -80,6 +81,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Kept here: the form is mounted in the column or in the sheet, whichever the screen shows.
   const draft = useCriteriaDraft(language);
   const [start, setStart] = useState<Position>();
+  // Where the server can route; unknown until it says, or if it cannot: then the server's own refusal stands.
+  const coverage = useCoverage();
+  const startUncovered = Boolean(start && coverage && !isCovered(coverage, start));
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
   const [picking, setPicking] = useState(false);
@@ -235,6 +239,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const criteriaFields = (
     <CriteriaFields
       start={start}
+      startUncovered={startUncovered}
       language={language}
       picking={picking}
       draft={draft}
@@ -269,6 +274,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         pickOnClick={picking}
         routes={browser.geometries}
         summaries={summaries}
+        {...(coverage && { coverage })}
         display={display}
         // A desktop highlights the route it points at in the list, and marks the one selected.
         selectedRoute={desktop ? (browser.preview ?? selected) : selected}
@@ -442,6 +448,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 // The start point and the criteria, in the left column of a desktop or in the layer of a phone.
 function CriteriaFields({
   start,
+  startUncovered,
   language,
   picking,
   draft,
@@ -452,6 +459,7 @@ function CriteriaFields({
   onSubmit,
 }: {
   start?: Position | undefined;
+  startUncovered: boolean;
   language: Language;
   picking: boolean;
   draft: ReturnType<typeof useCriteriaDraft>;
@@ -491,7 +499,13 @@ function CriteriaFields({
           <LocateFixed size={20} aria-hidden />
         </button>
       </StartPointField>
-      <CriteriaForm language={language} start={start} draft={draft} onSubmit={onSubmit} />
+      <CriteriaForm
+        language={language}
+        start={start}
+        startUncovered={startUncovered}
+        draft={draft}
+        onSubmit={onSubmit}
+      />
     </>
   );
 }

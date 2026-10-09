@@ -8,6 +8,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"math"
 )
 
 //go:embed contract.json
@@ -20,6 +21,7 @@ type limits struct {
 	MaxGainMetres    float64                    `json:"maxElevationGainMetres"`
 	ClimbPerEffortKm float64                    `json:"climbPerEffortKm"`
 	HillyMatchPerKm  float64                    `json:"hillyMatchPerKm"`
+	CoverageCell     float64                    `json:"coverageCellDegrees"`
 	Surfaces         []string                   `json:"surfaces"`
 	ErrorCodes       []string                   `json:"errorCodes"`
 }
@@ -70,4 +72,14 @@ type Route struct {
 	UnpavedShare      float64          `json:"unpavedShare"`
 	Surfaces          []SurfaceStretch `json:"surfaces"`
 	Technical         bool             `json:"technical"` // holds a technical stretch
+}
+
+// CoverageCellsPerDegree is how many cells of the coverage grid make a degree: the grid is the same on
+// both sides, since the cell size is in contract.json.
+func CoverageCellsPerDegree() int { return int(math.Round(1 / bounds.CoverageCell)) }
+
+// Coverage is the answer of GET /api/v1/coverage: the cells of the grid where routes can start, each as
+// west, south, east and north in degrees. A place in none of them has no way in the graph served.
+type Coverage struct {
+	Cells [][4]float64 `json:"cells"`
 }

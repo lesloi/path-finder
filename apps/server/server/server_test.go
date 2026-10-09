@@ -456,3 +456,37 @@ func TestRateLimitTableHasABound(t *testing.T) {
 		t.Errorf("table has %d entries", len(l.counts))
 	}
 }
+
+type coverageFunc func(perDegree int) [][4]float64
+
+func (f coverageFunc) Coverage(perDegree int) [][4]float64 { return f(perDegree) }
+
+func TestCoverageAnswersTheCellsOfTheSource(t *testing.T) {
+	var asked int
+	h := newServer(t, func(c *Config) {
+		c.Coverage = coverageFunc(func(perDegree int) [][4]float64 {
+			asked = perDegree
+			return [][4]float64{{6, 45.8, 6.1, 45.9}}
+		})
+	})
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/coverage", nil))
+	if rec.Code != 200 || asked != contract.CoverageCellsPerDegree() {
+		t.Fatalf("status %d, asked %d cells per degree", rec.Code, asked)
+	}
+	if got := strings.TrimSpace(rec.Body.String()); got != `{"cells":[[6,45.8,6.1,45.9]]}` {
+		t.Errorf("body %s", got)
+	}
+	if rec.Header().Get("Cache-Control") != "no-cache" {
+		t.Errorf("Cache-Control = %q", rec.Header().Get("Cache-Control"))
+	}
+}
+
+func TestCoverageOfNothingIsAnEmptyList(t *testing.T) {
+	h := newServer(t, func(c *Config) { c.Coverage = coverageFunc(func(int) [][4]float64 { return nil }) })
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/coverage", nil))
+	if got := strings.TrimSpace(rec.Body.String()); got != `{"cells":[]}` {
+		t.Errorf("body %s", got)
+	}
+}

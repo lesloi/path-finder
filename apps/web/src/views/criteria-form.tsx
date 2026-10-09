@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
 import {
   CriteriaError,
@@ -157,11 +157,14 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
 export function CriteriaForm({
   language,
   start,
+  startUncovered = false,
   draft: kept,
   onSubmit,
 }: {
   language: Language;
   start?: Position;
+  /** The start point is where the server has no routes: asking would only fail. */
+  startUncovered?: boolean;
   /** From `useCriteriaDraft`, for a view that mounts the form in more than one place and keeps what was set. */
   draft?: ReturnType<typeof useCriteriaDraft>;
   onSubmit: (request: RouteSetRequest) => void;
@@ -294,10 +297,26 @@ export function CriteriaForm({
     },
   };
 
+  const uncoveredId = useId();
   const findRoutes = request && !field && (
-    <button type="button" className={PRIMARY_BUTTON} data-testid="criteria-submit" onClick={() => onSubmit(request)}>
-      {t.findRoutes}
-    </button>
+    <>
+      {/* Not hidden, so that the user sees why the search cannot run; the message holds no coordinates. */}
+      {startUncovered && (
+        <p id={uncoveredId} role="status" data-testid="criteria-uncovered" className="text-sm text-ink">
+          {t.uncoveredStart}
+        </p>
+      )}
+      <button
+        type="button"
+        className={`${PRIMARY_BUTTON} disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-accent`}
+        data-testid="criteria-submit"
+        disabled={startUncovered}
+        {...(startUncovered && { 'aria-describedby': uncoveredId })}
+        onClick={() => onSubmit(request)}
+      >
+        {t.findRoutes}
+      </button>
+    </>
   );
   const error = field && (
     <p role="alert" data-testid="criteria-error" className="text-sm text-ink">

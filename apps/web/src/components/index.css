@@ -13,6 +13,8 @@
   --color-route-5: #c25e00;
   --color-start: #6b4f33;
   --color-route-muted: #9aa595;
+  /* The veil over the places the server cannot route: a grey, drawn at 35 % opacity on the map. */
+  --color-veil: #4a4f47;
 
   /* Road surfaces of a route (#9), and the icon of a criterion a suggestion misses. */
   --color-miss: #ef6c00;

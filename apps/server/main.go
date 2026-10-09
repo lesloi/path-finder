@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lesloi/path-finder/apps/server/contract"
 	"github.com/lesloi/path-finder/apps/server/engine"
 	"github.com/lesloi/path-finder/apps/server/generator"
 	"github.com/lesloi/path-finder/apps/server/graphbuild"
@@ -112,6 +113,10 @@ func serve() {
 		log.Fatal(err)
 	}
 	log.Printf("%d zone(s) opened in %s", zones.Len(), time.Since(opened).Round(time.Millisecond))
+	// The coverage reads the spatial index of every zone once: better before the port opens than in the first request.
+	covering := time.Now()
+	cells := zones.Coverage(contract.CoverageCellsPerDegree())
+	log.Printf("%d coverage cell(s) in %s", len(cells), time.Since(covering).Round(time.Millisecond))
 	engines := make(map[string]generator.Looper, len(engine.ProfileNames))
 	for _, name := range engine.ProfileNames {
 		z := zones.Profile(name)
@@ -134,6 +139,7 @@ func serve() {
 		gen.Seed = func() uint64 { return seed }
 	}
 	cfg.Generator = gen
+	cfg.Coverage = zones
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { ErrorCode } from '../contract/index.ts';
 import { parseRoutes, type Route, type RouteSetRequest } from '../core/index.ts';
+import { buildIdHeader } from './api.ts';
 
 /**
  * Why there is no route set: an error code of the API, the API cannot be reached, or it answered
@@ -34,15 +35,13 @@ export async function requestRouteSet(
   request: RouteSetRequest,
   signal?: AbortSignal,
 ): Promise<{ routes: Route[] } | { error: RouteSetError; retryAfter?: number }> {
-  const buildId: unknown = import.meta.env.VITE_BUILD_ID;
   let response: Response;
   try {
     response = await fetch('/api/v1/route-sets', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Outside a build there is no id, and "undefined" would never match the API's.
-        ...(typeof buildId === 'string' && { 'X-Build-Id': buildId }),
+        ...buildIdHeader(),
       },
       body: JSON.stringify(request),
       ...(signal && { signal }),
