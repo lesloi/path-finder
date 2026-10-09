@@ -170,10 +170,11 @@ is about `LOOP_LIMIT × CPUs × 50 MB`.
 The `Dockerfile` builds one image with the server and the web app, and no data. Build it with
 `docker build -t path-finder .`, or use the one CI publishes as `ghcr.io/lesloi/path-finder:latest`.
 
-To update the data from a job, build into a new directory beside the live one, not into it (the job plans the
-zones, then builds them, so a newer extract needs no new image), then point the volume's `current` link at it
-(the pods swap to it within 30 seconds). A build in place would show a pod a new `graph.bin` with old landmarks,
-which it refuses until the landmarks are there, and a zone dropped from the plan would still be served.
+To update the data from a job, replace the zones one at a time: two full copies (some 21 GiB each for France) rarely fit on a
+volume. Plan the zones once and keep the plan, or a zone dropped by planning again would still be served. Serve a directory of
+links, one per zone, and build each zone in a directory outside it. Then replace the zone's link by renaming a new link over it,
+made beside the served directory at the same depth (`mv -T ../swap/zNN zNN`): the four files change together, the pods follow
+within 30 seconds, and none sees a new `graph.bin` with old landmarks. Remove the old zone afterwards.
 
 The data is a volume: mount the directory holding `graph.bin`, `any.alt`, `paved.alt` and `unpaved.alt`, or one such
 subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. The server only reads it, and
