@@ -67,3 +67,36 @@ func TestCoarseRoundsDown(t *testing.T) {
 		}
 	}
 }
+
+// A start within the snap distance of a node is served, so the cell it is in counts though it holds no node.
+func TestCoverageReachesAsFarAsAStartSnaps(t *testing.T) {
+	dir := t.TempDir()
+	// 0.0005° (about 40 m) from the west edge of its cell, and 300 m from the south edge of the cell below.
+	writeZone(t, dir, squareAt(45.9027, 6.1005, 0.002))
+	z, err := OpenZones(dir, "any", "paved")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := [][4]float64{
+		{6, 45.8, 6.1, 45.9},
+		{6.1, 45.8, 6.2, 45.9},
+		{6, 45.9, 6.1, 46},
+		{6.1, 45.9, 6.2, 46},
+	}
+	if got := z.Coverage(10); !reflect.DeepEqual(got, want) {
+		t.Errorf("coverage = %v, want %v", got, want)
+	}
+}
+
+func TestCoverageLeavesOutWhatIsPastTheSnapDistance(t *testing.T) {
+	dir := t.TempDir()
+	// More than 400 m from every edge of the cell: it alone is covered.
+	writeZone(t, dir, squareAt(45.95, 6.15, 0.002))
+	z, err := OpenZones(dir, "any", "paved")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := z.Coverage(10); !reflect.DeepEqual(got, [][4]float64{{6.1, 45.9, 6.2, 46}}) {
+		t.Errorf("coverage = %v", got)
+	}
+}

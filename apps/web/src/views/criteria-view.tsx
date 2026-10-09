@@ -207,13 +207,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       />
     ) : undefined;
   const panel = routeSetView ?? (loading && <SearchingPanel language={language} />);
-  // Asking is only for criteria the form would let through.
+  // Asking is only for criteria the form would let through, from a start point the server can route from.
   const staleNotice = stale && (
     <div role="status" data-testid="routes-stale" className="flex flex-col gap-2 rounded-md bg-accent-soft p-3 text-sm">
       <span>
         <strong>{t.stale}.</strong> {t.staleHint}
       </span>
-      {current && !invalidField(current) && (
+      {current && !invalidField(current) && !startUncovered && (
         <button
           type="button"
           data-testid="routes-search-again"

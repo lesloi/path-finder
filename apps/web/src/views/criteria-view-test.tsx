@@ -854,6 +854,27 @@ describe('CriteriaView', () => {
       expect(screen.queryByTestId('routes-stale')).not.toBeInTheDocument();
     });
 
+    it('offers no new search from a start point that turns out to be out of the server’s reach', async () => {
+      onDesktop();
+      const routeSets = vi.fn(() => Promise.resolve(answer(route(0))));
+      // The coverage comes after the first search, and leaves its start point out.
+      let coverage: (response: Response) => void = () => {};
+      vi.stubGlobal('fetch', (url: string) =>
+        url === '/api/v1/coverage' ? new Promise<Response>((resolve) => (coverage = resolve)) : routeSets(),
+      );
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      await submit();
+      await screen.findByTestId('routes-count');
+      await act(async () => coverage(Response.json({ cells: [[10, 45, 11, 46]] })));
+
+      fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
+
+      expect(screen.getByTestId('routes-stale')).toBeInTheDocument();
+      expect(screen.queryByTestId('routes-search-again')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-submit')).toBeDisabled();
+    });
+
     describe('the criteria kept', () => {
       const kept = () => JSON.parse(localStorage.getItem('path-finder.settings')!).lastCriteria;
 
