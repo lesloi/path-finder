@@ -1,3 +1,4 @@
+import { commonText } from '../apps/web/src/i18n/index.ts';
 import { expect, openMap, test } from './test.ts';
 
 test.describe('the app', () => {
@@ -32,6 +33,23 @@ test.describe('the app', () => {
     await openMap(page);
 
     await expect(page.locator('html')).not.toHaveAttribute('data-geolocation');
+  });
+
+  test('names the map and the toggle of its attribution in the language of the app', async ({ page }) => {
+    await openMap(page);
+    const map = page.locator('canvas.maplibregl-canvas');
+    const toggle = page.locator('.maplibregl-ctrl-attrib-button');
+
+    await expect(map).toHaveAccessibleName(commonText.en.mapName);
+    await expect(toggle).toHaveAccessibleName(commonText.en.toggleAttribution);
+
+    // The language changes while the map stays mounted: MapLibre has named its controls by then.
+    await page.getByTestId('criteria-settings').click();
+    await page.locator('label', { has: page.getByTestId('settings-language-fr') }).click();
+    await page.keyboard.press('Escape');
+
+    await expect(map).toHaveAccessibleName(commonText.fr.mapName);
+    await expect(toggle).toHaveAccessibleName(commonText.fr.toggleAttribution);
   });
 
   test('gives the attribution touch targets, collapsed and open', async ({ page }) => {
