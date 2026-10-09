@@ -24,6 +24,8 @@ describe('parseCoverage', () => {
     ['a cell of three numbers', { cells: [[1, 2, 3]] }],
     ['a cell with text', { cells: [[1, 2, 3, '4']] }],
     ['a cell with a number that is not finite', { cells: [[1, 2, 3, null]] }],
+    ['a cell with no width', { cells: [[1, 2, 1, 3]] }],
+    ['a cell with no height', { cells: [[1, 2, 3, 2]] }],
   ])('refuses %s', (_, body) => {
     expect(parseCoverage(body)).toBeUndefined();
   });
@@ -136,5 +138,21 @@ describe('veilPolygon', () => {
       [6, 46],
       [6, 45.9],
     ]);
+  });
+
+  it('leaves out a cell that is off the grid of the first one, so that it stays veiled', () => {
+    const first: CoverageCell = [6, 45.8, 6.1, 45.9];
+
+    const outlines = rectangles([
+      first,
+      [6.25, 45.8, 6.35, 45.9], // shifted by half a cell
+      [6.3, 45.8, 6.5, 45.9], // twice as wide
+    ]);
+
+    expect(outlines).toEqual(rectangles([first]));
+  });
+
+  it('is the whole world when the first cell has no size', () => {
+    expect(rectangles([[6, 45.8, 6, 45.8]])).toEqual(rectangles([]));
   });
 });

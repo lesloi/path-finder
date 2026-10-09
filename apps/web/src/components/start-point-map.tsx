@@ -522,7 +522,7 @@ export function StartPointMap({
     source.setData({ type: 'FeatureCollection', features });
   }, [loaded, routes, selectedRoute, framing, drawnFor, styleVersion]);
 
-  // The veil is a world with a hole for each cell covered; a new style drops it, so it is set again.
+  // The veil covers what no cell does; a new style drops it, so it is set again.
   useEffect(() => {
     const source = mapRef.current?.getSource('coverage') as GeoJSONSource | undefined;
     if (!loaded || !source) return;

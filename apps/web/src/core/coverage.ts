@@ -5,11 +5,14 @@ export type CoverageCell = [number, number, number, number];
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
-/** The cells of an answer of `GET /api/v1/coverage`, or none when the answer is not one. */
+/** The cells of an answer of `GET /api/v1/coverage`, or none when the answer is not one (a cell has an area). */
 export function parseCoverage(body: unknown): CoverageCell[] | undefined {
   if (typeof body !== 'object' || body === null || !('cells' in body) || !Array.isArray(body.cells)) return undefined;
   const cells: unknown[] = body.cells;
-  const valid = cells.every((cell) => Array.isArray(cell) && cell.length === 4 && cell.every(isNumber));
+  const valid = cells.every(
+    (cell) =>
+      Array.isArray(cell) && cell.length === 4 && cell.every(isNumber) && cell[2] > cell[0] && cell[3] > cell[1],
+  );
   return valid ? (cells as CoverageCell[]) : undefined;
 }
 
@@ -30,6 +33,9 @@ const ring = (west: number, south: number, east: number, north: number): Positio
   [west, south],
 ];
 
+// How far from a whole number of cells a coordinate may be and still be on the grid, in cells.
+const GRID_TOLERANCE = 1e-6;
+
 // The coordinates of a grid computed in floats, rounded to the 1e-7 degree the server works in.
 const tidy = (degrees: number) => Math.round(degrees * 1e7) / 1e7;
 
@@ -40,8 +46,21 @@ const tidy = (degrees: number) => Math.round(degrees * 1e7) / 1e7;
  * zoom a tile holds thousands of holes that touch each other, so the triangulation fails and the veil is drawn
  * in streaks, over places that have routes.
  */
-export function veilPolygon(cells: CoverageCell[]) {
+export function veilPolygon(allCells: CoverageCell[]) {
   const rings: Position[][] = [];
+  // The grid is that of the first cell, as the server's is one size. A cell off it (another size, or between two
+  // cells of the grid) cannot be placed in a row and a column, so it is left out: it stays under the veil.
+  const [west0, south0, east0, north0] = allCells[0] ?? [0, 0, 0, 0];
+  const width = east0 - west0;
+  const height = north0 - south0;
+  const whole = (value: number) => Math.abs(value - Math.round(value)) < GRID_TOLERANCE;
+  const cells = allCells.filter(
+    ([west, south, east, north]) =>
+      Math.abs((east - west) / width - 1) < GRID_TOLERANCE &&
+      Math.abs((north - south) / height - 1) < GRID_TOLERANCE &&
+      whole((west - west0) / width) &&
+      whole((south - south0) / height),
+  );
   if (cells.length === 0) {
     rings.push(ring(-180, -MAX_LATITUDE, 180, MAX_LATITUDE));
   } else {
@@ -58,9 +77,6 @@ export function veilPolygon(cells: CoverageCell[]) {
       ring(west, -MAX_LATITUDE, east, south),
       ring(west, north, east, MAX_LATITUDE),
     );
-    // The grid is that of the first cell: whole numbers of cells from the south west corner of the box.
-    const width = cells[0][2] - cells[0][0];
-    const height = cells[0][3] - cells[0][1];
     const column = (lon: number) => Math.round((lon - west) / width);
     const columns = column(east);
     const rows = Math.round((north - south) / height);
