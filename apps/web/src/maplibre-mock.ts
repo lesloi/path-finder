@@ -27,15 +27,19 @@ export class Map {
   layers: { id: string }[] = [];
   canvas = {
     style: { cursor: '' },
+    attributes: {} as Record<string, string>,
+    setAttribute(name: string, value: string) {
+      this.attributes[name] = value;
+    },
     clientWidth: 800,
     clientHeight: 600,
     // A JPEG of the canvas, as an empty blob.
     toBlob: (callback: (blob: Blob | null) => void) => callback(new Blob(['snapshot'], { type: 'image/jpeg' })),
   };
   /** What the map was created with, and every style it was given since, the latest last. */
-  options: { style?: unknown };
+  options: { style?: unknown; locale?: unknown };
   styles: { style: unknown; options: unknown }[] = [];
-  constructor(options: { style?: unknown } = {}) {
+  constructor(options: { style?: unknown; locale?: unknown } = {}) {
     this.options = options;
     maps.push(this);
   }
@@ -95,6 +99,11 @@ export class Map {
   }
   getCanvas() {
     return this.canvas;
+  }
+  // The toggle of the compact attribution, which MapLibre's control draws: a real element to read its names from.
+  container = document.createElement('div');
+  getContainer() {
+    return this.container;
   }
   images: Record<string, unknown> = {};
   addImage(id: string, image: unknown) {

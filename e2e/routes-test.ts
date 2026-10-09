@@ -162,8 +162,8 @@ test.describe('the route set', () => {
       await expect(page.getByTestId('route-dock')).toHaveCount(0);
 
       await page.getByTestId('routes-row-0').click();
-      // Over the map under the left column, where the routes are framed clear of.
-      await page.mouse.click(200, page.viewportSize()!.height - 20);
+      // Over the map under the left column, where the routes are framed clear of, beside the attribution.
+      await page.mouse.click(300, page.viewportSize()!.height - 20);
       await expect(page.getByTestId('route-dock')).toHaveCount(0);
     });
 

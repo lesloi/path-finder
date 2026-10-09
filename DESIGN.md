@@ -35,10 +35,16 @@ Behaviour comes from native elements first (`<dialog>`, `popover`, `<input type=
 
 ## Accessibility
 
+The target is [WCAG 2.2](https://www.w3.org/TR/WCAG22/) level AA. In practice:
+
 - Touch targets are at least 44 px.
 - Every control has an accessible name, in both languages; icons are decorative (`aria-hidden`).
 - Text and controls keep enough contrast in light and dark mode.
 - The whole app works with the keyboard, with a visible focus.
+- What a control shows of its state is also exposed to assistive technology (`aria-pressed`, `aria-expanded`,
+  `aria-current`), never by a class or a `data-*` alone.
+- What appears after an action is announced by a live region that is already there, empty until then; an error is an
+  alert.
 - Sizes follow the user's font size, and animations respect `prefers-reduced-motion`.
 - Respect the safe areas of the screen.
 - Hide an action that cannot run yet rather than disable it.

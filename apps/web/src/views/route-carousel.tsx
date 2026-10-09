@@ -2,6 +2,8 @@ import { useEffect, useEffectEvent, useRef, type ReactNode } from 'react';
 
 import { centredCard } from '../core/index.ts';
 
+// The user asked the system for less motion: the carousel then jumps to a card.
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 // Milliseconds a scroll has to rest before the card it stopped on is selected.
 const SETTLE_MS = 90;
 // Milliseconds after the carousel moved by itself, at most, during which the cards it passes are not selected: the
@@ -45,7 +47,7 @@ export function RouteCarousel({
     movingUntil.current = Date.now() + MOVE_MS;
     list.current!.scrollTo({
       left: card.offsetLeft - (list.current!.clientWidth - card.offsetWidth) / 2,
-      behavior: 'smooth',
+      behavior: matchMedia(REDUCED_MOTION_QUERY).matches ? 'auto' : 'smooth',
     });
   });
   useEffect(() => {

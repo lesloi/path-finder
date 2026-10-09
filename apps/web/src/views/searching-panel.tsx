@@ -10,7 +10,7 @@ export function SearchingPanel({ language }: { language: Language }) {
       data-testid="routes-loading"
       className="m-0 flex min-h-touch items-center justify-center gap-2 text-ink-2"
     >
-      <LoaderCircle size={20} aria-hidden className="animate-spin" />
+      <LoaderCircle size={20} aria-hidden className="animate-spin motion-reduce:animate-none" />
       {routesText[language].finding}
     </p>
   );

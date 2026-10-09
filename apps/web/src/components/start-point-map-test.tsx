@@ -2,6 +2,7 @@ import { act, render } from '@testing-library/react';
 import { createRef } from 'react';
 
 import type { Position } from '../core/index.ts';
+import { commonText } from '../i18n/index.ts';
 import { maps, markers, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
 import { basemapStyle } from './basemap-style.ts';
 import { StartPointMap, type MapHandle } from './start-point-map.tsx';
@@ -114,6 +115,24 @@ describe('StartPointMap', () => {
     rerender(<StartPointMap display={{ units: 'metric', language: 'en' }} onStartChange={vi.fn()} />);
 
     expect(scale.options).toEqual({ unit: 'metric' });
+  });
+
+  it('names the map and the toggle of its attribution in the language of the display, and follows it', () => {
+    const { rerender } = render(
+      <StartPointMap display={{ units: 'metric', language: 'fr' }} onStartChange={vi.fn()} />,
+    );
+    expect(map().options.locale).toEqual({
+      'Map.Title': commonText.fr.mapName,
+      'AttributionControl.ToggleAttribution': commonText.fr.toggleAttribution,
+    });
+    expect(map().canvas.attributes['aria-label']).toBe(commonText.fr.mapName);
+
+    const toggle = map().container.appendChild(document.createElement('button'));
+    toggle.className = 'maplibregl-ctrl-attrib-button';
+    rerender(<StartPointMap display={{ units: 'metric', language: 'en' }} onStartChange={vi.fn()} />);
+
+    expect(map().canvas.attributes['aria-label']).toBe(commonText.en.mapName);
+    expect(toggle).toHaveAccessibleName(commonText.en.toggleAttribution);
   });
 
   it('shows the start point on the map', () => {

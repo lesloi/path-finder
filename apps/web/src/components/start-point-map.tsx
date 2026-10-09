@@ -26,6 +26,7 @@ import {
   type MapSnapshot,
   type Position,
 } from '../core/index.ts';
+import { commonText } from '../i18n/index.ts';
 import { basemapStyle } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
 import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
@@ -98,10 +99,16 @@ function framedRoutes(routes: Position[][], framed: number | undefined) {
   return framed === undefined ? routes : [routes[framed] ?? routes[0]];
 }
 
+// The names MapLibre gives its controls, in the language of the app.
+const mapLocale = (language: Display['language']) => ({
+  'Map.Title': commonText[language].mapName,
+  'AttributionControl.ToggleAttribution': commonText[language].toggleAttribution,
+});
+
 // Pixels the controls take from the right of the map (the floating buttons and their margin).
 const CONTROLS_RIGHT = 72;
 // Pixels the scale and the attribution take from the bottom of the map.
-const CONTROLS_BOTTOM = 40;
+const CONTROLS_BOTTOM = 58;
 // Half the width and height of a route's tag, which has to stay inside the map.
 const TAG_HALF: [number, number] = [56, 28];
 // Half the size of a distance marker.
@@ -234,6 +241,7 @@ export function StartPointMap({
   const desktop = useDesktop();
   const scale = useRef<ScaleControl>(null);
   const initialUnits = useEffectEvent(() => display.units);
+  const initialLanguage = useEffectEvent(() => display.language);
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
@@ -266,6 +274,8 @@ export function StartPointMap({
       center: [2.5, 46.6],
       zoom: 5,
       attributionControl: false,
+      // MapLibre words the names of its controls in English: ours are in the language of the app.
+      locale: mapLocale(initialLanguage()),
       // A flat map: the app draws no relief and no 3D, so a tilt would only skew it.
       maxPitch: 0,
       pitchWithRotate: false,
@@ -500,6 +510,17 @@ export function StartPointMap({
   useEffect(() => {
     scale.current?.setUnit(display.units);
   }, [display.units]);
+
+  // MapLibre names its controls once, when it draws them: a language picked since is applied by hand.
+  useEffect(() => {
+    const map = mapRef.current!;
+    const { mapName, toggleAttribution } = commonText[display.language];
+    map.getCanvas().setAttribute('aria-label', mapName);
+    for (const toggle of map.getContainer().querySelectorAll('.maplibregl-ctrl-attrib-button')) {
+      toggle.setAttribute('aria-label', toggleAttribution);
+      toggle.setAttribute('title', toggleAttribution);
+    }
+  }, [display.language]);
 
   // Drawn with the routes, so that the thumbnails' snapshot, taken without them, has no label either.
   useEffect(() => {

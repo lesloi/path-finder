@@ -10,6 +10,9 @@ import { commonText } from './i18n/index.ts';
 vi.mock('maplibre-gl');
 // The automock leaves out the method the map calls on its scale.
 ScaleControl.prototype.setUnit = vi.fn();
+// Nor the canvas and the container the map names the controls of.
+Map.prototype.getCanvas = vi.fn(() => ({ setAttribute: vi.fn() }) as never);
+Map.prototype.getContainer = vi.fn(() => document.createElement('div'));
 
 const onDesktop = () =>
   vi

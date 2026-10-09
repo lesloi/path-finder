@@ -514,6 +514,22 @@ describe('CriteriaView', () => {
       expect(document.documentElement.style.getPropertyValue('--list-inset')).toBe('');
     });
 
+    it('announces the routes found in a status that is there before them and empty while searching', async () => {
+      onDesktop();
+      ask(answer(route(0), route(1)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      const status = screen.getByTestId('routes-announcement');
+      expect(status).toHaveAttribute('role', 'status');
+      expect(status).toBeEmptyDOMElement();
+
+      await submit();
+      expect(status).toBeEmptyDOMElement();
+
+      await screen.findByTestId('routes-count');
+      expect(status).toHaveTextContent(routesText.en.routeCount(2));
+    });
+
     it('shows the route set in the column, and draws its routes on the map', async () => {
       onDesktop();
       ask(answer(route(0), route(1, { kind: 'suggestion', misses: [{ criterion: 'distance', gap: 1 }] })));

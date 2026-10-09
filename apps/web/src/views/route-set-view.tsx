@@ -201,6 +201,7 @@ function RouteRow({
       type="button"
       data-testid={`routes-row-${index}`}
       data-selected={selected ? '' : undefined}
+      aria-current={selected ? 'true' : undefined}
       className={
         `flex min-h-13 w-full flex-col gap-2 rounded-md border border-l-4 border-border p-2 text-left ` +
         `${routeBorder(index)} hover:bg-surface-2 data-selected:bg-surface-2`

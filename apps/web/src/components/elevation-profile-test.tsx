@@ -35,6 +35,25 @@ function plot(onHover = vi.fn(), props: Partial<Route> = {}, language: 'en' | 'f
 }
 
 describe('ElevationProfile', () => {
+  it('goes along the profile with the keyboard, as a pointer does', () => {
+    const { onHover } = plot();
+    const slider = screen.getByTestId('profile-cursor');
+    expect(slider).toHaveAccessibleName(routesText.en.profileCursor);
+
+    fireEvent.focus(slider);
+    expect(onHover).toHaveBeenLastCalledWith(expect.arrayContaining([expect.any(Number)]));
+    fireEvent.change(slider, { target: { value: '3' } });
+
+    expect(screen.getByTestId('profile-tip')).toHaveTextContent('450 m');
+    expect(slider).toHaveAttribute('aria-valuetext', expect.stringContaining('50 m'));
+    expect(slider).toHaveAttribute('aria-valuetext', expect.stringContaining(routesText.en.slope));
+
+    fireEvent.blur(slider);
+
+    expect(onHover).toHaveBeenLastCalledWith(undefined);
+    expect(screen.queryByTestId('profile-tip')).not.toBeInTheDocument();
+  });
+
   it.each([
     ['en', 'Altitude'],
     ['fr', 'Altitude'],

@@ -21,8 +21,8 @@ const HEIGHT = 60;
 const PAD = 8;
 
 /**
- * The altitude along a route, coloured by the surface it runs on. Hovering or dragging along it gives the
- * distance, altitude and grade there, and `onHover` the place on the map (undefined when the pointer leaves).
+ * The altitude along a route, coloured by the surface it runs on. Hovering or dragging along it, or the arrow
+ * keys on its slider, give the distance, altitude and grade there, and `onHover` the place on the map (undefined when the pointer leaves).
  * Renders nothing for a route without heights.
  */
 export function ElevationProfile({
@@ -53,6 +53,12 @@ export function ElevationProfile({
   function leave() {
     setAt(undefined);
     onHover(undefined);
+  }
+  // The keyboard moves along the profile one point at a time, as a pointer does.
+  function step(index: number) {
+    const fraction = index / (profile!.length - 1);
+    setAt(fraction);
+    onHover(positionAt(route.geometry, fraction * total));
   }
 
   const hovered = at === undefined ? undefined : profile[Math.round(at * (profile.length - 1))];
@@ -144,6 +150,29 @@ export function ElevationProfile({
               );
             })}
           </svg>
+          {/* The keyboard's way along the profile: a native slider, hidden, whose ring shows on the plot. */}
+          <input
+            type="range"
+            data-testid={testId && `${testId}-cursor`}
+            className="peer sr-only"
+            aria-label={t.profileCursor}
+            aria-valuetext={
+              hovered
+                ? `${formatDistance(hovered.distance, display)}, ${formatHeight(hovered.height, display)}, ${t.slope} ${grade}`
+                : undefined
+            }
+            min={0}
+            max={profile.length - 1}
+            step={1}
+            value={at === undefined ? 0 : Math.round(at * (profile.length - 1))}
+            onFocus={(event) => step(Number(event.target.value))}
+            onChange={(event) => step(Number(event.target.value))}
+            onBlur={leave}
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 rounded-sm peer-focus-visible:ring-2 peer-focus-visible:ring-accent"
+          />
           {at !== undefined && hovered && (
             <>
               <span className="absolute inset-y-0 w-px bg-ink" style={{ left: `${at * 100}%` }} />

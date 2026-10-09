@@ -62,6 +62,25 @@ describe('RouteCarousel', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
+  it('jumps to the card of a selection made elsewhere when the system asks for less motion', () => {
+    layout(0);
+    const matchMedia = window.matchMedia;
+    window.matchMedia = (query: string) => ({ ...matchMedia(query), matches: true }) as MediaQueryList;
+    const scrollTo = vi.spyOn(Element.prototype, 'scrollTo');
+    const { onSelect, rerender } = setup(0);
+
+    rerender(
+      <RouteCarousel testId="carousel" selected={2} onSelect={onSelect}>
+        {[0, 1, 2].map((index) => (
+          <button key={index}>{`card ${index}`}</button>
+        ))}
+      </RouteCarousel>,
+    );
+    window.matchMedia = matchMedia;
+
+    expect(scrollTo).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ behavior: 'auto' }));
+  });
+
   it('moves to the card of a selection made elsewhere, without selecting the cards it passes', () => {
     layout(0);
     const scrollTo = vi.spyOn(Element.prototype, 'scrollTo');
