@@ -39,7 +39,7 @@ func run(command string, args []string) error {
 		fs := flag.NewFlagSet(command, flag.ExitOnError)
 		var pbfs stringList
 		fs.Var(&pbfs, "pbf", "OSM PBF file (repeatable)")
-		dem := fs.String("dem", "", "directory holding the BD ALTI .asc tiles")
+		dem := fs.String("dem", "", "directory holding the BD ALTI .asc tiles, plain or gzipped (.asc.gz)")
 		out := fs.String("out", filepath.Join(dataDir(), engine.GraphFileName), "graph file to write")
 		bbox := fs.String("bbox", "", "keep only this zone, as minLon,minLat,maxLon,maxLat: the memory then follows the zone, not the extract (one sorted -pbf)")
 		_ = fs.Parse(args)

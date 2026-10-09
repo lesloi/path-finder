@@ -4,8 +4,10 @@ package elevation
 
 import (
 	"bufio"
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -114,8 +116,38 @@ func readHeader(r *bufio.Reader) (ascHeader, error) {
 	return ascHeader{ncols: int(hdr["ncols"]), nrows: int(hdr["nrows"]), xll: hdr["xllcorner"], yll: hdr["yllcorner"], cs: hdr["cellsize"], nodata: hdr["nodata_value"]}, nil
 }
 
-func readASC(path string) (*ascFile, error) {
+// isTile tells whether a file is a BD ALTI tile: an ASC file, plain or gzipped (about 3.4 times smaller).
+func isTile(path string) bool {
+	name := strings.ToLower(path)
+	return strings.HasSuffix(name, ".asc") || strings.HasSuffix(name, ".asc.gz")
+}
+
+// gzipFile reads a gzipped tile. gzip.Reader.Close does not close the file it reads from, so this does both.
+type gzipFile struct {
+	*gzip.Reader
+	f *os.File
+}
+
+func (g gzipFile) Close() error { return errors.Join(g.Reader.Close(), g.f.Close()) }
+
+func openTile(path string) (io.ReadCloser, error) {
 	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasSuffix(strings.ToLower(path), ".gz") {
+		return f, nil
+	}
+	z, err := gzip.NewReader(f)
+	if err != nil {
+		f.Close()
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return gzipFile{z, f}, nil
+}
+
+func readASC(path string) (*ascFile, error) {
+	f, err := openTile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +155,7 @@ func readASC(path string) (*ascFile, error) {
 	r := bufio.NewReaderSize(f, 1<<20)
 	h, err := readHeader(r)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	nc, nr, nodata := h.ncols, h.nrows, h.nodata
 	t := &demTile{ncols: nc, nrows: nr, v: make([]float32, 0, nc*nr)}
@@ -133,7 +165,7 @@ func readASC(path string) (*ascFile, error) {
 	for sc.Scan() {
 		v, err := strconv.ParseFloat(sc.Text(), 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %w", path, err)
 		}
 		if v == nodata {
 			t.v = append(t.v, float32(math.NaN()))
@@ -141,13 +173,18 @@ func readASC(path string) (*ascFile, error) {
 			t.v = append(t.v, float32(v))
 		}
 	}
+	// A gzip file reports a damaged stream, and its checksum, as a read error: without this a tile that is cut or
+	// corrupt could still hold the right number of values.
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
 	if len(t.v) != nc*nr {
 		return nil, fmt.Errorf("%s: got %d values, want %d", path, len(t.v), nc*nr)
 	}
 	return &ascFile{xll: h.xll, yll: h.yll, cs: h.cs, tile: t}, nil
 }
 
-// Load reads every .asc file below dir.
+// Load reads every .asc and .asc.gz file below dir.
 func Load(dir string) (*DEM, error) { return load(dir, nil) }
 
 // within is the test of a tile header that holds when the tile meets the box, given by its latitudes and
@@ -168,12 +205,12 @@ func within(minLat, minLon, maxLat, maxLon float64) func(ascHeader) bool {
 	}
 }
 
-// CountWithin is how many .asc files below dir meet the box: it reads only their headers, so a job can tell at
+// CountWithin is how many tiles below dir meet the box: it reads only their headers, so a job can tell at
 // once that it has not been given the tiles of its zone.
 func CountWithin(dir string, minLat, minLon, maxLat, maxLon float64) (int, error) {
 	keep, n := within(minLat, minLon, maxLat, maxLon), 0
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(strings.ToLower(p), ".asc") {
+		if err != nil || d.IsDir() || !isTile(p) {
 			return err
 		}
 		ok, herr := headerKept(p, keep)
@@ -185,7 +222,7 @@ func CountWithin(dir string, minLat, minLon, maxLat, maxLon float64) (int, error
 	return n, err
 }
 
-// LoadWithin reads the .asc files below dir whose tile meets the box: the memory of a build is then that of the
+// LoadWithin reads the tiles below dir that meet the box: the memory of a build is then that of the
 // tiles of its zone, not of the whole country. It reads only the header of the others.
 func LoadWithin(dir string, minLat, minLon, maxLat, maxLon float64) (*DEM, error) {
 	d, err := load(dir, within(minLat, minLon, maxLat, maxLon))
@@ -195,14 +232,14 @@ func LoadWithin(dir string, minLat, minLon, maxLat, maxLon float64) (*DEM, error
 	return d, err
 }
 
-// errNoTile is what loading says when no .asc file is left to read.
-var errNoTile = errors.New("no .asc file")
+// errNoTile is what loading says when no tile is left to read.
+var errNoTile = errors.New("no .asc or .asc.gz file")
 
-// load reads the .asc files below dir that keep accepts (all of them when it is nil).
+// load reads the tiles below dir that keep accepts (all of them when it is nil).
 func load(dir string, keep func(ascHeader) bool) (*DEM, error) {
 	var paths []string
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() && strings.HasSuffix(strings.ToLower(p), ".asc") {
+		if err == nil && !d.IsDir() && isTile(p) {
 			if keep != nil {
 				ok, herr := headerKept(p, keep)
 				if herr != nil {
@@ -328,7 +365,7 @@ func (d *DEM) Sample(lat, lon []int32) []int32 {
 
 // headerKept reads only the header of a tile, to tell whether keep wants it.
 func headerKept(path string, keep func(ascHeader) bool) (bool, error) {
-	f, err := os.Open(path)
+	f, err := openTile(path)
 	if err != nil {
 		return false, err
 	}
