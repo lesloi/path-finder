@@ -25,6 +25,7 @@ const onDesktop = () =>
 const onPage = (title: string) => waitFor(() => expect(screen.getByTestId('sub-page-title')).toHaveTextContent(title));
 
 afterEach(() => {
+  document.head.querySelectorAll('meta').forEach((tag) => tag.remove());
   window.location.hash = '';
   vi.restoreAllMocks();
 });
@@ -197,6 +198,17 @@ describe('App', () => {
 
     expect(screen.getByTestId('sub-page-title')).toHaveTextContent(commonText.fr.settings);
     expect(document.documentElement.lang).toBe('fr');
+  });
+
+  it('describes the page in the language of the app', () => {
+    document.head.innerHTML = '<meta name="description" content="English">';
+    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['fr-FR']);
+    render(<App />);
+
+    expect(document.head.querySelector('meta[name="description"]')).toHaveAttribute(
+      'content',
+      commonText.fr.description,
+    );
   });
 
   it('sets the document language to en otherwise', () => {

@@ -1,6 +1,7 @@
 import { useEffect, type ComponentType } from 'react';
 
 import { SubPage } from './components/index.ts';
+import { applyDescription } from './core/index.ts';
 import { commonText, type Language } from './i18n/index.ts';
 import { goTo, languageOf, useHash, useSettings } from './state/index.ts';
 import { CreditsPage, CriteriaView, LegalNoticePage, PrivacyPolicyPage, SettingsView } from './views/index.ts';
@@ -38,6 +39,7 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.lang = language;
+    applyDescription(commonText[language].description);
   }, [language]);
 
   return (

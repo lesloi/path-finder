@@ -5,6 +5,7 @@ export * from './criteria-summary.ts';
 export * from './gpx.ts';
 export * from './gpx-save.ts';
 export * from './pace.ts';
+export * from './page-meta.ts';
 export * from './route.ts';
 export * from './route-name.ts';
 export * from './theme.ts';
