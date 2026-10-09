@@ -48,32 +48,93 @@ describe('isCovered', () => {
 });
 
 describe('veilPolygon', () => {
-  it('is the world with a hole for each cell, adjacent cells kept apart', () => {
+  const rectangles = (covered: CoverageCell[]) => veilPolygon(covered).geometry.coordinates.map(([outline]) => outline);
+  const area = (outline: number[][]) =>
+    Math.abs(outline[2][0] - outline[0][0]) * Math.abs(outline[2][1] - outline[0][1]);
+  const holeFree = (covered: CoverageCell[]) => veilPolygon(covered).geometry.coordinates.every((p) => p.length === 1);
+
+  it('is the whole world when no cell is covered', () => {
+    expect(rectangles([])).toEqual([
+      [
+        [-180, -85.0511],
+        [180, -85.0511],
+        [180, 85.0511],
+        [-180, 85.0511],
+        [-180, -85.0511],
+      ],
+    ]);
+  });
+
+  it('is the four rectangles around a lone cell, which has no hole', () => {
+    const outlines = rectangles([[6, 45.8, 6.1, 45.9]]);
+
+    expect(outlines).toHaveLength(4);
+    expect(holeFree([[6, 45.8, 6.1, 45.9]])).toBe(true);
+    expect(outlines.reduce((sum, outline) => sum + area(outline), 0)).toBeCloseTo(360 * 2 * 85.0511 - 0.1 * 0.1, 6);
+  });
+
+  it('leaves no rectangle between adjacent cells', () => {
     const adjacent: CoverageCell[] = [
       [6, 45.8, 6.1, 45.9],
       [6.1, 45.8, 6.2, 45.9],
     ];
 
-    const { geometry } = veilPolygon(adjacent);
+    expect(rectangles(adjacent)).toHaveLength(4);
+  });
 
-    const [world, ...holes] = geometry.coordinates;
-    expect(world[0]).toEqual(world.at(-1));
-    expect(Math.min(...world.map(([lon]) => lon))).toBe(-180);
-    expect(holes).toEqual([
-      [
-        [6, 45.8],
-        [6, 45.9],
-        [6.1, 45.9],
-        [6.1, 45.8],
-        [6, 45.8],
-      ],
-      [
-        [6.1, 45.8],
-        [6.1, 45.9],
-        [6.2, 45.9],
-        [6.2, 45.8],
-        [6.1, 45.8],
-      ],
+  it('is one rectangle for a gap inside the cells, however many cells tall', () => {
+    const around: CoverageCell[] = [];
+    for (const lon of [6, 6.1, 6.2]) {
+      for (const lat of [45.8, 45.9, 46, 46.1]) {
+        // Everything but the two cells of the middle column, at 45.9 and 46.
+        if (lon !== 6.1 || lat === 45.8 || lat === 46.1) around.push([lon, lat, lon + 0.1, lat + 0.1]);
+      }
+    }
+
+    const outlines = rectangles(around);
+
+    expect(outlines).toHaveLength(5);
+    expect(outlines.at(-1)).toEqual([
+      [6.1, 45.9],
+      [6.2, 45.9],
+      [6.2, 46.1],
+      [6.1, 46.1],
+      [6.1, 45.9],
+    ]);
+  });
+
+  it('is a rectangle for each run of gaps of a row, and for a row with no cell', () => {
+    const cells: CoverageCell[] = [
+      [6, 45.8, 6.1, 45.9],
+      [6.2, 45.8, 6.3, 45.9],
+      [6, 46, 6.1, 46.1],
+      [6.2, 46, 6.3, 46.1],
+    ];
+
+    const outlines = rectangles(cells);
+
+    // The frame, the gap of the first row, the row with no cell, and the gap of the third row.
+    expect(outlines).toHaveLength(4 + 3);
+    expect(outlines).toContainEqual([
+      [6.1, 45.8],
+      [6.2, 45.8],
+      [6.2, 45.9],
+      [6.1, 45.9],
+      [6.1, 45.8],
+    ]);
+    expect(outlines).toContainEqual([
+      [6.1, 46],
+      [6.2, 46],
+      [6.2, 46.1],
+      [6.1, 46.1],
+      [6.1, 46],
+    ]);
+    expect(outlines).toContainEqual([
+      [6, 45.9],
+      [6.3, 45.9],
+      [6.3, 46],
+      [6, 46],
+      [6, 45.9],
     ]);
   });
 });

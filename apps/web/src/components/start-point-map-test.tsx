@@ -29,7 +29,7 @@ describe('StartPointMap', () => {
     act(() => map().fire('style.load'));
 
     const veil = map().getSource('coverage') as GeoJSONSource & { data: { geometry: { coordinates: unknown[] } } };
-    expect(veil.data.geometry.coordinates).toHaveLength(2); // the world, and a hole
+    expect(veil.data.geometry.coordinates).toHaveLength(4); // the four rectangles around the cell
     expect(map().layers.map(({ id }) => id)).toContain('coverage-veil');
   });
 
