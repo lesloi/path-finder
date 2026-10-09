@@ -18,7 +18,11 @@ WORKDIR /src
 COPY apps/server .
 RUN CGO_ENABLED=0 go build -trimpath -o /server .
 
-FROM gcr.io/distroless/static-debian12:nonroot
+# Alpine, not distroless: the job that rebuilds the data runs this same image and needs a shell and wget (busybox, with
+# HTTPS); coreutils for `mv -T`, which swaps the link of the current build in one step.
+FROM alpine:3.22
+RUN apk add --no-cache coreutils
+USER 65532:65532
 COPY --from=server /server /server
 COPY --from=web /app/apps/web/dist /web
 ENV WEB_ROOT=/web DATA_DIR=/data

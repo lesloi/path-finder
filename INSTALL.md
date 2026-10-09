@@ -193,7 +193,7 @@ services:
     restart: unless-stopped
 ```
 
-The image has no shell: check its health with an HTTP probe on `/healthz` (see [Health](#health)).
+The image has a shell and `wget`, but no `curl`: check its health with an HTTP probe on `/healthz` (see [Health](#health)).
 
 ### Behind a reverse proxy
 
