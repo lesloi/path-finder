@@ -29,9 +29,8 @@ type Zones struct {
 	// again from 0, which is when the files are unmapped, once (see acquire and release).
 	refs      atomic.Int64
 	closeOnce sync.Once
-	// cov is the area covered, computed on the first Coverage; covMu guards it.
-	covMu sync.Mutex
-	cov   *coverage
+	// cov is the area covered (see Coverage), computed once the zones are open.
+	cov [][4]float64
 }
 
 type zone struct {
@@ -87,6 +86,7 @@ func OpenZones(dir string, profiles ...string) (_ *Zones, err error) {
 			}
 		}
 	}
+	z.cov = computeCoverage(z.zones)
 	return z, nil
 }
 

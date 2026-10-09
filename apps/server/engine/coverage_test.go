@@ -4,7 +4,35 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+
+	"github.com/lesloi/path-finder/apps/server/contract"
 )
+
+// The web app draws the veil on the grid of contract.json: the engine's must be the same.
+func TestCoverageGridIsTheOneOfTheContract(t *testing.T) {
+	if CoverageCellsPerDegree != contract.CoverageCellsPerDegree() {
+		t.Errorf("the engine has %d cells to the degree, contract.json %d", CoverageCellsPerDegree, contract.CoverageCellsPerDegree())
+	}
+}
+
+// A reload brings the coverage of the files it maps, not the one of the zones it replaces.
+func TestReloadReplacesTheCoverage(t *testing.T) {
+	dir := t.TempDir()
+	writeZone(t, dir, squareAt(45.905, 6.11, 0.002))
+	r := newReloader(t, dir)
+	if got := r.Coverage(); !reflect.DeepEqual(got, [][4]float64{{6.1, 45.9, 6.2, 46}}) {
+		t.Fatalf("coverage = %v", got)
+	}
+
+	replaceZone(t, dir, squareAt(48.05, -2.55, 0.002))
+	if swapped, err := r.Reload(); err != nil || !swapped {
+		t.Fatalf("reload = %v, %v", swapped, err)
+	}
+
+	if got := r.Coverage(); !reflect.DeepEqual(got, [][4]float64{{-2.6, 48, -2.5, 48.1}}) {
+		t.Errorf("coverage after the reload = %v", got)
+	}
+}
 
 // squareAt is four nodes joined in a square whose south-west corner is at the given degrees.
 func squareAt(lat, lon, side float64) *testGraph {
@@ -34,14 +62,8 @@ func TestCoverageIsTheCellsHoldingANode(t *testing.T) {
 		{-2.6, 48, -2.5, 48.1},
 		{-2.5, 48, -2.4, 48.1},
 	}
-	if got := z.Coverage(10); !reflect.DeepEqual(got, want) {
+	if got := z.Coverage(); !reflect.DeepEqual(got, want) {
 		t.Errorf("coverage = %v, want %v", got, want)
-	}
-	if again := z.Coverage(10); !reflect.DeepEqual(again, want) {
-		t.Errorf("a second call = %v", again)
-	}
-	if got := z.Coverage(1); len(got) != 2 { // 6,45 and -3,48 hold them all
-		t.Errorf("1 cell to the degree: %v", got)
 	}
 }
 
@@ -52,7 +74,7 @@ func TestReloaderCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := r.Coverage(10); !reflect.DeepEqual(got, [][4]float64{{6.1, 45.9, 6.2, 46}}) {
+	if got := r.Coverage(); !reflect.DeepEqual(got, [][4]float64{{6.1, 45.9, 6.2, 46}}) {
 		t.Errorf("coverage = %v", got)
 	}
 }
@@ -83,7 +105,7 @@ func TestCoverageReachesAsFarAsAStartSnaps(t *testing.T) {
 		{6, 45.9, 6.1, 46},
 		{6.1, 45.9, 6.2, 46},
 	}
-	if got := z.Coverage(10); !reflect.DeepEqual(got, want) {
+	if got := z.Coverage(); !reflect.DeepEqual(got, want) {
 		t.Errorf("coverage = %v, want %v", got, want)
 	}
 }
@@ -96,7 +118,7 @@ func TestCoverageLeavesOutWhatIsPastTheSnapDistance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := z.Coverage(10); !reflect.DeepEqual(got, [][4]float64{{6.1, 45.9, 6.2, 46}}) {
+	if got := z.Coverage(); !reflect.DeepEqual(got, [][4]float64{{6.1, 45.9, 6.2, 46}}) {
 		t.Errorf("coverage = %v", got)
 	}
 }

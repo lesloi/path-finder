@@ -27,9 +27,9 @@ type RouteSetGenerator interface {
 	Generate(ctx context.Context, body json.RawMessage) (routes any, err error)
 }
 
-// CoverageSource lists the cells, cellsPerDegree to the degree, where the server can route.
+// CoverageSource lists the cells of the grid of contract.json where the server can route.
 type CoverageSource interface {
-	Coverage(cellsPerDegree int) [][4]float64
+	Coverage() [][4]float64
 }
 
 // Config is what New needs; the zero value of an optional field is its default.
@@ -200,7 +200,7 @@ func (a *app) routeSets(w http.ResponseWriter, r *http.Request) {
 
 // coverage answers the cells where the graph served has a way. Nothing in it is about the user.
 func (a *app) coverage(w http.ResponseWriter, _ *http.Request) {
-	cells := a.cfg.Coverage.Coverage(contract.CoverageCellsPerDegree())
+	cells := a.cfg.Coverage.Coverage()
 	if cells == nil {
 		cells = [][4]float64{}
 	}

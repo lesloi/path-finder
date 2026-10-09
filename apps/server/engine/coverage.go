@@ -5,35 +5,24 @@ import (
 	"sort"
 )
 
-// coverage is the answer of Zones.Coverage for one cell size, kept so that a request reads no graph.
-type coverage struct {
-	perDegree int
-	cells     [][4]float64
-}
+// CoverageCellsPerDegree is the grid of the coverage: cells of 0.1°. It is the one in contract.json, which the web
+// app draws on; a test of the server fails when the two differ.
+const CoverageCellsPerDegree = 10
 
-// Coverage lists the cells of a grid, cellsPerDegree to the degree, that hold at least one node of a zone, as
-// west, south, east and north in degrees, sorted from south to north then west to east. It reads the spatial
-// index of each zone, which says what each of its cells holds without reading a node, and keeps the answer.
+// Coverage lists the cells of the grid that hold at least one node of a zone, as west, south, east and north in
+// degrees, sorted from south to north then west to east. It was computed from the spatial index of each zone, which
+// says what each of its cells holds without reading a node, when the zones were opened: it is plain memory, which
+// a search or a request holds nothing to read, and a reload brings its own.
 // Every coarse cell that a fine cell with nodes overlaps counts, and so does one within the snap distance of it
 // (maxSnapMeters): a start that far from a node is served, so the error only goes towards a start the engines
 // refuse (ErrOffGraph), never towards an area they would serve that is left out.
-func (z *Zones) Coverage(cellsPerDegree int) [][4]float64 {
-	z.covMu.Lock()
-	defer z.covMu.Unlock()
-	if z.cov == nil || z.cov.perDegree != cellsPerDegree {
-		z.cov = &coverage{perDegree: cellsPerDegree, cells: computeCoverage(z.zones, cellsPerDegree)}
-	}
-	return z.cov.cells
-}
+func (z *Zones) Coverage() [][4]float64 { return z.cov }
 
 // Coverage is that of the zones now served.
-func (r *Reloader) Coverage(cellsPerDegree int) [][4]float64 {
-	z := r.hold()
-	defer r.drop(z)
-	return z.Coverage(cellsPerDegree)
-}
+func (r *Reloader) Coverage() [][4]float64 { return r.cur.Load().Coverage() }
 
-func computeCoverage(zones []*zone, perDegree int) [][4]float64 {
+func computeCoverage(zones []*zone) [][4]float64 {
+	const perDegree = CoverageCellsPerDegree
 	type index struct{ x, y int64 }
 	seen := map[index]struct{}{}
 	// The snap distance in 1e-7 degrees of latitude.
@@ -78,7 +67,7 @@ func computeCoverage(zones []*zone, perDegree int) [][4]float64 {
 		return keys[i].x < keys[j].x
 	})
 	cells := make([][4]float64, len(keys))
-	n := float64(perDegree)
+	const n = float64(perDegree)
 	for i, k := range keys {
 		// From whole numbers, so that the JSON says 45.3 and not 45.300000000000004.
 		cells[i] = [4]float64{float64(k.x) / n, float64(k.y) / n, float64(k.x+1) / n, float64(k.y+1) / n}
@@ -88,8 +77,8 @@ func computeCoverage(zones []*zone, perDegree int) [][4]float64 {
 
 // coarse is the index of the cell holding a coordinate in 1e-7 degrees. It rounds down: Go's division rounds
 // towards zero, which would put a negative longitude one cell off.
-func coarse(units int64, perDegree int) int64 {
-	scaled := units * int64(perDegree)
+func coarse(units int64, perDegree int64) int64 {
+	scaled := units * perDegree
 	q := scaled / 1e7
 	if scaled%1e7 < 0 {
 		q--
