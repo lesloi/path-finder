@@ -1,6 +1,13 @@
 import { useSyncExternalStore } from 'react';
 
-import { MAX_TARGET_ELEVATION_GAIN, SURFACES, type Criteria } from '../contract/index.ts';
+import {
+  MAX_TARGET_DISTANCE,
+  MAX_TARGET_ELEVATION_GAIN,
+  MIN_TARGET_DISTANCE,
+  SURFACES,
+  TARGET_DURATION,
+  type Criteria,
+} from '../contract/index.ts';
 import {
   BASEMAPS,
   DEFAULT_BASEMAP,
@@ -15,10 +22,14 @@ import { browserLanguage, type Language } from '../i18n/index.ts';
 /** How the elevation gain is asked for: no preference, a shortcut, or a target in metres. */
 export type ElevationLevel = 'any' | 'flat' | 'hilly' | 'target';
 
-/** The criteria the form starts from, the ones that do not change from one search to the next. */
+/** The criteria the form starts from: what the user asked for last. */
 export type LastCriteria = {
   /** What the length is set by. */
   target: 'distance' | 'duration';
+  /** The target distance, in kilometres whatever the units. */
+  distance: number;
+  /** The target duration, in minutes. */
+  duration: number;
   surface: Criteria['surface'];
   level: ElevationLevel;
   /** The target elevation gain, in metres whatever the units. */
@@ -45,6 +56,8 @@ const LEVELS: ElevationLevel[] = ['any', 'flat', 'hilly', 'target'];
 
 export const DEFAULT_CRITERIA: LastCriteria = {
   target: 'distance',
+  distance: 10,
+  duration: 60,
   surface: 'any',
   level: 'any',
   gain: 300,
@@ -53,8 +66,13 @@ export const DEFAULT_CRITERIA: LastCriteria = {
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 const isPace = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
-const isGain = (value: unknown): value is number =>
-  typeof value === 'number' && value >= 0 && value <= MAX_TARGET_ELEVATION_GAIN;
+const inRange =
+  (min: number, max: number) =>
+  (value: unknown): value is number =>
+    typeof value === 'number' && value >= min && value <= max;
+const isGain = inRange(0, MAX_TARGET_ELEVATION_GAIN);
+const isDistance = inRange(MIN_TARGET_DISTANCE, MAX_TARGET_DISTANCE);
+const isDuration = inRange(TARGET_DURATION.min, TARGET_DURATION.max);
 
 const isTarget = (value: unknown): value is LastCriteria['target'] => value === 'distance' || value === 'duration';
 const isSurface = (value: unknown): value is LastCriteria['surface'] =>
@@ -62,9 +80,11 @@ const isSurface = (value: unknown): value is LastCriteria['surface'] =>
 const isLevel = (value: unknown): value is ElevationLevel => LEVELS.includes(value as ElevationLevel);
 
 function parseLastCriteria(stored: unknown): LastCriteria {
-  const { target, surface, level, gain, includeTechnical } = isObject(stored) ? stored : {};
+  const { target, distance, duration, surface, level, gain, includeTechnical } = isObject(stored) ? stored : {};
   return {
     target: isTarget(target) ? target : DEFAULT_CRITERIA.target,
+    distance: isDistance(distance) ? distance : DEFAULT_CRITERIA.distance,
+    duration: isDuration(duration) ? duration : DEFAULT_CRITERIA.duration,
     surface: isSurface(surface) ? surface : DEFAULT_CRITERIA.surface,
     level: isLevel(level) ? level : DEFAULT_CRITERIA.level,
     gain: isGain(gain) ? gain : DEFAULT_CRITERIA.gain,

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { parseCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
@@ -263,18 +263,6 @@ describe('CriteriaForm', () => {
       expect(technical()).toBeChecked();
     });
 
-    it('is kept on the device with the last criteria, for the next search', () => {
-      setup();
-      fireEvent.click(technical()!);
-
-      cleanup();
-      const { onSubmit, submit } = setup();
-
-      expect(technical()).toBeChecked();
-      submit();
-      expect(onSubmit.mock.calls[0][0].includeTechnical).toBe(true);
-    });
-
     it('is worded in French', () => {
       setup({ language: 'fr' });
 
@@ -297,24 +285,6 @@ describe('CriteriaForm', () => {
       expect(screen.getByTestId('criteria-surface-unpaved')).toBeChecked();
     });
 
-    it('keeps the criteria on the device as they are set, the gain in metres', () => {
-      store({ units: 'imperial' });
-      setup();
-
-      choose('target', 'duration');
-      choose('surface', 'paved');
-      choose('elevation', 'target');
-      fireEvent.change(slider('gain'), { target: { value: '1500' } });
-
-      expect(JSON.parse(localStorage.getItem('path-finder.settings')!).lastCriteria).toEqual({
-        target: 'duration',
-        surface: 'paved',
-        level: 'target',
-        gain: 457,
-        includeTechnical: false,
-      });
-    });
-
     it('shows a gain kept in metres in the units of the settings', () => {
       store({ units: 'imperial', lastCriteria: { target: 'distance', surface: 'any', level: 'target', gain: 457 } });
       setup();
@@ -322,11 +292,8 @@ describe('CriteriaForm', () => {
       expect(slider('gain')).toHaveValue('1500');
     });
 
-    it('does not keep the distance or the duration', () => {
-      setup();
-      fireEvent.change(slider('distance'), { target: { value: '21' } });
-
-      cleanup();
+    it('shows a distance kept in kilometres in the units of the settings', () => {
+      store({ units: 'imperial', lastCriteria: { distance: 16.09344 } });
       setup();
 
       expect(slider('distance')).toHaveValue('10');

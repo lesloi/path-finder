@@ -8,7 +8,15 @@ const DEFAULTS = {
   pace: 6,
   theme: 'system',
   basemap: 'plan',
-  lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300, includeTechnical: false },
+  lastCriteria: {
+    target: 'distance',
+    distance: 10,
+    duration: 60,
+    surface: 'any',
+    level: 'any',
+    gain: 300,
+    includeTechnical: false,
+  },
 };
 
 describe('unitsOf', () => {
@@ -42,7 +50,15 @@ describe('useSettings', () => {
       units: 'imperial',
       theme: 'dark',
       basemap: 'aerial',
-      lastCriteria: { target: 'duration', surface: 'unpaved', level: 'target', gain: 450, includeTechnical: true },
+      lastCriteria: {
+        target: 'duration',
+        distance: 21.1,
+        duration: 95,
+        surface: 'unpaved',
+        level: 'target',
+        gain: 450,
+        includeTechnical: true,
+      },
     } as const;
     const first = renderHook(() => useSettings());
     act(() => first.result.current[1](kept));
@@ -73,7 +89,7 @@ describe('useSettings', () => {
         units: 'nautical',
         theme: 'sepia',
         basemap: 'satellite',
-        lastCriteria: { target: 'both', surface: 'ice', level: 'steep', gain: -5 },
+        lastCriteria: { target: 'both', distance: 'far', duration: null, surface: 'ice', level: 'steep', gain: -5 },
       }),
     ],
     ['criteria that are not an object', JSON.stringify({ lastCriteria: 'any' })],
@@ -118,8 +134,22 @@ describe('useSettings', () => {
       ...DEFAULTS,
       pace: 5,
       units: 'imperial',
-      lastCriteria: { target: 'distance', surface: 'paved', level: 'any', gain: 600, includeTechnical: false },
+      lastCriteria: { ...DEFAULTS.lastCriteria, surface: 'paved', gain: 600 },
     });
+  });
+
+  it.each([
+    ['a distance under the bounds', { distance: 0 }],
+    ['a distance over the bounds', { distance: 1e6 }],
+    ['a duration under the bounds', { duration: 1 }],
+    ['a duration over the bounds', { duration: 1e6 }],
+    ['a length that is not a number', { distance: '12', duration: '90' }],
+  ])('falls back to the default length on %s', (_, stored) => {
+    localStorage.setItem(KEY, JSON.stringify({ lastCriteria: stored }));
+
+    const { result } = renderHook(() => useSettings());
+
+    expect(result.current[0].lastCriteria).toEqual(DEFAULTS.lastCriteria);
   });
 
   it('keeps the switch of the technical stretches, off unless it was stored as true', () => {

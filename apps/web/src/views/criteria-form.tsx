@@ -7,7 +7,6 @@ import {
   MIN_TARGET_DISTANCE,
   parseCriteria,
   TARGET_DURATION,
-  type Criteria,
   type CriteriaField,
 } from '../contract/index.ts';
 import { PaceSlider, PRIMARY_BUTTON, SegmentedControl, Slider, Switch } from '../components/index.ts';
@@ -20,27 +19,17 @@ import {
   type Units,
 } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
-import { unitsOf, useSettings, useUnits, type ElevationLevel, type LastCriteria } from '../state/index.ts';
+import { unitsOf, useSettings, useUnits, type LastCriteria } from '../state/index.ts';
 
 const CRITERIA = ['target', 'surface', 'elevation'] as const;
 
 const DURATION_STEP = 5; // minutes
-const DURATION_DEFAULT = 60; // minutes
 
 type Target = LastCriteria['target'];
-type Surface = Criteria['surface'];
 type Criterion = (typeof CRITERIA)[number];
 
 // Distance in km or mi, elevation gain in m or ft: the user's units, which the bounds are shown in.
-export type Draft = {
-  target: Target;
-  distance: number;
-  duration: number;
-  level: ElevationLevel;
-  gain: number;
-  surface: Surface;
-  includeTechnical: boolean;
-};
+export type Draft = LastCriteria;
 
 /** The bounds of the sliders in the user's units, inside the API's bounds once converted back. */
 function boundsFor(units: Units) {
@@ -56,65 +45,48 @@ function boundsFor(units: Units) {
 
 function unitsFor(units: Units) {
   return units === 'metric'
-    ? { kmPerDistanceUnit: 1, metresPerGainUnit: 1, gainStep: 50, distance: 'km', gain: 'm', defaultDistance: 10 }
+    ? { kmPerDistanceUnit: 1, metresPerGainUnit: 1, gainStep: 50, distance: 'km', gain: 'm' }
     : {
         kmPerDistanceUnit: KM_PER_MILE,
         metresPerGainUnit: METRES_PER_FOOT,
         gainStep: 100,
         distance: 'mi',
         gain: 'ft',
-        defaultDistance: 6,
       };
 }
 
-const defaultDistance = (units: Units) => unitsFor(units).defaultDistance;
-
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-
-// The same distance in other units, as close as the slider's step allows.
-function convertDistance(distance: number, from: Units, to: Units): number {
-  return Math.round((distance * unitsFor(from).kmPerDistanceUnit) / unitsFor(to).kmPerDistanceUnit);
-}
 
 const round = (value: number, decimals: number) => Math.round(value * 10 ** decimals) / 10 ** decimals;
 
 /**
- * What the user has set in the form, in their units. The distance and the duration are asked anew with each
- * visit; the rest is what they asked for last, kept on the device. It follows a change of units made in the
- * settings while the view stays mounted.
+ * What the user has set in the form, in their units. It starts from the criteria of the last search, kept on the
+ * device, and is kept there only once a search is made with it (`keep`), so that setting a criterion writes nothing.
+ * The distance is held in kilometres and the gain in metres, so a change of units made in the settings, even while
+ * the view stays mounted, changes how they are shown and not what was asked.
  */
-export function useCriteriaDraft(language: Language): [Draft, (draft: Draft) => void] {
+export function useCriteriaDraft(language: Language): [Draft, (draft: Draft) => void, () => void] {
   const [settings, update] = useSettings();
-  const { lastCriteria } = settings;
   const units = unitsOf(settings, language);
-  const [lengths, setLengths] = useState(() => ({
-    distance: defaultDistance(units),
-    duration: DURATION_DEFAULT,
-  }));
-  const [unitsBefore, setUnitsBefore] = useState(units);
-  if (units !== unitsBefore) {
-    setUnitsBefore(units);
-    // Converts what the slider shows, not a distance it had to clamp.
-    const { distance } = boundsFor(unitsBefore);
-    setLengths({
-      ...lengths,
-      distance: convertDistance(clamp(lengths.distance, distance.min, distance.max), unitsBefore, units),
-    });
-  }
-  const { metresPerGainUnit, gainStep } = unitsFor(units);
+  const { kmPerDistanceUnit, metresPerGainUnit, gainStep } = unitsFor(units);
+  const [criteria, setCriteria] = useState(settings.lastCriteria);
   const draft: Draft = {
-    ...lastCriteria,
-    ...lengths,
-    gain: Math.round(lastCriteria.gain / metresPerGainUnit / gainStep) * gainStep,
+    ...criteria,
+    distance: Math.round(criteria.distance / kmPerDistanceUnit),
+    gain: Math.round(criteria.gain / metresPerGainUnit / gainStep) * gainStep,
   };
-  function setDraft({ target, level, surface, gain, includeTechnical, ...next }: Draft) {
-    setLengths(next);
-    // The gain is kept in metres, so a change of units does not change it.
-    update({
-      lastCriteria: { target, level, surface, includeTechnical, gain: Math.round(gain * metresPerGainUnit) },
+  function setDraft(next: Draft) {
+    // A length is rewritten only when its shown value changed, which would otherwise round the one asked.
+    setCriteria({
+      ...next,
+      distance: next.distance === draft.distance ? criteria.distance : next.distance * kmPerDistanceUnit,
+      gain: next.gain === draft.gain ? criteria.gain : Math.round(next.gain * metresPerGainUnit),
     });
   }
-  return [draft, setDraft];
+  const keep = () => {
+    if (criteria !== settings.lastCriteria) update({ lastCriteria: criteria });
+  };
+  return [draft, setDraft, keep];
 }
 
 /**
