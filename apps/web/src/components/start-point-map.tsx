@@ -694,10 +694,10 @@ export function StartPointMap({
     });
   }, [loaded, hover, styleVersion]);
 
-  // The basemap stays light in dark mode. MapLibre makes its container `position: relative`
+  // The basemap stays light in dark mode (see index.css). MapLibre makes its container `position: relative`
   // from outside Tailwind's layers, so a wrapper pins it to the screen.
   return (
-    <div className={`fixed inset-0 bg-white [color-scheme:light] ${pickOnClick ? 'map-picking' : ''}`}>
+    <div className={`fixed inset-0 bg-white ${pickOnClick ? 'map-picking' : ''}`}>
       <div ref={container} className="size-full" />
     </div>
   );
