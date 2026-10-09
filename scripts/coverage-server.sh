@@ -3,7 +3,7 @@
 # through): it fails under 90% like `pnpm coverage:web` does for the web app, and lists the functions that
 # are poorly covered. The integration tests are not counted: they check that the parts fit together.
 set -eu
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../apps/server"
 export CGO_ENABLED=0
 profile="$(mktemp)"
 trap 'rm -f "$profile" "$profile.kept"' EXIT

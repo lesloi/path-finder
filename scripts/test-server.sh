@@ -1,13 +1,13 @@
 #!/bin/sh
-# The server's tests: `test.sh unit` (the default) runs those that call functions directly, and
-# `test.sh integration` those that go through HTTP on a graph built for the test.
+# The server's tests: `test-server.sh unit` (the default) runs those that call functions directly, and
+# `test-server.sh integration` those that go through HTTP on a graph built for the test.
 set -eu
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../apps/server"
 
 case "${1:-unit}" in
 unit) packages="$(CGO_ENABLED=0 go list ./... | grep -v '/integration$')" ;;
 integration) packages="$(CGO_ENABLED=0 go list ./integration)" ;;
-*) echo "usage: test.sh [unit|integration]" >&2; exit 2 ;;
+*) echo "usage: test-server.sh [unit|integration]" >&2; exit 2 ;;
 esac
 
 # The race detector needs cgo, and the PBF reader needs the zlib headers with cgo: it runs on the packages
