@@ -1,4 +1,4 @@
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 
 import { CriteriaView } from './criteria-view.tsx';
 import { expectNamedControls } from '../accessible-names.ts';
@@ -244,6 +244,60 @@ describe('CriteriaView', () => {
 
         expect(screen.getByTestId('criteria-submit')).toBeEnabled();
         expect(screen.queryByTestId('criteria-uncovered')).not.toBeInTheDocument();
+      });
+
+      describe('in the sheet, behind the criteria', () => {
+        const enterStart = (text: string) => {
+          fireEvent.click(screen.getByTestId('criteria-bar'));
+          fireEvent.change(field(), { target: { value: text } });
+          fireEvent.keyDown(field(), { key: 'Enter' });
+        };
+        const startAndLeave = async (text: string) => {
+          enterStart(text);
+          await waitFor(() => expect(screen.getByTestId('criteria-submit')).toBeDisabled());
+          fireEvent.click(screen.getByTestId('sub-page-back'));
+        };
+        const sheetNotice = () => within(screen.getByTestId('criteria-sheet')).getByTestId('criteria-sheet-uncovered');
+
+        it('says it once the criteria are closed, without the coordinates', async () => {
+          cover(covered);
+          render(<CriteriaView language="en" />);
+
+          await startAndLeave('48.8, 2.3');
+
+          expect(sheetNotice()).toHaveTextContent(en.uncoveredStart);
+          expect(sheetNotice()).not.toHaveTextContent(/48|2\.3/);
+        });
+
+        it('says it in French', async () => {
+          cover(covered);
+          render(<CriteriaView language="fr" />);
+
+          await startAndLeave('48.8, 2.3');
+
+          expect(sheetNotice()).toHaveTextContent(fr.uncoveredStart);
+        });
+
+        it('is empty for a start point inside the cells', async () => {
+          cover(covered);
+          render(<CriteriaView language="en" />);
+
+          await startAndLeave('48.8, 2.3');
+          enterStart('45.85, 6.05');
+          fireEvent.click(screen.getByTestId('sub-page-back'));
+
+          expect(sheetNotice()).toBeEmptyDOMElement();
+        });
+
+        it('is empty when the coverage is unknown', async () => {
+          stubFetch(() => new Promise(() => {}));
+          render(<CriteriaView language="en" />);
+          enterStart('48.8, 2.3');
+          await act(async () => {});
+          fireEvent.click(screen.getByTestId('sub-page-back'));
+
+          expect(sheetNotice()).toBeEmptyDOMElement();
+        });
       });
 
       it('lets the search run when the coverage is unknown', async () => {
