@@ -386,6 +386,14 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             {!browser.detail && staleNotice}
             {panel || (
               <>
+                {/* Always mounted, so that a change of its text is announced. Not while the layer is open: the form shows its own message, and both would be announced. */}
+                <p
+                  role="status"
+                  data-testid="criteria-sheet-uncovered"
+                  className="text-center text-sm text-ink empty:hidden"
+                >
+                  {startUncovered && !layerOpen ? t.uncoveredStart : ''}
+                </p>
                 {!start && (
                   <p data-testid="criteria-long-press" className="text-center text-sm text-ink-2">
                     {t.longPress}
