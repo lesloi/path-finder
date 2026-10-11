@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { Map, ScaleControl } from 'maplibre-gl';
 
-import { App } from './App.tsx';
+import { App, preloadPages } from './App.tsx';
 import { expectNamedControls } from './accessible-names.ts';
 import { commonText } from './i18n/index.ts';
 
@@ -31,6 +31,10 @@ afterEach(() => {
 });
 
 describe('App', () => {
+  it('loads the code of every page ahead, for a visit offline', async () => {
+    await expect(preloadPages()).resolves.toBeUndefined();
+  });
+
   it('shows the app name', () => {
     render(<App />);
 

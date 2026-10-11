@@ -1,5 +1,6 @@
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 
+import { LazyStartPointMap } from '../components/index.ts';
 import { CriteriaView } from './criteria-view.tsx';
 import { expectNamedControls } from '../accessible-names.ts';
 import { criteriaText, errorText, routesText } from '../i18n/index.ts';
@@ -27,6 +28,13 @@ function stubFetch(routeSets: (...args: never[]) => Promise<Response>) {
     url === '/api/v1/coverage' ? Promise.reject(new Error('No coverage')) : routeSets(...([url, init] as never[])),
   );
 }
+
+// The map's code loads once, then every render has it at once, as in a session that has opened the map.
+beforeAll(async () => {
+  const { unmount } = render(<LazyStartPointMap onStartChange={vi.fn()} />);
+  await waitFor(() => expect(maps.length).toBeGreaterThan(0));
+  unmount();
+});
 
 beforeEach(() => {
   // The tests read metric figures, whatever the language.

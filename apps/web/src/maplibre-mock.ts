@@ -182,3 +182,6 @@ export class ScaleControl {
     this.options.unit = unit;
   }
 }
+
+/** The app points maplibre at its worker before the first map: nothing to do without one. */
+export function setWorkerUrl() {}
