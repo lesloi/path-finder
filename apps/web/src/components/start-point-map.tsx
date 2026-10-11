@@ -112,7 +112,7 @@ const mapLocale = (language: Display['language']) => ({
 // Pixels the controls take from the right of the map (the floating buttons and their margin).
 const CONTROLS_RIGHT = 72;
 // Pixels the scale and the attribution take from the bottom of the map.
-const CONTROLS_BOTTOM = 58;
+const CONTROLS_BOTTOM = 40;
 // Half the width and height of a route's tag, which has to stay inside the map.
 const TAG_HALF: [number, number] = [56, 28];
 // Half the size of a distance marker.
@@ -288,7 +288,7 @@ export function StartPointMap({
       pitchWithRotate: false,
     });
     // Routes come from OpenStreetMap: credit it from this map on, before any route is drawn.
-    // The stylesheet moves it above the sheet on phones and to the centre of the map on desktops.
+    // The stylesheet puts it in the bottom left corner, beside the scale.
     map.addControl(
       new AttributionControl({
         compact: true,
@@ -299,6 +299,8 @@ export function StartPointMap({
       }),
       'bottom-left',
     );
+    // MapLibre opens a compact attribution by itself: a credit stays closed until the user asks for it.
+    map.getContainer().querySelector<HTMLElement>('.maplibregl-compact-show .maplibregl-ctrl-attrib-button')?.click();
     // The ruler: a bar whose length is a round distance, so a route can be sized up by eye.
     scale.current = new ScaleControl({ unit: initialUnits() });
     map.addControl(scale.current, 'bottom-left');

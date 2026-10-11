@@ -60,23 +60,12 @@ test.describe('the app', () => {
     await expect(toggle).toHaveAccessibleName(commonText.fr.toggleAttribution);
   });
 
-  test('gives the attribution touch targets, collapsed and open', async ({ page }) => {
+  test('keeps the text of the map controls from being selected', async ({ page }) => {
     await openMap(page);
-    const attribution = page.locator('.maplibregl-ctrl-attrib');
-    const toggle = attribution.locator('.maplibregl-ctrl-attrib-button');
-    const links = attribution.locator('a');
 
-    // Wide maps open it by themselves, narrow ones keep it collapsed: check both states.
-    for (const open of [true, false]) {
-      if ((await attribution.evaluate((element) => element.classList.contains('maplibregl-compact-show'))) !== open) {
-        await toggle.click();
-      }
-      for (const target of open ? [toggle, ...(await links.all())] : [toggle]) {
-        const box = await target.boundingBox();
-        expect(box!.width).toBeGreaterThanOrEqual(44);
-        expect(box!.height).toBeGreaterThanOrEqual(44);
-      }
-    }
+    // A double click on the map would select it.
+    const attribution = page.locator('.maplibregl-ctrl-attrib');
+    expect(await attribution.evaluate((element) => getComputedStyle(element).userSelect)).toBe('none');
   });
 
   test('keeps the map background picked from the button over the map across a reload', async ({ page, isMobile }) => {

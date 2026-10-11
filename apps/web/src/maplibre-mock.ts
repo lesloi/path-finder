@@ -129,6 +129,7 @@ export class Map {
   }
   addControl(control: unknown) {
     this.controls.push(control);
+    if (control instanceof AttributionControl) control.mountIn(this.container);
   }
   easeTo(options: unknown) {
     this.easedTo = options;
@@ -161,6 +162,14 @@ export class AttributionControl {
   options: unknown;
   constructor(options?: unknown) {
     this.options = options;
+  }
+  /** As MapLibre's compact control does once added: open, with a button that toggles it. */
+  mountIn(container: HTMLElement) {
+    const element = container.appendChild(document.createElement('details'));
+    element.className = 'maplibregl-ctrl maplibregl-ctrl-attrib maplibregl-compact maplibregl-compact-show';
+    const button = element.appendChild(document.createElement('button'));
+    button.className = 'maplibregl-ctrl-attrib-button';
+    button.addEventListener('click', () => element.classList.toggle('maplibregl-compact-show'));
   }
 }
 
