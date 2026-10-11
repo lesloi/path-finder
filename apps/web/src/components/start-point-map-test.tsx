@@ -127,6 +127,14 @@ describe('StartPointMap', () => {
     expect(attribution.options.customAttribution.join(' ')).toMatch(/IGN.*OpenStreetMap/);
   });
 
+  it('starts with the attribution closed, whatever the width of the map', () => {
+    render(<StartPointMap onStartChange={vi.fn()} />);
+
+    const attribution = map().container.querySelector('.maplibregl-ctrl-attrib');
+    expect(attribution).not.toBeNull();
+    expect(attribution).not.toHaveClass('maplibregl-compact-show');
+  });
+
   it('shows a scale bar in the units of the display, and follows them', () => {
     const { rerender } = render(
       <StartPointMap display={{ units: 'imperial', language: 'en' }} onStartChange={vi.fn()} />,

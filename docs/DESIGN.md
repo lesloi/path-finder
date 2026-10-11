@@ -37,7 +37,7 @@ Behaviour comes from native elements first (`<dialog>`, `popover`, `<input type=
 
 The target is [WCAG 2.2](https://www.w3.org/TR/WCAG22/) level AA. In practice:
 
-- Touch targets are at least 44 px.
+- Touch targets are at least 44 px, except the map credits, which keep the 24 px of MapLibre's control (WCAG 2.5.8).
 - Every control has an accessible name, in both languages; icons are decorative (`aria-hidden`).
 - Text and controls keep enough contrast in light and dark mode.
 - The whole app works with the keyboard, with a visible focus.
