@@ -42,51 +42,11 @@ type graph struct {
 	n, e int
 	// fingerprint is the one in the file header: the landmarks built for this graph hold the same.
 	fingerprint uint64
-	// skip is the edge flags a search of this graph may not use (graphHead.skip). Skipping edges only raises costs,
-	// so the landmark bounds stay valid.
-	skip  uint8
-	nodes []node
-	off   []uint32
-	edges []edge
-	sp    *spatial
-	file  mapped
-}
-
-// hasEdgeWithout tells whether a node has a way that holds none of the flags.
-func (g *graph) hasEdgeWithout(n uint32, flags uint8) bool {
-	for e := g.off[n]; e < g.off[n+1]; e++ {
-		if g.edges[e].Flags&flags == 0 {
-			return true
-		}
-	}
-	return false
-}
-
-// roomNodes is how many nodes a way must reach without a flagged edge to count as room to start from.
-const roomNodes = 64
-
-// hasRoom tells whether a node leads, through ways that hold none of the flags, to at least roomNodes nodes: not to a
-// pocket that flagged ways close off, where a start would find no loop.
-func (g *graph) hasRoom(n uint32, flags uint8) bool {
-	if !g.hasEdgeWithout(n, flags) {
-		return false
-	}
-	seen := map[uint32]struct{}{n: {}}
-	queue := []uint32{n}
-	for len(queue) > 0 && len(seen) < roomNodes {
-		u := queue[0]
-		queue = queue[1:]
-		for e := g.off[u]; e < g.off[u+1]; e++ {
-			if g.edges[e].Flags&flags != 0 {
-				continue
-			}
-			if _, ok := seen[g.edges[e].To]; !ok {
-				seen[g.edges[e].To] = struct{}{}
-				queue = append(queue, g.edges[e].To)
-			}
-		}
-	}
-	return len(seen) >= roomNodes
+	nodes       []node
+	off         []uint32
+	edges       []edge
+	sp          *spatial
+	file        mapped
 }
 
 func align16(n int) int { return (n + 15) &^ 15 }
@@ -190,7 +150,7 @@ func openGraph(path string) (_ *graph, err error) {
 	nodesAt := graphHeaderSize
 	offAt := align16(nodesAt + 12*n)
 	edgesAt := align16(offAt + 4*(n+1))
-	g := &graph{n: n, e: e, fingerprint: head.fingerprint, skip: head.skip, file: m}
+	g := &graph{n: n, e: e, fingerprint: head.fingerprint, file: m}
 	if g.nodes, err = view[node](data, nodesAt, n); err != nil {
 		return nil, fmt.Errorf("%s: nodes: %w", path, err)
 	}
@@ -358,19 +318,11 @@ func computeSpatial(nodes []node) *spatial {
 	return s
 }
 
-// nearest is the node closest to a point. When the graph has edges to skip, only a node with a way that holds none
-// of those flags counts: a point near a flagged path then moves to the nearest way it may use.
+// nearest is the node closest to a point.
 func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bool) {
-	return s.nearestSkipping(g, g.skip, latDeg, lonDeg)
-}
-
-// nearestSkipping is nearest for the edge flags given, not those of the graph.
-func (s *spatial) nearestSkipping(g *graph, skip uint8, latDeg, lonDeg float64) (uint32, float64, bool) {
 	lat, lon := int32(latDeg*1e7), int32(lonDeg*1e7)
 	cy, cx := int(lat-s.minLat)/cellLat, int(lon-s.minLon)/cellLon
 	cosl := math.Cos(latDeg * rad)
-	// The metres a ring of cells adds at least: past the snap limit, a search with edges to skip has nothing to find.
-	ringMeters := math.Min(cellLat*1e-7*metersPerDegree, cellLon*1e-7*metersPerDegree*cosl)
 	best, node, found := math.Inf(1), uint32(0), false
 	visit := func(x, y int) {
 		if x < 0 || y < 0 || x >= s.nx || y >= s.ny {
@@ -380,12 +332,13 @@ func (s *spatial) nearestSkipping(g *graph, skip uint8, latDeg, lonDeg float64) 
 		for _, n := range s.nodes[s.start[c]:s.start[c+1]] {
 			dy := float64(g.nodes[n].Lat-lat) * 1e-7 * metersPerDegree
 			dx := float64(g.nodes[n].Lon-lon) * 1e-7 * metersPerDegree * cosl
-			// The edges of a node are read only when it would be the nearest.
-			if d := dx*dx + dy*dy; d < best && (skip == 0 || g.hasRoom(n, skip)) {
+			if d := dx*dx + dy*dy; d < best {
 				best, node, found = d, n, true
 			}
 		}
 	}
+	// Rings of cells around the point, 200 at most. A ring adds about 200 m (a cell is 0.002° of latitude), so once a
+	// node is found no farther ring can hold a nearer one.
 	for r := 0; r < 200; r++ {
 		for x := cx - r; x <= cx+r; x++ {
 			visit(x, cy-r)
@@ -398,9 +351,6 @@ func (s *spatial) nearestSkipping(g *graph, skip uint8, latDeg, lonDeg float64) 
 			visit(cx+r, y)
 		}
 		if found && math.Sqrt(best) <= float64(r)*200 {
-			break
-		}
-		if skip != 0 && float64(r)*ringMeters > maxSnapMeters+ringMeters {
 			break
 		}
 	}
@@ -582,7 +532,7 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 		return nil
 	}
 	g := cx.g
-	nodes, edges, skip := g.nodes, g.edges, g.skip
+	nodes, edges := g.nodes, g.edges
 	var tg [maxLandmarkValues]uint16
 	var rows []uint16
 	if cx.alt != nil {
@@ -656,9 +606,6 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 		nu := &nodes[u]
 		for e := g.off[u]; e < g.off[u+1]; e++ {
 			ed := &edges[e]
-			if ed.Flags&skip != 0 {
-				continue
-			}
 			nv := &nodes[ed.To]
 			c := ed.Len * cx.mult[ed.Kind][ed.Surf]
 			if dz := float32(nv.Elev-nu.Elev) * 0.1; dz > 0 {
