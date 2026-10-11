@@ -28,6 +28,7 @@ import (
 // includes climbing. A distance is floor(cost / unit); 0xFFFF means unreachable or too far.
 const (
 	graphMagic      = "PFGRAPH7"
+	legacyMagic     = "PFGRAPH6" // still read: see graphHead.skip
 	altMagic        = "PFALT003"
 	graphHeaderSize = 48 // magic, counts, fingerprint, bounds, padding: the nodes start on a 16-byte boundary
 	altHeaderSize   = 32
@@ -71,6 +72,10 @@ type graphHead struct {
 	nodes, edges uint32
 	fingerprint  uint64
 	bounds
+	// skip is the edge flags a search of this graph may not use. It is set by the reader, never written: a graph of
+	// the legacy format `PFGRAPH6` holds the alpine ways (T4 and up) flagged as the technical ones (T3), so none of
+	// the flagged ways can be used until it is built again.
+	skip uint8
 }
 
 type altHead struct {
@@ -92,9 +97,16 @@ func (h graphHead) encode() []byte {
 	return b
 }
 
-// readGraphHead reads the header of a graph file; ok is false for a file too short or of another version.
+// readGraphHead reads the header of a graph file; ok is false for a file too short or of a version that is not read.
 func readGraphHead(data []byte) (h graphHead, ok bool) {
-	if len(data) < graphHeaderSize || string(data[:8]) != graphMagic {
+	if len(data) < graphHeaderSize {
+		return h, false
+	}
+	switch string(data[:8]) {
+	case graphMagic:
+	case legacyMagic:
+		h.skip = EdgeTechnical
+	default:
 		return h, false
 	}
 	le := binary.LittleEndian
@@ -115,7 +127,7 @@ func (h altHead) encode() []byte {
 	return b
 }
 
-// readAltHead reads the header of a landmark file; ok is false for a file too short or of another version.
+// readAltHead reads the header of a landmark file; ok is false for a file too short or of a version that is not read.
 func readAltHead(data []byte) (h altHead, ok bool) {
 	if len(data) < altHeaderSize || string(data[:8]) != altMagic {
 		return h, false
