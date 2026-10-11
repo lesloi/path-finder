@@ -33,32 +33,38 @@ export function RouteDock({
       className={`${DOCK} items-stretch gap-4 p-4`}
       aria-label={t.route(index + 1, count)}
     >
-      <div className="flex w-52 flex-none flex-col justify-center gap-2">
+      <div className="flex w-52 flex-none flex-col gap-2">
         <strong data-testid="route-position">{t.route(index + 1, count)}</strong>
-        <RouteFigures route={route} display={display} />
-        {route.misses.map((miss) => (
-          <span key={miss.criterion} data-testid="route-miss" className="text-sm font-semibold text-ink">
-            {missText(miss, route, display)}
-          </span>
-        ))}
+        {/* Centred in the room above the export. */}
+        <div className="flex flex-1 flex-col justify-center">
+          <RouteFigures route={route} display={display} />
+        </div>
+        <div className="self-center">
+          <button
+            type="button"
+            data-testid="route-export"
+            className={PRIMARY_BUTTON}
+            // Nothing awaited before the share sheet: it needs the click that opened it.
+            onClick={() => void saveGpx(gpxExport(route, new Date(), display))}
+          >
+            <Download size={18} aria-hidden />
+            {t.exportGpx}
+          </button>
+        </div>
       </div>
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
         <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
-        <div className="flex items-center justify-between gap-3">
-          <SurfaceShare route={route} display={display} />
-          <div className="w-44 flex-none">
-            <button
-              type="button"
-              data-testid="route-export"
-              className={PRIMARY_BUTTON}
-              // Nothing awaited before the share sheet: it needs the click that opened it.
-              onClick={() => void saveGpx(gpxExport(route, new Date(), display))}
-            >
-              <Download size={18} aria-hidden />
-              {t.exportGpx}
-            </button>
+        <SurfaceShare route={route} display={display} />
+        {/* Here rather than in the figures' column, which has no room left for them. */}
+        {route.misses.length > 0 && (
+          <div className="flex flex-wrap justify-center gap-x-4">
+            {route.misses.map((miss) => (
+              <span key={miss.criterion} data-testid="route-miss" className="text-sm font-semibold text-ink">
+                {missText(miss, route, display)}
+              </span>
+            ))}
           </div>
-        </div>
+        )}
       </div>
       <button
         type="button"
