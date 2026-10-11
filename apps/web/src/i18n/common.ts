@@ -15,8 +15,7 @@ export const commonText = {
     mapName: 'Map',
     toggleAttribution: 'Toggle attribution',
     gpxAttribution: 'Data © OpenStreetMap contributors, ODbL.',
-    description:
-      'Create custom running and trail routes: start, distance, elevation gain. Free, open source, no account, no tracking.',
+    description: 'Generate a custom running or trail route. Free, no account, no tracking.',
   },
   fr: {
     back: 'Retour',
@@ -31,7 +30,6 @@ export const commonText = {
     mapName: 'Carte',
     toggleAttribution: 'Afficher les crédits de la carte',
     gpxAttribution: 'Données © les contributeurs d’OpenStreetMap, ODbL.',
-    description:
-      'Créez des parcours de course et de trail sur mesure : départ, distance, dénivelé. Gratuit, open source, sans compte ni suivi.',
+    description: 'Générez un parcours de course ou de trail sur mesure. Gratuit, sans compte ni suivi.',
   },
 } satisfies Record<Language, unknown>;
