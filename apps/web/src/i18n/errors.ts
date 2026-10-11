@@ -6,7 +6,7 @@ export const errorText = {
   en: {
     'invalid-json': 'The request could not be read.',
     'invalid-criteria': 'These criteria are not valid.',
-    'stale-build': 'A new version is available: the page reloads.',
+    'stale-build': 'A new version is available: reload the page.',
     'rate-limited': 'Too many requests: try again in a few minutes.',
     overloaded: 'The service is busy: try again in a few seconds.',
     'generation-timeout': 'The routes took too long to compute: try other criteria.',
@@ -14,7 +14,7 @@ export const errorText = {
   fr: {
     'invalid-json': 'La requête n’a pas pu être lue.',
     'invalid-criteria': 'Ces critères ne sont pas valides.',
-    'stale-build': 'Une nouvelle version est disponible : la page se recharge.',
+    'stale-build': 'Une nouvelle version est disponible : rechargez la page.',
     'rate-limited': 'Trop de requêtes : réessayez dans quelques minutes.',
     overloaded: 'Le service est occupé : réessayez dans quelques secondes.',
     'generation-timeout': 'Le calcul des parcours a pris trop de temps : essayez d’autres critères.',

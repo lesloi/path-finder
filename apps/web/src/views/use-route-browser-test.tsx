@@ -108,6 +108,29 @@ describe('useRouteBrowser', () => {
     expect(result.current.error).toBeUndefined();
   });
 
+  it('keeps the notice of a newer version until it is dropped, as the user has to reload', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    answer(Response.json({ error: 'stale-build' }, { status: 426 }));
+    const { result } = renderHook(() => useRouteBrowser());
+
+    act(() => result.current.ask(request));
+    await waitFor(() => expect(result.current.error).toBe('stale-build'));
+    act(() => void vi.advanceTimersByTime(TOAST_MS * 10));
+
+    expect(result.current.error).toBe('stale-build');
+  });
+
+  it('drops the notice of a newer version on request', async () => {
+    answer(Response.json({ error: 'stale-build' }, { status: 426 }));
+    const { result } = renderHook(() => useRouteBrowser());
+    act(() => result.current.ask(request));
+    await waitFor(() => expect(result.current.error).toBe('stale-build'));
+
+    act(() => result.current.dismissError());
+
+    expect(result.current.error).toBeUndefined();
+  });
+
   it('drops an error on request', async () => {
     answer(new Response('', { status: 500 }));
     const { result } = renderHook(() => useRouteBrowser());

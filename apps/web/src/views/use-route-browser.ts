@@ -24,7 +24,8 @@ export function useRouteBrowser() {
     [routeSet],
   );
 
-  useToastTimeout(error, () => setError(undefined));
+  // The notice of a newer version stays: the user has to reload, and a click drops it.
+  useToastTimeout(error === 'stale-build' ? undefined : error, () => setError(undefined));
 
   // A snapshot of another route set would draw the wrong places.
   const snapshot = mapSnapshot?.of === geometries ? mapSnapshot : undefined;

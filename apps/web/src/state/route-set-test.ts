@@ -83,13 +83,13 @@ describe('requestRouteSet', () => {
     expect(await requestRouteSet(request)).toEqual({ error: 'rate-limited' });
   });
 
-  it('reloads the page when the app is older than the API', async () => {
+  it('leaves the page alone when the app is older than the API', async () => {
     const reload = vi.fn();
     vi.stubGlobal('location', { reload });
     answer(Response.json({ error: 'stale-build' }, { status: 426 }));
 
     expect(await requestRouteSet(request)).toEqual({ error: 'stale-build' });
-    expect(reload).toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
   });
 
   it.each([

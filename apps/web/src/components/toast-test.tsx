@@ -27,6 +27,35 @@ describe('Toast', () => {
 
     expect(onDismiss).toHaveBeenCalledOnce();
   });
+
+  it('can be reached with the keyboard and dropped by Enter, Space or Escape', () => {
+    const onDismiss = vi.fn();
+    render(
+      <Toast testId="toast" onDismiss={onDismiss}>
+        Hi
+      </Toast>,
+    );
+    const toast = screen.getByTestId('toast');
+
+    toast.focus();
+    for (const key of ['Enter', ' ', 'Escape']) fireEvent.keyDown(toast, { key });
+
+    expect(toast).toHaveFocus();
+    expect(onDismiss).toHaveBeenCalledTimes(3);
+  });
+
+  it('ignores the other keys', () => {
+    const onDismiss = vi.fn();
+    render(
+      <Toast testId="toast" onDismiss={onDismiss}>
+        Hi
+      </Toast>,
+    );
+
+    fireEvent.keyDown(screen.getByTestId('toast'), { key: 'a' });
+
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
 });
 
 describe('useToastTimeout', () => {
