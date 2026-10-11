@@ -4,7 +4,7 @@ import type { Language } from './language.ts';
 export const criteriaText = {
   en: {
     criteria: 'Criteria',
-    setCriteria: 'Set the criteria',
+    setCriteria: 'Create a route',
     editCriteria: 'Edit the criteria',
     myLocation: 'My location',
     resetNorth: 'Point north',
@@ -55,7 +55,7 @@ export const criteriaText = {
   },
   fr: {
     criteria: 'Critères',
-    setCriteria: 'Régler les critères',
+    setCriteria: 'Créer un parcours',
     editCriteria: 'Modifier les critères',
     myLocation: 'Ma position',
     resetNorth: 'Remettre le nord en haut',
