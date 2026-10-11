@@ -28,7 +28,7 @@ const isErrorCode = (value: unknown): value is ErrorCode =>
 
 /**
  * Asks our own API for a route set, the only request that carries the start point. Returns the
- * routes, or why there are none; reloads the page when the API runs a newer build. Rejects only
+ * routes, or why there are none (`stale-build` when the API runs a newer build). Rejects only
  * once `signal` aborts.
  */
 export async function requestRouteSet(
@@ -54,8 +54,6 @@ export async function requestRouteSet(
   if (!response.ok) {
     const code = typeof body === 'object' && body !== null && 'error' in body ? body.error : undefined;
     if (!isErrorCode(code)) return { error: GATEWAY_STATUSES.includes(response.status) ? 'unreachable' : 'failed' };
-    // A tab left open across a deploy: the new build words the answer.
-    if (code === 'stale-build') window.location.reload();
     // Seconds the server asks to wait, which it sets for `overloaded` and `rate-limited`.
     const retryAfter = Number(response.headers.get('Retry-After'));
     return { error: code, ...(retryAfter > 0 && { retryAfter }) };

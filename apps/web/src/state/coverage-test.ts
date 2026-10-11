@@ -34,14 +34,14 @@ describe('requestCoverage', () => {
     expect(await requestCoverage()).toBeUndefined();
   });
 
-  it('reloads the page when the API runs a newer build', async () => {
+  it('leaves the page alone when the API runs a newer build', async () => {
     const reload = vi.fn();
     vi.stubGlobal('location', { ...window.location, reload });
     answer(Response.json({ error: 'stale-build' }, { status: 426 }));
 
     expect(await requestCoverage()).toBeUndefined();
 
-    expect(reload).toHaveBeenCalledOnce();
+    expect(reload).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 });

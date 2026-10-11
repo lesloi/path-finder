@@ -29,7 +29,7 @@ export function createCacheHandlers({ caches, cacheName, fetch, keepAlive }: Cac
 
   return {
     /**
-     * The network first, so the reload that follows a `426` fetches the new build. The cached shell is the way
+     * The network first, so the reload that follows a `426` notice fetches the new build. The cached shell is the way
      * out when the network fails, is too slow or answers with a server error; with no shell, the network is awaited.
      */
     async networkFirst(request: Request): Promise<Response> {
