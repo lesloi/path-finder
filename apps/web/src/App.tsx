@@ -1,6 +1,6 @@
-import { useEffect, type ComponentType } from 'react';
+import { Suspense, useDeferredValue, useEffect, type ComponentType } from 'react';
 
-import { LoadBoundary, SubPage, lazyChunk } from './components/index.ts';
+import { LoadErrorBoundary, SubPage, lazyChunk } from './components/index.ts';
 import { applyDescription } from './core/index.ts';
 import { commonText, type Language } from './i18n/index.ts';
 import { goTo, languageOf, useHash, useSettings } from './state/index.ts';
@@ -53,7 +53,9 @@ export function App() {
   const hash = useHash();
   const [settings] = useSettings();
   const language = languageOf(settings);
-  const page = pages[hash];
+  // A page shows once its code is there, with its content: until then the one on screen stays, or the map alone.
+  const shownHash = useDeferredValue(hash);
+  const page = pages[shownHash];
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -68,19 +70,21 @@ export function App() {
       </h1>
       {/* Pages open over the map, which stays mounted so it keeps its view and start point. */}
       <CriteriaView language={language} pageOpen={Boolean(page)} />
-      {page && (
-        <SubPage
-          title={commonText[language][page.title]}
-          back={page.back}
-          {...(page.wide && { wide: true })}
-          language={language}
-          navigate={goTo}
-        >
-          <LoadBoundary key={hash} language={language}>
-            <page.Page language={language} />
-          </LoadBoundary>
-        </SubPage>
-      )}
+      <Suspense fallback={null}>
+        {page && (
+          <SubPage
+            title={commonText[language][page.title]}
+            back={page.back}
+            {...(page.wide && { wide: true })}
+            language={language}
+            navigate={goTo}
+          >
+            <LoadErrorBoundary key={shownHash} language={language}>
+              <page.Page language={language} />
+            </LoadErrorBoundary>
+          </SubPage>
+        )}
+      </Suspense>
     </main>
   );
 }

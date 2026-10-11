@@ -18,19 +18,16 @@ export async function loadChunk<T>(load: () => Promise<T>): Promise<T> {
   }
 }
 
-/** `lazy`, with the failure of its load told by `LoadBoundary`. */
+/** `lazy`, with the failure of its load told by `LoadErrorBoundary`. */
 export function lazyChunk<P extends object>(load: () => Promise<{ default: ComponentType<P> }>) {
   return lazy(() => loadChunk(load));
 }
 
 /**
- * Pages and the map load on demand, behind `fallback`. When a load fails the whole app would go with it: the user
- * reloads instead, as for a `426`. Any other error is not mended by a reload, so it goes on to the app.
+ * When a load fails the whole app would go with it: the user reloads instead, as for a `426`. Any other error is not
+ * mended by a reload, so it goes on to the app.
  */
-export class LoadBoundary extends Component<
-  { language: Language; fallback?: ReactNode; children: ReactNode },
-  { error?: unknown }
-> {
+export class LoadErrorBoundary extends Component<{ language: Language; children: ReactNode }, { error?: unknown }> {
   state: { error?: unknown } = {};
 
   static getDerivedStateFromError(error: unknown) {
@@ -39,7 +36,7 @@ export class LoadBoundary extends Component<
 
   render() {
     const { error } = this.state;
-    if (error === undefined) return <Suspense fallback={this.props.fallback ?? null}>{this.props.children}</Suspense>;
+    if (error === undefined) return this.props.children;
     if (!(error instanceof ChunkLoadError)) throw error;
     return (
       <p role="alert" data-testid="load-failure" className="fixed inset-x-0 top-1/3 z-10 px-6 text-center text-ink">
@@ -47,4 +44,21 @@ export class LoadBoundary extends Component<
       </p>
     );
   }
+}
+
+/** The map loads on demand, behind `fallback`, and tells a failed load with `LoadErrorBoundary`. */
+export function LoadBoundary({
+  language,
+  fallback = null,
+  children,
+}: {
+  language: Language;
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <LoadErrorBoundary language={language}>
+      <Suspense fallback={fallback}>{children}</Suspense>
+    </LoadErrorBoundary>
+  );
 }

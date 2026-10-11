@@ -101,6 +101,26 @@ describe('App', () => {
     await waitFor(() => expect(screen.getByTestId('criteria-settings')).toHaveFocus());
   });
 
+  it('shows a page with its content, never its title alone', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    await screen.findByTestId('sub-page');
+
+    expect(screen.getByTestId('settings-credits')).toBeInTheDocument();
+  });
+
+  it('keeps the page it leaves on screen until the next one has its content', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+    fireEvent.click(await screen.findByTestId('settings-credits'));
+
+    await onPage(commonText.en.credits);
+
+    expect(screen.queryByTestId('settings-credits')).not.toBeInTheDocument();
+    expect(screen.getByTestId('sub-page')).toHaveTextContent('OpenStreetMap');
+  });
+
   it('opens a page as a modal dialog', async () => {
     render(<App />);
 
