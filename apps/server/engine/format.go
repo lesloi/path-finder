@@ -28,7 +28,6 @@ import (
 // includes climbing. A distance is floor(cost / unit); 0xFFFF means unreachable or too far.
 const (
 	graphMagic      = "PFGRAPH7"
-	legacyMagic     = "PFGRAPH6" // still read: see graphHead.skip
 	altMagic        = "PFALT003"
 	graphHeaderSize = 48 // magic, counts, fingerprint, bounds, padding: the nodes start on a 16-byte boundary
 	altHeaderSize   = 32
@@ -72,10 +71,6 @@ type graphHead struct {
 	nodes, edges uint32
 	fingerprint  uint64
 	bounds
-	// skip is the edge flags a search of this graph may not use. It is set by the reader, never written: a graph of
-	// the legacy format `PFGRAPH6` holds the alpine ways (T4 and up) flagged as the technical ones (T3), so none of
-	// the flagged ways can be used until it is built again.
-	skip uint8
 }
 
 type altHead struct {
@@ -104,8 +99,6 @@ func readGraphHead(data []byte) (h graphHead, ok bool) {
 	}
 	switch string(data[:8]) {
 	case graphMagic:
-	case legacyMagic:
-		h.skip = EdgeTechnical
 	default:
 		return h, false
 	}
