@@ -42,7 +42,7 @@ export function SurfaceShare({ route, display }: { route: Route; display: Displa
   const t = criteriaText[display.language];
   const shares = surfaceShares(route, display);
   return (
-    <p data-testid="route-surface" className="m-0 flex items-center gap-1 text-sm text-ink-2">
+    <p data-testid="route-surface" className="m-0 flex items-center justify-center gap-1 text-sm text-ink-2">
       <i className={`size-2 rounded-full ${SURFACE_CLASSES.paved.dot}`} aria-hidden />
       {t.paved} {shares.paved}
       <span className="whitespace-pre"> · </span>
@@ -64,9 +64,9 @@ function Figure({
   children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col-reverse">
-      <dt className="text-sm text-ink-2">{label}</dt>
-      <dd data-testid={testId} className="m-0 flex items-center gap-1 text-lg font-bold">
+    <div className="flex flex-col-reverse items-center">
+      <dt className="text-center text-sm text-ink-2">{label}</dt>
+      <dd data-testid={testId} className="m-0 flex items-center justify-center gap-1 text-lg font-bold">
         {icon}
         {children}
       </dd>
