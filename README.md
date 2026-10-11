@@ -24,6 +24,8 @@
 - **Routes on a map**, with elevation profile and estimated duration from your pace
   (from IGN BD ALTI elevation stored in the server's graph)
 - **GPX export** for your watch (Garmin, Coros, Polar…)
+- **France only**: the map tiles (IGN Plan) and the elevation (BD ALTI) are French national data, and
+  routes are generated only in the zones the server's graph was built for
 - **Supported languages**: English and French
 - **Running and hiking** first (road and trail), cycling/MTB later
 

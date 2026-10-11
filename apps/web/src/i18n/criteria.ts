@@ -42,7 +42,7 @@ export const criteriaText = {
     includeTechnical: 'Allow flagged technical stretches',
     technicalShort: 'Technical',
     findRoutes: 'Find routes',
-    uncoveredStart: 'This area is not covered: choose a point in the clear area.',
+    uncoveredStart: 'This area is not covered: choose another start point.',
     pace: 'Pace',
     distanceError: (min: number, max: number, unit: string) =>
       `The distance must be between ${min} and ${max} ${unit}.`,
@@ -93,7 +93,7 @@ export const criteriaText = {
     includeTechnical: 'Autoriser les passages techniques signalés',
     technicalShort: 'Technique',
     findRoutes: 'Trouver des parcours',
-    uncoveredStart: 'Zone non couverte : choisissez un point dans la zone claire.',
+    uncoveredStart: 'Zone non couverte : choisissez un autre point de départ.',
     pace: 'Allure',
     distanceError: (min: number, max: number, unit: string) =>
       `La distance doit être comprise entre ${min} et ${max} ${unit}.`,
