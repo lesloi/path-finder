@@ -308,7 +308,7 @@ export function CriteriaForm({
       )}
       <button
         type="button"
-        className={`${PRIMARY_BUTTON} disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-accent`}
+        className={PRIMARY_BUTTON}
         data-testid="criteria-submit"
         disabled={startUncovered}
         {...(startUncovered && { 'aria-describedby': uncoveredId })}

@@ -289,6 +289,38 @@ describe('CriteriaView', () => {
           expect(sheetNotice()).toBeEmptyDOMElement();
         });
 
+        it('disables the criteria button, and explains why, for a start point outside the cells', async () => {
+          cover(covered);
+          render(<CriteriaView language="en" />);
+
+          await startAndLeave('48.8, 2.3');
+
+          const open = screen.getByTestId('criteria-open');
+          expect(open).toBeDisabled();
+          expect(open).toHaveAccessibleDescription(en.uncoveredStart);
+        });
+
+        it('drops the description of the criteria button while the criteria are open', async () => {
+          cover(covered);
+          render(<CriteriaView language="en" />);
+          await startAndLeave('48.8, 2.3');
+
+          fireEvent.click(screen.getByTestId('criteria-bar'));
+
+          expect(screen.getByTestId('criteria-open')).not.toHaveAttribute('aria-describedby');
+        });
+
+        it('enables the criteria button for a start point inside the cells', async () => {
+          cover(covered);
+          render(<CriteriaView language="en" />);
+          await startAndLeave('48.8, 2.3');
+
+          enterStart('45.85, 6.05');
+          fireEvent.click(screen.getByTestId('sub-page-back'));
+
+          expect(screen.getByTestId('criteria-open')).toBeEnabled();
+        });
+
         it('is empty when the coverage is unknown', async () => {
           stubFetch(() => new Promise(() => {}));
           render(<CriteriaView language="en" />);
