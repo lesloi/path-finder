@@ -1,8 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
-// The left column replaces the bottom sheet from this size on, as in the stylesheets. A phone in landscape is wide
-// enough but too short for it, so it keeps the bottom sheet.
-export const DESKTOP_QUERY = '(min-width: 768px) and (min-height: 500px)';
+// The left column replaces the bottom sheet from this width on, as in the stylesheets.
+const DESKTOP_QUERY = '(min-width: 768px)';
 
 function subscribe(onChange: () => void) {
   const query = matchMedia(DESKTOP_QUERY);
