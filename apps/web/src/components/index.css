@@ -167,7 +167,8 @@
 
 /*
  * The bottom left of the map holds the scale and the compact attribution, kept a margin away from the screen edges.
- * On phones they sit above the sheet. On desktops they stay in the corner of the screen, under the left column.
+ * On phones they sit above the sheet. On desktops they stay in the corner of the screen, under the left column, at
+ * the level of the floating buttons on the right (`--edge-bottom` without the dock, which does not reach the corner).
  */
 .maplibregl-map .maplibregl-ctrl-bottom-left {
   bottom: calc(var(--sheet-height, 0px) + var(--map-margin));
@@ -179,7 +180,7 @@
   }
 
   @variant desktop {
-    bottom: calc(env(safe-area-inset-bottom) + var(--map-margin));
+    bottom: calc(env(safe-area-inset-bottom) + var(--spacing) * 6);
   }
 }
 .maplibregl-map .maplibregl-ctrl-bottom-left .maplibregl-ctrl {
