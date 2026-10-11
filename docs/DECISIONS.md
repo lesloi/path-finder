@@ -65,10 +65,11 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   same surface.
 - **Alpine ways (`sac_scale` T4 and up) are left out of the graph; T3 stays in and is only flagged.** A surface
   preference stays a weight, and there is no criterion to exclude anything: ways asking for more than hands, ropes or
-  chains have no place in a generator of running and hiking routes, and are dropped when the graph is built. T3 ways are kept, and flagged so that a route holding one
-  carries a badge, because the mountain massifs cannot be crossed without them. An earlier switch to allow them,
-  off by default, was removed: it hid every mountain route behind a setting, and the badge tells what a route holds. The change moved the graph
-  format to `PFGRAPH7`, and a graph of an older format is refused.
+  chains have no place in a generator of running and hiking routes, and are dropped when the graph is built. T3 ways
+  are kept, and flagged so that a route holding one carries a badge, because the mountain massifs cannot be crossed
+  without them. An earlier switch to allow them, off by default, was removed: it hid every mountain route behind a
+  setting, and the badge tells what a route holds. The change moved the graph format to `PFGRAPH7`, and a graph of an
+  older format is refused.
 - **Loops go through 2–4 waypoints on a circle through the start point**, each leg avoiding what the
   earlier ones used, resized up to four times, then ranked on distance, overlap and elevation gain.
   Criteria whose waypoints alone exceed the target are refused. A waypoint is moved to the nearest way

@@ -337,6 +337,8 @@ func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bo
 			}
 		}
 	}
+	// Rings of cells around the point, 200 at most. A ring adds about 200 m (a cell is 0.002° of latitude), so once a
+	// node is found no farther ring can hold a nearer one.
 	for r := 0; r < 200; r++ {
 		for x := cx - r; x <= cx+r; x++ {
 			visit(x, cy-r)

@@ -38,20 +38,21 @@ func setMagic(tb testing.TB, path, magic string) {
 }
 
 func TestARouteTakesTheDirectTechnicalWayAndSaysSo(t *testing.T) {
-	// A direct flagged way from a to b, and a longer detour through c.
+	// Arrange: a direct flagged way from a to b.
 	g := &testGraph{}
-	a, b, c := g.addNode(0, 0, 100), g.addNode(0, 400, 100), g.addNode(300, 200, 100)
+	a, b := g.addNode(0, 0, 100), g.addNode(0, 400, 100)
 	g.connect(a, b, KindPath)
 	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
-	g.connect(a, c, KindPath)
-	g.connect(c, b, KindPath)
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
 	e := openTest(t, g, true)
 
+	// Act
 	direct := s.route(context.Background(), e, 0, nil, searchLimits{}, uint32(a), uint32(b))
+
+	// Assert
 	if direct == nil || len(direct.edges) != 1 || e.g.edges[direct.edges[0]].Flags&EdgeTechnical == 0 {
-		t.Fatalf("the direct way should be taken: %+v", direct)
+		t.Fatalf("the flagged way should be taken: %+v", direct)
 	}
 }
 
@@ -59,7 +60,11 @@ func TestLoopsFromInsideATechnicalBlockAreMarkedTechnical(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(21, 21, flat)
 	flagAround(g, at, 10, 10, 1) // every way out of the start is technical
+
+	// Act
 	loops, err := openTest(t, g, false).Loops(context.Background(), loopRequest(g, at))
+
+	// Assert
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +81,7 @@ func TestLoopsFromInsideATechnicalBlockAreMarkedTechnical(t *testing.T) {
 func TestARouteAlongATechnicalRowIsMarkedTechnical(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(21, 21, flat)
-	// The straight row from (2, 10) to (18, 10) is technical: the shortest way there, and the only one of its length.
+	// Arrange: the straight row from (2, 10) to (18, 10) is technical: the shortest way there, and the only one of its length.
 	onRow := func(n int) bool {
 		for x := 2; x <= 18; x++ {
 			if n == at(x, 10) {
@@ -92,7 +97,11 @@ func TestARouteAlongATechnicalRowIsMarkedTechnical(t *testing.T) {
 			}
 		}
 	}
+
+	// Act
 	direct, err := openTest(t, g, false).Route(context.Background(), pointOf(g, at(2, 10)), pointOf(g, at(18, 10)))
+
+	// Assert
 	if err != nil || !direct.Technical {
 		t.Errorf("the technical row should be taken and flagged: %+v, %v", direct, err)
 	}
@@ -144,7 +153,10 @@ func TestAGraphOfAnOlderFormatIsRefused(t *testing.T) {
 			g.grid(3, 3, flat)
 			path := g.write(t)
 			setMagic(t, path, magic) // its flags do not tell T3 from T4 and up: serving it would be wrong
-			if _, err := Open(path, "", "any"); err == nil {
+
+			_, err := Open(path, "", "any")
+
+			if err == nil {
 				t.Error("a graph of an older format opened")
 			}
 		})
