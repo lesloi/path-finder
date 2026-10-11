@@ -334,7 +334,7 @@ function RouteDetail({
           index={selected}
           {...(snapshot && { snapshot })}
         />
-        <RouteFigures route={route} display={display} />
+        <RouteFigures route={route} display={display} className="flex-1" />
       </div>
       {route.misses.length > 0 && (
         <div className="flex flex-wrap gap-x-4 gap-y-1">

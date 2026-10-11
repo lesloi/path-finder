@@ -5,11 +5,19 @@ import { SURFACE_CLASSES } from '../components/index.ts';
 import { formatDistance, formatDuration, formatHeight, type Display, type Route } from '../core/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
 
-/** The distance, duration, climb and descent of a route. */
-export function RouteFigures({ route, display }: { route: Route; display: Display }) {
+/** The distance, duration, climb and descent of a route. `className` sizes it in its container. */
+export function RouteFigures({
+  route,
+  display,
+  className = '',
+}: {
+  route: Route;
+  display: Display;
+  className?: string;
+}) {
   const t = { ...criteriaText[display.language], ...routesText[display.language] };
   return (
-    <dl className="m-0 grid flex-1 grid-cols-2 gap-x-4 gap-y-2" data-testid="route-figures">
+    <dl className={`m-0 grid grid-cols-2 gap-x-4 gap-y-2 ${className}`} data-testid="route-figures">
       <Figure label={t.distance} testId="route-distance">
         {formatDistance(route.distance, display)}
       </Figure>
