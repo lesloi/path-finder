@@ -27,14 +27,14 @@ afterEach(() => {
 describe('useDesktop', () => {
   it.each([
     ['a desktop', true],
-    ['a phone', false],
+    ['a phone, upright or in landscape', false],
   ])('tells whether the screen is %s', (_, desktop) => {
     const { matchMedia } = stubScreen(desktop);
 
     const { result } = renderHook(() => useDesktop());
 
     expect(result.current).toBe(desktop);
-    expect(matchMedia).toHaveBeenCalledWith('(min-width: 768px)');
+    expect(matchMedia).toHaveBeenCalledWith('(min-width: 768px) and (min-height: 500px)');
   });
 
   it('follows the screen as it changes width', () => {
