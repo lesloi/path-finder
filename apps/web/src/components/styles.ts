@@ -63,4 +63,4 @@ export const NOTE = 'text-sm text-ink-2';
 /** The view's main action: one per view. */
 export const PRIMARY_BUTTON =
   'flex min-h-touch w-full items-center justify-center gap-2 rounded-full bg-accent px-4 font-semibold ' +
-  'text-on-accent hover:bg-accent-hover';
+  'text-on-accent hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-accent';

@@ -83,12 +83,15 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const [start, setStart] = useState<Position>();
   // Where the server can route; unknown until it says, or if it cannot: then the server's own refusal stands.
   const coverage = useCoverage();
+  const uncoveredId = useId();
   const startUncovered = useMemo(() => Boolean(start && coverage && !isCovered(coverage, start)), [start, coverage]);
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
   const [picking, setPicking] = useState(false);
   // On phones, the criteria are a layer over the map; the height of the sheet is what the routes are framed clear of.
   const [layerOpen, setLayerOpen] = useState(false);
+  // The sheet says it, and describes its button by it, only while the form does not show its own message.
+  const sheetUncovered = startUncovered && !layerOpen;
   const [sheetHeight, setSheetHeight] = useState(0);
   // What went wrong, and the start point then: setting a new one drops the toast.
   const [toast, setToast] = useState<{ problem: 'unavailable' | 'unreadable'; start?: Position }>();
@@ -388,11 +391,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               <>
                 {/* Always mounted, so that a change of its text is announced. Not while the layer is open: the form shows its own message, and both would be announced. */}
                 <p
+                  id={uncoveredId}
                   role="status"
                   data-testid="criteria-sheet-uncovered"
                   className="text-center text-sm text-ink empty:hidden"
                 >
-                  {startUncovered && !layerOpen ? t.uncoveredStart : ''}
+                  {sheetUncovered ? t.uncoveredStart : ''}
                 </p>
                 {!start && (
                   <p data-testid="criteria-long-press" className="text-center text-sm text-ink-2">
@@ -403,6 +407,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
                   type="button"
                   data-testid="criteria-open"
                   className={PRIMARY_BUTTON}
+                  // Nothing to set from a start point the server cannot route from: the notice above says why.
+                  disabled={startUncovered}
+                  {...(sheetUncovered && { 'aria-describedby': uncoveredId })}
                   onClick={() => setLayerOpen(true)}
                 >
                   {t.setCriteria}
