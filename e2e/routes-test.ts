@@ -67,7 +67,7 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('routes-row-0-profile')).toBeVisible();
   });
 
-  test('badges the routes with a technical stretch only once they are included', async ({ page }) => {
+  test('badges the routes with a technical stretch', async ({ page }) => {
     const badge = page.locator('[data-testid^="routes-row-"][data-testid$="-technical"]');
     await page.goto('/');
     await openCriteria(page);
@@ -75,13 +75,6 @@ test.describe('the route set', () => {
 
     // The stand-in graph tags the tracks 1.2 km east of the start as technical.
     await search(page);
-    await expect(page.getByTestId('routes-row-0')).toBeVisible();
-    await expect(badge).toHaveCount(0);
-
-    await openCriteria(page);
-    await page.locator('label', { has: page.getByTestId('criteria-technical') }).click();
-    await search(page);
-
     await expect(page.getByTestId('routes-row-0')).toBeVisible();
     await expect(badge.first()).toBeVisible();
   });

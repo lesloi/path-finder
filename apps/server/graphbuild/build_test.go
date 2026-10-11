@@ -189,6 +189,41 @@ func TestBuildMakesAGraphTheEngineRoutesOn(t *testing.T) {
 	}
 }
 
+func TestBuildFlagsT3AndLeavesOutT4(t *testing.T) {
+	const lat, lon = 45.9, 6.1
+	dir := t.TempDir()
+	writeHills(t, dir, lat, lon)
+
+	// A T3 path of three nodes, and a T4 path of two nodes 800 m east of it, out of the snap distance.
+	step := 0.002
+	nodes := []pbfNode{{1, lat - step, lon}, {2, lat, lon}, {3, lat + step, lon}, {4, lat, lon + 0.01}, {5, lat + step, lon + 0.01}}
+	writePBF(t, filepath.Join(dir, "a.pbf"), nodes, []pbfWay{
+		{id: 10, refs: []int64{1, 2, 3}, tags: [][2]string{{"highway", "path"}, {"sac_scale", "demanding_mountain_hiking"}}},
+		{id: 11, refs: []int64{4, 5}, tags: [][2]string{{"highway", "path"}, {"sac_scale", "alpine_hiking"}}},
+	})
+
+	graph := filepath.Join(dir, "graph.bin")
+	var log bytes.Buffer
+	if err := Build([]string{filepath.Join(dir, "a.pbf")}, dir, graph, &log); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(log.String(), "graph: 3 nodes") {
+		t.Errorf("the T4 way is in the graph:\n%s", log.String())
+	}
+
+	e, err := engine.Open(graph, "", "any")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := e.Route(context.Background(), engine.Point{Lat: lat - step, Lon: lon}, engine.Point{Lat: lat + step, Lon: lon})
+	if err != nil || !r.Technical {
+		t.Errorf("route = %+v, err = %v: the T3 way should be there, flagged", r, err)
+	}
+	if _, err := e.Route(context.Background(), engine.Point{Lat: lat, Lon: lon + 0.01}, engine.Point{Lat: lat + step, Lon: lon + 0.01}); err != engine.ErrOffGraph {
+		t.Errorf("err = %v, want ErrOffGraph: nothing of the T4 way is in the graph", err)
+	}
+}
+
 func TestBuildFailsOnMissingInput(t *testing.T) {
 	dir := t.TempDir()
 	if err := Build([]string{"missing.pbf"}, dir, filepath.Join(dir, "g.bin"), os.Stderr); err == nil {

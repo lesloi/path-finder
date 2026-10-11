@@ -25,53 +25,78 @@ func flagAround(t *testGraph, at func(x, y int) int, cx, cy, r int) {
 	}
 }
 
-func TestSearchSkipsTechnicalWaysOnlyWhenAsked(t *testing.T) {
-	// A direct technical way from a to b, and a longer detour through c that is allowed.
+// setMagic gives a graph file the magic of another format, its content left as it is.
+func setMagic(tb testing.TB, path, magic string) {
+	tb.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	copy(data, magic)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		tb.Fatal(err)
+	}
+}
+
+// openLegacy opens g as a graph of the previous format, `PFGRAPH6`: its edges are the same, but the flag holds T3 and
+// up without telling them apart.
+func openLegacy(tb testing.TB, g *testGraph) *Engine {
+	tb.Helper()
+	path := g.write(tb)
+	setMagic(tb, path, "PFGRAPH6")
+	e, err := Open(path, "", "any")
+	if err != nil {
+		tb.Fatal(err)
+	}
+	return e
+}
+
+func TestSearchOfALegacyGraphSkipsFlaggedWays(t *testing.T) {
+	// A direct flagged way from a to b, and a longer detour through c.
 	g := &testGraph{}
 	a, b, c := g.addNode(0, 0, 100), g.addNode(0, 400, 100), g.addNode(300, 200, 100)
 	g.connect(a, b, KindPath)
 	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
 	g.connect(a, c, KindPath)
 	g.connect(c, b, KindPath)
-	e := openTest(t, g, true)
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
 	ctx := context.Background()
 
-	allowed := s.route(ctx, e, 0, nil, searchLimits{}, uint32(a), uint32(b))
-	if allowed == nil || len(allowed.edges) != 1 || e.g.edges[allowed.edges[0]].Flags&EdgeTechnical == 0 {
-		t.Fatalf("with technical ways allowed, the route should take the direct one: %+v", allowed)
+	current, legacy := openTest(t, g, true), openLegacy(t, g)
+	direct := s.route(ctx, current, 0, nil, searchLimits{}, uint32(a), uint32(b))
+	if direct == nil || len(direct.edges) != 1 || current.g.edges[direct.edges[0]].Flags&EdgeTechnical == 0 {
+		t.Fatalf("a current graph should give the direct way: %+v", direct)
 	}
-	excluded := s.route(ctx, e, 0, nil, searchLimits{skip: EdgeTechnical}, uint32(a), uint32(b))
-	if excluded == nil || len(excluded.edges) != 2 {
-		t.Fatalf("with technical ways excluded, the route should take the detour: %+v", excluded)
+	detour := s.route(ctx, legacy, 0, nil, searchLimits{}, uint32(a), uint32(b))
+	if detour == nil || len(detour.edges) != 2 {
+		t.Fatalf("a legacy graph should give the detour: %+v", detour)
 	}
-	if excluded.cost <= allowed.cost {
-		t.Errorf("the detour should cost more: %v <= %v", excluded.cost, allowed.cost)
+	if detour.cost <= direct.cost {
+		t.Errorf("the detour should cost more: %v <= %v", detour.cost, direct.cost)
 	}
 }
 
-func TestSearchFindsNoRouteWhenTheOnlyWayIsTechnical(t *testing.T) {
+func TestSearchFindsNoRouteWhenTheOnlyWayIsFlaggedOnALegacyGraph(t *testing.T) {
 	g := &testGraph{}
 	a, b := g.addNode(0, 0, 100), g.addNode(0, 200, 100)
 	g.connect(a, b, KindPath)
 	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
-	e := openTest(t, g, false)
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
-	if r := s.route(context.Background(), e, 0, nil, searchLimits{skip: EdgeTechnical}, uint32(a), uint32(b)); r != nil {
+	if r := s.route(context.Background(), openLegacy(t, g), 0, nil, searchLimits{}, uint32(a), uint32(b)); r != nil {
 		t.Errorf("route = %+v, want none", r)
 	}
 }
 
-func TestLoopsAvoidTechnicalWaysAndMoveTheirStart(t *testing.T) {
+func TestLoopsOfALegacyGraphAvoidTechnicalWaysAndMoveTheirStart(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(21, 21, flat)
 	flagAround(g, at, 10, 10, 1) // every way out of the start is technical
-	e := openTest(t, g, false)
 	req := loopRequest(g, at)
 
-	loops, err := e.Loops(context.Background(), req)
+	// A current graph keeps them, and tells a loop that holds one.
+	loops, err := openTest(t, g, false).Loops(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,8 +106,8 @@ func TestLoopsAvoidTechnicalWaysAndMoveTheirStart(t *testing.T) {
 		}
 	}
 
-	req.ExcludeTechnical = true
-	loops, err = e.Loops(context.Background(), req)
+	// A legacy graph cannot tell T3 from T4 and up: every flagged way is out.
+	loops, err = openLegacy(t, g).Loops(context.Background(), req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,11 +116,42 @@ func TestLoopsAvoidTechnicalWaysAndMoveTheirStart(t *testing.T) {
 	}
 	for _, l := range loops {
 		if l.Technical {
-			t.Error("a loop holds a technical stretch though they were excluded")
+			t.Error("a loop holds a technical stretch though a legacy graph leaves them out")
 		}
 		if l.Points[0].Point == pointOf(g, at(10, 10)) {
 			t.Error("the start stayed on the technical way")
 		}
+	}
+}
+
+func TestARouteOfALegacyGraphAvoidsTechnicalWays(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	// The straight row from (2, 10) to (18, 10) is technical: the shortest way there, and the only one of its length.
+	onRow := func(n int) bool {
+		for x := 2; x <= 18; x++ {
+			if n == at(x, 10) {
+				return true
+			}
+		}
+		return false
+	}
+	for a, es := range g.edges {
+		for i := range es {
+			if onRow(a) && onRow(int(es[i].To)) {
+				es[i].Flags = EdgeTechnical
+			}
+		}
+	}
+	from, to := pointOf(g, at(2, 10)), pointOf(g, at(18, 10))
+
+	direct, err := openTest(t, g, false).Route(context.Background(), from, to)
+	if err != nil || !direct.Technical {
+		t.Fatalf("a current graph should take the technical row: %+v, %v", direct, err)
+	}
+	detour, err := openLegacy(t, g).Route(context.Background(), from, to)
+	if err != nil || detour.Technical {
+		t.Errorf("a legacy graph should go around it: %+v, %v", detour, err)
 	}
 }
 
@@ -119,8 +175,8 @@ func TestAStartTooFarFromAnAllowedWayIsOffTheGraph(t *testing.T) {
 	a, b := g.addNode(0, 0, 100), g.addNode(0, 200, 100)
 	g.connect(a, b, KindPath)
 	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
-	e := openTest(t, g, false)
-	_, err := e.Loops(context.Background(), LoopRequest{Start: pointOf(g, a), Distance: 1000, Candidates: 2, ExcludeTechnical: true})
+	e := openLegacy(t, g)
+	_, err := e.Loops(context.Background(), LoopRequest{Start: pointOf(g, a), Distance: 1000, Candidates: 2})
 	if err != ErrOffGraph {
 		t.Errorf("err = %v, want ErrOffGraph", err)
 	}
@@ -150,18 +206,11 @@ func TestABuilderFlagsTechnicalWays(t *testing.T) {
 	}
 }
 
-func TestAGraphBeforeTheTechnicalFlagIsRefused(t *testing.T) {
+func TestAGraphBeforeTheLegacyFormatIsRefused(t *testing.T) {
 	g := &testGraph{}
 	g.grid(3, 3, flat)
 	path := g.write(t)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	copy(data, "PFGRAPH5") // its ways all read as untagged: serving it would silently allow every one
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	setMagic(t, path, "PFGRAPH5") // its ways all read as untagged: serving it would silently allow every one
 	if _, err := Open(path, "", "any"); err == nil {
 		t.Error("a graph of the previous version opened")
 	}
@@ -177,10 +226,9 @@ func TestAStartDoesNotSnapToAPocketTechnicalWaysCloseOff(t *testing.T) {
 	g.edges[stubA][len(g.edges[stubA])-1].Flags = EdgeTechnical
 	g.edges[at(10, 10)][len(g.edges[at(10, 10)])-1].Flags = EdgeTechnical
 	flagAround(g, at, 10, 10, 1)
-	e := openTest(t, g, false)
+	e := openLegacy(t, g)
 	req := loopRequest(g, at)
 	req.Start = pointOf(g, stubA)
-	req.ExcludeTechnical = true
 
 	loops, err := e.Loops(context.Background(), req)
 	if err != nil || len(loops) == 0 {
@@ -191,19 +239,22 @@ func TestAStartDoesNotSnapToAPocketTechnicalWaysCloseOff(t *testing.T) {
 	}
 }
 
-func TestNearestWithSkipGivesUpPastTheSnapLimit(t *testing.T) {
+func TestNearestOnALegacyGraphGivesUpPastTheSnapLimit(t *testing.T) {
 	g := &testGraph{}
 	a, b := g.addNode(0, 0, 100), g.addNode(0, 200, 100)
 	g.connect(a, b, KindPath)
 	far, farB := g.addNode(0, 20_000, 100), g.addNode(0, 20_200, 100)
 	g.connect(far, farB, KindPath)
 	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
-	e := openTest(t, g, false)
-	if _, _, ok := e.sp.nearest(e.g, EdgeTechnical, baseLat, baseLon); ok {
+	legacy, current := openLegacy(t, g), openTest(t, g, false)
+	if _, _, ok := legacy.sp.nearest(legacy.g, baseLat, baseLon); ok {
 		t.Error("a node 20 km away was found: the search should stop near the snap limit")
 	}
-	if _, _, ok := e.sp.nearest(e.g, noSkip, baseLat, baseLon); !ok {
-		t.Error("without skip, the nearest node is found")
+	if _, _, ok := legacy.sp.nearestSkipping(legacy.g, 0, baseLat, baseLon); !ok {
+		t.Error("the landmarks are built over the whole graph: a node should be found whatever the graph skips")
+	}
+	if _, _, ok := current.sp.nearest(current.g, baseLat, baseLon); !ok {
+		t.Error("without edges to skip, the nearest node is found")
 	}
 }
 
@@ -211,12 +262,26 @@ func TestCancellingStopsALoopSearchThatExcludesTechnicalWays(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(21, 21, flat)
 	flagAround(g, at, 4, 4, 2)
-	e := openTest(t, g, false)
+	e := openLegacy(t, g)
 	req := loopRequest(g, at)
-	req.ExcludeTechnical = true
 	done, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := e.Loops(done, req); !errors.Is(err, context.Canceled) {
 		t.Errorf("err = %v, want context.Canceled", err)
+	}
+}
+
+func TestALegacyGraphKeepsItsLandmarks(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	path := g.write(t)
+	alt := writeTestLandmarks(t, path)
+	setMagic(t, path, "PFGRAPH6")
+	legacy, err := Open(path, alt, "any")
+	if err != nil {
+		t.Fatalf("the landmarks of a current graph should fit its legacy form: %v", err)
+	}
+	if _, err := legacy.Route(context.Background(), pointOf(g, at(0, 0)), pointOf(g, at(20, 20))); err != nil {
+		t.Errorf("err = %v", err)
 	}
 }

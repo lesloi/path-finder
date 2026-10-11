@@ -15,7 +15,6 @@ const DEFAULTS = {
     surface: 'any',
     level: 'any',
     gain: 300,
-    includeTechnical: false,
   },
 };
 
@@ -57,7 +56,6 @@ describe('useSettings', () => {
         surface: 'unpaved',
         level: 'target',
         gain: 450,
-        includeTechnical: true,
       },
     } as const;
     const first = renderHook(() => useSettings());
@@ -152,14 +150,12 @@ describe('useSettings', () => {
     expect(result.current[0].lastCriteria).toEqual(DEFAULTS.lastCriteria);
   });
 
-  it('keeps the switch of the technical stretches, off unless it was stored as true', () => {
-    localStorage.setItem(KEY, JSON.stringify({ lastCriteria: { includeTechnical: true } }));
-    expect(renderHook(() => useSettings()).result.current[0].lastCriteria.includeTechnical).toBe(true);
-
-    for (const stored of ['true', 1, null, 'yes']) {
-      localStorage.setItem(KEY, JSON.stringify({ lastCriteria: { includeTechnical: stored } }));
-      expect(renderHook(() => useSettings()).result.current[0].lastCriteria.includeTechnical).toBe(false);
-    }
+  it('drops the retired switch of the technical stretches', () => {
+    localStorage.setItem(KEY, JSON.stringify({ lastCriteria: { surface: 'unpaved', includeTechnical: true } }));
+    expect(renderHook(() => useSettings()).result.current[0].lastCriteria).toEqual({
+      ...DEFAULTS.lastCriteria,
+      surface: 'unpaved',
+    });
   });
 });
 

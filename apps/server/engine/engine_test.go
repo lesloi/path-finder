@@ -84,20 +84,26 @@ func (t *testGraph) write(tb testing.TB) string {
 
 func flat(x, y int) float64 { return 100 }
 
+// writeTestLandmarks builds the landmarks of the graph file at path, and returns the file they are in.
+func writeTestLandmarks(tb testing.TB, path string) string {
+	tb.Helper()
+	e, err := Open(path, "", "any")
+	if err != nil {
+		tb.Fatal(err)
+	}
+	alt := filepath.Join(tb.TempDir(), "graph.alt")
+	if err := writeLandmarks(alt, 4, uint32(e.g.n), e.g.fingerprint, 8, buildLandmarks(e.g, e.sp, e.prof, 4, 8)); err != nil {
+		tb.Fatal(err)
+	}
+	return alt
+}
+
 func openTest(tb testing.TB, t *testGraph, withLandmarks bool) *Engine {
 	tb.Helper()
 	path := t.write(tb)
 	alt := ""
 	if withLandmarks {
-		e, err := Open(path, "", "any")
-		if err != nil {
-			tb.Fatal(err)
-		}
-		alt = filepath.Join(tb.TempDir(), "graph.alt")
-		rows := buildLandmarks(e.g, e.sp, e.prof, 4, 8)
-		if err := writeLandmarks(alt, 4, uint32(e.g.n), e.g.fingerprint, 8, rows); err != nil {
-			tb.Fatal(err)
-		}
+		alt = writeTestLandmarks(tb, path)
 	}
 	e, err := Open(path, alt, "any")
 	if err != nil {

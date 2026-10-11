@@ -63,11 +63,15 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   weight alone. Every multiplier stays at least 1, so that the search heuristic stays admissible.
   Revisit if the comparison with a reference (#131) shows that runners and walkers need different costs on the
   same surface.
-- **Technical stretches are the one hard exclusion, stored as an edge flag in the graph.** A surface preference
-  stays a weight, but a walker who did not ask for ropes or chains must never be routed onto them, so flagged
-  ways (`sac_scale` T3 and up) are skipped, not made dearer. Skipping edges only raises costs, so the landmark
-  bounds stay valid and need no new `.alt` file. The flag changes the graph format (`PFGRAPH6`): a graph built
-  before it would read as having none, and serve every way as allowed, so it is refused until it is built again.
+- **Alpine ways (`sac_scale` T4 and up) are left out of the graph; T3 stays in and is only flagged.** A surface
+  preference stays a weight, and there is no criterion to exclude anything: ways asking for more than hands, ropes or
+  chains have no place in a generator of running and hiking routes, and are dropped when the graph is built, so the
+  search has nothing to skip on a current graph. T3 ways are kept, and flagged so that a route holding one carries a badge, because
+  the mountain massifs cannot be crossed without them. An earlier switch to allow them, off by default, was removed:
+  it hid every mountain route behind a setting, and the badge tells what a route holds. The change moved the graph
+  format to `PFGRAPH7`. A `PFGRAPH6` graph still holds alpine ways, flagged like T3, so it is read for a while as a
+  graph whose flagged ways are all skipped (landmarks stay valid, since skipping edges only raises costs), with no
+  badge, until it is built again; this reading is to be removed once every graph is rebuilt. Older ones are refused.
 - **Loops go through 2–4 waypoints on a circle through the start point**, each leg avoiding what the
   earlier ones used, resized up to four times, then ranked on distance, overlap and elevation gain.
   Criteria whose waypoints alone exceed the target are refused. A waypoint is moved to the nearest way

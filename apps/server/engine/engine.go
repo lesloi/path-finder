@@ -42,11 +42,14 @@ type graph struct {
 	n, e int
 	// fingerprint is the one in the file header: the landmarks built for this graph hold the same.
 	fingerprint uint64
-	nodes       []node
-	off         []uint32
-	edges       []edge
-	sp          *spatial
-	file        mapped
+	// skip is the edge flags a search of this graph may not use (graphHead.skip). Skipping edges only raises costs,
+	// so the landmark bounds stay valid.
+	skip  uint8
+	nodes []node
+	off   []uint32
+	edges []edge
+	sp    *spatial
+	file  mapped
 }
 
 // hasEdgeWithout tells whether a node has a way that holds none of the flags.
@@ -63,7 +66,7 @@ func (g *graph) hasEdgeWithout(n uint32, flags uint8) bool {
 const roomNodes = 64
 
 // hasRoom tells whether a node leads, through ways that hold none of the flags, to at least roomNodes nodes: not to a
-// pocket that technical ways close off, where a start would find no loop.
+// pocket that flagged ways close off, where a start would find no loop.
 func (g *graph) hasRoom(n uint32, flags uint8) bool {
 	if !g.hasEdgeWithout(n, flags) {
 		return false
@@ -85,9 +88,6 @@ func (g *graph) hasRoom(n uint32, flags uint8) bool {
 	}
 	return len(seen) >= roomNodes
 }
-
-// noSkip is the set of edge flags that excludes no way.
-const noSkip uint8 = 0
 
 func align16(n int) int { return (n + 15) &^ 15 }
 
@@ -184,13 +184,13 @@ func openGraph(path string) (_ *graph, err error) {
 	data := m.data
 	head, ok := readGraphHead(data)
 	if !ok {
-		return nil, fmt.Errorf("%s is not a graph file of this version: build it again with build-graph", path)
+		return nil, fmt.Errorf("%s is not a graph file of a version this server reads: build it again with build-graph", path)
 	}
 	n, e := int(head.nodes), int(head.edges)
 	nodesAt := graphHeaderSize
 	offAt := align16(nodesAt + 12*n)
 	edgesAt := align16(offAt + 4*(n+1))
-	g := &graph{n: n, e: e, fingerprint: head.fingerprint, file: m}
+	g := &graph{n: n, e: e, fingerprint: head.fingerprint, skip: head.skip, file: m}
 	if g.nodes, err = view[node](data, nodesAt, n); err != nil {
 		return nil, fmt.Errorf("%s: nodes: %w", path, err)
 	}
@@ -358,13 +358,18 @@ func computeSpatial(nodes []node) *spatial {
 	return s
 }
 
-// nearest is the node closest to a point. With skip set, only a node with a way that holds none of those
-// flags counts: a point near a technical path then moves to the nearest way it may use.
-func (s *spatial) nearest(g *graph, skip uint8, latDeg, lonDeg float64) (uint32, float64, bool) {
+// nearest is the node closest to a point. When the graph has edges to skip, only a node with a way that holds none
+// of those flags counts: a point near a flagged path then moves to the nearest way it may use.
+func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bool) {
+	return s.nearestSkipping(g, g.skip, latDeg, lonDeg)
+}
+
+// nearestSkipping is nearest for the edge flags given, not those of the graph.
+func (s *spatial) nearestSkipping(g *graph, skip uint8, latDeg, lonDeg float64) (uint32, float64, bool) {
 	lat, lon := int32(latDeg*1e7), int32(lonDeg*1e7)
 	cy, cx := int(lat-s.minLat)/cellLat, int(lon-s.minLon)/cellLon
 	cosl := math.Cos(latDeg * rad)
-	// The metres a ring of cells adds at least: past the snap limit, a search with skip set has nothing to find.
+	// The metres a ring of cells adds at least: past the snap limit, a search with edges to skip has nothing to find.
 	ringMeters := math.Min(cellLat*1e-7*metersPerDegree, cellLon*1e-7*metersPerDegree*cosl)
 	best, node, found := math.Inf(1), uint32(0), false
 	visit := func(x, y int) {
@@ -562,9 +567,6 @@ type route struct {
 
 // searchLimits bound what a search may use and do. The zero value bounds nothing.
 type searchLimits struct {
-	// skip is a set of edge flags (DECISIONS.md, Routing): an edge holding one is not used, which keeps the landmark
-	// bounds valid, since removing edges can only raise the cost of a route.
-	skip uint8
 	// maxSettled caps the nodes one search may settle (0 for no cap): a loop leg that needs more is not worth
 	// finding, and a huge search would also have to regrow its table, which cannot be interrupted.
 	maxSettled int
@@ -580,7 +582,7 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 		return nil
 	}
 	g := cx.g
-	nodes, edges := g.nodes, g.edges
+	nodes, edges, skip := g.nodes, g.edges, g.skip
 	var tg [maxLandmarkValues]uint16
 	var rows []uint16
 	if cx.alt != nil {
@@ -654,7 +656,7 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 		nu := &nodes[u]
 		for e := g.off[u]; e < g.off[u+1]; e++ {
 			ed := &edges[e]
-			if ed.Flags&lim.skip != 0 {
+			if ed.Flags&skip != 0 {
 				continue
 			}
 			nv := &nodes[ed.To]
@@ -749,7 +751,6 @@ type loopParams struct {
 	distM, ascentM float64
 	candidates     int
 	seed           uint64
-	skip           uint8 // edge flags a loop may not use
 }
 
 type loopResult struct {
@@ -807,7 +808,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 		for j := 0; j < k; j++ {
 			phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(k+1)
 			x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
-			n, d, ok := sp.nearest(g, lp.skip, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
+			n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
 			if !ok || d > 400 {
 				return best
 			}
@@ -824,7 +825,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 			if avoid.n > 0 {
 				av = avoid
 			}
-			leg := s.route(ctx, cx, climb, av, searchLimits{lp.skip, loopLegMaxSettled}, points[j-1], points[j])
+			leg := s.route(ctx, cx, climb, av, searchLimits{loopLegMaxSettled}, points[j-1], points[j])
 			if leg == nil {
 				return best
 			}

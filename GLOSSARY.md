@@ -14,8 +14,8 @@ _Avoid_: Origin, departure
 
 **Criteria**:
 Everything the user sets to ask for routes: start point, a target distance or a
-target duration, an optional target elevation gain, a surface preference, whether to include
-technical stretches, and up to three optional waypoints.
+target duration, an optional target elevation gain, a surface preference,
+and up to three optional waypoints.
 _Avoid_: Filters, query, search parameters
 
 **Waypoint**:
@@ -48,17 +48,14 @@ _Avoid_: Easy, mountainous
 **Surface preference**:
 A soft preference for paved roads, unpaved paths, or no preference. It picks the **routing profile**
 of the search, so it weights the generation, and the loops found are ranked on it too. It never excludes
-a route outright: the only hard rule of the criteria is the exclusion of **technical stretches**.
+a route outright.
 _Avoid_: Road type, terrain filter
 
 **Technical stretch**:
-A way tagged as asking for the hands, ropes or chains: on foot, `sac_scale` from
-`demanding_mountain_hiking` (T3) up. T1 and T2 are ordinary hiking and trail running. The switch « Autoriser les
-passages techniques signalés » in the criteria is off by default, kept with the last criteria, and shown unless
-the surface preference is paved, when the form always asks to exclude them and keeps the stored value. When it is off, flagged ways are excluded outright,
-not weighted, and a start point or waypoint on one moves to the nearest way allowed. An untagged way is never
-excluded: the switch says « signalés », it does not promise safety. A route that holds one carries the badge
-« passages techniques ».
+A way tagged as asking for the hands, ropes or chains: on foot, `sac_scale` `demanding_mountain_hiking` (T3).
+T1 and T2 are ordinary hiking and trail running. T3 ways are part of the routes, with no switch in the criteria:
+a route that holds one carries the badge « passages techniques ». An untagged way is never flagged. Ways from
+`alpine_hiking` (T4) up are not in the graph at all, whatever the surface preference.
 _Avoid_: Dangerous, difficult, T3
 
 **Routing profile**:
@@ -141,7 +138,7 @@ _Avoid_: Sync, upload
 The user's preferences kept on the device: pace, language (English or French,
 the browser's until the user picks one), units (those of the language until the user picks some: miles and feet in English,
 kilometres and metres in French), the last criteria (surface preference,
-elevation gain, technical stretches, whether the length is a distance or a duration, and that distance and duration), and which POI categories the map shows. Lost if the user clears the site's data.
+elevation gain, whether the length is a distance or a duration, and that distance and duration), and which POI categories the map shows. Lost if the user clears the site's data.
 _Avoid_: Profile, account
 
 ### On the map

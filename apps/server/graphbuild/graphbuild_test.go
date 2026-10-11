@@ -52,27 +52,29 @@ func TestClassifyWay(t *testing.T) {
 	}
 }
 
-func TestClassifyWayFlagsTechnicalWaysFromT3(t *testing.T) {
+func TestClassifyWayFlagsT3AndLeavesOutT4AndUp(t *testing.T) {
 	cases := []struct {
 		scale     string
-		technical bool
+		technical bool // flagged for the badge
+		walkable  bool
 	}{
-		{"", false}, // untagged: not excluded
-		{"hiking", false},
-		{"mountain_hiking", false},
-		{"demanding_mountain_hiking", true},
-		{"alpine_hiking", true},
-		{"hiking;demanding_mountain_hiking", true},
-		{"hiking; mountain_hiking", false},
-		{"demanding_alpine_hiking", true},
-		{"difficult_alpine_hiking", true},
-		{"unknown", false},
+		{"", false, true}, // untagged: neither flagged nor excluded
+		{"hiking", false, true},
+		{"mountain_hiking", false, true},
+		{"demanding_mountain_hiking", true, true},
+		{"hiking;demanding_mountain_hiking", true, true},
+		{"hiking; mountain_hiking", false, true},
+		{"unknown", false, true},
+		{"alpine_hiking", false, false},
+		{"demanding_alpine_hiking", false, false},
+		{"difficult_alpine_hiking", false, false},
+		{"demanding_mountain_hiking;alpine_hiking", false, false}, // one T4+ value is enough
 	}
 	for _, tc := range cases {
 		t.Run("sac_scale="+tc.scale, func(t *testing.T) {
 			_, _, flags, ok := classifyWay(tags("highway", "path", "sac_scale", tc.scale))
-			if !ok || (flags&engine.EdgeTechnical != 0) != tc.technical {
-				t.Errorf("flags %d ok %v, want technical %v", flags, ok, tc.technical)
+			if ok != tc.walkable || (flags&engine.EdgeTechnical != 0) != tc.technical {
+				t.Errorf("flags %d ok %v, want technical %v walkable %v", flags, ok, tc.technical, tc.walkable)
 			}
 		})
 	}
