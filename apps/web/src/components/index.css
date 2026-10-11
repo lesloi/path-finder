@@ -44,10 +44,11 @@
   --text-lg: 1.125rem;
   --text-xl: 1.5rem;
 
-  /* The left column replaces the bottom sheet from this width on, as in `useDesktop`. */
   --breakpoint-*: initial;
-  --breakpoint-desktop: 768px;
 }
+
+/* The left column replaces the bottom sheet from this size on, as in `DESKTOP_QUERY`. */
+@custom-variant desktop (@media (min-width: 768px) and (min-height: 500px));
 
 /* UI colours switch with the colour scheme, so utilities name the role, never `dark:`. */
 @theme inline {
