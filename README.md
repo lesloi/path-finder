@@ -4,7 +4,7 @@
 
 <h1 align="center">Path finder</h1>
 
-<h3 align="center">Your next run or hike, without being tracked</h3>
+<h3 align="center">Generate a custom running or trail route. Free, no account, no tracking.</h3>
 
 <p align="center">
   A privacy-first web app that generates running and trail routes in France from where you
