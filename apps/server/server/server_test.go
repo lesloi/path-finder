@@ -95,6 +95,23 @@ func TestEveryAnswerSendsNoReferrer(t *testing.T) {
 	}
 }
 
+func TestEveryAnswerSendsAContentSecurityPolicy(t *testing.T) {
+	h := newServer(t, nil)
+	for _, path := range []string{"/", "/sw.js", "/assets/app.js", "/api/v1/coverage", "/healthz", "/missing"} {
+		policy := do(h, http.MethodGet, path, "", "", nil).Header().Get("Content-Security-Policy")
+		for _, directive := range []string{
+			"default-src 'self'",
+			"connect-src 'self' https://data.geopf.fr",
+			"object-src 'none'",
+			"frame-ancestors 'none'",
+		} {
+			if !strings.Contains(policy, directive) {
+				t.Errorf("%s: Content-Security-Policy = %q, want %q", path, policy, directive)
+			}
+		}
+	}
+}
+
 func TestRouteSetsAnswerTheRoutes(t *testing.T) {
 	r := post(newServer(t, nil), `{"start":[2,48]}`)
 	if r.Code != http.StatusOK || strings.TrimSpace(r.Body.String()) != `{"routes":["route"]}` {
