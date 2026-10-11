@@ -43,6 +43,8 @@ exception, open an issue before implementing it.
 - Self-host every script, stylesheet, and font; only the map style and its fonts and icons
   come from the IGN Géoplateforme. No analytics, tracking, or accounts.
 - Serve every page with `Referrer-Policy: no-referrer`.
+- Serve every answer with a `Content-Security-Policy` (`contentSecurityPolicy` in `apps/server/server/server.go`). A new
+  external host goes there only once the maintainer has approved it.
 - Ask for geolocation only when the user asks for their location; otherwise the start
   point is picked on the map.
 

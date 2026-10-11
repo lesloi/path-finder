@@ -79,7 +79,7 @@ func New(cfg Config) http.Handler {
 		r.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: cfg.Log}))
 	}
 	// A panic answers 500 here, rather than in net/http, which would log the client's address.
-	r.Use(middleware.Recoverer, referrerPolicy, middleware.Heartbeat("/healthz"), middleware.ClientIPFromRemoteAddr)
+	r.Use(middleware.Recoverer, securityHeaders, middleware.Heartbeat("/healthz"), middleware.ClientIPFromRemoteAddr)
 	if len(cfg.TrustedProxies) > 0 {
 		r.Use(forwardedFor(cfg.TrustedProxies))
 	}
@@ -107,9 +107,26 @@ type app struct {
 	buildID string
 }
 
-func referrerPolicy(next http.Handler) http.Handler {
+// contentSecurityPolicy is the Content-Security-Policy of every answer. The only third party is the Géoplateforme, for the map: its
+// tiles, style, sprite and fonts. It is a header, not a <meta> tag: the tag ignores frame-ancestors, and would break
+// the Vite dev server (inline preamble, HMR). Any new external host must be added here, and approved by the owner.
+const contentSecurityPolicy = "default-src 'self'; " +
+	"script-src 'self'; " +
+	"style-src 'self'; " +
+	"img-src 'self' data: blob: https://data.geopf.fr; " +
+	"connect-src 'self' https://data.geopf.fr; " +
+	"worker-src 'self'; " +
+	"font-src 'self'; " +
+	"object-src 'none'; " +
+	"base-uri 'none'; " +
+	"form-action 'self'; " +
+	"frame-ancestors 'none'"
+
+// securityHeaders sends the Referrer-Policy and the Content-Security-Policy with every answer.
+func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 		next.ServeHTTP(w, r)
 	})
 }
