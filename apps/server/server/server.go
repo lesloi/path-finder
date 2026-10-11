@@ -122,11 +122,16 @@ const contentSecurityPolicy = "default-src 'self'; " +
 	"form-action 'self'; " +
 	"frame-ancestors 'none'"
 
-// securityHeaders sends the Referrer-Policy and the Content-Security-Policy with every answer.
+// securityHeaders sends the hardening headers with every answer. Only geolocation is left to the page (the
+// "My location" button); the camera and microphone are never used.
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+		h := w.Header()
+		h.Set("Referrer-Policy", "no-referrer")
+		h.Set("Content-Security-Policy", contentSecurityPolicy)
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Permissions-Policy", "geolocation=(self), camera=(), microphone=()")
 		next.ServeHTTP(w, r)
 	})
 }
