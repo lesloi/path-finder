@@ -8,7 +8,6 @@ const request: RouteSetRequest = {
   target: { distance: 10 },
   surface: 'any',
   pace: 6,
-  includeTechnical: false,
 };
 
 const route: Route = {

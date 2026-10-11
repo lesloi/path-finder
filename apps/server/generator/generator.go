@@ -52,8 +52,6 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		Distance:   km * 1000,
 		Candidates: cmpOr(g.Candidates, defaultCandidates),
 		Seed:       g.seed(),
-		// Technical ways are left out unless the criteria allow them, whatever the surface preference.
-		ExcludeTechnical: !criteria.IncludeTechnical,
 	}
 	if criteria.ElevationGain != nil && criteria.ElevationGain.Shortcut == "" {
 		req.Ascent = criteria.ElevationGain.Metres

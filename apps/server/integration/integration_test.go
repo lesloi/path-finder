@@ -65,7 +65,7 @@ func routeSets(t *testing.T, h http.Handler, body string) (int, []contract.Route
 }
 
 func criteria(target, rest string) string {
-	return `{"start":[6.1294,45.8992],"target":` + target + `,"surface":"any","pace":6,"includeTechnical":false` + rest + `}`
+	return `{"start":[6.1294,45.8992],"target":` + target + `,"surface":"any","pace":6` + rest + `}`
 }
 
 func TestRouteSetOfTheDefaultCriteria(t *testing.T) {
@@ -254,23 +254,9 @@ func TestTheSurfacePreferenceSteersTheSearch(t *testing.T) {
 	}
 }
 
-func TestTechnicalStretchesAreLeftOutUnlessAsked(t *testing.T) {
+func TestRoutesThroughTechnicalStretchesAreTold(t *testing.T) {
 	h := newServer(t)
-	unpaved := func(include string) string {
-		return `{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"unpaved","pace":6,"includeTechnical":` + include + `}`
-	}
-
-	code, routes, body := routeSets(t, h, unpaved("false"))
-	if code != 200 || len(routes) == 0 {
-		t.Fatalf("status %d, %d routes: %s", code, len(routes), body[:min(len(body), 200)])
-	}
-	for i, r := range routes {
-		if r.Technical {
-			t.Errorf("route %d holds a technical stretch though they were left out", i)
-		}
-	}
-
-	code, routes, body = routeSets(t, h, unpaved("true"))
+	code, routes, body := routeSets(t, h, `{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"unpaved","pace":6}`)
 	if code != 200 {
 		t.Fatalf("status %d: %s", code, body)
 	}
@@ -281,14 +267,7 @@ func TestTechnicalStretchesAreLeftOutUnlessAsked(t *testing.T) {
 		}
 	}
 	if technical == 0 {
-		t.Errorf("none of %d routes holds a technical stretch though they were allowed and the unpaved ways are the technical ones", len(routes))
-	}
-}
-
-func TestACriteriaWithoutTheTechnicalSwitchIsRefused(t *testing.T) {
-	code, _, body := routeSets(t, newServer(t), `{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"any","pace":6}`)
-	if code != http.StatusBadRequest || !strings.Contains(body, "includeTechnical") {
-		t.Errorf("status %d: %s", code, body)
+		t.Errorf("none of %d routes holds a technical stretch though the unpaved ways are the technical ones", len(routes))
 	}
 }
 

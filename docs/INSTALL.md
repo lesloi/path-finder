@@ -59,7 +59,7 @@ export DATA_DIR=$PWD/../../data
 ./path-finder build-alt -profile unpaved
 ```
 
-A graph built before the technical stretches is refused when the server starts (the current format is `PFGRAPH6`): build it again, then
+A graph built before the alpine ways were left out is refused when the server starts (the current format is `PFGRAPH7`): build it again, then
 the landmarks. A server that is running keeps the zones it serves when replaced files cannot be served, and says why
 in its log.
 

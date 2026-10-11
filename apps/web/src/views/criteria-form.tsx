@@ -9,7 +9,7 @@ import {
   TARGET_DURATION,
   type CriteriaField,
 } from '../contract/index.ts';
-import { PaceSlider, PRIMARY_BUTTON, SegmentedControl, Slider, Switch } from '../components/index.ts';
+import { PaceSlider, PRIMARY_BUTTON, SegmentedControl, Slider } from '../components/index.ts';
 import {
   formatDuration,
   KM_PER_MILE,
@@ -102,8 +102,6 @@ export function criteriaRequest(
   const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
   const gain = clamp(draft.gain, 0, bounds.gain.max);
   const level = draft.level;
-  // A paved request always excludes technical stretches, whatever was kept: the stored value is not touched.
-  const allowed = draft.surface !== 'paved' && draft.includeTechnical;
   return (
     start && {
       start,
@@ -115,7 +113,6 @@ export function criteriaRequest(
       ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
       surface: draft.surface,
       pace,
-      includeTechnical: allowed,
     }
   );
 }
@@ -144,7 +141,6 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
     request.start[0] === found.start[0] &&
     request.start[1] === found.start[1] &&
     request.surface === found.surface &&
-    request.includeTechnical === found.includeTechnical &&
     ('distance' in b || request.pace === found.pace)
   );
 }
@@ -180,9 +176,6 @@ export function CriteriaForm({
   const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
   const gain = clamp(draft.gain, 0, bounds.gain.max);
   const level = draft.level;
-  // Only the surface preferences that can route onto technical ways get the switch. A paved request always excludes
-  // them, whatever was kept: the stored value is not touched.
-  const technicalApplies = draft.surface !== 'paved';
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
   const request = criteriaRequest(draft, { units, pace: settings.pace, start });
@@ -272,27 +265,17 @@ export function CriteriaForm({
     surface: {
       title: t.surface,
       content: (
-        <div className="flex flex-col gap-2">
-          <SegmentedControl
-            testId="criteria-surface"
-            label={t.surface}
-            value={draft.surface}
-            options={[
-              { value: 'paved', label: t.paved },
-              { value: 'any', label: t.anySurface },
-              { value: 'unpaved', label: t.unpaved },
-            ]}
-            onChange={(surface) => change({ surface })}
-          />
-          {technicalApplies && (
-            <Switch
-              testId="criteria-technical"
-              label={t.includeTechnical}
-              checked={draft.includeTechnical}
-              onChange={(includeTechnical) => change({ includeTechnical })}
-            />
-          )}
-        </div>
+        <SegmentedControl
+          testId="criteria-surface"
+          label={t.surface}
+          value={draft.surface}
+          options={[
+            { value: 'paved', label: t.paved },
+            { value: 'any', label: t.anySurface },
+            { value: 'unpaved', label: t.unpaved },
+          ]}
+          onChange={(surface) => change({ surface })}
+        />
       ),
     },
   };
@@ -370,7 +353,6 @@ function message(
     elevationGain: t.elevationGainError(gain.max, unit.gain),
     surface: t.surfaceError,
     pace: t.paceError,
-    includeTechnical: t.includeTechnicalError,
   };
   return messages[field];
 }

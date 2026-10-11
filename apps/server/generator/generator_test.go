@@ -34,7 +34,7 @@ func engineLoop(heading float64) *engine.Route {
 	}
 }
 
-const body = `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":300,"surface":"any","pace":6,"includeTechnical":false}`
+const body = `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":300,"surface":"any","pace":6}`
 
 func generate(t *testing.T, looper *fakeLooper, ctx context.Context, request string) ([]contract.Route, error) {
 	t.Helper()
@@ -51,7 +51,7 @@ func TestGenerateAsksTheEngineForLoopsFromTheCriteria(t *testing.T) {
 	if _, err := generate(t, looper, context.Background(), body); err != nil {
 		t.Fatal(err)
 	}
-	want := engine.LoopRequest{Start: engine.Point{Lat: 45.8992, Lon: 6.1294}, Distance: 10_000, Ascent: 300, Candidates: 80, Seed: 42, ExcludeTechnical: true}
+	want := engine.LoopRequest{Start: engine.Point{Lat: 45.8992, Lon: 6.1294}, Distance: 10_000, Ascent: 300, Candidates: 80, Seed: 42}
 	got := looper.got
 	if got.Enough == nil {
 		t.Error("the engine is not told when to stop")
@@ -88,7 +88,7 @@ func TestGenerateSpellsOutTheContract(t *testing.T) {
 
 func TestGenerateSetsNoAscentForAShortcut(t *testing.T) {
 	looper := &fakeLooper{}
-	hilly := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":"hilly","surface":"any","pace":6,"includeTechnical":false}`
+	hilly := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":"hilly","surface":"any","pace":6}`
 	if _, err := generate(t, looper, context.Background(), hilly); err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestGenerateSkipsALoopWithNoLength(t *testing.T) {
 func TestGenerateUsesTheEngineOfTheSurfacePreference(t *testing.T) {
 	anyLooper, paved, unpaved := &fakeLooper{}, &fakeLooper{}, &fakeLooper{}
 	g := &Generator{Engines: map[string]Looper{"any": anyLooper, "paved": paved, "unpaved": unpaved}}
-	if _, err := g.Generate(context.Background(), json.RawMessage(`{"start":[6.1294,45.8992],"target":{"distance":5},"surface":"unpaved","pace":5,"includeTechnical":false}`)); err != nil {
+	if _, err := g.Generate(context.Background(), json.RawMessage(`{"start":[6.1294,45.8992],"target":{"distance":5},"surface":"unpaved","pace":5}`)); err != nil {
 		t.Fatal(err)
 	}
 	if unpaved.got.Candidates == 0 || anyLooper.got.Candidates != 0 || paved.got.Candidates != 0 {
@@ -194,27 +194,6 @@ func TestCmpOrFallsBackOnlyForANonPositiveValue(t *testing.T) {
 	for _, tc := range []struct{ v, fallback, want int }{{0, 40, 40}, {-3, 40, 40}, {7, 40, 7}} {
 		if got := cmpOr(tc.v, tc.fallback); got != tc.want {
 			t.Errorf("cmpOr(%d, %d) = %d, want %d", tc.v, tc.fallback, got, tc.want)
-		}
-	}
-}
-
-func TestGenerateExcludesTechnicalWaysUnlessTheCriteriaAllowThem(t *testing.T) {
-	for _, tc := range []struct {
-		include string
-		exclude bool
-	}{{"false", true}, {"true", false}} {
-		for _, surface := range []string{"any", "paved", "unpaved"} {
-			looper := &fakeLooper{}
-			g := &Generator{Engines: map[string]Looper{surface: looper}}
-			req := `{"start":[6.1294,45.8992],"target":{"distance":5},"surface":"` + surface + `","pace":5,"includeTechnical":` + tc.include + `}`
-			if _, err := g.Generate(context.Background(), json.RawMessage(req)); err != nil {
-				t.Fatal(err)
-			}
-			// A paved request excludes them whatever the client sends.
-			want := tc.exclude || surface == "paved"
-			if looper.got.ExcludeTechnical != want {
-				t.Errorf("includeTechnical %s on %s: ExcludeTechnical = %v, want %v", tc.include, surface, looper.got.ExcludeTechnical, want)
-			}
 		}
 	}
 }

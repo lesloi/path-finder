@@ -46,7 +46,6 @@ describe('CriteriaForm', () => {
       target: { distance: 10 },
       surface: 'any',
       pace: 6,
-      includeTechnical: false,
     });
   });
 
@@ -216,57 +215,13 @@ describe('CriteriaForm', () => {
   });
 
   describe('technical stretches', () => {
-    const technical = () => screen.queryByTestId('criteria-technical');
-    const stored = () => JSON.parse(localStorage.getItem('path-finder.settings')!).lastCriteria;
-
-    it('is off by default and asks for the stretches to be excluded', () => {
-      const { onSubmit, submit } = setup();
-
-      expect(technical()).not.toBeChecked();
-      expect(technical()).toHaveAccessibleName(en.includeTechnical);
-      submit();
-
-      expect(onSubmit.mock.calls[0][0].includeTechnical).toBe(false);
-    });
-
-    it.each(['any', 'unpaved'])('can be turned on with the %s surface preference', (surface) => {
+    it.each(['paved', 'any', 'unpaved'])('are not a choice, whatever the %s surface preference', (surface) => {
       const { onSubmit, submit } = setup();
       choose('surface', surface);
-
-      fireEvent.click(technical()!);
       submit();
 
-      expect(technical()).toBeChecked();
-      expect(onSubmit.mock.calls[0][0].includeTechnical).toBe(true);
-    });
-
-    it('is hidden with the paved surface preference, which excludes them whatever was kept', () => {
-      store({ lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300, includeTechnical: true } });
-      const { onSubmit, submit } = setup();
-      choose('surface', 'paved');
-
-      expect(technical()).not.toBeInTheDocument();
-      submit();
-
-      expect(onSubmit.mock.calls[0][0].includeTechnical).toBe(false);
-      expect(stored().includeTechnical).toBe(true);
-      expect(parseCriteria(onSubmit.mock.calls[0][0]).includeTechnical).toBe(false);
-    });
-
-    it('comes back as it was kept when the surface preference is not paved again', () => {
-      store({ lastCriteria: { target: 'distance', surface: 'any', level: 'any', gain: 300, includeTechnical: true } });
-      setup();
-      choose('surface', 'paved');
-
-      choose('surface', 'unpaved');
-
-      expect(technical()).toBeChecked();
-    });
-
-    it('is worded in French', () => {
-      setup({ language: 'fr' });
-
-      expect(technical()).toHaveAccessibleName('Autoriser les passages techniques signalés');
+      expect(screen.queryByTestId('criteria-technical')).not.toBeInTheDocument();
+      expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('includeTechnical');
     });
   });
 
@@ -394,7 +349,6 @@ describe('criteriaChanged', () => {
     elevationGain: 300,
     surface: 'any',
     pace: 6,
-    includeTechnical: false,
   };
   const changed = (changes: Partial<RouteSetRequest>, units: 'metric' | 'imperial' = 'metric') =>
     criteriaChanged({ ...found, ...changes }, found, units);
@@ -410,7 +364,6 @@ describe('criteriaChanged', () => {
     ['the elevation gain', { elevationGain: 400 }],
     ['the elevation level', { elevationGain: 'hilly' as const }],
     ['the surface', { surface: 'paved' as const }],
-    ['the technical stretches', { includeTechnical: true }],
   ])('sees a change of %s', (_, changes) => {
     expect(changed(changes)).toBe(true);
   });

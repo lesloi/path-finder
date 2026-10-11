@@ -42,14 +42,10 @@ var surfaceGroups = map[string]uint8{
 	"rock": engine.SurfaceRough, "pebblestone": engine.SurfaceRough, "cobblestone": engine.SurfaceRough, "grass_paver": engine.SurfaceRough, "woodchips": engine.SurfaceRough,
 }
 
-// technicalScales are the sac_scale values from which a way is technical on foot: T3 (ropes, chains, hands for
-// balance) and up. T1 and T2 are ordinary hiking and trail running.
-var technicalScales = map[string]bool{
-	"demanding_mountain_hiking": true, "alpine_hiking": true, "demanding_alpine_hiking": true, "difficult_alpine_hiking": true,
-}
-
 // classifyWay decides whether a pedestrian can use a way, and under which kind and surface group, with the
-// edge flags it carries. A way with no sac_scale is not flagged.
+// edge flags it carries. A way with no sac_scale is neither flagged nor left out. One of T3 (ropes, chains, hands for
+// balance) is flagged technical; one of T4 and up, an alpine route, is left out. T1 and T2 are ordinary hiking and
+// trail running.
 func classifyWay(tags osm.Tags) (kind, surf, flags uint8, ok bool) {
 	hw := tags.Find("highway")
 	kind, ok = highwayKinds[hw]
@@ -73,9 +69,12 @@ func classifyWay(tags osm.Tags) (kind, surf, flags uint8, ok bool) {
 	if kind == engine.KindCycleway && !explicit && foot != "" {
 		return 0, 0, 0, false
 	}
-	// A way can carry several scales, such as hiking;demanding_mountain_hiking: one technical value is enough.
+	// A way can carry several scales, such as hiking;demanding_mountain_hiking: one value from T3 up is enough.
 	for _, scale := range strings.Split(tags.Find("sac_scale"), ";") {
-		if technicalScales[strings.TrimSpace(scale)] {
+		switch strings.TrimSpace(scale) {
+		case "alpine_hiking", "demanding_alpine_hiking", "difficult_alpine_hiking":
+			return 0, 0, 0, false
+		case "demanding_mountain_hiking":
 			flags = engine.EdgeTechnical
 		}
 	}
