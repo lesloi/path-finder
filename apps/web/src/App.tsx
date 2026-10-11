@@ -1,10 +1,28 @@
 import { useEffect, type ComponentType } from 'react';
 
-import { SubPage } from './components/index.ts';
+import { LoadBoundary, SubPage, lazyChunk } from './components/index.ts';
 import { applyDescription } from './core/index.ts';
 import { commonText, type Language } from './i18n/index.ts';
 import { goTo, languageOf, useHash, useSettings } from './state/index.ts';
-import { CreditsPage, CriteriaView, LegalNoticePage, PrivacyPolicyPage, SettingsView } from './views/index.ts';
+import { CriteriaView } from './views/index.ts';
+
+// The pages load when opened: the map is what the first visit is for.
+const pageLoaders = {
+  settings: () => import('./views/settings-view.tsx').then((m) => ({ default: m.SettingsView })),
+  credits: () => import('./views/legal/credits-page.tsx').then((m) => ({ default: m.CreditsPage })),
+  privacy: () => import('./views/legal/privacy-policy-page.tsx').then((m) => ({ default: m.PrivacyPolicyPage })),
+  legalNotice: () => import('./views/legal/legal-notice-page.tsx').then((m) => ({ default: m.LegalNoticePage })),
+};
+const SettingsView = lazyChunk(pageLoaders.settings);
+const CreditsPage = lazyChunk(pageLoaders.credits);
+const PrivacyPolicyPage = lazyChunk(pageLoaders.privacy);
+const LegalNoticePage = lazyChunk(pageLoaders.legalNotice);
+
+/** Fetches the code of every page, so the service worker keeps it for a visit offline. */
+export async function preloadPages() {
+  await Promise.all(Object.values(pageLoaders).map((load) => load()));
+}
+
 // Each page by its hash, with its title and where its back arrow goes.
 const pages: Record<
   string,
@@ -58,7 +76,9 @@ export function App() {
           language={language}
           navigate={goTo}
         >
-          <page.Page language={language} />
+          <LoadBoundary key={hash} language={language}>
+            <page.Page language={language} />
+          </LoadBoundary>
         </SubPage>
       )}
     </main>

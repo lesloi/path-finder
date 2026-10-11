@@ -21,7 +21,7 @@ import {
 } from '../core/index.ts';
 import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
-  StartPointMap,
+  LazyStartPointMap,
   type MapHandle,
   type MapView,
   BasemapPicker,
@@ -267,7 +267,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       <p role="status" className="sr-only" data-testid="routes-announcement">
         {routeSet && !loading ? t.routeCount(routeSet.routes.length) : ''}
       </p>
-      <StartPointMap
+      <LazyStartPointMap
         ref={map}
         onViewChange={setMapView}
         basemap={basemap}
