@@ -41,3 +41,53 @@ describe('goTo', () => {
     expect(window.location.hash).toBe('#/map-b');
   });
 });
+
+describe('goTo on a restored entry', () => {
+  // Loads a fresh module on an entry that carries `trail`, as when the system restores the app.
+  async function restore(trail: string[], entriesBehind?: number) {
+    vi.resetModules();
+    if (entriesBehind !== undefined) vi.stubGlobal('navigation', { currentEntry: { index: entriesBehind } });
+    window.history.replaceState({ trail }, '', trail.at(-1) ?? '#/');
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
+    return { go, ...(await import('./navigation.ts')) };
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('does not go back past the first entry the app has', async () => {
+    const { go, goTo } = await restore(['#/', '#/settings', '#/credits', '#/privacy'], 1);
+
+    goTo('#/');
+
+    // Only the last two hashes have an entry: '#/' is not one of them, so it is added, not reached by going back.
+    expect(go).not.toHaveBeenCalled();
+  });
+
+  it('keeps the entries that exist when the trail is longer than the history', async () => {
+    const { go, goTo } = await restore(['#/', '#/settings', '#/credits', '#/privacy'], 1);
+
+    goTo('#/credits');
+
+    expect(go).toHaveBeenCalledWith(-1);
+  });
+
+  it('keeps a trail as long as the entries behind it', async () => {
+    const { go, goTo } = await restore(['#/', '#/settings', '#/credits'], 2);
+
+    goTo('#/');
+
+    expect(go).toHaveBeenCalledWith(-2);
+  });
+
+  it('falls back to the history length without the Navigation API', async () => {
+    const trail = ['#/', ...Array.from({ length: window.history.length + 1 }, (_, i) => `#/page-${String(i)}`)];
+    const { go, goTo } = await restore(trail);
+
+    goTo('#/');
+
+    expect(go).not.toHaveBeenCalled();
+  });
+});
