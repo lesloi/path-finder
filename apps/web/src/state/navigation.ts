@@ -11,8 +11,14 @@ let trail: string[] = [];
 
 function syncTrail() {
   const state: unknown = window.history.state;
+  // A trail longer than the history is a stale one, kept from a session the system restored without its earlier
+  // entries: going back through it would leave the app, and close an installed one.
   const saved =
-    typeof state === 'object' && state !== null && 'trail' in state && isHashList(state.trail)
+    typeof state === 'object' &&
+    state !== null &&
+    'trail' in state &&
+    isHashList(state.trail) &&
+    state.trail.length <= window.history.length
       ? state.trail
       : undefined;
   if (saved) {

@@ -41,3 +41,21 @@ describe('goTo', () => {
     expect(window.location.hash).toBe('#/map-b');
   });
 });
+
+describe('goTo on a restored entry', () => {
+  it('does not go back further than the history holds', async () => {
+    // Arrange: an entry whose saved trail is longer than the history behind it, as when the app is reopened.
+    vi.resetModules();
+    const trail = ['#/', ...Array.from({ length: window.history.length + 1 }, (_, i) => `#/page-${String(i)}`)];
+    window.history.replaceState({ trail }, '', trail.at(-1));
+    const go = vi.spyOn(window.history, 'go').mockImplementation(() => undefined);
+    const { goTo: restoredGoTo } = await import('./navigation.ts');
+
+    // Act
+    restoredGoTo('#/');
+
+    // Assert: leaving the history would close the installed app.
+    expect(go).not.toHaveBeenCalled();
+    go.mockRestore();
+  });
+});
