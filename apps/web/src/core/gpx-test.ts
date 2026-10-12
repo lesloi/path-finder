@@ -13,7 +13,7 @@ function loop(points: number): [number, number, number][] {
 }
 
 const route: GpxRoute = { geometry: loop(5), distance: 12.34, elevationGain: 339.6, estimatedDuration: 85 };
-const french = { units: 'metric', language: 'fr' } as const;
+const french = { paceUnit: 'min/km', language: 'fr' } as const;
 
 /** Fails on any XML syntax error, so every test below also checks that the file is well-formed. */
 function parse(content: string) {
@@ -34,11 +34,10 @@ describe('gpxExport', () => {
     expect(gpxExport(route, DAY, french, PACE).fileName).toBe('Running-12km_340m-20260928120000.gpx');
   });
 
-  it('follows the language and units of the settings', () => {
-    const { fileName, content } = gpxExport(route, DAY, { units: 'imperial', language: 'en' }, PACE);
+  it('follows the language of the settings', () => {
+    const { content } = gpxExport(route, DAY, { paceUnit: 'min/km', language: 'en' }, PACE);
 
-    expect(fileName).toBe('Running-8mi_1114ft-20260928120000.gpx');
-    expect(parse(content).querySelector('trk > name')?.textContent).toBe('Route · 7.7 mi');
+    expect(parse(content).querySelector('trk > name')?.textContent).toBe('Route · 12.3 km');
   });
 
   it('writes one GPX 1.1 track with a height on every point and no timestamp on them', () => {
@@ -65,12 +64,12 @@ describe('gpxExport', () => {
     expect(gpx.querySelector('ele')).toBeNull();
   });
 
-  it('describes the climb, the estimated duration and the pace, in the units of the settings', () => {
+  it('describes the climb, the estimated duration and the pace, in the settings', () => {
     const desc = (settings: Parameters<typeof gpxExport>[2], geometry = route) =>
       parse(gpxExport(geometry, DAY, settings, PACE).content).querySelector('trk > desc')?.textContent;
 
     expect(desc(french)).toBe('+340 m · 1 h 25 min (5:30 min/km)');
-    expect(desc({ units: 'imperial', language: 'en' })).toBe('+1114 ft · 1 h 25 min (8:51 min/mi)');
+    expect(desc({ paceUnit: 'km/h', language: 'en' })).toBe('+340 m · 1 h 25 min (10.9 km/h)');
     expect(desc(french, { ...route, elevationGain: undefined })).toBe('1 h 25 min (5:30 min/km)');
   });
 

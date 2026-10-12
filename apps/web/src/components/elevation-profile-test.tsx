@@ -20,14 +20,7 @@ const route: Route = {
 };
 
 function plot(onHover = vi.fn(), props: Partial<Route> = {}, language: 'en' | 'fr' = 'en') {
-  render(
-    <ElevationProfile
-      testId="profile"
-      route={{ ...route, ...props }}
-      display={{ units: 'metric', language }}
-      onHover={onHover}
-    />,
-  );
+  render(<ElevationProfile testId="profile" route={{ ...route, ...props }} language={language} onHover={onHover} />);
   const element = screen.getByTestId('profile-plot');
   // jsdom has no layout: the plot is 200 px wide, from the left of the screen.
   element.getBoundingClientRect = () => ({ left: 0, width: 200 }) as DOMRect;
@@ -73,18 +66,11 @@ describe('ElevationProfile', () => {
     expect(screen.getByTestId('profile')).toHaveAccessibleName('Elevation profile, from 450 m to 500 m');
   });
 
-  it('shows the altitudes in the units and the language of the settings', () => {
-    render(
-      <ElevationProfile
-        testId="profile"
-        route={route}
-        display={{ units: 'imperial', language: 'fr' }}
-        onHover={vi.fn()}
-      />,
-    );
+  it('shows the altitudes and the name of the profile in the language of the settings', () => {
+    render(<ElevationProfile testId="profile" route={route} language="fr" onHover={vi.fn()} />);
 
-    expect(screen.getByTestId('profile-max')).toHaveTextContent('1640 ft');
-    expect(screen.getByTestId('profile')).toHaveAccessibleName('Profil altimétrique, de 1476 ft à 1640 ft');
+    expect(screen.getByTestId('profile-max')).toHaveTextContent('500 m');
+    expect(screen.getByTestId('profile')).toHaveAccessibleName('Profil altimétrique, de 450 m à 500 m');
   });
 
   it('draws a line across the plot at the highest altitude and at the middle one', () => {
@@ -110,7 +96,7 @@ describe('ElevationProfile', () => {
             { surface: 'unpaved', from: 0.6, to: 1.2 },
           ],
         }}
-        display={{ units: 'metric', language: 'en' }}
+        language="en"
         onHover={vi.fn()}
       />,
     );
@@ -153,12 +139,7 @@ describe('ElevationProfile', () => {
     const swipe = vi.fn();
     render(
       <div onPointerDown={swipe}>
-        <ElevationProfile
-          testId="profile"
-          route={route}
-          display={{ units: 'metric', language: 'en' }}
-          onHover={vi.fn()}
-        />
+        <ElevationProfile testId="profile" route={route} language="en" onHover={vi.fn()} />
       </div>,
     );
 
@@ -180,13 +161,7 @@ describe('ElevationProfile', () => {
   it('shows nothing for a route without heights', () => {
     const geometry = route.geometry.map(([lon, lat]) => [lon, lat]) as [number, number][];
 
-    const { container } = render(
-      <ElevationProfile
-        route={{ ...route, geometry }}
-        display={{ units: 'metric', language: 'en' }}
-        onHover={vi.fn()}
-      />,
-    );
+    const { container } = render(<ElevationProfile route={{ ...route, geometry }} language="en" onHover={vi.fn()} />);
 
     expect(container).toBeEmptyDOMElement();
   });

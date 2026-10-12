@@ -1,10 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import type { PaceUnit } from '../core/index.ts';
 import { PaceSlider } from './pace-slider.tsx';
 
-function setup(props: { pace?: number; units?: 'metric' | 'imperial' } = {}) {
+function setup(props: { pace?: number; paceUnit?: PaceUnit } = {}) {
   const onChange = vi.fn();
-  render(<PaceSlider label="Pace" pace={6} units="metric" testId="pace" onChange={onChange} {...props} />);
+  render(
+    <PaceSlider label="Pace" pace={6} paceUnit="min/km" language="en" testId="pace" onChange={onChange} {...props} />,
+  );
   return { onChange, slider: screen.getByTestId('pace') };
 }
 
@@ -19,13 +22,6 @@ describe('PaceSlider', () => {
     expect(screen.getByTestId('pace-value')).toHaveTextContent('5:30 min/km');
   });
 
-  it('shows the pace per mile in imperial units', () => {
-    const { slider } = setup({ units: 'imperial' });
-
-    expect(screen.getByTestId('pace-value')).toHaveTextContent('9:39 min/mi');
-    expect(slider).toHaveAttribute('max', '1140');
-  });
-
   it('changes the pace, in minutes per km, as the slider moves', () => {
     const { slider, onChange } = setup();
 
@@ -34,11 +30,40 @@ describe('PaceSlider', () => {
     expect(onChange).toHaveBeenCalledExactlyOnceWith(5.5);
   });
 
-  it('changes a pace per mile into minutes per km', () => {
-    const { slider, onChange } = setup({ units: 'imperial' });
+  it('shows the pace in km/h, within 5 and 20, when the user asks for it', () => {
+    const { slider } = setup({ pace: 5, paceUnit: 'km/h' });
 
-    fireEvent.change(slider, { target: { value: '480' } });
+    expect(slider).toHaveValue('12');
+    expect(slider).toHaveAttribute('min', '5');
+    expect(slider).toHaveAttribute('max', '20');
+    expect(screen.getByTestId('pace-value')).toHaveTextContent('12.0 km/h');
+  });
 
-    expect(onChange).toHaveBeenCalledExactlyOnceWith(8 / 1.609344);
+  it('changes a speed in km/h into a pace in minutes per km', () => {
+    const { slider, onChange } = setup({ paceUnit: 'km/h' });
+
+    fireEvent.change(slider, { target: { value: '12' } });
+
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(5);
+  });
+
+  it('shows the step the thumb is on, so that the thumb and the pace agree', () => {
+    // 5.5 min/km is 10.9 km/h, which the thumb holds at 11.
+    const { slider } = setup({ pace: 5.5, paceUnit: 'km/h' });
+
+    expect(slider).toHaveValue('11');
+    expect(screen.getByTestId('pace-value')).toHaveTextContent('11.0 km/h');
+  });
+
+  it.each([
+    ['too fast, in min/km', 2, 'min/km', '180', '3:00 min/km'],
+    ['too slow, in min/km', 15, 'min/km', '720', '12:00 min/km'],
+    ['too slow, in km/h', 15, 'km/h', '5', '5.0 km/h'],
+    ['too fast, in km/h', 2, 'km/h', '20', '20.0 km/h'],
+  ] as const)('keeps a pace %s within the range of the slider', (_, pace, paceUnit, value, shown) => {
+    const { slider } = setup({ pace, paceUnit });
+
+    expect(slider).toHaveValue(value);
+    expect(screen.getByTestId('pace-value')).toHaveTextContent(shown);
   });
 });

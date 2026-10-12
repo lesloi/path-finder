@@ -1,19 +1,21 @@
 import type { ReactNode } from 'react';
 
-import { formatPace, paceFromSeconds, paceSeconds, type Units } from '../core/index.ts';
+import type { Language } from '../i18n/index.ts';
+import { formatPace, invertPace, paceFromSeconds, paceSeconds, type PaceUnit } from '../core/index.ts';
 import { Slider } from './slider.tsx';
 
-// Seconds per km or per mile, in the user's units: from 3:00 to 12:00 per km, and what that is per mile, rounded.
+// From 3:00 to 12:00 per km in seconds per km, and what that is in km/h.
 const RANGE = {
-  metric: { min: 180, max: 720, step: 5 },
-  imperial: { min: 300, max: 1140, step: 10 },
+  'min/km': { min: 180, max: 720, step: 5 },
+  'km/h': { min: 5, max: 20, step: 0.5 },
 };
 
-/** A pace as a slider, in minutes per distance, which changes as the slider moves. */
+/** A pace as a slider, in minutes per km or in km/h, which changes as the slider moves. */
 export function PaceSlider({
   label,
   pace,
-  units,
+  paceUnit,
+  language,
   testId,
   leading,
   onChange,
@@ -21,25 +23,30 @@ export function PaceSlider({
   label: string;
   /** Minutes per km. */
   pace: number;
-  units: Units;
+  paceUnit: PaceUnit;
+  language: Language;
   testId: string;
   /** Before the pace shown above the slider. */
   leading?: ReactNode;
   onChange: (pace: number) => void;
 }) {
-  const { min, max, step } = RANGE[units];
-  const seconds = Math.min(Math.max(paceSeconds(pace, units), min), max);
+  const { min, max, step } = RANGE[paceUnit];
+  const speed = paceUnit === 'km/h';
+  const raw = speed ? invertPace(pace) : paceSeconds(pace);
+  // Snapped to the step, as the range input does, so that the thumb and the pace shown agree.
+  const value = min + Math.round((Math.min(Math.max(raw, min), max) - min) / step) * step;
+  const toPace = speed ? invertPace : paceFromSeconds;
   return (
     <Slider
       testId={testId}
       leading={leading}
       label={label}
-      value={seconds}
-      shown={formatPace(paceFromSeconds(seconds, units), units)}
+      value={value}
+      shown={formatPace(toPace(value), paceUnit, language)}
       min={min}
       max={max}
       step={step}
-      onChange={(value) => onChange(paceFromSeconds(value, units))}
+      onChange={(next) => onChange(toPace(next))}
     />
   );
 }

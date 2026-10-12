@@ -1,7 +1,7 @@
 import { Crosshair, LocateFixed, Navigation2, Scan, Settings } from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import { useCoverage, useSettings, useUnits } from '../state/index.ts';
+import { useCoverage, useSettings } from '../state/index.ts';
 import { CriteriaBar } from './criteria-bar.tsx';
 import { CriteriaForm, criteriaChanged, criteriaRequest, invalidField, useCriteriaDraft } from './criteria-form.tsx';
 import { RouteDock } from './route-dock.tsx';
@@ -79,7 +79,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const t = { ...commonText[language], ...criteriaText[language], ...routesText[language] };
   const desktop = useDesktop();
   // Kept here: the form is mounted in the column or in the sheet, whichever the screen shows.
-  const draft = useCriteriaDraft(language);
+  const draft = useCriteriaDraft();
   const [start, setStart] = useState<Position>();
   // Where the server can route; unknown until it says, or if it cannot: then the server's own refusal stands.
   const coverage = useCoverage();
@@ -99,11 +99,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const map = useRef<MapHandle>(null);
   const [mapView, setMapView] = useState<MapView>({ bearing: 0, rotated: false, movedAway: false });
   const pageWasOpen = useRef(pageOpen);
-  const [{ basemap, pace }, update] = useSettings();
-  const units = useUnits(language);
+  const [{ basemap, pace, paceUnit }, update] = useSettings();
   const browser = useRouteBrowser();
   const { routeSet, loading } = browser;
-  const display = useMemo(() => ({ units, language }), [units, language]);
   const atPace = useMemo(() => routeSet && routesAtPace(routeSet.request, routeSet.routes, pace), [routeSet, pace]);
   const summaries = useMemo(
     () => routeSet?.routes.map(({ distance, elevationGain }) => ({ distance, elevationGain })),
@@ -115,13 +113,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const selected = desktop ? browser.selected : (browser.selected ?? 0);
   const dockRoute = desktop ? atPace?.routes[selected ?? -1] : undefined;
   const dockShown = Boolean(dockRoute);
-  const current = criteriaRequest(draft[0], { units, pace, start });
+  const current = criteriaRequest(draft[0], { pace, start });
   // Every search keeps the criteria it was made with, whichever button asked for it.
   const search = (request: RouteSetRequest) => {
     draft[2]();
     browser.ask(request);
   };
-  const stale = Boolean(routeSet && current && criteriaChanged(current, routeSet.request, units));
+  const stale = Boolean(routeSet && current && criteriaChanged(current, routeSet.request));
   useRootProperty('--list-inset', 'var(--list-reserved)', listShown);
   useRootProperty('--dock-inset', 'var(--dock-reserved)', dockShown);
   // The floating buttons and the map attribution sit above the sheet, whatever its height.
@@ -195,7 +193,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const routeSetView =
     atPace && routeSet && routesShown ? (
       <RouteSetView
-        display={display}
+        language={language}
+        paceUnit={paceUnit}
         routes={atPace.routes}
         pace={atPace.pace}
         snapshot={browser.snapshot}
@@ -278,7 +277,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         routes={browser.geometries}
         summaries={summaries}
         coverage={coverage}
-        display={display}
+        language={language}
         // A desktop highlights the route it points at in the list, and marks the one selected.
         selectedRoute={desktop ? (browser.preview ?? selected) : selected}
         {...(desktop && { markedRoute: selected })}
@@ -375,7 +374,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <>
           <CriteriaBar
             language={language}
-            summary={criteriaSummary(criteriaRequest(draft[0], { units, pace, start: start ?? NO_START })!, display)}
+            summary={criteriaSummary(criteriaRequest(draft[0], { pace, start: start ?? NO_START })!, language)}
             start={start && formatPosition(start, language)}
             onClick={() => setLayerOpen(true)}
           />
@@ -427,7 +426,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       )}
       {dockRoute && atPace && selected !== undefined && (
         <RouteDock
-          display={display}
+          language={language}
+          paceUnit={paceUnit}
           pace={atPace.pace}
           route={dockRoute}
           index={selected}

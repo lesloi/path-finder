@@ -1,11 +1,12 @@
 import { act, renderHook } from '@testing-library/react';
 
-import { DEFAULT_CRITERIA, unitsOf, type Settings, useSettings, watchSettings } from './settings.ts';
+import { DEFAULT_CRITERIA, useSettings, watchSettings } from './settings.ts';
 
 const KEY = 'path-finder.settings';
 
 const DEFAULTS = {
   pace: 6,
+  paceUnit: 'min/km',
   theme: 'system',
   basemap: 'plan',
   lastCriteria: {
@@ -17,22 +18,6 @@ const DEFAULTS = {
     gain: 300,
   },
 };
-
-describe('unitsOf', () => {
-  const settings = (units?: 'metric' | 'imperial'): Settings => ({ ...DEFAULTS, ...(units && { units }) }) as Settings;
-
-  it.each([
-    ['fr', 'metric'],
-    ['en', 'imperial'],
-  ] as const)('follows the %s language when the user picked no units: %s', (language, units) => {
-    expect(unitsOf(settings(), language)).toBe(units);
-  });
-
-  it.each(['fr', 'en'] as const)('keeps the units the user picked, in %s', (language) => {
-    expect(unitsOf(settings('metric'), language)).toBe('metric');
-    expect(unitsOf(settings('imperial'), language)).toBe('imperial');
-  });
-});
 
 describe('useSettings', () => {
   it('starts from the defaults', () => {
@@ -46,7 +31,7 @@ describe('useSettings', () => {
     const kept = {
       pace: 7.5,
       language: 'fr',
-      units: 'imperial',
+      paceUnit: 'km/h',
       theme: 'dark',
       basemap: 'aerial',
       lastCriteria: {
@@ -71,9 +56,9 @@ describe('useSettings', () => {
     const reader = renderHook(() => useSettings());
     const writer = renderHook(() => useSettings());
 
-    act(() => writer.result.current[1]({ units: 'imperial' }));
+    act(() => writer.result.current[1]({ paceUnit: 'km/h' }));
 
-    expect(reader.result.current[0].units).toBe('imperial');
+    expect(reader.result.current[0].paceUnit).toBe('km/h');
   });
 
   it.each([
@@ -84,7 +69,7 @@ describe('useSettings', () => {
       JSON.stringify({
         pace: 'fast',
         language: 'de',
-        units: 'nautical',
+        paceUnit: 'knots',
         theme: 'sepia',
         basemap: 'satellite',
         lastCriteria: { target: 'both', distance: 'far', duration: null, surface: 'ice', level: 'steep', gain: -5 },
@@ -111,19 +96,20 @@ describe('useSettings', () => {
     expect(result.current[0].pace).toBe(6);
   });
 
-  it('does not read the last activity of an earlier version', () => {
+  it('does not read the last activity or the units of an earlier version', () => {
     localStorage.setItem(KEY, JSON.stringify({ lastActivity: 'hike', units: 'imperial' }));
 
     const { result } = renderHook(() => useSettings());
 
-    expect(result.current[0]).toEqual({ ...DEFAULTS, units: 'imperial' });
+    expect(result.current[0]).toEqual(DEFAULTS);
     expect(result.current[0]).not.toHaveProperty('lastActivity');
+    expect(result.current[0]).not.toHaveProperty('units');
   });
 
   it('keeps the valid fields of partial data', () => {
     localStorage.setItem(
       KEY,
-      JSON.stringify({ pace: 5, units: 'imperial', lastCriteria: { surface: 'paved', level: 'steep', gain: 600 } }),
+      JSON.stringify({ pace: 5, paceUnit: 'km/h', lastCriteria: { surface: 'paved', level: 'steep', gain: 600 } }),
     );
 
     const { result } = renderHook(() => useSettings());
@@ -131,7 +117,7 @@ describe('useSettings', () => {
     expect(result.current[0]).toEqual({
       ...DEFAULTS,
       pace: 5,
-      units: 'imperial',
+      paceUnit: 'km/h',
       lastCriteria: { ...DEFAULTS.lastCriteria, surface: 'paved', gain: 600 },
     });
   });

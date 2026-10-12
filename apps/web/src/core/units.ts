@@ -1,46 +1,45 @@
 import { commonText, type Language } from '../i18n/index.ts';
 
-export type Units = 'metric' | 'imperial';
+/** How a pace is written: minutes per km, or a speed in km/h. */
+export type PaceUnit = 'min/km' | 'km/h';
 
-/** How figures are written: in the user's units and language. */
-export type Display = { units: Units; language: Language };
+export const PACE_UNITS: PaceUnit[] = ['min/km', 'km/h'];
 
-export const KM_PER_MILE = 1.609344;
-export const METRES_PER_FOOT = 0.3048;
-
-const kmPerDistanceUnit = (units: Units) => (units === 'metric' ? 1 : KM_PER_MILE);
-
-/** The unit of a pace: minutes per distance, never a speed. */
-export function paceUnit(units: Units): string {
-  return units === 'metric' ? 'min/km' : 'min/mi';
+/** A pace in minutes per km as seconds per km. */
+export function paceSeconds(minPerKm: number): number {
+  return Math.round(minPerKm * 60);
 }
 
-/** A pace in minutes per km as seconds per km, or per mile in imperial units. */
-export function paceSeconds(minPerKm: number, units: Units): number {
-  return Math.round(minPerKm * kmPerDistanceUnit(units) * 60);
+/** Seconds per km as a pace in minutes per km. */
+export function paceFromSeconds(seconds: number): number {
+  return seconds / 60;
 }
 
-/** Seconds per km, or per mile in imperial units, as a pace in minutes per km. */
-export function paceFromSeconds(seconds: number, units: Units): number {
-  return seconds / 60 / kmPerDistanceUnit(units);
+/** A pace in minutes per km as a speed in km/h, and a speed in km/h as a pace: the one is the inverse of the other. */
+export function invertPace(value: number): number {
+  return 60 / value;
 }
 
-/** A pace in minutes per km as "5:30 min/km", or "8:51 min/mi" in imperial units. */
-export function formatPace(minPerKm: number, units: Units): string {
-  const seconds = paceSeconds(minPerKm, units);
-  return `${Math.floor(seconds / 60)}:${`${seconds % 60}`.padStart(2, '0')} ${paceUnit(units)}`;
+/** A pace in minutes per km as "5:30 min/km", or "10.9 km/h" as a speed. */
+export function formatPace(minPerKm: number, paceUnit: PaceUnit, language: Language): string {
+  if (paceUnit === 'km/h') return `${oneDecimal(language).format(invertPace(minPerKm))} km/h`;
+  const seconds = paceSeconds(minPerKm);
+  return `${Math.floor(seconds / 60)}:${`${seconds % 60}`.padStart(2, '0')} min/km`;
 }
 
-/** A distance in kilometres as "12.3 km", or "7.7 mi" in imperial units. */
-export function formatDistance(km: number, { units, language }: Display): string {
-  const decimal = new Intl.NumberFormat(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  return units === 'metric' ? `${decimal.format(km)} km` : `${decimal.format(km / KM_PER_MILE)} mi`;
+/** A number with one decimal, such as "12.3", or "12,3" in French. */
+export const oneDecimal = (language: Language) =>
+  new Intl.NumberFormat(language, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** A distance in kilometres as "12.3 km". */
+export function formatDistance(km: number, language: Language): string {
+  return `${oneDecimal(language).format(km)} km`;
 }
 
-/** A height or an elevation gain in metres as "340 m", or "1115 ft" in imperial units. */
-export function formatHeight(metres: number, { units, language }: Display): string {
+/** A height or an elevation gain in metres as "340 m". */
+export function formatHeight(metres: number, language: Language): string {
   const whole = new Intl.NumberFormat(language, { maximumFractionDigits: 0, useGrouping: false });
-  return units === 'metric' ? `${whole.format(metres)} m` : `${whole.format(metres / METRES_PER_FOOT)} ft`;
+  return `${whole.format(metres)} m`;
 }
 
 /** A duration in minutes as "45 min", or "1 h 05" from an hour on. */

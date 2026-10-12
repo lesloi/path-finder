@@ -2,21 +2,23 @@ import { Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { PaceSlider } from '../components/index.ts';
-import { formatPace, type Display } from '../core/index.ts';
-import { criteriaText, routesText } from '../i18n/index.ts';
+import { formatPace, type PaceUnit } from '../core/index.ts';
+import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 
 // The pace the durations are estimated at, and, with `onChange`, a pencil that opens a slider to change it and
 // closes it again.
 export function RoutePace({
-  display,
+  paceUnit,
+  language,
   pace,
   onChange,
 }: {
-  display: Display;
+  paceUnit: PaceUnit;
+  language: Language;
   pace: number;
   onChange?: (pace: number) => void;
 }) {
-  const t = { ...criteriaText[display.language], ...routesText[display.language] };
+  const t = { ...criteriaText[language], ...routesText[language] };
   const [editing, setEditing] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
   const edit = useRef<HTMLButtonElement>(null);
@@ -47,7 +49,8 @@ export function RoutePace({
         <PaceSlider
           label={t.pace}
           pace={pace}
-          units={display.units}
+          paceUnit={paceUnit}
+          language={language}
           testId="routes-pace-input"
           leading={pencil}
           onChange={onChange}
@@ -58,7 +61,7 @@ export function RoutePace({
   return (
     <div data-testid="routes-pace" className="flex items-center gap-2 text-sm text-ink-2">
       {pencil}
-      <span className="flex min-h-touch items-center">{t.estimatedPace(formatPace(pace, display.units))}</span>
+      <span className="flex min-h-touch items-center">{t.estimatedPace(formatPace(pace, paceUnit, language))}</span>
     </div>
   );
 }
