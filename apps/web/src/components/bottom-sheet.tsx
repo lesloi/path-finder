@@ -2,9 +2,9 @@ import { useEffectEvent, useLayoutEffect, useRef, useState, type PointerEvent, t
 
 // A drag of the handle longer than this, in px, moves the sheet instead of toggling it.
 const SWIPE_PX = 30;
-// While it follows the finger, the sheet stays between these shares of the screen height.
-const DRAG_MIN = 0.15;
-const DRAG_MAX = 0.6;
+// While it follows the finger, the sheet stays between these heights: in screen units, as the classes are.
+const DRAG_MIN = '15dvh';
+const DRAG_MAX = '60dvh';
 
 /**
  * The phone panel over the bottom of the map. It is as tall as its content, up to 40 % of the screen; once
@@ -31,8 +31,8 @@ export function BottomSheet({
   children?: ReactNode;
 }) {
   const sheet = useRef<HTMLDivElement>(null);
-  // Where a drag of the handle began, and how tall the sheet was then; none when there is no drag.
-  const drag = useRef<{ y: number; height: number }>(undefined);
+  // The finger dragging the handle: where it began, how tall the sheet was then and how far it went; none without a drag.
+  const drag = useRef<{ pointerId: number; y: number; height: number; reach: number }>(undefined);
   const swiped = useRef(false);
   // Counts the ends of a drag: the height is told again then, even if the sheet ends as tall as it was.
   const [settled, setSettled] = useState(0);
@@ -51,21 +51,28 @@ export function BottomSheet({
   }, [settled]);
 
   const follow = (event: PointerEvent) => {
-    if (!drag.current) return;
-    const [min, max] = [window.innerHeight * DRAG_MIN, window.innerHeight * DRAG_MAX];
-    const height = drag.current.height - (event.clientY - drag.current.y);
+    if (drag.current?.pointerId !== event.pointerId) return;
+    const moved = event.clientY - drag.current.y;
+    drag.current.reach = Math.max(drag.current.reach, Math.abs(moved));
     const style = sheet.current!.style;
-    style.maxHeight = `${max}px`;
-    style.height = `${Math.min(Math.max(height, min), max)}px`;
+    // The screen units bound it: the pixels of the finger may go beyond.
+    style.minHeight = DRAG_MIN;
+    style.maxHeight = DRAG_MAX;
+    style.height = `${drag.current.height - moved}px`;
   };
 
   // The sheet goes back to the height its state gives it.
   const letGo = () => {
     drag.current = undefined;
-    sheet.current!.style.height = '';
-    sheet.current!.style.maxHeight = '';
+    Object.assign(sheet.current!.style, { height: '', minHeight: '', maxHeight: '' });
     setSettled((count) => count + 1);
   };
+
+  // Without a handle, nothing ends a drag that was on it.
+  const canExpand = onExpandedChange !== undefined;
+  useLayoutEffect(() => {
+    if (!canExpand && drag.current) letGo();
+  }, [canExpand]);
 
   const mark = 'before:block before:h-1 before:w-10 before:rounded-full before:bg-border';
   return (
@@ -88,18 +95,23 @@ export function BottomSheet({
           aria-label={label}
           aria-expanded={expanded}
           onPointerDown={(event) => {
-            drag.current = { y: event.clientY, height: sheet.current!.getBoundingClientRect().height };
+            if (drag.current) return;
+            const { pointerId, clientY: y } = event;
+            drag.current = { pointerId, y, height: sheet.current!.getBoundingClientRect().height, reach: 0 };
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerMove={follow}
           onPointerUp={(event) => {
+            if (drag.current && drag.current.pointerId !== event.pointerId) return;
             const distance = event.clientY - (drag.current?.y ?? event.clientY);
+            const reach = Math.max(drag.current?.reach ?? 0, Math.abs(distance));
             letGo();
-            swiped.current = Math.abs(distance) > SWIPE_PX;
-            if (swiped.current) onExpandedChange(distance < 0);
+            // A drag that went far is no tap, even back where it began; only where it ended says which way to settle.
+            swiped.current = reach > SWIPE_PX;
+            if (Math.abs(distance) > SWIPE_PX) onExpandedChange(distance < 0);
           }}
           // A gesture the system takes over leaves the state as it was.
-          onPointerCancel={letGo}
+          onPointerCancel={(event) => drag.current?.pointerId === event.pointerId && letGo()}
           onLostPointerCapture={() => drag.current && letGo()}
           // A swipe ends with a click too: only a tap or a key toggles the sheet.
           onClick={() => {
