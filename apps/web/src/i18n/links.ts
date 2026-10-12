@@ -1,6 +1,9 @@
-/** The addresses the legal pages link to, which the dictionaries name by id. */
+/** The addresses the legal pages and the GPX export link to; the dictionaries name the former by id. */
 export const LINKS = {
+  app: 'https://mypathfinder.fr/',
   odbl: 'https://www.openstreetmap.org/copyright',
+  // The licence text itself, where `odbl` is OSM's copyright page.
+  odblText: 'https://opendatacommons.org/licenses/odbl/',
   licence: 'https://www.etalab.gouv.fr/licence-ouverte-open-licence/',
   agpl: 'https://www.gnu.org/licenses/agpl-3.0.html',
   source: 'https://github.com/lesloi/path-finder',

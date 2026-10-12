@@ -1,4 +1,4 @@
-import { commonText } from '../i18n/index.ts';
+import { commonText, LINKS } from '../i18n/index.ts';
 import { formatDistance, formatHeight, formatPace, KM_PER_MILE, METRES_PER_FOOT, type Display } from './units.ts';
 
 /**
@@ -15,10 +15,8 @@ export type GpxRoute = {
   estimatedDuration: number;
 };
 
-const APP_URL = 'https://mypathfinder.fr/';
-
-// The licence text itself, unlike LINKS.odbl, which is OSM's copyright page for the legal pages.
-const OSM_LICENSE = 'https://opendatacommons.org/licenses/odbl/';
+// Cycling (#131) will be a travel mode that chooses this; only running is generated for now.
+const TRAVEL_MODE = { type: 'running', label: 'Running' };
 
 /** Older watches truncate longer tracks. */
 export const MAX_GPX_POINTS = 2_000;
@@ -44,14 +42,14 @@ export function gpxExport(
   const content = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Path finder" xmlns="http://www.topografix.com/GPX/1/1">
 <metadata>
-<copyright author="OpenStreetMap contributors"><license>${OSM_LICENSE}</license></copyright>
-<link href="${APP_URL}"><text>Path finder</text></link>
+<copyright author="OpenStreetMap contributors"><license>${LINKS.odblText}</license></copyright>
+<link href="${LINKS.app}"><text>Path finder</text></link>
 <time>${exportedAt.toISOString()}</time>
 </metadata>
 <trk>
 <name>${name}</name>
 <desc>${description}</desc>
-<type>running</type>
+<type>${TRAVEL_MODE.type}</type>
 <trkseg>
 ${points}
 </trkseg>
@@ -80,7 +78,7 @@ function fileName({ distance, elevationGain }: GpxRoute, exportedAt: Date, { uni
     elevationGain === undefined
       ? ''
       : `_${metric ? `${Math.round(elevationGain)}m` : `${Math.round(elevationGain / METRES_PER_FOOT)}ft`}`;
-  return `Running-${length}${climb}-${date}${time}`;
+  return `${TRAVEL_MODE.label}-${length}${climb}-${date}${time}`;
 }
 
 /** Douglas–Peucker, with a tolerance doubled from 1 m until at most `max` points are left. */
