@@ -10,9 +10,9 @@ const DRAG_MAX = '60dvh';
  * The phone panel over the bottom of the map. It is as tall as its content, up to 40 % of the screen; once
  * `expanded` (such as for the detail of a route), it takes 60 % of it. The handle toggles that, from a tap or a
  * swipe; without `onExpandedChange`, the handle is only a mark. A drag of the handle moves the sheet with the finger,
- * and it settles on the side the finger went. `onHeightChange` hears the height of the sheet in px, so the map is
- * framed clear of it and the buttons over the map stand above it: it waits for the end of a drag, so the map is
- * not framed again at every move.
+ * but never past its state (a collapsed sheet does not shrink, an expanded one does not grow), and it settles on the
+ * side the finger went. `onHeightChange` hears the height of the sheet in px, so the map is framed clear of it and the
+ * buttons over the map stand above it: it waits for the end of a drag, so the map is not framed again at every move.
  */
 export function BottomSheet({
   label,
@@ -31,8 +31,9 @@ export function BottomSheet({
   children?: ReactNode;
 }) {
   const sheet = useRef<HTMLDivElement>(null);
-  // The finger dragging the handle: where it began, how tall the sheet was then and how far it went; none without a drag.
-  const drag = useRef<{ pointerId: number; y: number; height: number; reach: number }>(undefined);
+  // The finger dragging the handle: where it began, how tall the sheet was then, whether it was expanded and how far
+  // it went; none without a drag.
+  const drag = useRef<{ pointerId: number; y: number; height: number; expanded: boolean; reach: number }>(undefined);
   const swiped = useRef(false);
   // Counts the ends of a drag: the height is told again then, even if the sheet ends as tall as it was.
   const [settled, setSettled] = useState(0);
@@ -59,7 +60,7 @@ export function BottomSheet({
     style.minHeight = DRAG_MIN;
     style.maxHeight = DRAG_MAX;
     // A sheet already collapsed does not shrink further, nor does an expanded one grow: the finger may go on, not the sheet.
-    const allowed = expanded ? Math.max(moved, 0) : Math.min(moved, 0);
+    const allowed = drag.current.expanded ? Math.max(moved, 0) : Math.min(moved, 0);
     style.height = `${drag.current.height - allowed}px`;
   };
 
@@ -99,7 +100,7 @@ export function BottomSheet({
           onPointerDown={(event) => {
             if (drag.current) return;
             const { pointerId, clientY: y } = event;
-            drag.current = { pointerId, y, height: sheet.current!.getBoundingClientRect().height, reach: 0 };
+            drag.current = { pointerId, y, height: sheet.current!.getBoundingClientRect().height, expanded, reach: 0 };
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerMove={follow}
