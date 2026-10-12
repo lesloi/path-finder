@@ -10,7 +10,6 @@ import { SearchingPanel } from './searching-panel.tsx';
 import { useRouteBrowser } from './use-route-browser.ts';
 import { RouteSetView } from './route-set-view.tsx';
 import {
-  BASEMAPS,
   criteriaSummary,
   formatPosition,
   isCovered,
@@ -24,7 +23,6 @@ import {
   LazyStartPointMap,
   type MapHandle,
   type MapView,
-  BasemapPicker,
   BottomSheet,
   FLOATING_BUTTON,
   ICON_BUTTON,
@@ -37,17 +35,15 @@ import {
   useDesktop,
 } from '../components/index.ts';
 
-// The bottom-right buttons: the location or reframe one, the basemap, the north. On phones they stack up from the
+// The bottom-right buttons: the location or reframe one, the north. On phones they stack up from the
 // bottom, over the sheet; on desktops they line up from the right, above the dock when it is shown (`--edge-bottom`).
 // Each class is written whole for Tailwind; `below` counts the buttons the one stands on or beside.
 const STACKED_ABOVE = [
   'bottom-[calc(var(--sheet-height,0px)+--spacing(3))]',
   'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2))] ' +
     'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2))]',
-  'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2)+var(--spacing-touch)+--spacing(2))] ' +
-    'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2)+var(--spacing-touch)+--spacing(2))]',
 ];
-const stackedAbove = (below: 0 | 1 | 2) =>
+const stackedAbove = (below: 0 | 1) =>
   `right-safe-3 transition-[bottom] duration-250 ease-[ease] motion-reduce:transition-none desktop:bottom-(--edge-bottom) ${STACKED_ABOVE[below]}`;
 
 // Sets a custom property of the page while `shown`.
@@ -306,19 +302,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       </a>
       {!detailOpen && (
         <>
-          <BasemapPicker
-            // Over the location button, or in its place while that one is hidden.
-            className={stackedAbove(locateShown || reframeShown ? 1 : 0)}
-            label={t.basemap}
-            value={basemap}
-            options={BASEMAPS.map((value) => ({ value, label: t[value] }))}
-            onChange={(picked) => update({ basemap: picked })}
-          />
           {mapView.rotated && (
             <button
               type="button"
               data-testid="criteria-north"
-              className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(locateShown || reframeShown ? 2 : 1)}`}
+              className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(locateShown || reframeShown ? 1 : 0)}`}
               aria-label={t.resetNorth}
               onClick={() => putBack('resetNorth')}
             >

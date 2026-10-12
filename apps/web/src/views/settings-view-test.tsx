@@ -1,4 +1,4 @@
-import { fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 
 import { expectNamedControls } from '../accessible-names.ts';
 import { commonText, settingsText } from '../i18n/index.ts';
@@ -9,7 +9,7 @@ const en = { ...commonText.en, ...settingsText.en };
 const fr = { ...commonText.fr, ...settingsText.fr };
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);
 const saved = () => renderHook(() => useSettings()).result.current[0];
-const pick = (control: 'theme' | 'language' | 'pace-unit', option: string) =>
+const pick = (control: 'theme' | 'language' | 'pace-unit' | 'basemap', option: string) =>
   fireEvent.click(screen.getByTestId(`settings-${control}-${option}`));
 
 describe('SettingsView', () => {
@@ -66,6 +66,38 @@ describe('SettingsView', () => {
 
     expect(screen.getByTestId('settings-pace-unit-km/h')).toBeChecked();
     expect(saved().paceUnit).toBe('km/h');
+  });
+
+  it('shows the saved map background, and saves the one the user picks', () => {
+    renderView();
+    expect(screen.getByTestId('settings-basemap')).toHaveAccessibleName(en.basemap);
+    expect(screen.getByTestId('settings-basemap-plan')).toBeChecked();
+
+    pick('basemap', 'aerial');
+
+    expect(screen.getByTestId('settings-basemap-aerial')).toBeChecked();
+    expect(saved().basemap).toBe('aerial');
+  });
+
+  it('says so when the map background picked could not be loaded, until the next pick', () => {
+    renderView();
+    const settings = renderHook(() => useSettings());
+    pick('basemap', 'minimal');
+    expect(screen.queryByTestId('settings-basemap-error')).toBeNull();
+
+    // The map gives the previous background back when the style of the new one fails.
+    act(() => settings.result.current[1]({ basemap: 'plan' }));
+
+    expect(screen.getByTestId('settings-basemap-error')).toHaveTextContent(en.basemapFailed);
+    expect(screen.getByTestId('settings-basemap')).toHaveAccessibleDescription(en.basemapFailed);
+    pick('basemap', 'aerial');
+    expect(screen.queryByTestId('settings-basemap-error')).toBeNull();
+  });
+
+  it('names the map backgrounds in French', () => {
+    renderView('fr');
+
+    expect(screen.getByTestId('settings-basemap-aerial')).toHaveAccessibleName(fr.aerial);
   });
 
   it('saves the language the user picks', () => {
