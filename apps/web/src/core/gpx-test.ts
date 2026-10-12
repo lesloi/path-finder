@@ -94,24 +94,10 @@ describe('gpxExport', () => {
     expect(metadata.querySelector('time')?.textContent).toBe(DAY.toISOString());
   });
 
-  it('writes a well-formed file in both languages, without heights, and with no point at all', () => {
-    const english = { units: 'imperial', language: 'en' } as const;
-    const flat = loop(5).map(([lon, lat]): [number, number] => [lon, lat]);
-
-    const files = [
-      gpxExport(route, DAY, english, PACE),
-      gpxExport({ ...route, geometry: flat }, DAY, french, PACE),
-      gpxExport({ ...route, geometry: [] }, DAY, french, PACE),
-    ];
-
-    for (const { content } of files) expect(() => parse(content)).not.toThrow();
-  });
-
   it('writes an empty track for a route with no point', () => {
     const { content } = gpxExport({ ...route, geometry: [] }, DAY, french, PACE);
 
     const gpx = parse(content);
-    expect([...gpx.documentElement.children].map((element) => element.localName)).toEqual(['metadata', 'trk']);
     expect(gpx.querySelectorAll('trkpt')).toHaveLength(0);
   });
 

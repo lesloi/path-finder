@@ -29,7 +29,7 @@ export const MAX_GPX_POINTS = 2_000;
  */
 export function gpxExport(
   route: GpxRoute,
-  day: Date,
+  exportedAt: Date,
   settings: Display,
   /** Minutes per km, the one the estimated duration was computed at. */
   pace: number,
@@ -37,8 +37,7 @@ export function gpxExport(
   const name = `${commonText[settings.language].gpxTrackName} · ${formatDistance(route.distance, settings)}`;
   const minutes = Math.round(route.estimatedDuration);
   const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
-  const kept = simplify(route.geometry, MAX_GPX_POINTS);
-  const points = kept.map(trackPoint).join('\n');
+  const points = simplify(route.geometry, MAX_GPX_POINTS).map(trackPoint).join('\n');
   const climb = route.elevationGain === undefined ? [] : [`+${formatHeight(route.elevationGain, settings)}`];
   const description = `${[...climb, duration].join(' · ')} (${formatPace(pace, settings.units)})`;
   // The schema fixes the order of the elements, in the metadata as in the track.
@@ -47,7 +46,7 @@ export function gpxExport(
 <metadata>
 <copyright author="OpenStreetMap contributors"><license>${OSM_LICENSE}</license></copyright>
 <link href="${APP_URL}"><text>Path finder</text></link>
-<time>${day.toISOString()}</time>
+<time>${exportedAt.toISOString()}</time>
 </metadata>
 <trk>
 <name>${name}</name>
@@ -59,7 +58,7 @@ ${points}
 </trk>
 </gpx>
 `;
-  return { fileName: `${fileName(route, day, settings)}.gpx`, content };
+  return { fileName: `${fileName(route, exportedAt, settings)}.gpx`, content };
 }
 
 function trackPoint([lon, lat, ele]: [number, number, number?]): string {
@@ -68,25 +67,20 @@ function trackPoint([lon, lat, ele]: [number, number, number?]): string {
 }
 
 /** Such as "Running-12km_340m-20260928120000", or "Running-8mi_1114ft-20260928120000" in imperial units. */
-function fileName({ distance, elevationGain }: GpxRoute, day: Date, { units }: Display): string {
+function fileName({ distance, elevationGain }: GpxRoute, exportedAt: Date, { units }: Display): string {
   const metric = units === 'metric';
   // The device's local time, as the user reads it on their watch.
-  const date = [
-    day.getFullYear(),
-    day.getMonth() + 1,
-    day.getDate(),
-    day.getHours(),
-    day.getMinutes(),
-    day.getSeconds(),
-  ]
-    .map((part, k) => `${part}`.padStart(k === 0 ? 4 : 2, '0'))
-    .join('');
+  const pad = (n: number) => `${n}`.padStart(2, '0');
+  const [date, time] = [
+    `${exportedAt.getFullYear()}${pad(exportedAt.getMonth() + 1)}${pad(exportedAt.getDate())}`,
+    `${pad(exportedAt.getHours())}${pad(exportedAt.getMinutes())}${pad(exportedAt.getSeconds())}`,
+  ];
   const length = metric ? `${Math.round(distance)}km` : `${Math.round(distance / KM_PER_MILE)}mi`;
   const climb =
     elevationGain === undefined
       ? ''
       : `_${metric ? `${Math.round(elevationGain)}m` : `${Math.round(elevationGain / METRES_PER_FOOT)}ft`}`;
-  return `Running-${length}${climb}-${date}`;
+  return `Running-${length}${climb}-${date}${time}`;
 }
 
 /** Douglas–Peucker, with a tolerance doubled from 1 m until at most `max` points are left. */
