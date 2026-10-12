@@ -64,6 +64,118 @@ describe('BottomSheet', () => {
     expect(screen.queryByTestId('sheet-handle')).not.toBeInTheDocument();
   });
 
+  describe('a drag of its handle', () => {
+    const SHEET_PX = 300;
+    const heightOf = (sheet: HTMLElement) => sheet.style.height;
+    beforeEach(() => {
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: SHEET_PX } as DOMRect);
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    it('makes the sheet follow the finger', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 350 });
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe('350px');
+    });
+
+    it('leaves the bounds of the sheet to the screen units of its classes', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 700 });
+      fireEvent.pointerMove(handle, { clientY: 0 });
+
+      expect(screen.getByTestId('sheet').style).toMatchObject({ minHeight: '15dvh', maxHeight: '60dvh' });
+    });
+
+    it('settles on expanded when released after a swipe up', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 300 });
+      fireEvent.pointerUp(handle, { clientY: 300 });
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe('');
+      expect(handle).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('lets go of the sheet when the gesture is cancelled', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 300 });
+      fireEvent.pointerCancel(handle);
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe('');
+      expect(handle).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('does not toggle when the drag comes back near where it began', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 280 });
+      fireEvent.pointerMove(handle, { clientY: 395 });
+      fireEvent.pointerUp(handle, { clientY: 395 });
+      fireEvent.click(handle);
+
+      expect(handle).toHaveAttribute('aria-expanded', 'false');
+      expect(heightOf(screen.getByTestId('sheet'))).toBe('');
+    });
+
+    it('follows the first finger only', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 400, pointerId: 1 });
+      fireEvent.pointerDown(handle, { clientY: 100, pointerId: 2 });
+      fireEvent.pointerMove(handle, { clientY: 350, pointerId: 1 });
+      fireEvent.pointerUp(handle, { clientY: 100, pointerId: 2 });
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe('350px');
+
+      fireEvent.pointerUp(handle, { clientY: 350, pointerId: 1 });
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe('');
+    });
+
+    it('lets go of the sheet when its handle goes away during a drag', () => {
+      const onHeightChange = vi.fn();
+      const props = { testId: 'sheet', label: 'Route', onHeightChange };
+      const { rerender } = render(<BottomSheet {...props} onExpandedChange={vi.fn()} />);
+      const handle = screen.getByTestId('sheet-handle');
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 300 });
+      onHeightChange.mockClear();
+
+      rerender(<BottomSheet {...props} />);
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe('');
+      expect(onHeightChange).toHaveBeenLastCalledWith(SHEET_PX);
+    });
+
+    it('tells its height once released, not while it moves', () => {
+      const onHeightChange = vi.fn();
+      render(<Sheet onHeightChange={onHeightChange} />);
+      const handle = screen.getByTestId('sheet-handle');
+      onHeightChange.mockClear();
+
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 300 });
+      expect(onHeightChange).not.toHaveBeenCalled();
+
+      fireEvent.pointerUp(handle, { clientY: 300 });
+      expect(onHeightChange).toHaveBeenLastCalledWith(SHEET_PX);
+    });
+  });
+
   describe('its height', () => {
     const observed: { callback: ResizeObserverCallback }[] = [];
     const observer = window.ResizeObserver;
