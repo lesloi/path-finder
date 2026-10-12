@@ -9,20 +9,23 @@ const currentHash = () => window.location.hash || HOME;
 // entry keeps its trail in its state, so the trail survives going back, forward, and reloading.
 let trail: string[] = [];
 
+// How many entries of the app are behind the current one. The Navigation API counts them exactly; without it, the
+// history length is an upper bound (it also counts the entries ahead).
+function entriesBehind(): number {
+  const { navigation } = window as { navigation?: { currentEntry: { index: number } | null } };
+  return navigation?.currentEntry?.index ?? window.history.length - 1;
+}
+
 function syncTrail() {
   const state: unknown = window.history.state;
-  // A trail longer than the history is a stale one, kept from a session the system restored without its earlier
-  // entries: going back through it would leave the app, and close an installed one.
   const saved =
-    typeof state === 'object' &&
-    state !== null &&
-    'trail' in state &&
-    isHashList(state.trail) &&
-    state.trail.length <= window.history.length
+    typeof state === 'object' && state !== null && 'trail' in state && isHashList(state.trail)
       ? state.trail
       : undefined;
   if (saved) {
-    trail = saved;
+    // A system that restores the app, or a browser that caps its history, leaves fewer entries than the trail has
+    // hashes. Going back through a hash with no entry would leave the app, and close an installed one.
+    trail = saved.slice(-(entriesBehind() + 1));
     return;
   }
   // A new entry, from a link or the address bar: it follows the one before.
