@@ -181,7 +181,7 @@ test.describe('the route set', () => {
 
     const file = await download;
     // The elevation gain is in the name, and every point carries its height.
-    expect(file.suggestedFilename()).toMatch(/^\d{4}-\d+km_\d+m\.gpx$/);
+    expect(file.suggestedFilename()).toMatch(/^Running-\d+km_\d+m-\d{14}\.gpx$/);
     expect(await readFile((await file.path())!, 'utf8')).toContain('<ele>');
   });
 });
