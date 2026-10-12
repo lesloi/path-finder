@@ -66,6 +66,52 @@ describe('gpxExport', () => {
     expect(desc).toBe('28 sept. · 12,3 km · +340 m · 1 h 25 min. Données © les contributeurs d’OpenStreetMap, ODbL.');
   });
 
+  it('orders the root elements as the GPX 1.1 schema requires', () => {
+    const gpx = parse(gpxExport(route, DAY, french).content);
+
+    expect([...gpx.documentElement.children].map((element) => element.localName)).toEqual(['metadata', 'wpt', 'trk']);
+  });
+
+  it('repeats the name and description in the metadata, with the OpenStreetMap copyright and the bounds', () => {
+    const gpx = parse(gpxExport(route, DAY, french).content);
+
+    const metadata = gpx.querySelector('metadata')!;
+    expect(metadata.querySelector('name')?.textContent).toBe('28 sept. · 12,3 km · +340 m');
+    expect(metadata.querySelector('desc')?.textContent).toBe(gpx.querySelector('trk > desc')?.textContent);
+    expect(metadata.querySelector('copyright')?.getAttribute('author')).toBe('OpenStreetMap contributors');
+    expect(metadata.querySelector('copyright > license')?.textContent).toBe(
+      'https://opendatacommons.org/licenses/odbl/',
+    );
+    const lats = loop(5).map(([, lat]) => lat);
+    const lons = loop(5).map(([lon]) => lon);
+    const bounds = metadata.querySelector('bounds')!;
+    expect(bounds.getAttribute('minlat')).toBe(Math.min(...lats).toFixed(6));
+    expect(bounds.getAttribute('maxlat')).toBe(Math.max(...lats).toFixed(6));
+    expect(bounds.getAttribute('minlon')).toBe(Math.min(...lons).toFixed(6));
+    expect(bounds.getAttribute('maxlon')).toBe(Math.max(...lons).toFixed(6));
+  });
+
+  it('marks the start with a waypoint at the first point, named in the language of the settings', () => {
+    const french_ = parse(gpxExport(route, DAY, french).content).querySelector('wpt')!;
+    const english = parse(gpxExport(route, DAY, { units: 'metric', language: 'en' }).content).querySelector('wpt')!;
+
+    const [lon, lat, ele] = loop(5)[0];
+    expect(french_.getAttribute('lat')).toBe(lat.toFixed(6));
+    expect(french_.getAttribute('lon')).toBe(lon.toFixed(6));
+    expect(french_.querySelector('ele')?.textContent).toBe(ele.toFixed(1));
+    expect(french_.querySelector('name')?.textContent).toBe('Départ');
+    expect(english.querySelector('name')?.textContent).toBe('Start');
+  });
+
+  it('writes the start waypoint without a height for a route without heights', () => {
+    const geometry = loop(5).map(([lon, lat]): [number, number] => [lon, lat]);
+
+    const { content } = gpxExport({ geometry, distance: 12.34, estimatedDuration: 74 }, DAY, french);
+
+    expect(parse(content).querySelector('wpt > ele')).toBeNull();
+    expect(parse(content).querySelector('wpt > name')?.textContent).toBe('Départ');
+  });
+
   it(`keeps at most ${MAX_GPX_POINTS} points, with the start and end of the loop`, () => {
     // A zigzag of about 4 m on every point, which a 1 m tolerance keeps whole.
     const zigzag = loop(20_000).map(([lon, lat, ele], k): [number, number, number] => [

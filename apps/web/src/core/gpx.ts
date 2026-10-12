@@ -16,28 +16,41 @@ export type GpxRoute = {
   estimatedDuration: number;
 };
 
+const OSM_LICENSE = 'https://opendatacommons.org/licenses/odbl/';
+
 /** Older watches truncate longer tracks. */
 export const MAX_GPX_POINTS = 2_000;
 
 /**
  * The GPX export of a route, built on the device: a GPX 1.1 file with one track named after
- * the route, in a file such as "2809-12km_340m.gpx".
+ * the route and a waypoint on its start, in a file such as "2809-12km_340m.gpx".
  */
 export function gpxExport(route: GpxRoute, day: Date, settings: Display): { fileName: string; content: string } {
   const name = routeName(day, route, settings);
   const minutes = Math.round(route.estimatedDuration);
   const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
-  const points = simplify(route.geometry, MAX_GPX_POINTS)
-    .map(([lon, lat, ele]) => {
-      const height = ele === undefined ? '' : `<ele>${ele.toFixed(1)}</ele>`;
-      return `<trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${height}</trkpt>`;
-    })
+  const kept = simplify(route.geometry, MAX_GPX_POINTS);
+  const points = kept
+    .map(([lon, lat, ele]) => `<trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${height(ele)}</trkpt>`)
     .join('\n');
+  const [startLon, startLat, startEle] = kept[0];
+  const lats = kept.map(([, lat]) => lat);
+  const lons = kept.map(([lon]) => lon);
+  const bounds = `minlat="${Math.min(...lats).toFixed(6)}" minlon="${Math.min(...lons).toFixed(6)}" maxlat="${Math.max(...lats).toFixed(6)}" maxlon="${Math.max(...lons).toFixed(6)}"`;
+  const description = `${name} · ${duration}. ${commonText[settings.language].gpxAttribution}`;
+  // The schema fixes the order of the elements: metadata, waypoints, then tracks.
   const content = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Path finder" xmlns="http://www.topografix.com/GPX/1/1">
+<metadata>
+<name>${name}</name>
+<desc>${description}</desc>
+<copyright author="OpenStreetMap contributors"><license>${OSM_LICENSE}</license></copyright>
+<bounds ${bounds}/>
+</metadata>
+<wpt lat="${startLat.toFixed(6)}" lon="${startLon.toFixed(6)}">${height(startEle)}<name>${commonText[settings.language].gpxStart}</name></wpt>
 <trk>
 <name>${name}</name>
-<desc>${name} · ${duration}. ${commonText[settings.language].gpxAttribution}</desc>
+<desc>${description}</desc>
 <trkseg>
 ${points}
 </trkseg>
@@ -46,6 +59,8 @@ ${points}
 `;
   return { fileName: `${fileName(route, day, settings)}.gpx`, content };
 }
+
+const height = (ele?: number) => (ele === undefined ? '' : `<ele>${ele.toFixed(1)}</ele>`);
 
 /** Short, such as "2809-12km_340m", or "2809-8mi_1114ft" in imperial units. */
 function fileName({ distance, elevationGain }: GpxRoute, day: Date, { units }: Display): string {
