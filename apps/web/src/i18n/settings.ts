@@ -8,9 +8,7 @@ export const settingsText = {
     light: 'Light',
     dark: 'Dark',
     language: 'Language',
-    units: 'Units',
-    metric: 'km, m',
-    imperial: 'mi, ft',
+    paceUnit: 'Pace',
     about: 'About',
   },
   fr: {
@@ -20,9 +18,7 @@ export const settingsText = {
     light: 'Clair',
     dark: 'Sombre',
     language: 'Langue',
-    units: 'Unités',
-    metric: 'km, m',
-    imperial: 'mi, ft',
+    paceUnit: 'Allure',
     about: 'À propos',
   },
 } satisfies Record<Language, unknown>;

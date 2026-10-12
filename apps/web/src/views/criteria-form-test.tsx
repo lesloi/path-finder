@@ -4,7 +4,6 @@ import { parseCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
 import { criteriaText } from '../i18n/index.ts';
 import { CriteriaForm, criteriaChanged } from './criteria-form.tsx';
-import { useSettings } from '../state/index.ts';
 import type { Position, RouteSetRequest } from '../core/index.ts';
 
 const en = criteriaText.en;
@@ -12,9 +11,7 @@ const fr = criteriaText.fr;
 
 const START: Position = [6.1294, 45.8992];
 
-// The tests read metric figures, whatever the language, unless they pick other units.
-const store = (settings: object) =>
-  localStorage.setItem('path-finder.settings', JSON.stringify({ units: 'metric', ...settings }));
+const store = (settings: object) => localStorage.setItem('path-finder.settings', JSON.stringify(settings));
 
 function setup(props: { start?: Position; language?: 'en' | 'fr' } = {}) {
   const onSubmit = vi.fn();
@@ -86,28 +83,12 @@ describe('CriteriaForm', () => {
       expect(slider('distance')).toHaveValue('21');
     });
 
-    it.each([
-      ['metric', 2, 50],
-      ['imperial', 2, 31],
-    ])('keeps the distance slider within the API bounds in %s units', (units, min, max) => {
-      store({ units });
+    it('keeps the distance slider within the API bounds, in kilometres', () => {
       setup();
 
-      expect(slider('distance')).toHaveAttribute('min', `${min}`);
-      expect(slider('distance')).toHaveAttribute('max', `${max}`);
-    });
-
-    it.each([
-      ['en', 'imperial', 'mi'],
-      ['fr', 'metric', 'km'],
-    ] as const)('asks the distance in the units of the %s language by default: %s', (language, units, unit) => {
-      localStorage.clear();
-      const { onSubmit, submit } = setup({ language });
-
-      expect(screen.getByTestId('criteria-distance')).toHaveAttribute('max', units === 'metric' ? '50' : '31');
-      expect(screen.getByTestId('criteria-distance-value')).toHaveTextContent(new RegExp(`\\d+ ${unit}$`));
-      submit();
-      expect(() => parseCriteria(onSubmit.mock.calls[0][0])).not.toThrow();
+      expect(slider('distance')).toHaveAttribute('min', '2');
+      expect(slider('distance')).toHaveAttribute('max', '50');
+      expect(screen.getByTestId('criteria-distance-value')).toHaveTextContent(/\d+ km$/);
     });
 
     it('keeps the duration slider within the API bounds', () => {
@@ -117,41 +98,6 @@ describe('CriteriaForm', () => {
       expect(slider('duration')).toHaveAttribute('min', '15');
       expect(slider('duration')).toHaveAttribute('max', '360');
     });
-
-    it('converts miles to kilometres', () => {
-      store({ units: 'imperial' });
-      const { onSubmit, submit } = setup();
-      fireEvent.change(slider('distance'), { target: { value: '31' } });
-
-      submit();
-
-      expect(onSubmit.mock.calls[0][0].target).toEqual({ distance: 49.89 });
-      expect(() => parseCriteria(onSubmit.mock.calls[0][0])).not.toThrow();
-    });
-
-    it('follows a change of units from the settings page', () => {
-      const onSubmit = vi.fn();
-      render(<UnitsSwitch onSubmit={onSubmit} />);
-      fireEvent.change(slider('distance'), { target: { value: '16' } });
-      choose('elevation', 'target');
-      fireEvent.change(slider('gain'), { target: { value: '500' } });
-
-      fireEvent.click(screen.getByTestId('imperial'));
-
-      // 16 km is 9.9 mi, and 500 m is 1,640 ft, which the sliders round to their steps.
-      expect(slider('distance')).toHaveValue('10');
-      expect(slider('gain')).toHaveValue('1600');
-    });
-  });
-
-  it('converts the longest distance to the longest one in the new units', () => {
-    render(<UnitsSwitch onSubmit={vi.fn()} />);
-    fireEvent.change(slider('distance'), { target: { value: '50' } });
-
-    fireEvent.click(screen.getByTestId('imperial'));
-
-    // 50 km is 31.07 mi, which the slider shows as 31.
-    expect(slider('distance')).toHaveValue('31');
   });
 
   describe('elevation gain', () => {
@@ -188,18 +134,6 @@ describe('CriteriaForm', () => {
       choose('elevation', 'target');
 
       expect(slider('gain')).toHaveAttribute('max', '2500');
-    });
-
-    it('converts feet to metres, within the API bounds', () => {
-      store({ units: 'imperial' });
-      const { onSubmit, submit } = setup();
-      choose('elevation', 'target');
-      expect(slider('gain')).toHaveAttribute('max', '8200');
-      fireEvent.change(slider('gain'), { target: { value: '8200' } });
-
-      submit();
-
-      expect(onSubmit.mock.calls[0][0].elevationGain).toBe(2_499);
     });
   });
 
@@ -239,20 +173,6 @@ describe('CriteriaForm', () => {
       });
       expect(screen.getByTestId('criteria-surface-unpaved')).toBeChecked();
     });
-
-    it('shows a gain kept in metres in the units of the settings', () => {
-      store({ units: 'imperial', lastCriteria: { target: 'distance', surface: 'any', level: 'target', gain: 457 } });
-      setup();
-
-      expect(slider('gain')).toHaveValue('1500');
-    });
-
-    it('shows a distance kept in kilometres in the units of the settings', () => {
-      store({ units: 'imperial', lastCriteria: { distance: 16.09344 } });
-      setup();
-
-      expect(slider('distance')).toHaveValue('10');
-    });
   });
 
   describe('pace', () => {
@@ -278,12 +198,17 @@ describe('CriteriaForm', () => {
       expect(JSON.parse(localStorage.getItem('path-finder.settings')!).pace).toBe(5.5);
     });
 
-    it('is shown in min/mi with imperial units', () => {
-      store({ units: 'imperial' });
-      setup();
+    it('is shown in km/h when the user asks for it, and saved in minutes per km as the slider moves', () => {
+      store({ paceUnit: 'km/h' });
+      const { onSubmit, submit } = setup();
       choose('target', 'duration');
+      expect(field()).toHaveValue('10');
+      expect(screen.getByTestId('criteria-pace-value')).toHaveTextContent('10.0 km/h');
 
-      expect(screen.getByTestId('criteria-pace-value')).toHaveTextContent('9:39 min/mi');
+      fireEvent.change(field()!, { target: { value: '12' } });
+      submit();
+
+      expect(onSubmit.mock.calls[0][0].pace).toBe(5);
     });
 
     it('shows the saved pace', () => {
@@ -329,19 +254,6 @@ describe('CriteriaForm', () => {
   });
 });
 
-// Settings are changed elsewhere in the app: a button stands for the settings page.
-function UnitsSwitch({ onSubmit }: { onSubmit: () => void }) {
-  const [, update] = useSettings();
-  return (
-    <>
-      <button type="button" data-testid="imperial" onClick={() => update({ units: 'imperial' })}>
-        Imperial
-      </button>
-      <CriteriaForm language="en" start={START} onSubmit={onSubmit} />
-    </>
-  );
-}
-
 describe('criteriaChanged', () => {
   const found: RouteSetRequest = {
     start: [6.1, 45.8],
@@ -350,8 +262,7 @@ describe('criteriaChanged', () => {
     surface: 'any',
     pace: 6,
   };
-  const changed = (changes: Partial<RouteSetRequest>, units: 'metric' | 'imperial' = 'metric') =>
-    criteriaChanged({ ...found, ...changes }, found, units);
+  const changed = (changes: Partial<RouteSetRequest>) => criteriaChanged({ ...found, ...changes }, found);
 
   it('sees no change in the same request', () => {
     expect(changed({})).toBe(false);
@@ -371,20 +282,16 @@ describe('criteriaChanged', () => {
   it('sees a change of the pace by duration only', () => {
     expect(changed({ pace: 5 })).toBe(false);
     expect(
-      criteriaChanged(
-        { ...found, target: { duration: 60 }, pace: 5 },
-        { ...found, target: { duration: 60 } },
-        'metric',
-      ),
+      criteriaChanged({ ...found, target: { duration: 60 }, pace: 5 }, { ...found, target: { duration: 60 } }),
     ).toBe(true);
   });
 
-  it('takes a value rounded in other units for the same one, and a step for another', () => {
-    // 6 mi is 9.66 km, which a slider in miles holds for 10 km; 7 mi is not.
-    expect(changed({ target: { distance: 9.66 } }, 'imperial')).toBe(false);
-    expect(changed({ target: { distance: 11.27 } }, 'imperial')).toBe(true);
-    // 1000 ft is 305 m, which a slider in metres holds for 300 m; 1100 ft is not.
-    expect(changed({ elevationGain: 305 }, 'imperial')).toBe(false);
-    expect(changed({ elevationGain: 335 }, 'imperial')).toBe(true);
+  it('takes a value within half a step of the slider for the same one, and a step for another', () => {
+    // 9.66 km, kept from a search, is held by the slider for 10 km; 11.27 km is not.
+    expect(changed({ target: { distance: 9.66 } })).toBe(false);
+    expect(changed({ target: { distance: 11.27 } })).toBe(true);
+    // 305 m is held for 300 m; 335 m is not.
+    expect(changed({ elevationGain: 305 })).toBe(false);
+    expect(changed({ elevationGain: 335 })).toBe(true);
   });
 });

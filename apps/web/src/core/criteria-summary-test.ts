@@ -8,7 +8,7 @@ const request: RouteSetRequest = {
   surface: 'any',
   pace: 6,
 };
-const metric = { units: 'metric', language: 'en' } as const;
+const metric = 'en';
 
 describe('criteriaSummary', () => {
   it('names the target distance', () => {
@@ -31,9 +31,9 @@ describe('criteriaSummary', () => {
     expect(criteriaSummary({ ...request, surface: 'unpaved' }, metric)).toBe(`10.0 km · ${criteriaText.en.unpaved}`);
   });
 
-  it('follows the units and the language', () => {
-    expect(
-      criteriaSummary({ ...request, elevationGain: 300, surface: 'paved' }, { units: 'imperial', language: 'fr' }),
-    ).toBe(`6,2 mi · 984 ft · ${criteriaText.fr.paved}`);
+  it('follows the language', () => {
+    expect(criteriaSummary({ ...request, elevationGain: 300, surface: 'paved' }, 'fr')).toBe(
+      `10,0 km · 300 m · ${criteriaText.fr.paved}`,
+    );
   });
 });

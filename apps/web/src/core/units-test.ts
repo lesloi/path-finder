@@ -5,28 +5,25 @@ import {
   formatPace,
   paceFromSeconds,
   paceSeconds,
-  paceUnit,
+  invertPace,
 } from './units.ts';
 
 describe('formatDistance', () => {
   it.each([
-    ['in kilometres', 12.34, 'metric', 'en', '12.3 km'],
-    ['with a decimal comma in French', 12.34, 'metric', 'fr', '12,3 km'],
-    ['in miles', 16.09344, 'imperial', 'en', '10.0 mi'],
-    ['in miles with a decimal comma in French', 12.34, 'imperial', 'fr', '7,7 mi'],
-  ] as const)('writes a distance %s', (_, km, units, language, expected) => {
-    expect(formatDistance(km, { units, language })).toBe(expected);
+    ['in kilometres', 12.34, 'en', '12.3 km'],
+    ['with a decimal comma in French', 12.34, 'fr', '12,3 km'],
+  ] as const)('writes a distance %s', (_, km, language, expected) => {
+    expect(formatDistance(km, language)).toBe(expected);
   });
 });
 
 describe('formatHeight', () => {
   it.each([
-    ['in metres', 339.6, 'metric', '340 m'],
-    ['in feet', 339.6, 'imperial', '1114 ft'],
-    ['without a thousands separator', 1_234, 'metric', '1234 m'],
-  ] as const)('writes a height %s, in both languages', (_, metres, units, expected) => {
-    expect(formatHeight(metres, { units, language: 'fr' })).toBe(expected);
-    expect(formatHeight(metres, { units, language: 'en' })).toBe(expected);
+    ['in metres', 339.6, '340 m'],
+    ['without a thousands separator', 1_234, '1234 m'],
+  ] as const)('writes a height %s, in both languages', (_, metres, expected) => {
+    expect(formatHeight(metres, 'fr')).toBe(expected);
+    expect(formatHeight(metres, 'en')).toBe(expected);
   });
 });
 
@@ -42,23 +39,21 @@ describe('formatDuration', () => {
 });
 
 describe('pace', () => {
-  it('is minutes per distance, never a speed', () => {
-    expect(paceUnit('metric')).toBe('min/km');
-    expect(paceUnit('imperial')).toBe('min/mi');
+  it.each([
+    ['in minutes per km', 5.5, 'min/km', 'en', '5:30 min/km'],
+    ['in km/h', 5.5, 'km/h', 'en', '10.9 km/h'],
+    ['in km/h with a decimal comma in French', 5.5, 'km/h', 'fr', '10,9 km/h'],
+  ] as const)('writes a pace %s', (_, minPerKm, paceUnit, language, expected) => {
+    expect(formatPace(minPerKm, paceUnit, language)).toBe(expected);
   });
 
-  it.each([
-    ['per kilometre', 5.5, 'metric', '5:30 min/km'],
-    ['per mile', 5.5, 'imperial', '8:51 min/mi'],
-  ] as const)('writes a pace %s', (_, minPerKm, units, expected) => {
-    expect(formatPace(minPerKm, units)).toBe(expected);
+  it('goes from seconds per km to a pace in minutes per km, and back', () => {
+    expect(paceFromSeconds(330)).toBe(5.5);
+    expect(paceSeconds(5.5)).toBe(330);
   });
 
-  it.each([
-    ['per kilometre', 330, 'metric', 5.5],
-    ['per mile', 480, 'imperial', 8 / 1.609344],
-  ] as const)('goes from seconds %s to a pace in minutes per km, and back', (_, seconds, units, minPerKm) => {
-    expect(paceFromSeconds(seconds, units)).toBeCloseTo(minPerKm, 10);
-    expect(paceSeconds(minPerKm, units)).toBe(seconds);
+  it('goes from a speed in km/h to a pace in minutes per km, and back', () => {
+    expect(invertPace(12)).toBe(5);
+    expect(invertPace(5)).toBe(12);
   });
 });

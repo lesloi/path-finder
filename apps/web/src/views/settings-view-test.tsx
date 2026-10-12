@@ -9,27 +9,18 @@ const en = { ...commonText.en, ...settingsText.en };
 const fr = { ...commonText.fr, ...settingsText.fr };
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);
 const saved = () => renderHook(() => useSettings()).result.current[0];
-const pick = (control: 'theme' | 'language' | 'units', option: string) =>
+const pick = (control: 'theme' | 'language' | 'pace-unit', option: string) =>
   fireEvent.click(screen.getByTestId(`settings-${control}-${option}`));
 
 describe('SettingsView', () => {
   it.each([
-    ['en', 'imperial', en],
-    ['fr', 'metric', fr],
-  ] as const)('shows the units of the %s language by default: %s', (language, units, text) => {
+    ['en', en],
+    ['fr', fr],
+  ] as const)('shows the pace in min/km by default, in %s', (language, text) => {
     renderView(language);
 
-    expect(screen.getByTestId('settings-units')).toHaveAccessibleName(text.units);
-    expect(screen.getByTestId(`settings-units-${units}`)).toBeChecked();
-  });
-
-  it('keeps the units picked in front of the language', () => {
-    renderView('en');
-
-    pick('units', 'metric');
-
-    expect(screen.getByTestId('settings-units-metric')).toBeChecked();
-    expect(saved().units).toBe('metric');
+    expect(screen.getByTestId('settings-pace-unit')).toHaveAccessibleName(text.paceUnit);
+    expect(screen.getByTestId('settings-pace-unit-min/km')).toBeChecked();
   });
 
   it('saves the picked theme', () => {
@@ -68,12 +59,13 @@ describe('SettingsView', () => {
     expect(screen.getByTestId(`settings-${page}`)).toHaveAttribute('href', href);
   });
 
-  it('saves the units the user picks', () => {
+  it('saves the pace unit the user picks', () => {
     renderView('fr');
 
-    pick('units', 'imperial');
+    pick('pace-unit', 'km/h');
 
-    expect(saved().units).toBe('imperial');
+    expect(screen.getByTestId('settings-pace-unit-km/h')).toBeChecked();
+    expect(saved().paceUnit).toBe('km/h');
   });
 
   it('saves the language the user picks', () => {
@@ -96,6 +88,6 @@ describe('SettingsView', () => {
     expect(screen.getAllByRole('heading', { level: 2 })[0]).toHaveTextContent(fr.display);
     expect(screen.getByTestId('settings-language')).toHaveAccessibleName(fr.language);
     expect(screen.getByTestId('settings-language-fr')).toBeChecked();
-    expect(screen.getByTestId('settings-units')).toHaveAccessibleName(fr.units);
+    expect(screen.getByTestId('settings-pace-unit')).toHaveAccessibleName(fr.paceUnit);
   });
 });

@@ -178,9 +178,6 @@ export class ScaleControl {
   constructor(options: { unit?: string } = {}) {
     this.options = options;
   }
-  setUnit(unit: string) {
-    this.options.unit = unit;
-  }
 }
 
 /** The app points maplibre at its worker before the first map: nothing to do without one. */

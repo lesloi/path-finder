@@ -4,13 +4,13 @@ test.describe('the settings', () => {
   test('survive a reload', async ({ page }) => {
     await page.goto('/#/settings');
 
-    await expect(page.getByTestId('settings-units-metric')).toBeChecked();
-    await page.locator('label', { has: page.getByTestId('settings-units-imperial') }).click();
+    await expect(page.getByTestId('settings-pace-unit-min/km')).toBeChecked();
+    await page.locator('label', { has: page.getByTestId('settings-pace-unit-km/h') }).click();
     await page.locator('label', { has: page.getByTestId('settings-language-fr') }).click();
     await page.reload();
 
     await expect(page.getByTestId('settings-language-fr')).toBeChecked();
-    await expect(page.getByTestId('settings-units-imperial')).toBeChecked();
+    await expect(page.getByTestId('settings-pace-unit-km/h')).toBeChecked();
   });
 
   test('keep a forced theme across a reload', async ({ page }) => {

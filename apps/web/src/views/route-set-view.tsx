@@ -32,9 +32,9 @@ import {
   type Position,
   type MapSnapshot,
   type Route,
-  type Display,
+  type PaceUnit,
 } from '../core/index.ts';
-import { criteriaText, routesText } from '../i18n/index.ts';
+import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 import { RouteFigures, SurfaceShare, surfaceShares } from './route-figures.tsx';
 import { RouteCarousel } from './route-carousel.tsx';
 import { RoutePace } from './route-pace.tsx';
@@ -48,7 +48,7 @@ const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp
 >;
 
 // The words of the route set: its own, and the labels it shares with the criteria.
-const words = ({ language }: Display) => ({ ...criteriaText[language], ...routesText[language] });
+const words = (language: Language) => ({ ...criteriaText[language], ...routesText[language] });
 
 /**
  * The route set the user asked for. On phones, first a carousel of its routes, where settling on a card selects
@@ -59,7 +59,8 @@ const words = ({ language }: Display) => ({ ...criteriaText[language], ...routes
  * lets the user change it in the list.
  */
 export function RouteSetView({
-  display,
+  language,
+  paceUnit,
   routes,
   pace,
   snapshot,
@@ -71,7 +72,8 @@ export function RouteSetView({
   onPaceChange,
   onHover,
 }: {
-  display: Display;
+  language: Language;
+  paceUnit: PaceUnit;
   routes: Route[];
   /** Minutes per km, which the durations of the routes are estimated at. */
   pace: number;
@@ -94,7 +96,8 @@ export function RouteSetView({
   if (detail && !desktop) {
     return (
       <RouteDetail
-        display={display}
+        language={language}
+        paceUnit={paceUnit}
         routes={routes}
         pace={pace}
         snapshot={snapshot}
@@ -106,7 +109,7 @@ export function RouteSetView({
     );
   }
 
-  const t = words(display);
+  const t = words(language);
   const rows = routes.map((route, index) => (
     <RouteRow
       key={index}
@@ -115,7 +118,7 @@ export function RouteSetView({
       index={index}
       count={routes.length}
       selected={index === selected}
-      display={display}
+      language={language}
       desktop={desktop}
       // A tap opens the detail of the route on the card in the middle, and brings another card there; a click on
       // a desktop selects the route.
@@ -138,7 +141,7 @@ export function RouteSetView({
           </span>
         )}
       </div>
-      <RoutePace display={display} pace={pace} onChange={onPaceChange} />
+      <RoutePace paceUnit={paceUnit} language={language} pace={pace} onChange={onPaceChange} />
       {desktop ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
           {rows.map((row, index) => (
@@ -160,7 +163,7 @@ function RouteRow({
   index,
   count,
   selected,
-  display,
+  language,
   desktop,
   onOpen,
   onPreview,
@@ -171,7 +174,7 @@ function RouteRow({
   index: number;
   count: number;
   selected: boolean;
-  display: Display;
+  language: Language;
   desktop: boolean;
   onOpen: () => void;
   /** The pointer or the focus is on the row: its route is the one the map highlights. */
@@ -179,14 +182,14 @@ function RouteRow({
   /** The pointer or the focus left the row. */
   onPreviewEnd?: (() => void) | undefined;
 }) {
-  const t = words(display);
+  const t = words(language);
   // A press focuses the row before its click: only the keyboard selects from the focus, not a tap.
   const pressed = useRef(false);
-  const distance = formatDistance(route.distance, display);
-  const duration = formatDuration(route.estimatedDuration, display.language);
-  const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, display);
-  const misses = route.misses.map((miss) => missText(miss, route, display));
-  const shares = surfaceShares(route, display);
+  const distance = formatDistance(route.distance, language);
+  const duration = formatDuration(route.estimatedDuration, language);
+  const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, language);
+  const misses = route.misses.map((miss) => missText(miss, route, language));
+  const shares = surfaceShares(route, language);
   const surface = `${t.paved} ${shares.paved} · ${t.unpaved} ${shares.unpaved}`;
   const name = [
     t.route(index + 1, count),
@@ -269,7 +272,8 @@ function Marker({ icon: Icon, text, testId }: { icon: LucideIcon; text: string; 
 }
 
 function RouteDetail({
-  display,
+  language,
+  paceUnit,
   routes,
   pace,
   snapshot,
@@ -278,7 +282,8 @@ function RouteDetail({
   onBack,
   onHover,
 }: {
-  display: Display;
+  language: Language;
+  paceUnit: PaceUnit;
   routes: Route[];
   /** Minutes per km, the pace of the durations. */
   pace: number;
@@ -288,7 +293,7 @@ function RouteDetail({
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
 }) {
-  const t = words(display);
+  const t = words(language);
   const route = routes[selected];
   const swipeFrom = useRef<[number, number]>(undefined);
   const hasPrevious = selected > 0;
@@ -338,23 +343,23 @@ function RouteDetail({
           index={selected}
           {...(snapshot && { snapshot })}
         />
-        <RouteFigures route={route} display={display} className="flex-1" />
+        <RouteFigures route={route} language={language} className="flex-1" />
       </div>
       {route.misses.length > 0 && (
         <div className="flex flex-wrap gap-x-4 gap-y-1">
           {route.misses.map((miss) => (
-            <MissMarker key={miss.criterion} miss={miss} text={missText(miss, route, display)} testId="route-miss" />
+            <MissMarker key={miss.criterion} miss={miss} text={missText(miss, route, language)} testId="route-miss" />
           ))}
         </div>
       )}
-      <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
-      <SurfaceShare route={route} display={display} />
+      <ElevationProfile testId="route-profile" route={route} language={language} onHover={onHover} />
+      <SurfaceShare route={route} language={language} />
       <button
         type="button"
         data-testid="route-export"
         className={PRIMARY_BUTTON}
         // Nothing awaited before the share sheet: it needs the tap that opened it.
-        onClick={() => void saveGpx(gpxExport(route, new Date(), display, pace))}
+        onClick={() => void saveGpx(gpxExport(route, new Date(), { language, paceUnit }, pace))}
       >
         <Download size={18} aria-hidden />
         {t.exportGpx}

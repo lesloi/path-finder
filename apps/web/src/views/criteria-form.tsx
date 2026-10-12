@@ -10,16 +10,9 @@ import {
   type CriteriaField,
 } from '../contract/index.ts';
 import { PaceSlider, PRIMARY_BUTTON, SegmentedControl, Slider } from '../components/index.ts';
-import {
-  formatDuration,
-  KM_PER_MILE,
-  METRES_PER_FOOT,
-  type Position,
-  type RouteSetRequest,
-  type Units,
-} from '../core/index.ts';
+import { formatDuration, type Position, type RouteSetRequest } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
-import { unitsOf, useSettings, useUnits, type LastCriteria } from '../state/index.ts';
+import { useSettings, type LastCriteria } from '../state/index.ts';
 
 const CRITERIA = ['target', 'surface', 'elevation'] as const;
 
@@ -28,59 +21,38 @@ const DURATION_STEP = 5; // minutes
 type Target = LastCriteria['target'];
 type Criterion = (typeof CRITERIA)[number];
 
-// Distance in km or mi, elevation gain in m or ft: the user's units, which the bounds are shown in.
+// Distance in km, elevation gain in m, which the bounds are shown in.
 export type Draft = LastCriteria;
 
-/** The bounds of the sliders in the user's units, inside the API's bounds once converted back. */
-function boundsFor(units: Units) {
-  const { kmPerDistanceUnit, metresPerGainUnit, gainStep } = unitsFor(units);
-  return {
-    distance: {
-      min: Math.ceil(MIN_TARGET_DISTANCE / kmPerDistanceUnit),
-      max: Math.floor(MAX_TARGET_DISTANCE / kmPerDistanceUnit),
-    },
-    gain: { max: Math.floor(MAX_TARGET_ELEVATION_GAIN / metresPerGainUnit / gainStep) * gainStep },
-  };
-}
+const GAIN_STEP = 50;
 
-function unitsFor(units: Units) {
-  return units === 'metric'
-    ? { kmPerDistanceUnit: 1, metresPerGainUnit: 1, gainStep: 50, distance: 'km', gain: 'm' }
-    : {
-        kmPerDistanceUnit: KM_PER_MILE,
-        metresPerGainUnit: METRES_PER_FOOT,
-        gainStep: 100,
-        distance: 'mi',
-        gain: 'ft',
-      };
-}
+/** The bounds of the sliders, inside the API's bounds. */
+const BOUNDS = {
+  distance: { min: Math.ceil(MIN_TARGET_DISTANCE), max: Math.floor(MAX_TARGET_DISTANCE) },
+  gain: { max: Math.floor(MAX_TARGET_ELEVATION_GAIN / GAIN_STEP) * GAIN_STEP },
+};
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-const round = (value: number, decimals: number) => Math.round(value * 10 ** decimals) / 10 ** decimals;
-
 /**
- * What the user has set in the form, in their units. It starts from the criteria of the last search, kept on the
+ * What the user has set in the form. It starts from the criteria of the last search, kept on the
  * device, and is kept there only once a search is made with it (`keep`), so that setting a criterion writes nothing.
- * The distance is held in kilometres and the gain in metres, so a change of units made in the settings, even while
- * the view stays mounted, changes how they are shown and not what was asked.
+ * The sliders show the distance to the kilometre and the gain to the step, which the criteria kept are not rounded to.
  */
-export function useCriteriaDraft(language: Language): [Draft, (draft: Draft) => void, () => void] {
+export function useCriteriaDraft(): [Draft, (draft: Draft) => void, () => void] {
   const [settings, update] = useSettings();
-  const units = unitsOf(settings, language);
-  const { kmPerDistanceUnit, metresPerGainUnit, gainStep } = unitsFor(units);
   const [criteria, setCriteria] = useState(settings.lastCriteria);
   const draft: Draft = {
     ...criteria,
-    distance: Math.round(criteria.distance / kmPerDistanceUnit),
-    gain: Math.round(criteria.gain / metresPerGainUnit / gainStep) * gainStep,
+    distance: Math.round(criteria.distance),
+    gain: Math.round(criteria.gain / GAIN_STEP) * GAIN_STEP,
   };
   function setDraft(next: Draft) {
     // A length is rewritten only when its shown value changed, which would otherwise round the one asked.
     setCriteria({
       ...next,
-      distance: next.distance === draft.distance ? criteria.distance : next.distance * kmPerDistanceUnit,
-      gain: next.gain === draft.gain ? criteria.gain : Math.round(next.gain * metresPerGainUnit),
+      distance: next.distance === draft.distance ? criteria.distance : next.distance,
+      gain: next.gain === draft.gain ? criteria.gain : next.gain,
     });
   }
   const keep = () => {
@@ -90,26 +62,21 @@ export function useCriteriaDraft(language: Language): [Draft, (draft: Draft) => 
 }
 
 /**
- * The request the draft asks for, with the values in the API's units, or none without a start point. Both the
+ * The request the draft asks for, or none without a start point. Both the
  * form and the view that compares it with the routes found build it here.
  */
 export function criteriaRequest(
   draft: Draft,
-  { units, pace, start }: { units: Units; pace: number; start?: Position },
+  { pace, start }: { pace: number; start?: Position },
 ): RouteSetRequest | undefined {
-  const bounds = boundsFor(units);
-  const unit = unitsFor(units);
-  const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
-  const gain = clamp(draft.gain, 0, bounds.gain.max);
+  const distance = clamp(draft.distance, BOUNDS.distance.min, BOUNDS.distance.max);
+  const gain = clamp(draft.gain, 0, BOUNDS.gain.max);
   const level = draft.level;
   return (
     start && {
       start,
-      target:
-        draft.target === 'distance'
-          ? { distance: round(distance * unit.kmPerDistanceUnit, 2) }
-          : { duration: draft.duration },
-      ...(level === 'target' && { elevationGain: Math.round(gain * unit.metresPerGainUnit) }),
+      target: draft.target === 'distance' ? { distance } : { duration: draft.duration },
+      ...(level === 'target' && { elevationGain: gain }),
       ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
       surface: draft.surface,
       pace,
@@ -119,22 +86,19 @@ export function criteriaRequest(
 
 /**
  * Whether `request` asks for something other than `found`, the request of the routes shown. A distance or an
- * elevation gain within half a step of the slider is the same one worded in other units (6 mi is 9.66 km, which
- * a slider in km rounds to 10), and the pace of a distance only changes the durations, on the spot.
+ * elevation gain within half a step of the slider is the same one (a distance of 9.66 km, which the slider
+ * rounds to 10, comes from the last search), and the pace of a distance only changes the durations, on the spot.
  */
-export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest, units: Units): boolean {
-  const unit = unitsFor(units);
+export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest): boolean {
   const within = (a: number, b: number, tolerance: number) => Math.abs(a - b) <= tolerance;
   const [a, b] = [request.target, found.target];
   const sameTarget =
     'distance' in a && 'distance' in b
-      ? within(a.distance, b.distance, unit.kmPerDistanceUnit / 2)
+      ? within(a.distance, b.distance, 0.5)
       : 'duration' in a && 'duration' in b && a.duration === b.duration;
   const [gainA, gainB] = [request.elevationGain, found.elevationGain];
   const sameGain =
-    typeof gainA === 'number' && typeof gainB === 'number'
-      ? within(gainA, gainB, (unit.metresPerGainUnit * unit.gainStep) / 2)
-      : gainA === gainB;
+    typeof gainA === 'number' && typeof gainB === 'number' ? within(gainA, gainB, GAIN_STEP / 2) : gainA === gainB;
   return !(
     sameTarget &&
     sameGain &&
@@ -167,18 +131,15 @@ export function CriteriaForm({
 }) {
   const t = { ...commonText[language], ...criteriaText[language] };
   const [settings, update] = useSettings();
-  const units = useUnits(language);
-  const own = useCriteriaDraft(language);
+  const own = useCriteriaDraft();
   const [draft, setDraft] = kept ?? own;
 
-  const bounds = boundsFor(units);
-  const unit = unitsFor(units);
-  const distance = clamp(draft.distance, bounds.distance.min, bounds.distance.max);
-  const gain = clamp(draft.gain, 0, bounds.gain.max);
+  const distance = clamp(draft.distance, BOUNDS.distance.min, BOUNDS.distance.max);
+  const gain = clamp(draft.gain, 0, BOUNDS.gain.max);
   const level = draft.level;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
-  const request = criteriaRequest(draft, { units, pace: settings.pace, start });
+  const request = criteriaRequest(draft, { pace: settings.pace, start });
   const field = request && invalidField(request);
 
   const sections: Record<Criterion, { title: string; content: ReactNode }> = {
@@ -201,9 +162,9 @@ export function CriteriaForm({
               testId="criteria-distance"
               label={t.distance}
               value={distance}
-              shown={`${distance} ${unit.distance}`}
-              min={bounds.distance.min}
-              max={bounds.distance.max}
+              shown={`${distance} km`}
+              min={BOUNDS.distance.min}
+              max={BOUNDS.distance.max}
               step={1}
               onChange={(value) => change({ distance: value })}
             />
@@ -223,7 +184,8 @@ export function CriteriaForm({
             <PaceSlider
               label={t.pace}
               pace={settings.pace}
-              units={units}
+              paceUnit={settings.paceUnit}
+              language={language}
               testId="criteria-pace"
               onChange={(pace) => update({ pace })}
             />
@@ -252,10 +214,10 @@ export function CriteriaForm({
               testId="criteria-gain"
               label={t.elevationGain}
               value={gain}
-              shown={`${gain} ${unit.gain}`}
+              shown={`${gain} m`}
               min={0}
-              max={bounds.gain.max}
-              step={unit.gainStep}
+              max={BOUNDS.gain.max}
+              step={GAIN_STEP}
               onChange={(value) => change({ gain: value })}
             />
           )}
@@ -303,7 +265,7 @@ export function CriteriaForm({
   );
   const error = field && (
     <p role="alert" data-testid="criteria-error" className="text-sm text-ink">
-      {message(field, draft.target, { language, distance: bounds.distance, gain: bounds.gain, unit })}
+      {message(field, draft.target, { language, distance: BOUNDS.distance, gain: BOUNDS.gain })}
     </p>
   );
 
@@ -338,19 +300,17 @@ function message(
     language,
     distance,
     gain,
-    unit,
   }: {
     language: Language;
     distance: { min: number; max: number };
     gain: { max: number };
-    unit: { distance: string; gain: string };
   },
 ): string {
   const t = criteriaText[language];
   const messages: Record<CriteriaField, string> = {
     start: t.startError,
-    target: target === 'distance' ? t.distanceError(distance.min, distance.max, unit.distance) : t.durationError,
-    elevationGain: t.elevationGainError(gain.max, unit.gain),
+    target: target === 'distance' ? t.distanceError(distance.min, distance.max, 'km') : t.durationError,
+    elevationGain: t.elevationGainError(gain.max, 'm'),
     surface: t.surfaceError,
     pace: t.paceError,
   };

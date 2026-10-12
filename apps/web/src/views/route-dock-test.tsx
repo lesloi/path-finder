@@ -26,7 +26,8 @@ const route: Route = {
 function dock(language: 'en' | 'fr' = 'en', props: Partial<Parameters<typeof RouteDock>[0]> = {}) {
   return render(
     <RouteDock
-      display={{ units: 'metric', language }}
+      language={language}
+      paceUnit="min/km"
       pace={5.5}
       route={route}
       index={1}

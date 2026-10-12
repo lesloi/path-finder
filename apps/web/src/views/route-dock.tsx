@@ -1,8 +1,8 @@
 import { Download, X } from 'lucide-react';
 
 import { DOCK, ElevationProfile, ICON_BUTTON, PRIMARY_BUTTON } from '../components/index.ts';
-import { gpxExport, missText, saveGpx, type Display, type Position, type Route } from '../core/index.ts';
-import { routesText } from '../i18n/index.ts';
+import { gpxExport, missText, saveGpx, type PaceUnit, type Position, type Route } from '../core/index.ts';
+import { routesText, type Language } from '../i18n/index.ts';
 import { RouteFigures, SurfaceShare } from './route-figures.tsx';
 
 /**
@@ -11,7 +11,8 @@ import { RouteFigures, SurfaceShare } from './route-figures.tsx';
  * points at on the profile.
  */
 export function RouteDock({
-  display,
+  language,
+  paceUnit,
   pace,
   route,
   index,
@@ -19,7 +20,8 @@ export function RouteDock({
   onClose,
   onHover,
 }: {
-  display: Display;
+  language: Language;
+  paceUnit: PaceUnit;
   /** Minutes per km, the pace of the route's duration. */
   pace: number;
   route: Route;
@@ -29,7 +31,7 @@ export function RouteDock({
   onClose: () => void;
   onHover: (position: Position | undefined) => void;
 }) {
-  const t = routesText[display.language];
+  const t = routesText[language];
   return (
     <section
       data-testid="route-dock"
@@ -40,7 +42,7 @@ export function RouteDock({
         <strong data-testid="route-position">{t.route(index + 1, count)}</strong>
         {/* Centred in the room above the export. */}
         <div className="flex flex-1 flex-col justify-center">
-          <RouteFigures route={route} display={display} />
+          <RouteFigures route={route} language={language} />
         </div>
         <div className="self-center">
           <button
@@ -48,7 +50,7 @@ export function RouteDock({
             data-testid="route-export"
             className={PRIMARY_BUTTON}
             // Nothing awaited before the share sheet: it needs the click that opened it.
-            onClick={() => void saveGpx(gpxExport(route, new Date(), display, pace))}
+            onClick={() => void saveGpx(gpxExport(route, new Date(), { language, paceUnit }, pace))}
           >
             <Download size={18} aria-hidden />
             {t.exportGpx}
@@ -56,14 +58,14 @@ export function RouteDock({
         </div>
       </div>
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
-        <ElevationProfile testId="route-profile" route={route} display={display} onHover={onHover} />
-        <SurfaceShare route={route} display={display} />
+        <ElevationProfile testId="route-profile" route={route} language={language} onHover={onHover} />
+        <SurfaceShare route={route} language={language} />
         {/* Here rather than in the figures' column, which has no room left for them. */}
         {route.misses.length > 0 && (
           <div className="flex flex-wrap justify-center gap-x-4">
             {route.misses.map((miss) => (
               <span key={miss.criterion} data-testid="route-miss" className="text-sm font-semibold text-ink">
-                {missText(miss, route, display)}
+                {missText(miss, route, language)}
               </span>
             ))}
           </div>

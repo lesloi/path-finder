@@ -12,10 +12,12 @@ import {
   BASEMAPS,
   DEFAULT_BASEMAP,
   DEFAULT_PACE,
+  DEFAULT_PACE_UNIT,
   DEFAULT_THEME,
   type Basemap,
   type Theme,
-  type Units,
+  PACE_UNITS,
+  type PaceUnit,
 } from '../core/index.ts';
 import { browserLanguage, type Language } from '../i18n/index.ts';
 
@@ -26,13 +28,13 @@ export type ElevationLevel = 'any' | 'flat' | 'hilly' | 'target';
 export type LastCriteria = {
   /** What the length is set by. */
   target: 'distance' | 'duration';
-  /** The target distance, in kilometres whatever the units. */
+  /** The target distance, in kilometres. */
   distance: number;
   /** The target duration, in minutes. */
   duration: number;
   surface: Criteria['surface'];
   level: ElevationLevel;
-  /** The target elevation gain, in metres whatever the units. */
+  /** The target elevation gain, in metres. */
   gain: number;
 };
 
@@ -42,8 +44,8 @@ export type Settings = {
   pace: number;
   /** Absent until the user picks one: the app follows the browser. */
   language?: Language;
-  /** Absent until the user picks one: the units follow the language. */
-  units?: Units;
+  /** How the pace is written: minutes per km until the user picks km/h. */
+  paceUnit: PaceUnit;
   theme: Theme;
   basemap: Basemap;
   lastCriteria: LastCriteria;
@@ -89,7 +91,7 @@ function parseLastCriteria(stored: unknown): LastCriteria {
 }
 
 // Each field falls back to its default on its own, so older or damaged data never breaks the app.
-// A pace kept per activity, or a last activity, from an earlier version is not read.
+// A pace kept per activity, a last activity, or units (miles and feet) from an earlier version are not read.
 function parse(raw: string | null): Settings {
   let stored: unknown;
   try {
@@ -97,11 +99,11 @@ function parse(raw: string | null): Settings {
   } catch {
     stored = {};
   }
-  const { pace, language, units, theme, basemap, lastCriteria } = isObject(stored) ? stored : {};
+  const { pace, language, paceUnit, theme, basemap, lastCriteria } = isObject(stored) ? stored : {};
   return {
     pace: isPace(pace) ? pace : DEFAULT_PACE,
     ...((language === 'fr' || language === 'en') && { language }),
-    ...((units === 'metric' || units === 'imperial') && { units }),
+    paceUnit: PACE_UNITS.includes(paceUnit as PaceUnit) ? (paceUnit as PaceUnit) : DEFAULT_PACE_UNIT,
     theme: theme === 'light' || theme === 'dark' ? theme : DEFAULT_THEME,
     basemap: BASEMAPS.includes(basemap as Basemap) ? (basemap as Basemap) : DEFAULT_BASEMAP,
     lastCriteria: parseLastCriteria(lastCriteria),
@@ -120,11 +122,6 @@ function readRaw(): string | null {
 /** The language the app is shown in: the user's, else the browser's. */
 export function languageOf({ language }: Settings): Language {
   return language ?? browserLanguage(navigator.languages);
-}
-
-/** The units figures are shown in: the user's, else the language's (miles and feet in English, kilometres and metres in French). */
-export function unitsOf({ units }: Settings, language: Language): Units {
-  return units ?? (language === 'en' ? 'imperial' : 'metric');
 }
 
 const listeners = new Set<() => void>();
@@ -148,11 +145,6 @@ function updateSettings(change: Partial<Settings>) {
     return;
   }
   for (const listener of listeners) listener();
-}
-
-/** The units figures are shown in, in the given language: the user's pick, else the language's. */
-export function useUnits(language: Language): Units {
-  return unitsOf(useSettings()[0], language);
 }
 
 /** Calls `listener` with the current settings now and after every change, until the returned function is called. */

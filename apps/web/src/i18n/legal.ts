@@ -73,7 +73,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Your settings (pace, language, units, last criteria) are kept in your browser’s storage. Routes are never saved. We receive neither. Clearing the site’s data in your browser erases them.',
+              text: 'Your settings (pace and its unit, language, last criteria) are kept in your browser’s storage. Routes are never saved. We receive neither. Clearing the site’s data in your browser erases them.',
             },
           },
         ],
@@ -226,7 +226,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Vos réglages (allure, langue, unités, derniers critères) sont enregistrés dans le stockage de votre navigateur. Les itinéraires ne sont jamais enregistrés. Nous ne recevons ni les uns ni les autres. Effacer les données du site dans votre navigateur les supprime.',
+              text: 'Vos réglages (allure et son unité, langue, derniers critères) sont enregistrés dans le stockage de votre navigateur. Les itinéraires ne sont jamais enregistrés. Nous ne recevons ni les uns ni les autres. Effacer les données du site dans votre navigateur les supprime.',
             },
           },
         ],

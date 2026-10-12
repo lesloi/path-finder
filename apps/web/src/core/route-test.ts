@@ -264,7 +264,7 @@ describe('distanceMarkers', () => {
 });
 
 describe('missText', () => {
-  const metric = { units: 'metric', language: 'en' } as const;
+  const metric = 'en';
 
   it.each([
     ['a distance too long', { criterion: 'distance', gap: 2 }, { distance: 12 }, '+20% distance'],
@@ -281,12 +281,10 @@ describe('missText', () => {
     );
   });
 
-  it('follows the language and the units', () => {
+  it('follows the language', () => {
     const miss = { criterion: 'elevationGain', gap: 80 } as const;
 
-    expect(missText(miss, { ...route, elevationGain: 90 }, { units: 'imperial', language: 'fr' })).toBe(
-      '+262 ft de dénivelé',
-    );
+    expect(missText(miss, { ...route, elevationGain: 90 }, 'fr')).toBe('+80 m de dénivelé');
   });
 });
 
