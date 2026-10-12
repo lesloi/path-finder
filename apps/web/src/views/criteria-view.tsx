@@ -42,10 +42,8 @@ const STACKED_ABOVE = [
   'bottom-[calc(var(--sheet-height,0px)+--spacing(3))]',
   'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2))] ' +
     'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2))]',
-  'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2)+var(--spacing-touch)+--spacing(2))] ' +
-    'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2)+var(--spacing-touch)+--spacing(2))]',
 ];
-const stackedAbove = (below: 0 | 1 | 2) =>
+const stackedAbove = (below: 0 | 1) =>
   `right-safe-3 transition-[bottom] duration-250 ease-[ease] motion-reduce:transition-none desktop:bottom-(--edge-bottom) ${STACKED_ABOVE[below]}`;
 
 // Sets a custom property of the page while `shown`.
