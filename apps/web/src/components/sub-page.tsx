@@ -1,5 +1,5 @@
 import { ArrowLeft, X } from 'lucide-react';
-import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 
 import { commonText, type Language } from '../i18n/index.ts';
 import { ICON_BUTTON } from './styles.ts';
@@ -36,8 +36,9 @@ export function SubPage({
   const heading = useRef<HTMLHeadingElement>(null);
   const headingId = useId();
 
-  // Modal: the map and its controls are out of reach until the page closes.
-  useEffect(() => {
+  // Modal: the map and its controls are out of reach until the page closes. Opened with the commit that mounts it, so
+  // the title is never in the document under a closed dialog, which has no accessible name.
+  useLayoutEffect(() => {
     const element = dialog.current!;
     element.showModal();
     return () => element.close();
