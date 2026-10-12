@@ -1,5 +1,4 @@
 export * from './bottom-sheet.tsx';
-export * from './basemap-picker.tsx';
 export * from './basemap-style.ts';
 export * from './pace-slider.tsx';
 export * from './segmented-control.tsx';

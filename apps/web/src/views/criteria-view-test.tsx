@@ -78,25 +78,11 @@ describe('CriteriaView', () => {
     });
   });
 
-  describe('the map background', () => {
-    const saved = () => renderHook(() => useSettings()).result.current[0].basemap;
-
-    it('is picked from a button over the map, and saved', () => {
-      render(<CriteriaView language="en" />);
-
-      fireEvent.click(screen.getByTestId('criteria-basemap'));
-      fireEvent.click(screen.getByTestId('criteria-basemap-aerial'));
-
-      expect(saved()).toBe('aerial');
-      expect(screen.queryByTestId('criteria-basemap-menu')).not.toBeInTheDocument();
-    });
-  });
-
   it('goes back to the saved basemap that failed to load', () => {
     render(<CriteriaView language="en" />);
     act(() => maps.at(-1)!.fire('style.load'));
-    fireEvent.click(screen.getByTestId('criteria-basemap'));
-    fireEvent.click(screen.getByTestId('criteria-basemap-minimal'));
+    const settings = renderHook(() => useSettings());
+    act(() => settings.result.current[1]({ basemap: 'minimal' }));
 
     act(() => maps.at(-1)!.fire('error'));
 
@@ -1259,11 +1245,12 @@ describe('CriteriaView', () => {
       render(<CriteriaView language="en" />);
       await submitOnPhone();
       await screen.findByTestId('routes-count');
-      expect(screen.getByTestId('criteria-basemap')).toBeInTheDocument();
+      act(() => map().rotateTo(30));
+      expect(screen.getByTestId('criteria-north')).toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
 
-      expect(screen.queryByTestId('criteria-basemap')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-north')).not.toBeInTheDocument();
       expect(screen.queryByTestId('criteria-locate')).not.toBeInTheDocument();
     });
 

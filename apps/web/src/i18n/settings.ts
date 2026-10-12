@@ -9,6 +9,10 @@ export const settingsText = {
     dark: 'Dark',
     language: 'Language',
     paceUnit: 'Pace',
+    basemap: 'Map background',
+    plan: 'Plan IGN',
+    minimal: 'Minimal',
+    aerial: 'Aerial photo',
     about: 'About',
   },
   fr: {
@@ -19,6 +23,10 @@ export const settingsText = {
     dark: 'Sombre',
     language: 'Langue',
     paceUnit: 'Allure',
+    basemap: 'Fond de carte',
+    plan: 'Plan IGN',
+    minimal: 'Épuré',
+    aerial: 'Photo aérienne',
     about: 'À propos',
   },
 } satisfies Record<Language, unknown>;

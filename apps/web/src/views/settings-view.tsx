@@ -1,7 +1,7 @@
 import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { PACE_UNITS, type PaceUnit, type Theme } from '../core/index.ts';
+import { BASEMAPS, PACE_UNITS, type Basemap, type PaceUnit, type Theme } from '../core/index.ts';
 import { commonText, settingsText, type Language } from '../i18n/index.ts';
 import { useSettings } from '../state/index.ts';
 import { GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON, SegmentedControl } from '../components/index.ts';
@@ -47,6 +47,15 @@ export function SettingsView({ language }: { language: Language }) {
             value={settings.paceUnit}
             options={PACE_UNITS.map((value) => ({ value, label: value }))}
             onChange={(paceUnit: PaceUnit) => update({ paceUnit })}
+          />
+        </SettingRow>
+        <SettingRow label={t.basemap}>
+          <SegmentedControl
+            testId="settings-basemap"
+            label={t.basemap}
+            value={settings.basemap}
+            options={BASEMAPS.map((value) => ({ value, label: t[value] }))}
+            onChange={(basemap: Basemap) => update({ basemap })}
           />
         </SettingRow>
       </div>

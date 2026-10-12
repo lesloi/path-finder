@@ -9,7 +9,7 @@ const en = { ...commonText.en, ...settingsText.en };
 const fr = { ...commonText.fr, ...settingsText.fr };
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);
 const saved = () => renderHook(() => useSettings()).result.current[0];
-const pick = (control: 'theme' | 'language' | 'pace-unit', option: string) =>
+const pick = (control: 'theme' | 'language' | 'pace-unit' | 'basemap', option: string) =>
   fireEvent.click(screen.getByTestId(`settings-${control}-${option}`));
 
 describe('SettingsView', () => {
@@ -66,6 +66,23 @@ describe('SettingsView', () => {
 
     expect(screen.getByTestId('settings-pace-unit-km/h')).toBeChecked();
     expect(saved().paceUnit).toBe('km/h');
+  });
+
+  it('shows the saved map background, and saves the one the user picks', () => {
+    renderView();
+    expect(screen.getByTestId('settings-basemap')).toHaveAccessibleName(en.basemap);
+    expect(screen.getByTestId('settings-basemap-plan')).toBeChecked();
+
+    pick('basemap', 'aerial');
+
+    expect(screen.getByTestId('settings-basemap-aerial')).toBeChecked();
+    expect(saved().basemap).toBe('aerial');
+  });
+
+  it('names the map backgrounds in French', () => {
+    renderView('fr');
+
+    expect(screen.getByTestId('settings-basemap-aerial')).toHaveAccessibleName(fr.aerial);
   });
 
   it('saves the language the user picks', () => {
