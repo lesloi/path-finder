@@ -9,9 +9,9 @@ const DRAG_MAX = '60dvh';
 /**
  * The phone panel over the bottom of the map. It is as tall as its content, up to 40 % of the screen; once
  * `expanded` (such as for the detail of a route), it takes 60 % of it. The handle toggles that, from a tap or a
- * swipe; without `onExpandedChange`, the handle is only a mark. A drag of the handle moves the sheet with the finger,
- * but never past its state (a collapsed sheet does not shrink, an expanded one does not grow), and it settles on the
- * side the finger went. `onHeightChange` hears the height of the sheet in px, so the map is framed clear of it and the
+ * swipe; without `onExpandedChange` there is no handle, as a mark that does nothing would mislead. A drag of the
+ * handle moves the sheet with the finger, but never past its state (a collapsed sheet does not shrink, an expanded one
+ * does not grow), and it settles on the side the finger went. `onHeightChange` hears the height of the sheet in px, so the map is framed clear of it and the
  * buttons over the map stand above it: it waits for the end of a drag, so the map is not framed again at every move.
  */
 export function BottomSheet({
@@ -77,7 +77,8 @@ export function BottomSheet({
     if (!canExpand && drag.current) letGo();
   }, [canExpand]);
 
-  const mark = 'before:block before:h-1 before:w-10 before:rounded-full before:bg-border';
+  // Without a handle, a sheet left at 60 % could not be brought back down.
+  const tall = expanded && canExpand;
   return (
     <div
       ref={sheet}
@@ -85,16 +86,18 @@ export function BottomSheet({
       className={
         'fixed inset-x-0 bottom-0 z-4 flex flex-col rounded-t-lg bg-surface shadow-float ' +
         'pr-safe-4 pb-safe-4 pl-safe-4 desktop:hidden ' +
-        (expanded ? 'h-[60dvh]' : 'max-h-[40dvh]')
+        (tall ? 'h-[60dvh]' : 'max-h-[40dvh]') +
+        // Without a handle, the space it took is kept as plain padding.
+        (canExpand ? '' : ' pt-4')
       }
     >
-      {onExpandedChange ? (
+      {canExpand && (
         <button
           type="button"
           data-testid={testId && `${testId}-handle`}
           // As tall as a touch target, with the mark in the middle. The negative margin takes back most of the half-leading
           // of the first line below, so the space under the mark looks the same as the one above it.
-          className={`-mb-1 grid h-touch w-full flex-none cursor-grab place-items-center touch-none ${mark}`}
+          className="-mb-1 grid h-touch w-full flex-none cursor-grab place-items-center touch-none before:block before:h-1 before:w-10 before:rounded-full before:bg-border"
           aria-label={label}
           aria-expanded={expanded}
           onPointerDown={(event) => {
@@ -122,8 +125,6 @@ export function BottomSheet({
             swiped.current = false;
           }}
         />
-      ) : (
-        <div aria-hidden className={`grid h-7 w-full flex-none place-items-center ${mark}`} />
       )}
       <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">{children}</div>
     </div>

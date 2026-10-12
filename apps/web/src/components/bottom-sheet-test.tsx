@@ -58,10 +58,16 @@ describe('BottomSheet', () => {
     expect(handle).toHaveAttribute('aria-expanded', expanded);
   });
 
-  it('has a handle that is only a mark when it cannot expand', () => {
+  it('has no handle when it cannot expand', () => {
     render(<BottomSheet testId="sheet" label="Route" />);
 
     expect(screen.queryByTestId('sheet-handle')).not.toBeInTheDocument();
+  });
+
+  it('stays collapsed when it cannot expand, since nothing could collapse it', () => {
+    render(<BottomSheet testId="sheet" label="Route" expanded />);
+
+    expect(screen.getByTestId('sheet')).not.toHaveClass('h-[60dvh]');
   });
 
   describe('a drag of its handle', () => {
