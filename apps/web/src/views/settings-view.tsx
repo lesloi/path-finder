@@ -1,5 +1,5 @@
 import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
 import { BASEMAPS, PACE_UNITS, type Basemap, type PaceUnit, type Theme } from '../core/index.ts';
 import { commonText, settingsText, type Language } from '../i18n/index.ts';
@@ -11,6 +11,11 @@ const FLAG_CLASSES = 'flex-none ring-1 ring-border';
 export function SettingsView({ language }: { language: Language }) {
   const t = { ...commonText[language], ...settingsText[language] };
   const [settings, update] = useSettings();
+  const errorId = useId();
+  // The map gives the previous background back when the style of a new one fails to load, behind this page: a pick
+  // that is no longer the saved one is the one that failed.
+  const [picked, setPicked] = useState<Basemap>();
+  const basemapFailed = picked !== undefined && picked !== settings.basemap;
   return (
     <>
       <h2 className={GROUP_TITLE}>{t.display}</h2>
@@ -55,8 +60,17 @@ export function SettingsView({ language }: { language: Language }) {
             label={t.basemap}
             value={settings.basemap}
             options={BASEMAPS.map((value) => ({ value, label: t[value] }))}
-            onChange={(basemap: Basemap) => update({ basemap })}
+            describedBy={basemapFailed ? errorId : undefined}
+            onChange={(basemap: Basemap) => {
+              setPicked(basemap);
+              update({ basemap });
+            }}
           />
+          {basemapFailed && (
+            <p id={errorId} role="alert" data-testid="settings-basemap-error" className="w-full text-sm">
+              {t.basemapFailed}
+            </p>
+          )}
         </SettingRow>
       </div>
       <h2 className={GROUP_TITLE}>{t.about}</h2>

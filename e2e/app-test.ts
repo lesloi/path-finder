@@ -92,5 +92,6 @@ test.describe('the app', () => {
     const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('path-finder.settings')!).basemap);
     await expect.poll(saved).toBe('plan');
     await expect(page.getByTestId('settings-basemap-plan')).toBeChecked();
+    await expect(page.getByTestId('settings-basemap-error')).toBeVisible();
   });
 });

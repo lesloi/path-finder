@@ -1,5 +1,6 @@
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 
+import { basemapStyle } from '../components/basemap-style.ts';
 import { LazyStartPointMap } from '../components/index.ts';
 import { CriteriaView } from './criteria-view.tsx';
 import { expectNamedControls } from '../accessible-names.ts';
@@ -76,6 +77,16 @@ describe('CriteriaView', () => {
 
       expect(screen.getByTestId('criteria-north')).toHaveAccessibleName(fr.resetNorth);
     });
+  });
+
+  it('shows the map on the basemap picked in the settings', () => {
+    render(<CriteriaView language="en" />);
+    act(() => map().fire('style.load'));
+    const settings = renderHook(() => useSettings());
+
+    act(() => settings.result.current[1]({ basemap: 'aerial' }));
+
+    expect(map().styles.at(-1)!.style).toEqual(basemapStyle('aerial'));
   });
 
   it('goes back to the saved basemap that failed to load', () => {

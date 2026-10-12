@@ -13,6 +13,7 @@ export const settingsText = {
     plan: 'Plan IGN',
     minimal: 'Minimal',
     aerial: 'Aerial photo',
+    basemapFailed: 'This map background could not be loaded.',
     about: 'About',
   },
   fr: {
@@ -27,6 +28,7 @@ export const settingsText = {
     plan: 'Plan IGN',
     minimal: 'Épuré',
     aerial: 'Photo aérienne',
+    basemapFailed: "Ce fond de carte n'a pas pu être chargé.",
     about: 'À propos',
   },
 } satisfies Record<Language, unknown>;

@@ -1,4 +1,4 @@
-import { fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react';
 
 import { expectNamedControls } from '../accessible-names.ts';
 import { commonText, settingsText } from '../i18n/index.ts';
@@ -77,6 +77,21 @@ describe('SettingsView', () => {
 
     expect(screen.getByTestId('settings-basemap-aerial')).toBeChecked();
     expect(saved().basemap).toBe('aerial');
+  });
+
+  it('says so when the map background picked could not be loaded, until the next pick', () => {
+    renderView();
+    const settings = renderHook(() => useSettings());
+    pick('basemap', 'minimal');
+    expect(screen.queryByTestId('settings-basemap-error')).toBeNull();
+
+    // The map gives the previous background back when the style of the new one fails.
+    act(() => settings.result.current[1]({ basemap: 'plan' }));
+
+    expect(screen.getByTestId('settings-basemap-error')).toHaveTextContent(en.basemapFailed);
+    expect(screen.getByTestId('settings-basemap')).toHaveAccessibleDescription(en.basemapFailed);
+    pick('basemap', 'aerial');
+    expect(screen.queryByTestId('settings-basemap-error')).toBeNull();
   });
 
   it('names the map backgrounds in French', () => {
