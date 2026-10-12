@@ -64,6 +64,73 @@ describe('BottomSheet', () => {
     expect(screen.queryByTestId('sheet-handle')).not.toBeInTheDocument();
   });
 
+  describe('a drag of its handle', () => {
+    const SHEET_PX = 300;
+    const heightOf = (sheet: HTMLElement) => sheet.style.height;
+    beforeEach(() => {
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ height: SHEET_PX } as DOMRect);
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    it('makes the sheet follow the finger', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 350 });
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe('350px');
+    });
+
+    it('stops the sheet at 60 % of the screen', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 700 });
+      fireEvent.pointerMove(handle, { clientY: 0 });
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe(`${window.innerHeight * 0.6}px`);
+    });
+
+    it('settles on expanded when released after a swipe up', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 300 });
+      fireEvent.pointerUp(handle, { clientY: 300 });
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe('');
+      expect(handle).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('lets go of the sheet when the gesture is cancelled', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 300 });
+      fireEvent.pointerCancel(handle);
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe('');
+      expect(handle).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('tells its height once released, not while it moves', () => {
+      const onHeightChange = vi.fn();
+      render(<Sheet onHeightChange={onHeightChange} />);
+      const handle = screen.getByTestId('sheet-handle');
+      onHeightChange.mockClear();
+
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 300 });
+      expect(onHeightChange).not.toHaveBeenCalled();
+
+      fireEvent.pointerUp(handle, { clientY: 300 });
+      expect(onHeightChange).toHaveBeenLastCalledWith(SHEET_PX);
+    });
+  });
+
   describe('its height', () => {
     const observed: { callback: ResizeObserverCallback }[] = [];
     const observer = window.ResizeObserver;

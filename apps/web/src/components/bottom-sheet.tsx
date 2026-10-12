@@ -1,13 +1,18 @@
-import { useEffectEvent, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useEffectEvent, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 
 // A drag of the handle longer than this, in px, moves the sheet instead of toggling it.
 const SWIPE_PX = 30;
+// While it follows the finger, the sheet stays between these shares of the screen height.
+const DRAG_MIN = 0.15;
+const DRAG_MAX = 0.6;
 
 /**
  * The phone panel over the bottom of the map. It is as tall as its content, up to 40 % of the screen; once
  * `expanded` (such as for the detail of a route), it takes 60 % of it. The handle toggles that, from a tap or a
- * swipe; without `onExpandedChange`, the handle is only a mark. `onHeightChange` hears the height of the sheet in
- * px, so the map is framed clear of it and the buttons over the map stand above it.
+ * swipe; without `onExpandedChange`, the handle is only a mark. A drag of the handle moves the sheet with the finger,
+ * and it settles on the side the finger went. `onHeightChange` hears the height of the sheet in px, so the map is
+ * framed clear of it and the buttons over the map stand above it: it waits for the end of a drag, so the map is
+ * not framed again at every move.
  */
 export function BottomSheet({
   label,
@@ -27,14 +32,42 @@ export function BottomSheet({
 }) {
   const sheet = useRef<HTMLDivElement>(null);
   const dragFrom = useRef<number>(undefined);
+  const dragFromHeight = useRef(0);
+  const dragging = useRef(false);
   const swiped = useRef(false);
+  // Counts the ends of a drag: the height is told again then, even if the sheet ends as tall as it was.
+  const [settled, setSettled] = useState(0);
   const heightChanged = useEffectEvent((height: number) => onHeightChange?.(height));
 
   useLayoutEffect(() => {
-    const observer = new ResizeObserver(([entry]) => heightChanged(entry.borderBoxSize[0].blockSize));
+    const observer = new ResizeObserver(([entry]) => {
+      if (!dragging.current) heightChanged(entry.borderBoxSize[0].blockSize);
+    });
     observer.observe(sheet.current!);
     return () => observer.disconnect();
   }, []);
+
+  useLayoutEffect(() => {
+    if (settled > 0) heightChanged(sheet.current!.getBoundingClientRect().height);
+  }, [settled]);
+
+  const follow = (event: PointerEvent) => {
+    if (dragFrom.current === undefined) return;
+    dragging.current = true;
+    const height = dragFromHeight.current - (event.clientY - dragFrom.current);
+    const style = sheet.current!.style;
+    style.maxHeight = `${window.innerHeight * DRAG_MAX}px`;
+    style.height = `${Math.min(Math.max(height, window.innerHeight * DRAG_MIN), window.innerHeight * DRAG_MAX)}px`;
+  };
+
+  // The sheet goes back to the height its state gives it.
+  const letGo = () => {
+    dragFrom.current = undefined;
+    dragging.current = false;
+    sheet.current!.style.height = '';
+    sheet.current!.style.maxHeight = '';
+    setSettled((count) => count + 1);
+  };
 
   const mark = 'before:block before:h-1 before:w-10 before:rounded-full before:bg-border';
   return (
@@ -58,14 +91,19 @@ export function BottomSheet({
           aria-expanded={expanded}
           onPointerDown={(event) => {
             dragFrom.current = event.clientY;
+            dragFromHeight.current = sheet.current!.getBoundingClientRect().height;
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
+          onPointerMove={follow}
           onPointerUp={(event) => {
             const distance = event.clientY - (dragFrom.current ?? event.clientY);
-            dragFrom.current = undefined;
+            letGo();
             swiped.current = Math.abs(distance) > SWIPE_PX;
             if (swiped.current) onExpandedChange(distance < 0);
           }}
+          // A gesture the system takes over leaves the state as it was.
+          onPointerCancel={letGo}
+          onLostPointerCapture={() => dragFrom.current !== undefined && letGo()}
           // A swipe ends with a click too: only a tap or a key toggles the sheet.
           onClick={() => {
             if (!swiped.current) onExpandedChange(!expanded);
