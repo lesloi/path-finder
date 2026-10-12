@@ -1,9 +1,9 @@
 import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import type { Theme, Units } from '../core/index.ts';
+import { PACE_UNITS, type PaceUnit, type Theme } from '../core/index.ts';
 import { commonText, settingsText, type Language } from '../i18n/index.ts';
-import { useSettings, useUnits } from '../state/index.ts';
+import { useSettings } from '../state/index.ts';
 import { GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON, SegmentedControl } from '../components/index.ts';
 
 const FLAG_CLASSES = 'flex-none ring-1 ring-border';
@@ -11,7 +11,6 @@ const FLAG_CLASSES = 'flex-none ring-1 ring-border';
 export function SettingsView({ language }: { language: Language }) {
   const t = { ...commonText[language], ...settingsText[language] };
   const [settings, update] = useSettings();
-  const units = useUnits(language);
   return (
     <>
       <h2 className={GROUP_TITLE}>{t.display}</h2>
@@ -41,16 +40,13 @@ export function SettingsView({ language }: { language: Language }) {
             onChange={(picked) => update({ language: picked })}
           />
         </SettingRow>
-        <SettingRow label={t.units}>
+        <SettingRow label={t.paceUnit}>
           <SegmentedControl
-            testId="settings-units"
-            label={t.units}
-            value={units}
-            options={[
-              { value: 'metric', label: t.metric },
-              { value: 'imperial', label: t.imperial },
-            ]}
-            onChange={(units: Units) => update({ units })}
+            testId="settings-pace-unit"
+            label={t.paceUnit}
+            value={settings.paceUnit}
+            options={PACE_UNITS.map((value) => ({ value, label: value }))}
+            onChange={(paceUnit: PaceUnit) => update({ paceUnit })}
           />
         </SettingRow>
       </div>

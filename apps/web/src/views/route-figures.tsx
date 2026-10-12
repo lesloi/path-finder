@@ -2,36 +2,37 @@ import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { SURFACE_CLASSES } from '../components/index.ts';
-import { formatDistance, formatDuration, formatHeight, type Display, type Route } from '../core/index.ts';
+import { formatDistance, formatDuration, formatHeight, type Route } from '../core/index.ts';
+import type { Language } from '../i18n/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
 
 /** The distance, duration, climb and descent of a route. `className` sizes it in its container. */
 export function RouteFigures({
   route,
-  display,
+  language,
   className = '',
 }: {
   route: Route;
-  display: Display;
+  language: Language;
   className?: string;
 }) {
-  const t = { ...criteriaText[display.language], ...routesText[display.language] };
+  const t = { ...criteriaText[language], ...routesText[language] };
   return (
     <dl className={`m-0 grid grid-cols-2 gap-x-4 gap-y-2 ${className}`} data-testid="route-figures">
       <Figure label={t.distance} testId="route-distance">
-        {formatDistance(route.distance, display)}
+        {formatDistance(route.distance, language)}
       </Figure>
       <Figure label={t.estimatedDuration} testId="route-duration">
-        {formatDuration(route.estimatedDuration, display.language)}
+        {formatDuration(route.estimatedDuration, language)}
       </Figure>
       {route.elevationGain !== undefined && (
         <Figure label={t.climb} testId="route-climb" icon={<ArrowUpRight size={16} aria-hidden />}>
-          {formatHeight(route.elevationGain, display)}
+          {formatHeight(route.elevationGain, language)}
         </Figure>
       )}
       {route.elevationLoss !== undefined && (
         <Figure label={t.descent} testId="route-descent" icon={<ArrowDownRight size={16} aria-hidden />}>
-          {formatHeight(route.elevationLoss, display)}
+          {formatHeight(route.elevationLoss, language)}
         </Figure>
       )}
     </dl>
@@ -39,16 +40,16 @@ export function RouteFigures({
 }
 
 /** The unpaved share of a route, kept within 0 and 1, and the paved and unpaved shares as percentages. */
-export function surfaceShares({ unpavedShare }: Route, { language }: Display) {
+export function surfaceShares({ unpavedShare }: Route, language: Language) {
   const unpaved = Math.min(1, Math.max(0, unpavedShare));
   const percent = new Intl.NumberFormat(language, { style: 'percent' });
   return { unpaved: percent.format(unpaved), paved: percent.format(1 - unpaved), unpavedShare: unpaved };
 }
 
 /** The legend of the colours of the elevation profile, with the share of each surface. */
-export function SurfaceShare({ route, display }: { route: Route; display: Display }) {
-  const t = criteriaText[display.language];
-  const shares = surfaceShares(route, display);
+export function SurfaceShare({ route, language }: { route: Route; language: Language }) {
+  const t = criteriaText[language];
+  const shares = surfaceShares(route, language);
   return (
     <p data-testid="route-surface" className="m-0 flex items-center justify-center gap-1 text-sm text-ink-2">
       <i className={`size-2 rounded-full ${SURFACE_CLASSES.paved.dot}`} aria-hidden />

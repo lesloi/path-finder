@@ -1,8 +1,12 @@
 import { CLIMB_PER_EFFORT_KM } from '../contract/index.ts';
 import type { Route, RouteSetRequest } from './route.ts';
+import type { PaceUnit } from './units.ts';
 
 /** Minutes per km on flat ground until the user sets a pace. */
 export const DEFAULT_PACE = 6;
+
+/** How the pace is written until the user picks another way. */
+export const DEFAULT_PACE_UNIT: PaceUnit = 'min/km';
 
 /**
  * The minutes a route takes at a pace: its distance plus its climb as effort kilometres, as the

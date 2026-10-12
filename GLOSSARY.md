@@ -81,10 +81,11 @@ _Avoid_: Sport, mode, profile
 Running on unpaved ways: the unpaved surface preference. Not a separate kind of route.
 
 **Pace**:
-The user's flat-ground pace, in minutes per km (or per mile), 6 min/km until they set it.
+The user's flat-ground pace, in minutes per km, 6 min/km until they set it. It can be written as a speed in km/h; the
+stored value stays in minutes per km.
 It gives the estimated duration, and turns a target duration into a distance. It is set
 under the duration and in the route list, and stored in their settings.
-_Avoid_: Speed
+_Avoid_: Speed, as a name for the pace (km/h is only one way to write it)
 
 **Effort distance**:
 Distance plus climb converted to distance, at 100 m of elevation gain for 1 km. Without
@@ -99,7 +100,7 @@ _Avoid_: Trace, track, itinerary, path
 
 **Route name**:
 The label of a route in its GPX export: a word and the distance, such as
-"Itinéraire · 12,3 km", in the user's language and units. It never names where the route starts.
+"Itinéraire · 12,3 km", in the user's language. It never names where the route starts.
 _Avoid_: Title
 
 **Loop**:
@@ -135,8 +136,7 @@ _Avoid_: Sync, upload
 
 **Settings**:
 The user's preferences kept on the device: pace, language (English or French,
-the browser's until the user picks one), units (those of the language until the user picks some: miles and feet in English,
-kilometres and metres in French), the last criteria (surface preference,
+the browser's until the user picks one), the unit of the pace (minutes per km until the user picks km/h), the last criteria (surface preference,
 elevation gain, whether the length is a distance or a duration, and that distance and duration), and which POI categories the map shows. Lost if the user clears the site's data.
 _Avoid_: Profile, account
 

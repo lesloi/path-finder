@@ -135,22 +135,15 @@ describe('StartPointMap', () => {
     expect(attribution).not.toHaveClass('maplibregl-compact-show');
   });
 
-  it('shows a scale bar in the units of the display, and follows them', () => {
-    const { rerender } = render(
-      <StartPointMap display={{ units: 'imperial', language: 'en' }} onStartChange={vi.fn()} />,
-    );
+  it('shows a scale bar in kilometres and metres', () => {
+    render(<StartPointMap onStartChange={vi.fn()} />);
+
     const scale = map().controls.find((control) => control instanceof ScaleControl) as ScaleControl;
-    expect(scale.options).toEqual({ unit: 'imperial' });
-
-    rerender(<StartPointMap display={{ units: 'metric', language: 'en' }} onStartChange={vi.fn()} />);
-
     expect(scale.options).toEqual({ unit: 'metric' });
   });
 
   it('names the map and the toggle of its attribution in the language of the display, and follows it', () => {
-    const { rerender } = render(
-      <StartPointMap display={{ units: 'metric', language: 'fr' }} onStartChange={vi.fn()} />,
-    );
+    const { rerender } = render(<StartPointMap language="fr" onStartChange={vi.fn()} />);
     expect(map().options.locale).toEqual({
       'Map.Title': commonText.fr.mapName,
       'AttributionControl.ToggleAttribution': commonText.fr.toggleAttribution,
@@ -159,7 +152,7 @@ describe('StartPointMap', () => {
 
     const toggle = map().container.appendChild(document.createElement('button'));
     toggle.className = 'maplibregl-ctrl-attrib-button';
-    rerender(<StartPointMap display={{ units: 'metric', language: 'en' }} onStartChange={vi.fn()} />);
+    rerender(<StartPointMap language="en" onStartChange={vi.fn()} />);
 
     expect(map().canvas.attributes['aria-label']).toBe(commonText.en.mapName);
     expect(toggle).toHaveAccessibleName(commonText.en.toggleAttribution);
@@ -648,16 +641,10 @@ describe('StartPointMap', () => {
         renderRoutes({
           routes: [out, out],
           summaries: [...summaries, { distance: 12.5 }],
-          display: { units: 'metric', language: 'fr' },
+          language: 'fr',
         });
 
         expect(labels('route-badges')).toEqual(['14,0 km\n+340 m', '12,5 km']);
-      });
-
-      it('writes it in miles and feet in imperial units', () => {
-        renderRoutes({ routes: [out], summaries, display: { units: 'imperial', language: 'en' } });
-
-        expect(labels('route-badges')).toEqual(['8.7 mi\n+1115 ft']);
       });
 
       it('marks the distance along the selected route only once its detail is open', () => {
@@ -678,6 +665,10 @@ describe('StartPointMap', () => {
         expect(labels('route-markers')).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13']);
         // The route's own labels give way to its markers.
         expect(labels('route-badges')).toEqual([]);
+        // A multiple of ten takes the first place, and a multiple of five the second.
+        expect(labelled('route-markers').map(({ properties }) => properties.priority)).toEqual([
+          2, 2, 2, 2, 1, 2, 2, 2, 2, 0, 2, 2, 2,
+        ]);
       });
 
       it('marks the distance along the route marked while every route stays drawn, as on a desktop', () => {
@@ -687,21 +678,6 @@ describe('StartPointMap', () => {
         // Its own label gives way to the markers; the other route keeps its.
         expect(labels('route-badges')).toEqual(['14.0 km\n+340 m']);
         expect(features()).toHaveLength(2);
-      });
-
-      it('marks every mile in imperial units, and gives a multiple of ten the first place', () => {
-        renderRoutes({
-          routes: [out],
-          summaries,
-          selectedRoute: 0,
-          framing: 'selected',
-          display: { units: 'imperial', language: 'en' },
-        });
-
-        expect(labels('route-markers')).toEqual(['1', '2', '3', '4', '5', '6', '7', '8']);
-        expect(labelled('route-markers').map(({ properties }) => properties.priority)).toEqual([
-          2, 2, 2, 2, 1, 2, 2, 2,
-        ]);
       });
 
       it('draws each tag in a box the map has an image for, white or in the colour of a route', () => {

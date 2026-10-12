@@ -26,7 +26,7 @@ const LoadedMap = lazy(load);
 export function LazyStartPointMap(props: ComponentProps<typeof StartPointMap>) {
   return (
     <LoadBoundary
-      language={props.display?.language ?? 'en'}
+      language={props.language ?? 'en'}
       fallback={<div data-testid="map-placeholder" className="fixed inset-0 bg-white" />}
     >
       <LoadedMap {...props} />

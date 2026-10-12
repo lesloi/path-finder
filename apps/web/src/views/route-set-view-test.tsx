@@ -51,7 +51,7 @@ const onDesktop = () =>
 // The view as its parent holds it: which route is selected, and whether its detail is open.
 function View({
   language = 'en',
-  units = 'metric',
+  paceUnit = 'min/km',
   list = routes,
   onSelect = () => {},
   onPreview,
@@ -61,7 +61,7 @@ function View({
   open = false,
 }: {
   language?: 'en' | 'fr';
-  units?: 'metric' | 'imperial';
+  paceUnit?: 'min/km' | 'km/h';
   list?: Route[];
   onSelect?: (index: number) => void;
   onPreview?: (index: number | undefined) => void;
@@ -74,7 +74,8 @@ function View({
   const [detail, setDetail] = useState(open);
   return (
     <RouteSetView
-      display={{ units, language }}
+      language={language}
+      paceUnit={paceUnit}
       routes={list}
       pace={pace}
       selected={selected}
@@ -320,18 +321,18 @@ describe('RouteSetView', () => {
       expect(screen.queryByTestId('routes-pace-edit')).not.toBeInTheDocument();
     });
 
-    it('says the pace in min/mi with imperial units, in French', () => {
-      render(<View units="imperial" language="fr" />);
+    it('says the pace in km/h when the user asks for it, in French', () => {
+      render(<View paceUnit="km/h" language="fr" />);
 
-      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.fr.estimatedPace('9:39 min/mi'));
+      expect(screen.getByTestId('routes-pace')).toHaveTextContent(routesText.fr.estimatedPace('10,0 km/h'));
     });
 
-    it('shows the figures in the units and the language of the settings', () => {
-      render(<View units="imperial" language="fr" />);
+    it('shows the figures in the language of the settings', () => {
+      render(<View language="fr" />);
 
       expect(screen.getByTestId('routes-count')).toHaveTextContent('3 parcours');
-      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('7,7 mi');
-      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1115 ft');
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('12,3 km');
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('340 m');
     });
   });
 

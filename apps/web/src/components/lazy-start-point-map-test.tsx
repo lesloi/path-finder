@@ -43,7 +43,7 @@ describe('LazyStartPointMap', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const { LazyStartPointMap: Fresh } = await import('./lazy-start-point-map.tsx');
 
-    render(<Fresh display={{ units: 'metric', language: 'en' }} onStartChange={vi.fn()} />);
+    render(<Fresh language="en" onStartChange={vi.fn()} />);
 
     expect(await screen.findByTestId('load-failure')).toHaveTextContent(errorText.en['stale-build']);
   });

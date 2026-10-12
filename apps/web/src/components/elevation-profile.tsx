@@ -9,9 +9,8 @@ import {
   surfaceAt,
   type Position,
   type Route,
-  type Display,
 } from '../core/index.ts';
-import { routesText } from '../i18n/index.ts';
+import { routesText, type Language } from '../i18n/index.ts';
 import { profileScale } from './profile-scale.ts';
 import { SURFACE_CLASSES } from './surface-colors.ts';
 
@@ -27,16 +26,16 @@ const PAD = 8;
  */
 export function ElevationProfile({
   route,
-  display,
+  language,
   onHover,
   testId,
 }: {
   route: Route;
-  display: Display;
+  language: Language;
   onHover: (position: Position | undefined) => void;
   testId?: string;
 }) {
-  const t = routesText[display.language];
+  const t = routesText[language];
   const [at, setAt] = useState<number>();
   const profile = elevationProfile(route.geometry);
   if (!profile) return null;
@@ -65,12 +64,12 @@ export function ElevationProfile({
   const grade =
     at === undefined
       ? ''
-      : `${new Intl.NumberFormat(display.language, { maximumFractionDigits: 1, signDisplay: 'exceptZero' }).format(gradeAt(profile, at))} %`;
+      : `${new Intl.NumberFormat(language, { maximumFractionDigits: 1, signDisplay: 'exceptZero' }).format(gradeAt(profile, at))} %`;
   return (
     <figure
       data-testid={testId}
       className="m-0"
-      aria-label={t.profile(formatHeight(min, display), formatHeight(max, display))}
+      aria-label={t.profile(formatHeight(min, language), formatHeight(max, language))}
     >
       <figcaption data-testid={testId && `${testId}-title`} className="mb-1 text-sm font-semibold text-ink-2">
         {t.altitude}
@@ -79,7 +78,7 @@ export function ElevationProfile({
         {/* The altitudes of the top, the middle and the bottom of the plot, beside it and not over the trace. */}
         <div className="relative h-24 flex-none text-right text-sm text-ink-2" aria-hidden>
           {/* As wide as the widest altitude, which the others are placed in. */}
-          <span className="invisible block h-0 overflow-hidden whitespace-nowrap">{formatHeight(max, display)}</span>
+          <span className="invisible block h-0 overflow-hidden whitespace-nowrap">{formatHeight(max, language)}</span>
           {[
             { name: 'max', height: max },
             { name: 'mid', height: middle },
@@ -91,7 +90,7 @@ export function ElevationProfile({
               className="absolute right-0 -translate-y-1/2 leading-none"
               style={{ top: `${(y(height) / HEIGHT) * 100}%` }}
             >
-              {formatHeight(height, display)}
+              {formatHeight(height, language)}
             </span>
           ))}
         </div>
@@ -158,7 +157,7 @@ export function ElevationProfile({
             aria-label={t.profileCursor}
             aria-valuetext={
               hovered
-                ? `${formatDistance(hovered.distance, display)}, ${formatHeight(hovered.height, display)}, ${t.slope} ${grade}`
+                ? `${formatDistance(hovered.distance, language)}, ${formatHeight(hovered.height, language)}, ${t.slope} ${grade}`
                 : undefined
             }
             min={0}
@@ -181,7 +180,7 @@ export function ElevationProfile({
                 className="absolute top-0 -translate-x-1/2 rounded-sm bg-surface px-2 text-center text-sm whitespace-nowrap shadow-float"
                 style={{ left: `${Math.min(80, Math.max(20, at * 100))}%` }}
               >
-                {formatDistance(hovered.distance, display)} · {formatHeight(hovered.height, display)}
+                {formatDistance(hovered.distance, language)} · {formatHeight(hovered.height, language)}
                 <br />
                 <span data-testid={testId && `${testId}-grade`}>
                   {t.slope} {grade}

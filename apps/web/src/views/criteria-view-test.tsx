@@ -37,8 +37,6 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  // The tests read metric figures, whatever the language.
-  localStorage.setItem('path-finder.settings', JSON.stringify({ units: 'metric' }));
   maps.length = 0;
   markers.length = 0;
 });
@@ -159,7 +157,6 @@ describe('CriteriaView', () => {
       localStorage.setItem(
         'path-finder.settings',
         JSON.stringify({
-          units: 'metric',
           lastCriteria: { target: 'distance', surface: 'unpaved', level: 'hilly', gain: 300 },
         }),
       );
@@ -970,24 +967,23 @@ describe('CriteriaView', () => {
     });
 
     describe('the criteria kept', () => {
-      const kept = () => JSON.parse(localStorage.getItem('path-finder.settings')!).lastCriteria;
+      const kept = () => JSON.parse(localStorage.getItem('path-finder.settings') ?? '{}').lastCriteria;
 
       it('are kept once a search is made, the distance in kilometres and the gain in metres', async () => {
         onDesktop();
-        localStorage.setItem('path-finder.settings', JSON.stringify({ units: 'imperial' }));
         stubFetch(() => Promise.resolve(answer(route(0))));
         render(<CriteriaView language="en" />);
         fireEvent.change(screen.getByTestId('criteria-distance'), { target: { value: '21' } });
         fireEvent.click(screen.getByTestId('criteria-surface-paved'));
         fireEvent.click(screen.getByTestId('criteria-elevation-target'));
-        fireEvent.change(screen.getByTestId('criteria-gain'), { target: { value: '1500' } });
+        fireEvent.change(screen.getByTestId('criteria-gain'), { target: { value: '450' } });
 
         expect(kept()).toBeUndefined();
 
         await submit();
         await screen.findByTestId('routes-count');
 
-        expect(kept()).toMatchObject({ distance: 21 * 1.609344, surface: 'paved', level: 'target', gain: 457 });
+        expect(kept()).toMatchObject({ distance: 21, surface: 'paved', level: 'target', gain: 450 });
       });
 
       it('are kept by a new search from the stale notice too', async () => {
@@ -1022,7 +1018,7 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('routes-stale')).toBeInTheDocument();
     });
 
-    it('does not call the routes stale when the units change', async () => {
+    it('does not call the routes stale when the pace unit changes', async () => {
       onDesktop();
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
@@ -1030,7 +1026,7 @@ describe('CriteriaView', () => {
       await screen.findByTestId('routes-count');
 
       const settings = renderHook(() => useSettings());
-      act(() => settings.result.current[1]({ units: 'imperial' }));
+      act(() => settings.result.current[1]({ paceUnit: 'km/h' }));
 
       expect(screen.queryByTestId('routes-stale')).not.toBeInTheDocument();
       fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));

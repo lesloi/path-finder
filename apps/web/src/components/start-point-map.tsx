@@ -16,19 +16,17 @@ import {
   distanceMarkers,
   formatDistance,
   formatHeight,
-  KM_PER_MILE,
   isWithin,
   markerInterval,
   midpointWithin,
   type PixelRect,
   type Basemap,
-  type Display,
   type MapSnapshot,
   type CoverageCell,
   type Position,
   veilPolygon,
 } from '../core/index.ts';
-import { commonText } from '../i18n/index.ts';
+import { commonText, type Language } from '../i18n/index.ts';
 import { basemapStyle } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
 import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
@@ -104,7 +102,7 @@ function framedRoutes(routes: Position[][], framed: number | undefined) {
 }
 
 // The names MapLibre gives its controls, in the language of the app.
-const mapLocale = (language: Display['language']) => ({
+const mapLocale = (language: Language) => ({
   'Map.Title': commonText[language].mapName,
   'AttributionControl.ToggleAttribution': commonText[language].toggleAttribution,
 });
@@ -123,7 +121,6 @@ const emptyRoutes = { type: 'FeatureCollection', features: [] } as const;
 
 // The font stack the IGN style serves glyphs for.
 const LABEL_FONT = ['Source Sans Pro Bold'];
-const DEFAULT_DISPLAY: Display = { units: 'metric', language: 'en' };
 
 /** How the user left the map, for the buttons that put it back. */
 export type MapView = {
@@ -172,7 +169,7 @@ export function StartPointMap({
   routes,
   summaries,
   coverage,
-  display = DEFAULT_DISPLAY,
+  language = 'en',
   selectedRoute,
   markedRoute,
   framing = 'all',
@@ -195,8 +192,8 @@ export function StartPointMap({
   summaries?: RouteSummary[];
   /** The cells where the server can route: the rest of the map is veiled. None draws no veil. */
   coverage?: CoverageCell[] | undefined;
-  /** The units of the scale, the labels and the distance markers, and the language of the labels. */
-  display?: Display;
+  /** The language of the labels. */
+  language?: Language;
   selectedRoute?: number;
   /** The route that carries distance markers while the others stay drawn, such as the one selected on a desktop. */
   markedRoute?: number;
@@ -247,8 +244,7 @@ export function StartPointMap({
   const swappedFrom = useRef<Basemap>(undefined);
   const desktop = useDesktop();
   const scale = useRef<ScaleControl>(null);
-  const initialUnits = useEffectEvent(() => display.units);
-  const initialLanguage = useEffectEvent(() => display.language);
+  const initialLanguage = useEffectEvent(() => language);
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
@@ -302,7 +298,7 @@ export function StartPointMap({
     // MapLibre opens a compact attribution by itself: a credit stays closed until the user asks for it.
     map.getContainer().querySelector<HTMLElement>('.maplibregl-compact-show .maplibregl-ctrl-attrib-button')?.click();
     // The ruler: a bar whose length is a round distance, so a route can be sized up by eye.
-    scale.current = new ScaleControl({ unit: initialUnits() });
+    scale.current = new ScaleControl({ unit: 'metric' });
     map.addControl(scale.current, 'bottom-left');
     mapRef.current = map;
     for (const type of ['moveend', 'resize'] as const) map.on(type, () => setViewVersion((version) => version + 1));
@@ -531,20 +527,16 @@ export function StartPointMap({
     source.setData(coverage?.length ? veilPolygon(coverage) : emptyRoutes);
   }, [loaded, coverage, styleVersion]);
 
-  useEffect(() => {
-    scale.current?.setUnit(display.units);
-  }, [display.units]);
-
   // MapLibre names its controls once, when it draws them: a language picked since is applied by hand.
   useEffect(() => {
     const map = mapRef.current!;
-    const { mapName, toggleAttribution } = commonText[display.language];
+    const { mapName, toggleAttribution } = commonText[language];
     map.getCanvas().setAttribute('aria-label', mapName);
     for (const toggle of map.getContainer().querySelectorAll('.maplibregl-ctrl-attrib-button')) {
       toggle.setAttribute('aria-label', toggleAttribution);
       toggle.setAttribute('title', toggleAttribution);
     }
-  }, [display.language]);
+  }, [language]);
 
   // Drawn with the routes, so that the thumbnails' snapshot, taken without them, has no label either.
   useEffect(() => {
@@ -566,8 +558,8 @@ export function StartPointMap({
           const anchor = midpointWithin(geometry, project, tagArea);
           if (!anchor) return [];
           const summary = summaries?.[index];
-          const label = summary ? [formatDistance(summary.distance, display)] : [];
-          if (summary?.elevationGain !== undefined) label.push(`+${formatHeight(summary.elevationGain, display)}`);
+          const label = summary ? [formatDistance(summary.distance, language)] : [];
+          if (summary?.elevationGain !== undefined) label.push(`+${formatHeight(summary.elevationGain, language)}`);
           const selected = index === selectedRoute;
           // As for the lines, with none selected every tag keeps its route's colour.
           const filled = selected || selectedRoute === undefined;
@@ -584,16 +576,15 @@ export function StartPointMap({
             },
           ];
         });
-    const kilometres = display.units === 'metric' ? 1 : KM_PER_MILE;
     // The route with markers: the one of the open detail, or the one a desktop marks while it shows the others.
     const marked = detail ? selectedRoute : markedRoute;
     const summary = marked === undefined ? undefined : summaries?.[marked];
     const geometry = marked === undefined ? undefined : drawn[marked];
-    const interval = summary && markerInterval(summary.distance / kilometres);
+    const interval = summary && markerInterval(summary.distance);
     const markerArea = freeArea(map, desktop, sheetHeight, space, [MARKER_HALF, MARKER_HALF]);
     const markers =
       geometry && interval
-        ? distanceMarkers(geometry, interval * kilometres)
+        ? distanceMarkers(geometry, interval)
             .filter(({ position }) => isWithin(position, project, markerArea))
             .map(({ position, count }) => {
               const label = count * interval;
@@ -618,7 +609,7 @@ export function StartPointMap({
     loaded,
     routes,
     summaries,
-    display,
+    language,
     selectedRoute,
     markedRoute,
     framing,
