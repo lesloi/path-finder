@@ -27,6 +27,7 @@ function dock(language: 'en' | 'fr' = 'en', props: Partial<Parameters<typeof Rou
   return render(
     <RouteDock
       display={{ units: 'metric', language }}
+      pace={5.5}
       route={route}
       index={1}
       count={3}

@@ -12,6 +12,7 @@ import { RouteFigures, SurfaceShare } from './route-figures.tsx';
  */
 export function RouteDock({
   display,
+  pace,
   route,
   index,
   count,
@@ -19,6 +20,8 @@ export function RouteDock({
   onHover,
 }: {
   display: Display;
+  /** Minutes per km, the pace of the route's duration. */
+  pace: number;
   route: Route;
   /** Its place in the route set, from 0. */
   index: number;
@@ -45,7 +48,7 @@ export function RouteDock({
             data-testid="route-export"
             className={PRIMARY_BUTTON}
             // Nothing awaited before the share sheet: it needs the click that opened it.
-            onClick={() => void saveGpx(gpxExport(route, new Date(), display))}
+            onClick={() => void saveGpx(gpxExport(route, new Date(), display, pace))}
           >
             <Download size={18} aria-hidden />
             {t.exportGpx}

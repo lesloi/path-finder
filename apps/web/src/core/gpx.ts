@@ -1,6 +1,5 @@
 import { commonText } from '../i18n/index.ts';
-import { routeName } from './route-name.ts';
-import { KM_PER_MILE, METRES_PER_FOOT, type Display } from './units.ts';
+import { formatDistance, formatHeight, formatPace, KM_PER_MILE, METRES_PER_FOOT, type Display } from './units.ts';
 
 /**
  * A route as the API sends it: longitude, latitude, and height in metres on every point, or
@@ -26,26 +25,30 @@ export const MAX_GPX_POINTS = 2_000;
 
 /**
  * The GPX export of a route, built on the device: a GPX 1.1 file with one track named after
- * the route, in a file such as "Running-12km_340m-20260928120000.gpx".
+ * the route and its pace, in a file such as "Running-12km_340m-20260928120000.gpx".
  */
-export function gpxExport(route: GpxRoute, day: Date, settings: Display): { fileName: string; content: string } {
-  const name = routeName(day, route, settings);
+export function gpxExport(
+  route: GpxRoute,
+  day: Date,
+  settings: Display,
+  /** Minutes per km, the one the estimated duration was computed at. */
+  pace: number,
+): { fileName: string; content: string } {
+  const name = `${commonText[settings.language].gpxTrackName} · ${formatDistance(route.distance, settings)}`;
   const minutes = Math.round(route.estimatedDuration);
   const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
   const kept = simplify(route.geometry, MAX_GPX_POINTS);
   const points = kept.map(trackPoint).join('\n');
-  // A route with no point has no area to bound.
-  const area = kept.length ? `<bounds ${bounds(kept)}/>\n` : '';
-  const description = `${name} · ${duration}. ${commonText[settings.language].gpxAttribution}`;
+  const climb = route.elevationGain === undefined ? [] : [`+${formatHeight(route.elevationGain, settings)}`];
+  const description = `${[...climb, duration].join(' · ')} (${formatPace(pace, settings.units)})`;
   // The schema fixes the order of the elements, in the metadata as in the track.
   const content = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Path finder" xmlns="http://www.topografix.com/GPX/1/1">
 <metadata>
-<desc>${description}</desc>
 <copyright author="OpenStreetMap contributors"><license>${OSM_LICENSE}</license></copyright>
 <link href="${APP_URL}"><text>Path finder</text></link>
 <time>${day.toISOString()}</time>
-${area}</metadata>
+</metadata>
 <trk>
 <name>${name}</name>
 <desc>${description}</desc>
@@ -62,17 +65,6 @@ ${points}
 function trackPoint([lon, lat, ele]: [number, number, number?]): string {
   const height = ele === undefined ? '' : `<ele>${ele.toFixed(1)}</ele>`;
   return `<trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${height}</trkpt>`;
-}
-
-/** One pass, since spreading every coordinate into `Math.min` would not hold for a longer track. */
-function bounds(points: [number, number, number?][]): string {
-  let [minLat, maxLat, minLon, maxLon] = [Infinity, -Infinity, Infinity, -Infinity];
-  for (const [lon, lat] of points) {
-    [minLat, maxLat] = [Math.min(minLat, lat), Math.max(maxLat, lat)];
-    [minLon, maxLon] = [Math.min(minLon, lon), Math.max(maxLon, lon)];
-  }
-  const [a, b, c, d] = [minLat, minLon, maxLat, maxLon].map((degrees) => degrees.toFixed(6));
-  return `minlat="${a}" minlon="${b}" maxlat="${c}" maxlon="${d}"`;
 }
 
 /** Such as "Running-12km_340m-20260928120000", or "Running-8mi_1114ft-20260928120000" in imperial units. */
