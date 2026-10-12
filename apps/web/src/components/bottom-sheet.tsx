@@ -58,7 +58,9 @@ export function BottomSheet({
     // The screen units bound it: the pixels of the finger may go beyond.
     style.minHeight = DRAG_MIN;
     style.maxHeight = DRAG_MAX;
-    style.height = `${drag.current.height - moved}px`;
+    // A sheet already collapsed does not shrink further, nor does an expanded one grow: the finger may go on, not the sheet.
+    const allowed = expanded ? Math.max(moved, 0) : Math.min(moved, 0);
+    style.height = `${drag.current.height - allowed}px`;
   };
 
   // The sheet goes back to the height its state gives it.

@@ -82,6 +82,19 @@ describe('BottomSheet', () => {
       expect(heightOf(screen.getByTestId('sheet'))).toBe('350px');
     });
 
+    it.each([
+      ['collapsed', false, 450, 400],
+      ['expanded', true, 350, 400],
+    ])('does not move a %s sheet further than it is', (_, expanded, to, from) => {
+      render(<BottomSheet testId="sheet" label="Route" expanded={expanded} onExpandedChange={vi.fn()} />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: from });
+      fireEvent.pointerMove(handle, { clientY: to });
+
+      expect(heightOf(screen.getByTestId('sheet'))).toBe(`${SHEET_PX}px`);
+    });
+
     it('leaves the bounds of the sheet to the screen units of its classes', () => {
       render(<Sheet />);
       const handle = screen.getByTestId('sheet-handle');
