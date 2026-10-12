@@ -1,6 +1,5 @@
-import { commonText } from '../i18n/index.ts';
-import { routeName } from './route-name.ts';
-import { KM_PER_MILE, METRES_PER_FOOT, type Display } from './units.ts';
+import { commonText, LINKS } from '../i18n/index.ts';
+import { formatDistance, formatHeight, formatPace, KM_PER_MILE, METRES_PER_FOOT, type Display } from './units.ts';
 
 /**
  * A route as the API sends it: longitude, latitude, and height in metres on every point, or
@@ -16,47 +15,70 @@ export type GpxRoute = {
   estimatedDuration: number;
 };
 
+// Cycling (#131) will be a travel mode that chooses this; only running is generated for now.
+const TRAVEL_MODE = { type: 'running', label: 'Running' };
+
 /** Older watches truncate longer tracks. */
 export const MAX_GPX_POINTS = 2_000;
 
 /**
  * The GPX export of a route, built on the device: a GPX 1.1 file with one track named after
- * the route, in a file such as "2809-12km_340m.gpx".
+ * the route and its pace, in a file such as "Running-12km_340m-20260928120000.gpx".
  */
-export function gpxExport(route: GpxRoute, day: Date, settings: Display): { fileName: string; content: string } {
-  const name = routeName(day, route, settings);
+export function gpxExport(
+  route: GpxRoute,
+  exportedAt: Date,
+  settings: Display,
+  /** Minutes per km, the one the estimated duration was computed at. */
+  pace: number,
+): { fileName: string; content: string } {
+  const name = `${commonText[settings.language].gpxTrackName} · ${formatDistance(route.distance, settings)}`;
   const minutes = Math.round(route.estimatedDuration);
   const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
-  const points = simplify(route.geometry, MAX_GPX_POINTS)
-    .map(([lon, lat, ele]) => {
-      const height = ele === undefined ? '' : `<ele>${ele.toFixed(1)}</ele>`;
-      return `<trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${height}</trkpt>`;
-    })
-    .join('\n');
+  const points = simplify(route.geometry, MAX_GPX_POINTS).map(trackPoint).join('\n');
+  const climb = route.elevationGain === undefined ? [] : [`+${formatHeight(route.elevationGain, settings)}`];
+  const description = `${[...climb, duration].join(' · ')} (${formatPace(pace, settings.units)})`;
+  // The schema fixes the order of the elements, in the metadata as in the track.
   const content = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Path finder" xmlns="http://www.topografix.com/GPX/1/1">
+<metadata>
+<copyright author="OpenStreetMap contributors"><license>${LINKS.odblText}</license></copyright>
+<link href="${LINKS.app}"><text>Path finder</text></link>
+<time>${exportedAt.toISOString()}</time>
+</metadata>
 <trk>
 <name>${name}</name>
-<desc>${name} · ${duration}. ${commonText[settings.language].gpxAttribution}</desc>
+<desc>${description}</desc>
+<type>${TRAVEL_MODE.type}</type>
 <trkseg>
 ${points}
 </trkseg>
 </trk>
 </gpx>
 `;
-  return { fileName: `${fileName(route, day, settings)}.gpx`, content };
+  return { fileName: `${fileName(route, exportedAt, settings)}.gpx`, content };
 }
 
-/** Short, such as "2809-12km_340m", or "2809-8mi_1114ft" in imperial units. */
-function fileName({ distance, elevationGain }: GpxRoute, day: Date, { units }: Display): string {
+function trackPoint([lon, lat, ele]: [number, number, number?]): string {
+  const height = ele === undefined ? '' : `<ele>${ele.toFixed(1)}</ele>`;
+  return `<trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${height}</trkpt>`;
+}
+
+/** Such as "Running-12km_340m-20260928120000", or "Running-8mi_1114ft-20260928120000" in imperial units. */
+function fileName({ distance, elevationGain }: GpxRoute, exportedAt: Date, { units }: Display): string {
   const metric = units === 'metric';
-  const date = `${day.getDate()}`.padStart(2, '0') + `${day.getMonth() + 1}`.padStart(2, '0');
+  // The device's local time, as the user reads it on their watch.
+  const pad = (n: number) => `${n}`.padStart(2, '0');
+  const [date, time] = [
+    `${exportedAt.getFullYear()}${pad(exportedAt.getMonth() + 1)}${pad(exportedAt.getDate())}`,
+    `${pad(exportedAt.getHours())}${pad(exportedAt.getMinutes())}${pad(exportedAt.getSeconds())}`,
+  ];
   const length = metric ? `${Math.round(distance)}km` : `${Math.round(distance / KM_PER_MILE)}mi`;
   const climb =
     elevationGain === undefined
       ? ''
       : `_${metric ? `${Math.round(elevationGain)}m` : `${Math.round(elevationGain / METRES_PER_FOOT)}ft`}`;
-  return `${date}-${length}${climb}`;
+  return `${TRAVEL_MODE.label}-${length}${climb}-${date}${time}`;
 }
 
 /** Douglas–Peucker, with a tolerance doubled from 1 m until at most `max` points are left. */

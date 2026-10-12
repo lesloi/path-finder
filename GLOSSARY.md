@@ -98,9 +98,8 @@ One generated loop, with its geometry, distance, elevation gain, surface breakdo
 _Avoid_: Trace, track, itinerary, path
 
 **Route name**:
-The label of a route in its GPX export: the day of the export, the distance,
-and the elevation gain when known, such as "28 sept. · 12,3 km · +340 m", in the
-user's language and units. It never names where the route starts.
+The label of a route in its GPX export: a word and the distance, such as
+"Itinéraire · 12,3 km", in the user's language and units. It never names where the route starts.
 _Avoid_: Title
 
 **Loop**:

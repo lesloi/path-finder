@@ -96,6 +96,7 @@ export function RouteSetView({
       <RouteDetail
         display={display}
         routes={routes}
+        pace={pace}
         snapshot={snapshot}
         selected={selected ?? 0}
         onSelect={onSelect}
@@ -270,6 +271,7 @@ function Marker({ icon: Icon, text, testId }: { icon: LucideIcon; text: string; 
 function RouteDetail({
   display,
   routes,
+  pace,
   snapshot,
   selected,
   onSelect,
@@ -278,6 +280,8 @@ function RouteDetail({
 }: {
   display: Display;
   routes: Route[];
+  /** Minutes per km, the pace of the durations. */
+  pace: number;
   snapshot?: MapSnapshot;
   selected: number;
   onSelect: (index: number) => void;
@@ -350,7 +354,7 @@ function RouteDetail({
         data-testid="route-export"
         className={PRIMARY_BUTTON}
         // Nothing awaited before the share sheet: it needs the tap that opened it.
-        onClick={() => void saveGpx(gpxExport(route, new Date(), display))}
+        onClick={() => void saveGpx(gpxExport(route, new Date(), display, pace))}
       >
         <Download size={18} aria-hidden />
         {t.exportGpx}

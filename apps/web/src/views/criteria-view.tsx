@@ -428,6 +428,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       {dockRoute && atPace && selected !== undefined && (
         <RouteDock
           display={display}
+          pace={atPace.pace}
           route={dockRoute}
           index={selected}
           count={atPace.routes.length}
