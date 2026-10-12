@@ -1,4 +1,4 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import type { Theme, Units } from '../core/index.ts';
@@ -22,9 +22,9 @@ export function SettingsView({ language }: { language: Language }) {
             label={t.theme}
             value={settings.theme}
             options={[
-              { value: 'system', label: t.system },
-              { value: 'light', label: t.light },
-              { value: 'dark', label: t.dark },
+              { value: 'system', label: t.system, icon: <Monitor size={16} aria-hidden className="flex-none" /> },
+              { value: 'light', label: t.light, icon: <Sun size={16} aria-hidden className="flex-none" /> },
+              { value: 'dark', label: t.dark, icon: <Moon size={16} aria-hidden className="flex-none" /> },
             ]}
             onChange={(theme: Theme) => update({ theme })}
           />
