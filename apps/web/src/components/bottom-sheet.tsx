@@ -72,7 +72,7 @@ export function BottomSheet({
           }}
         />
       ) : (
-        <div aria-hidden className={`h-7 w-full flex-none ${mark}`} />
+        <div aria-hidden className={`grid h-7 w-full flex-none place-items-center ${mark}`} />
       )}
       <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">{children}</div>
     </div>
