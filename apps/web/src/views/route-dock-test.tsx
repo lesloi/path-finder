@@ -77,7 +77,7 @@ describe('RouteDock', () => {
     fireEvent.click(screen.getByTestId('route-export'));
 
     const [{ files }] = share.mock.calls[0] as unknown as [ShareData];
-    expect(files![0].name).toMatch(/^\d{4}-12km_340m\.gpx$/);
+    expect(files![0].name).toMatch(/^Running-12km_340m-\d{14}\.gpx$/);
   });
 
   it.each(['en', 'fr'] as const)('names every control in %s', (language) => {

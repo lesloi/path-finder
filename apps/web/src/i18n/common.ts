@@ -1,6 +1,6 @@
 import type { Language } from './language.ts';
 
-/** Words several screens share: page titles, hemispheres, units of time, the GPX attribution and start label, the map's names. */
+/** Words several screens share: page titles, hemispheres, units of time, the GPX attribution, the map's names. */
 export const commonText = {
   en: {
     back: 'Back',
@@ -14,7 +14,6 @@ export const commonText = {
     minute: 'min',
     mapName: 'Map',
     toggleAttribution: 'Toggle attribution',
-    gpxStart: 'Start',
     gpxAttribution: 'Data © OpenStreetMap contributors, ODbL.',
     description: 'Generate a custom running or trail route. Free, no account, no tracking.',
   },
@@ -30,7 +29,6 @@ export const commonText = {
     minute: 'min',
     mapName: 'Carte',
     toggleAttribution: 'Afficher les crédits de la carte',
-    gpxStart: 'Départ',
     gpxAttribution: 'Données © les contributeurs d’OpenStreetMap, ODbL.',
     description: 'Générez un parcours de course ou de trail sur mesure. Gratuit, sans compte ni suivi.',
   },
