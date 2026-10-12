@@ -31,9 +31,8 @@ export function BottomSheet({
   children?: ReactNode;
 }) {
   const sheet = useRef<HTMLDivElement>(null);
-  const dragFrom = useRef<number>(undefined);
-  const dragFromHeight = useRef(0);
-  const dragging = useRef(false);
+  // Where a drag of the handle began, and how tall the sheet was then; none when there is no drag.
+  const drag = useRef<{ y: number; height: number }>(undefined);
   const swiped = useRef(false);
   // Counts the ends of a drag: the height is told again then, even if the sheet ends as tall as it was.
   const [settled, setSettled] = useState(0);
@@ -41,7 +40,7 @@ export function BottomSheet({
 
   useLayoutEffect(() => {
     const observer = new ResizeObserver(([entry]) => {
-      if (!dragging.current) heightChanged(entry.borderBoxSize[0].blockSize);
+      if (!drag.current) heightChanged(entry.borderBoxSize[0].blockSize);
     });
     observer.observe(sheet.current!);
     return () => observer.disconnect();
@@ -52,18 +51,17 @@ export function BottomSheet({
   }, [settled]);
 
   const follow = (event: PointerEvent) => {
-    if (dragFrom.current === undefined) return;
-    dragging.current = true;
-    const height = dragFromHeight.current - (event.clientY - dragFrom.current);
+    if (!drag.current) return;
+    const [min, max] = [window.innerHeight * DRAG_MIN, window.innerHeight * DRAG_MAX];
+    const height = drag.current.height - (event.clientY - drag.current.y);
     const style = sheet.current!.style;
-    style.maxHeight = `${window.innerHeight * DRAG_MAX}px`;
-    style.height = `${Math.min(Math.max(height, window.innerHeight * DRAG_MIN), window.innerHeight * DRAG_MAX)}px`;
+    style.maxHeight = `${max}px`;
+    style.height = `${Math.min(Math.max(height, min), max)}px`;
   };
 
   // The sheet goes back to the height its state gives it.
   const letGo = () => {
-    dragFrom.current = undefined;
-    dragging.current = false;
+    drag.current = undefined;
     sheet.current!.style.height = '';
     sheet.current!.style.maxHeight = '';
     setSettled((count) => count + 1);
@@ -90,20 +88,19 @@ export function BottomSheet({
           aria-label={label}
           aria-expanded={expanded}
           onPointerDown={(event) => {
-            dragFrom.current = event.clientY;
-            dragFromHeight.current = sheet.current!.getBoundingClientRect().height;
+            drag.current = { y: event.clientY, height: sheet.current!.getBoundingClientRect().height };
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerMove={follow}
           onPointerUp={(event) => {
-            const distance = event.clientY - (dragFrom.current ?? event.clientY);
+            const distance = event.clientY - (drag.current?.y ?? event.clientY);
             letGo();
             swiped.current = Math.abs(distance) > SWIPE_PX;
             if (swiped.current) onExpandedChange(distance < 0);
           }}
           // A gesture the system takes over leaves the state as it was.
           onPointerCancel={letGo}
-          onLostPointerCapture={() => dragFrom.current !== undefined && letGo()}
+          onLostPointerCapture={() => drag.current && letGo()}
           // A swipe ends with a click too: only a tap or a key toggles the sheet.
           onClick={() => {
             if (!swiped.current) onExpandedChange(!expanded);
