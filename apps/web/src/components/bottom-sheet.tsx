@@ -51,8 +51,9 @@ export function BottomSheet({
         <button
           type="button"
           data-testid={testId && `${testId}-handle`}
-          // As tall as a touch target, with the mark in the middle.
-          className={`grid h-touch w-full flex-none cursor-grab place-items-center touch-none ${mark}`}
+          // As tall as a touch target, with the mark in the middle. The negative margin takes back most of the half-leading
+          // of the first line below, so the space under the mark looks the same as the one above it.
+          className={`-mb-1 grid h-touch w-full flex-none cursor-grab place-items-center touch-none ${mark}`}
           aria-label={label}
           aria-expanded={expanded}
           onPointerDown={(event) => {
