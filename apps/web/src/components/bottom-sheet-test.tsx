@@ -83,9 +83,9 @@ describe('BottomSheet', () => {
     });
 
     it.each([
-      ['collapsed', false, 450, 400],
-      ['expanded', true, 350, 400],
-    ])('does not move a %s sheet further than it is', (_, expanded, to, from) => {
+      ['collapsed', false, 400, 450],
+      ['expanded', true, 400, 350],
+    ])('does not move a %s sheet further than it is', (_, expanded, from, to) => {
       render(<BottomSheet testId="sheet" label="Route" expanded={expanded} onExpandedChange={vi.fn()} />);
       const handle = screen.getByTestId('sheet-handle');
 
