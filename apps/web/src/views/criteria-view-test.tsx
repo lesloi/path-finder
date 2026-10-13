@@ -1576,6 +1576,33 @@ describe('CriteriaView', () => {
       expect(waypointMarkers().map((marker) => marker.position)).toEqual([[6.21, 45.81]]);
     });
 
+    it('says so when a tap falls on the veiled part of the map, then asks again for a point', async () => {
+      vi.stubGlobal('fetch', (url: string) =>
+        url === '/api/v1/coverage'
+          ? Promise.resolve(Response.json({ cells: [[6, 45.7, 6.3, 45.9]] }))
+          : new Promise(() => {}),
+      );
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      await act(async () => {});
+
+      place(2.3, 48.8);
+      expect(banner()).toHaveTextContent(en.waypointUncovered);
+
+      place(6.21, 45.81);
+      expect(banner()).toHaveTextContent(en.placeWaypoint);
+    });
+
+    it('stops placing once the search starts', () => {
+      stubFetch(() => new Promise(() => {}));
+      render(<CriteriaView language="en" />);
+      startPlacing();
+
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      expect(screen.queryByTestId('criteria-waypoint-bar')).not.toBeInTheDocument();
+    });
+
     it('does not move the start point while placing', () => {
       render(<CriteriaView language="en" />);
       startPlacing();

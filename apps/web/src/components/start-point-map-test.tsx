@@ -1271,6 +1271,25 @@ describe('StartPointMap waypoints', () => {
     expect(onStartChange).not.toHaveBeenCalled();
   });
 
+  it('shows a crosshair while placing, and the usual cursor after', () => {
+    const view = render(<StartPointMap placing onStartChange={vi.fn()} />);
+    expect(map().getCanvas().style.cursor).toBe('crosshair');
+
+    view.rerender(<StartPointMap onStartChange={vi.fn()} />);
+
+    expect(map().getCanvas().style.cursor).toBe('');
+  });
+
+  it('shows a forbidden cursor over the veiled part of the map while placing', () => {
+    render(<StartPointMap placing coverage={[[6, 45.8, 6.1, 45.9]]} onStartChange={vi.fn()} />);
+
+    act(() => map().fire('mousemove', { lngLat: { lng: 2.3, lat: 48.8 } }));
+    expect(map().getCanvas().style.cursor).toBe('not-allowed');
+
+    act(() => map().fire('mousemove', { lngLat: { lng: 6.05, lat: 45.85 } }));
+    expect(map().getCanvas().style.cursor).toBe('crosshair');
+  });
+
   it('adds nothing on a click when not placing', () => {
     const onWaypointAdd = vi.fn();
     render(<StartPointMap onWaypointAdd={onWaypointAdd} onStartChange={vi.fn()} />);

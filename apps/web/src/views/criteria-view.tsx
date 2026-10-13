@@ -1,4 +1,4 @@
-import { Crosshair, LocateFixed, MapPinPlus, Navigation2, Scan, Settings } from 'lucide-react';
+import { Crosshair, LocateFixed, MapPinCheck, MapPinPlus, Navigation2, Scan, Settings } from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { MAX_WAYPOINTS } from '../contract/index.ts';
@@ -72,6 +72,13 @@ const MAP_NOTICE =
   'desktop:top-auto desktop:bottom-[calc(var(--edge-bottom)+--spacing(8))] desktop:left-(--map-centre) ' +
   'desktop:max-w-none';
 
+// A notice over the top of the map, under the bar on phones; on desktops in line with the settings button, clear of
+// the buttons at the bottom right.
+const TOP_NOTICE =
+  'fixed z-4 w-max -translate-x-1/2 rounded-md bg-surface text-sm text-ink-2 shadow-float ' +
+  'top-[calc(var(--top-reserved)+--spacing(2))] left-1/2 max-w-[calc(100vw-2*--spacing(4))] ' +
+  'desktop:top-safe-3 desktop:left-(--map-centre) desktop:max-w-[calc(100vw-var(--column-inset)-2*var(--spacing-touch)-(--spacing(12)))]';
+
 // The start point of a request that is not there yet, for the summary of the criteria alone.
 const NO_START: Position = [0, 0];
 
@@ -95,6 +102,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
   const [placing, setPlacing] = useState(false);
+  // A tap on the veiled part of the map was refused: the banner says why for a while.
+  const [refused, setRefused] = useState(false);
   // On phones, the criteria are a layer over the map; the height of the sheet is what the routes are framed clear of.
   const [layerOpen, setLayerOpen] = useState(false);
   // The sheet says it, and describes its button by it, only while the form does not show its own message.
@@ -126,6 +135,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Every search keeps the criteria it was made with, whichever button asked for it.
   const search = (request: RouteSetRequest) => {
     setCleared(false);
+    setPlacing(false);
     draft[2]();
     browser.ask(request);
   };
@@ -164,6 +174,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   }, [pageOpen]);
 
   useToastTimeout(toast, () => setToast(undefined));
+  useToastTimeout(refused || undefined, () => setRefused(false));
 
   // Escape steps back on a desktop: first out of placing waypoints, then out of picking the start point on the map, then out of the route selected.
   const deselect = () => {
@@ -194,7 +205,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   function addWaypoint(position: Position) {
     if (waypoints.length >= MAX_WAYPOINTS) return;
     // The veiled part of the map is where the server cannot route: a waypoint there would only be refused.
-    if (coverage && !isCovered(coverage, position)) return;
+    if (coverage && !isCovered(coverage, position)) return setRefused(true);
+    setRefused(false);
     setWaypoints([...waypoints, position]);
     // The last one ends placing on its own.
     if (waypoints.length + 1 >= MAX_WAYPOINTS) setPlacing(false);
@@ -370,7 +382,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               disabled={!placing && waypoints.length >= MAX_WAYPOINTS}
               onClick={togglePlacing}
             >
-              <MapPinPlus size={20} aria-hidden />
+              {placing ? <MapPinCheck size={20} aria-hidden /> : <MapPinPlus size={20} aria-hidden />}
             </button>
           )}
           {mapView.rotated && (
@@ -517,8 +529,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         </div>
       )}
       {placing && (
-        <div data-testid="criteria-waypoint-bar" className={`${MAP_NOTICE} flex items-center gap-3 py-1 pr-1 pl-4`}>
-          {desktop ? t.placeWaypoint : t.placeWaypointTouch}
+        <div data-testid="criteria-waypoint-bar" className={`${TOP_NOTICE} flex items-center gap-3 py-1 pr-1 pl-4`}>
+          {refused ? t.waypointUncovered : desktop ? t.placeWaypoint : t.placeWaypointTouch}
           <button
             type="button"
             data-testid="criteria-waypoint-done"

@@ -17,6 +17,7 @@ import {
   distanceMarkers,
   formatDistance,
   formatHeight,
+  isCovered,
   isWithin,
   POI_MIN_ZOOM,
   poiTilesCovering,
@@ -587,9 +588,18 @@ export function StartPointMap({
     };
   }, [start]);
 
-  // A crosshair tells the user a tap now places a waypoint.
+  // A crosshair tells the user a tap now places a waypoint, and a forbidden sign that this part is veiled.
+  const coverageNow = useEffectEvent(() => coverage);
   useEffect(() => {
-    mapRef.current!.getCanvas().style.cursor = placing ? 'crosshair' : '';
+    const map = mapRef.current!;
+    map.getCanvas().style.cursor = placing ? 'crosshair' : '';
+    if (!placing) return;
+    const follow = ({ lngLat }: MapMouseEvent) => {
+      const cells = coverageNow();
+      map.getCanvas().style.cursor = cells && !isCovered(cells, [lngLat.lng, lngLat.lat]) ? 'not-allowed' : 'crosshair';
+    };
+    map.on('mousemove', follow);
+    return () => void map.off('mousemove', follow);
   }, [placing]);
 
   // A white circle with a dark border and its number, in the order the waypoints were placed. Tapping one opens a
