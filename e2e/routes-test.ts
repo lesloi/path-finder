@@ -200,7 +200,7 @@ test.describe('the route set', () => {
       await page.locator('label', { has: page.getByTestId('criteria-surface-unpaved') }).click();
 
       await expect(page.getByTestId('routes-stale')).toBeVisible();
-      await page.getByTestId('routes-search-again').click();
+      await page.getByTestId('criteria-submit').click();
       await expect(page.getByTestId('routes-stale')).toHaveCount(0);
       await expect(page.getByTestId('routes-row-0')).toBeVisible();
     });

@@ -3,7 +3,7 @@ import { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, use
 
 import { forgetPendingSearch, pendingSearch, useCoverage, useSettings } from '../state/index.ts';
 import { CriteriaBar } from './criteria-bar.tsx';
-import { CriteriaForm, criteriaChanged, criteriaRequest, invalidField, useCriteriaDraft } from './criteria-form.tsx';
+import { CriteriaForm, criteriaChanged, criteriaRequest, useCriteriaDraft } from './criteria-form.tsx';
 import { RouteDock } from './route-dock.tsx';
 import { RouteErrorToast } from './route-error-toast.tsx';
 import { SearchingPanel } from './searching-panel.tsx';
@@ -228,23 +228,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       />
     ) : undefined;
   const panel = routeSetView ?? (loading && <SearchingPanel language={language} />);
-  // Asking is only for criteria the form would let through, from a start point the server can route from.
   const staleNotice = stale && (
-    <div role="status" data-testid="routes-stale" className="flex flex-col gap-2 rounded-md bg-accent-soft p-3 text-sm">
-      <span>
-        <strong>{t.stale}.</strong> {t.staleHint}
-      </span>
-      {current && !invalidField(current) && !startUncovered && (
-        <button
-          type="button"
-          data-testid="routes-search-again"
-          // Not a second primary button: the form's own, or the sheet's, is the view's.
-          className="min-h-touch rounded-full font-semibold text-accent"
-          onClick={() => search(current)}
-        >
-          {t.searchAgain}
-        </button>
-      )}
+    <div role="status" data-testid="routes-stale" className="rounded-md bg-accent-soft p-3 text-sm">
+      <strong>{t.stale}.</strong> {t.staleHint}
     </div>
   );
   const cancelButton = loading && (
