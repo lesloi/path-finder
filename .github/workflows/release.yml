@@ -13,8 +13,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Builds the multi-platform image and pushes it to GitHub Container Registry; the pull requests build the app through the e2e tests (workflow `web`).
+  # The checks and tests run here on `main`, so that nothing is published or deployed before they pass.
+  check:
+    uses: ./.github/workflows/check.yml
+  web:
+    uses: ./.github/workflows/web.yml
+  server:
+    uses: ./.github/workflows/server.yml
+
+  # Builds the multi-platform image and pushes it to GitHub Container Registry once the checks and tests pass; the pull requests
+  # build the app through the e2e tests (workflow `web`).
   container:
+    needs: [check, web, server]
     runs-on: ubuntu-latest
     outputs:
       digest: ${{ steps.build.outputs.digest }}
