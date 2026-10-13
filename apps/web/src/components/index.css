@@ -304,3 +304,62 @@
     0 0 3px #fff;
   filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
 }
+
+/*
+ * A tooltip for an icon: `data-tip` is its text, `data-tip-side` the side it opens on, chosen so that it stays on the
+ * screen and out of a scrolling panel, which would cut it. `stack` is for the buttons that stack up on phones and line
+ * up on desktops: to the left of a stack, above a line. Escape dismisses it (`useTipDismiss`).
+ */
+[data-tip]:where(:not(.fixed, .absolute)) {
+  position: relative;
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 10;
+  display: none;
+  width: max-content;
+  max-width: calc(var(--spacing) * 56);
+  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  [data-tip]:not([data-tip-dismissed]):hover::after,
+  [data-tip]:not([data-tip-dismissed]):focus-visible::after {
+    display: block;
+  }
+}
+[data-tip-side='stack']::after {
+  top: 50%;
+  right: calc(100% + var(--spacing) * 2);
+  translate: 0 -50%;
+
+  @variant desktop {
+    top: auto;
+    right: 0;
+    bottom: calc(100% + var(--spacing) * 2);
+    translate: none;
+  }
+}
+[data-tip-side^='bottom']::after {
+  top: calc(100% + var(--spacing) * 2);
+}
+[data-tip-side^='top']::after {
+  bottom: calc(100% + var(--spacing) * 2);
+}
+[data-tip-side$='-start']::after {
+  left: 0;
+}
+[data-tip-side$='-end']::after {
+  right: 0;
+}

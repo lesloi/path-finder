@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { POI_LAYER_KEYS, type PoiLayers } from '../core/index.ts';
 import { criteriaText, type Language } from '../i18n/index.ts';
 import { PoiBadge } from './poi-badge.tsx';
-import { FLOATING_BUTTON } from './styles.ts';
+import { FLOATING_BUTTON, tip } from './styles.ts';
 
 const LABELS = { water: 'poiWater', viewpoint: 'poiViewpoint', seasonal: 'poiSeasonal' } as const;
 
@@ -55,7 +55,7 @@ export function LayersControl({
         type="button"
         data-testid="criteria-layers"
         className={FLOATING_BUTTON}
-        aria-label={t.layers}
+        {...tip(t.pointsOfInterest, 'stack')}
         aria-expanded={open}
         aria-controls={`${id}-popover`}
         onClick={() => setOpen(!open)}
@@ -66,7 +66,7 @@ export function LayersControl({
         <div
           id={`${id}-popover`}
           role="group"
-          aria-label={t.layers}
+          aria-label={t.pointsOfInterest}
           className="absolute right-0 bottom-full mb-2 w-max max-w-[calc(100vw-2*--spacing(4))] rounded-lg border border-border bg-surface p-2 shadow-float"
         >
           {POI_LAYER_KEYS.map((key) => {

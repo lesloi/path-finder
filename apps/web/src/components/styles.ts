@@ -64,3 +64,15 @@ export const NOTE = 'text-sm text-ink-2';
 export const PRIMARY_BUTTON =
   'flex min-h-touch w-full items-center justify-center gap-2 rounded-full bg-accent px-4 font-semibold ' +
   'text-on-accent hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-accent';
+
+type TipSide = 'stack' | 'bottom-start' | 'bottom-end' | 'top-start';
+
+/**
+ * A tooltip for an icon that sits beside a figure: the accessible name of the element around it already says what
+ * the icon means (see `data-tip` in index.css). `side` is where the tooltip opens, chosen so that it stays on the
+ * screen.
+ */
+export const hint = (label: string, side: TipSide) => ({ 'data-tip': label, 'data-tip-side': side });
+
+/** The name of a control that shows an icon alone, and the tooltip that says it. */
+export const tip = (label: string, side: TipSide) => ({ 'aria-label': label, ...hint(label, side) });

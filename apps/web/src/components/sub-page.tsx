@@ -2,7 +2,7 @@ import { ArrowLeft, X } from 'lucide-react';
 import { useEffect, useId, useLayoutEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 
 import { commonText, type Language } from '../i18n/index.ts';
-import { ICON_BUTTON } from './styles.ts';
+import { ICON_BUTTON, tip } from './styles.ts';
 import { useDesktop } from './use-desktop.ts';
 
 // Where closing a page leads: the map.
@@ -79,7 +79,13 @@ export function SubPage({
         }
       >
         {(!desktop || back !== HOME) && (
-          <a className={ICON_BUTTON} data-testid="sub-page-back" href={back} aria-label={t.back} onClick={follow(back)}>
+          <a
+            className={ICON_BUTTON}
+            data-testid="sub-page-back"
+            href={back}
+            {...tip(t.back, 'bottom-start')}
+            onClick={follow(back)}
+          >
             <ArrowLeft aria-hidden />
           </a>
         )}
@@ -97,7 +103,7 @@ export function SubPage({
             className={`${ICON_BUTTON} ml-auto`}
             data-testid="sub-page-close"
             href={HOME}
-            aria-label={t.close}
+            {...tip(t.close, 'bottom-end')}
             onClick={follow(HOME)}
           >
             <X aria-hidden />
