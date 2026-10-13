@@ -616,7 +616,11 @@ export function StartPointMap({
           .setDOMContent(remove)
           .addTo(map);
       };
-      element.addEventListener('click', open);
+      element.addEventListener('click', (event) => {
+        // MapLibre hears clicks on its markers as clicks on the map, which would close the bubble this opens.
+        event.stopPropagation();
+        open();
+      });
       element.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
