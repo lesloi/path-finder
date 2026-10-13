@@ -25,7 +25,7 @@ export function SelectControl<Value extends string>({
       // The values come from `options`, so the browser can only give one of them back.
       onChange={(event) => onChange(event.target.value as Value)}
       className={
-        'min-h-touch rounded-full bg-surface-2 px-4 text-sm font-semibold text-ink ' +
+        'min-h-touch rounded-md bg-surface-2 px-4 text-sm font-medium text-ink ' +
         'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none'
       }
     >

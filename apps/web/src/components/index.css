@@ -304,18 +304,25 @@
     border: 1px solid var(--border);
     cursor: pointer;
   }
+  /* A thin chevron instead of the default triangle. */
   select::picker-icon {
-    color: var(--ink-2);
+    content: '';
+    width: 6px;
+    height: 6px;
+    margin-bottom: 3px;
+    border: solid var(--ink-2);
+    border-width: 0 1.5px 1.5px 0;
+    rotate: 45deg;
     transition: rotate 150ms;
   }
   select:open::picker-icon {
-    rotate: 180deg;
+    rotate: 225deg;
   }
   select::picker(select) {
-    margin-top: calc(var(--spacing) * 1);
-    padding: calc(var(--spacing) * 1);
+    margin-top: calc(var(--spacing) * 2);
+    padding: calc(var(--spacing) * 2);
     border: 1px solid var(--border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     background: var(--surface);
     color: var(--ink);
     box-shadow: var(--float);
@@ -326,21 +333,19 @@
     gap: calc(var(--spacing) * 2);
     min-height: var(--spacing-touch);
     padding: 0 calc(var(--spacing) * 3);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     cursor: pointer;
     font-size: var(--text-sm);
-    font-weight: 600;
+    font-weight: 500;
   }
   select option:hover,
   select option:focus-visible {
     background: var(--surface-2);
   }
-  select option:checked {
-    background: var(--accent-soft);
-  }
   select option::checkmark {
     order: 1;
     margin-left: auto;
-    color: var(--ink);
+    padding-left: calc(var(--spacing) * 6);
+    color: var(--ink-2);
   }
 }
