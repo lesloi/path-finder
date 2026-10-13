@@ -211,7 +211,7 @@ func (a *app) routeSets(w http.ResponseWriter, r *http.Request) {
 	var criteria *contract.CriteriaError
 	switch {
 	case errors.As(err, &criteria):
-		writeJSON(w, http.StatusBadRequest, refusal{Error: contract.CodeInvalidCriteria, Field: criteria.Field})
+		writeJSON(w, http.StatusBadRequest, refusal{Error: contract.CodeInvalidCriteria, Field: criteria.Field, Waypoint: criteria.Index})
 	case errors.Is(err, context.DeadlineExceeded):
 		refuse(w, http.StatusGatewayTimeout, contract.CodeGenerationTimeout)
 	case r.Context().Err() != nil:

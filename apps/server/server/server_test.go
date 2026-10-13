@@ -126,6 +126,12 @@ func TestRouteSetsRefusals(t *testing.T) {
 			t.Errorf("got %d %s", r.Code, r.Body.String())
 		}
 	})
+	t.Run("a refused waypoint is told by its number", func(t *testing.T) {
+		r := post(newServer(t, failing(&contract.CriteriaError{Field: "waypoints", Index: 2})), `{}`)
+		if r.Code != 400 || strings.TrimSpace(r.Body.String()) != `{"error":"invalid-criteria","field":"waypoints","waypoint":2}` {
+			t.Errorf("got %d %s", r.Code, r.Body.String())
+		}
+	})
 	t.Run("a bug is a 500 without its message", func(t *testing.T) {
 		r := post(newServer(t, failing(os.ErrPermission)), `{}`)
 		if r.Code != 500 || r.Body.Len() != 0 {

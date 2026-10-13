@@ -19,6 +19,7 @@ type limits struct {
 	MinDistanceKm    float64                    `json:"minDistanceKm"`
 	DurationMinutes  struct{ Min, Max float64 } `json:"durationMinutes"`
 	MaxGainMetres    float64                    `json:"maxElevationGainMetres"`
+	MaxWaypoints     int                        `json:"maxWaypoints"`
 	ClimbPerEffortKm float64                    `json:"climbPerEffortKm"`
 	HillyMatchPerKm  float64                    `json:"hillyMatchPerKm"`
 	CoverageCell     float64                    `json:"coverageCellDegrees"`
@@ -111,3 +112,6 @@ func POITileOf(lat, lon float64) (x, y int) {
 	clamp := func(v float64) int { return int(math.Max(0, math.Min(n-1, math.Floor(v)))) }
 	return clamp(fx), clamp(fy)
 }
+
+// MaxWaypoints is the most waypoints a set of criteria holds.
+func MaxWaypoints() int { return bounds.MaxWaypoints }

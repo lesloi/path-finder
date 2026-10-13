@@ -305,3 +305,53 @@ func TestCoverageRefusesAStaleBuild(t *testing.T) {
 		t.Errorf("status %d, want 426", rec.Code)
 	}
 }
+
+func TestRouteSetsThroughWaypoints(t *testing.T) {
+	h := newServer(t)
+	for name, waypoints := range map[string]string{
+		"one waypoint":    `[[6.1380,45.9030]]`,
+		"three waypoints": `[[6.1380,45.9030],[6.1450,45.9000],[6.1400,45.8950]]`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			code, routes, out := routeSets(t, h, criteria(`{"distance":10}`, `,"waypoints":`+waypoints))
+
+			if code != 200 || len(routes) == 0 {
+				t.Fatalf("status %d, %d routes: %s", code, len(routes), out[:min(len(out), 200)])
+			}
+			for i, r := range routes {
+				first, last := r.Geometry[0], r.Geometry[len(r.Geometry)-1]
+				if first[0] != last[0] || first[1] != last[1] {
+					t.Errorf("route %d is not a loop", i)
+				}
+			}
+		})
+	}
+}
+
+func TestWaypointRefusalsNameAFieldOrANumberNeverAPosition(t *testing.T) {
+	h := newServer(t)
+	cases := map[string]struct{ criteria, want string }{
+		"waypoints beyond the target": {criteria(`{"distance":5}`, `,"waypoints":[[6.30,45.99]]`), `{"error":"invalid-criteria","field":"waypoints"}`},
+		"a waypoint off the ways":     {criteria(`{"distance":10}`, `,"waypoints":[[6.1380,45.9030],[6.1916,45.8992]]`), `{"error":"invalid-criteria","field":"waypoints","waypoint":2}`},
+		"too many waypoints":          {criteria(`{"distance":10}`, `,"waypoints":[[6.1,45.9],[6.1,45.9],[6.1,45.9],[6.1,45.9],[6.1,45.9],[6.1,45.9]]`), `{"error":"invalid-criteria","field":"waypoints"}`},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			code, _, out := routeSets(t, h, tc.criteria)
+
+			if code != 400 || strings.TrimSpace(out) != tc.want {
+				t.Errorf("status %d: %s, want %s", code, out, tc.want)
+			}
+		})
+	}
+	t.Run("a start off the ways", func(t *testing.T) {
+		// 800 m east of the stand-in graph's last way, which a start may be 400 m from.
+		body := strings.Replace(criteria(`{"distance":10}`, `,"waypoints":[[6.1871,45.8992]]`), "[6.1294,45.8992]", "[6.1960,45.8992]", 1)
+
+		code, _, out := routeSets(t, h, body)
+
+		if code != 400 || strings.TrimSpace(out) != `{"error":"invalid-criteria","field":"start"}` {
+			t.Errorf("status %d: %s", code, out)
+		}
+	})
+}

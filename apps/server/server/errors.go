@@ -13,6 +13,8 @@ const busyRetryAfter = 1
 type refusal struct {
 	Error string `json:"error"`
 	Field string `json:"field,omitempty"`
+	// Waypoint is the waypoint at fault, counted from 1: a number, never a position.
+	Waypoint int `json:"waypoint,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

@@ -166,3 +166,9 @@ func TestPOITileOfCutsTheWorldOnAGridOfPoiTileZoom(t *testing.T) {
 		})
 	}
 }
+
+func TestParseCriteriaTellsAWaypointsLimitFromTheContractFile(t *testing.T) {
+	if got := MaxWaypoints(); got != 5 {
+		t.Errorf("MaxWaypoints = %d, want 5", got)
+	}
+}

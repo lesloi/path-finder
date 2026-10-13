@@ -92,3 +92,16 @@ func retraceShare(visits []cellVisit) float64 {
 	}
 	return float64(len(twice)) / float64(len(visits))
 }
+
+// crowFlies is the length in metres of the straight lines from start through the points and back.
+func crowFlies(start [2]float64, points [][2]float64) float64 {
+	var total float64
+	prev := start
+	for _, p := range append(append([][2]float64{}, points...), start) {
+		dLat := (p[1] - prev[1]) * math.Pi / 180
+		dLon := (p[0] - prev[0]) * math.Pi / 180 * math.Cos((p[1]+prev[1])/2*math.Pi/180)
+		total += earthRadius * math.Hypot(dLat, dLon)
+		prev = p
+	}
+	return total
+}

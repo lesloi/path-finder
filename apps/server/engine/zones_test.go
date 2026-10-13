@@ -275,3 +275,27 @@ func TestADataDirectoryCanBeALink(t *testing.T) {
 		t.Errorf("a data directory that is a link: %v zones, %v", z, err)
 	}
 }
+
+func TestZonesFindTheDirectLoopInTheZoneOfTheStart(t *testing.T) {
+	dir := t.TempDir()
+	west, westCentre := zoneGraph(0, 0)
+	east, eastCentre := zoneGraph(10_000, 0)
+	writeZone(t, filepath.Join(dir, "west"), west)
+	writeZone(t, filepath.Join(dir, "east"), east)
+	z, err := OpenZones(dir, "any")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile := z.Profile("any")
+	toward := func(p Point, northM float64) Point { return Point{p.Lat + northM/metersPerDegree, p.Lon} }
+
+	r, err := profile.DirectLoop(context.Background(), eastCentre, []Point{toward(eastCentre, 300)})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	near(t, r.Distance, 700, 101, "distance") // 600 m there and back, or 800 m when the way back avoids the way there
+	if _, err := profile.DirectLoop(context.Background(), westCentre, []Point{toward(eastCentre, 300)}); !errors.Is(err, ErrOffGraph) {
+		t.Errorf("a waypoint in another zone: err = %v, want ErrOffGraph", err)
+	}
+}

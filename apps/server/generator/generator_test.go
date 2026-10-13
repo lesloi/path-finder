@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/lesloi/path-finder/apps/server/contract"
@@ -15,10 +16,21 @@ type fakeLooper struct {
 	loops []*engine.Route
 	err   error
 	got   engine.LoopRequest
+	// direct is the loop through the waypoints, and directErr why there is none.
+	direct      *engine.Route
+	directErr   error
+	directCalls int
+	loopCalls   int
+}
+
+func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.Point, _ []engine.Point) (*engine.Route, error) {
+	f.directCalls++
+	return f.direct, f.directErr
 }
 
 func (f *fakeLooper) Loops(_ context.Context, req engine.LoopRequest) ([]*engine.Route, error) {
 	f.got = req
+	f.loopCalls++
 	return f.loops, f.err
 }
 
@@ -246,5 +258,156 @@ func TestStretchesDropTheOnesWithoutLengthAndMergeTheirNeighbours(t *testing.T) 
 	want := []contract.SurfaceStretch{{Surface: "paved", From: 0, To: 10}}
 	if got := toCandidate(r).surfaces; !reflect.DeepEqual(got, want) {
 		t.Errorf("surfaces = %+v, want %+v", got, want)
+	}
+}
+
+// withWaypoints is body with waypoints: two near the start point, 1 km and 2 km to the north-east.
+func withWaypoints(waypoints string) string {
+	return `{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"any","pace":6,"waypoints":` + waypoints + `}`
+}
+
+const twoWaypoints = `[[6.14,45.906],[6.15,45.91]]`
+
+func TestGeneratePassesTheWaypointsToTheEngineInOrder(t *testing.T) {
+	looper := &fakeLooper{direct: engineLoop(0), loops: []*engine.Route{engineLoop(120)}}
+
+	if _, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints)); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []engine.Point{{Lat: 45.906, Lon: 6.14}, {Lat: 45.91, Lon: 6.15}}
+	if !reflect.DeepEqual(looper.got.Waypoints, want) {
+		t.Errorf("waypoints = %v, want %v", looper.got.Waypoints, want)
+	}
+}
+
+func TestGenerateOffersTheDirectLoopAsACandidate(t *testing.T) {
+	looper := &fakeLooper{direct: engineLoop(0), loops: nil, err: engine.ErrNoLoop}
+
+	routes, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints))
+
+	if err != nil || len(routes) != 1 || routes[0].Kind != "match" {
+		t.Errorf("routes = %+v, err = %v, want the direct loop alone", routes, err)
+	}
+}
+
+func TestGenerateAsksNothingOfTheEngineWithoutWaypoints(t *testing.T) {
+	looper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
+
+	if _, err := generate(t, looper, context.Background(), body); err != nil {
+		t.Fatal(err)
+	}
+
+	if looper.directCalls != 0 || looper.got.Waypoints != nil {
+		t.Errorf("direct loops asked %d times, waypoints = %v", looper.directCalls, looper.got.Waypoints)
+	}
+}
+
+func TestGenerateRefusesWaypointsBeyondTheTargetBeforeSearching(t *testing.T) {
+	looper := &fakeLooper{direct: engineLoop(0)}
+	// 30 km away and back, for a target of 10 km.
+	far := `[[6.5,46.1]]`
+
+	_, err := generate(t, looper, context.Background(), withWaypoints(far))
+
+	var ce *contract.CriteriaError
+	if !errors.As(err, &ce) || ce.Field != "waypoints" || ce.Index != 0 {
+		t.Fatalf("err = %v, want a CriteriaError on waypoints, with no index", err)
+	}
+	if looper.directCalls+looper.loopCalls != 0 {
+		t.Errorf("the engine was asked %d times", looper.directCalls+looper.loopCalls)
+	}
+}
+
+func TestGenerateRefusesADirectLoopBeyondTheTarget(t *testing.T) {
+	long := engineLoop(0)
+	long.Distance = 14_000 // 40 % over a target of 10 km: beyond what a suggestion allows
+	looper := &fakeLooper{direct: long}
+
+	_, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints))
+
+	var ce *contract.CriteriaError
+	if !errors.As(err, &ce) || ce.Field != "waypoints" || ce.Index != 0 {
+		t.Fatalf("err = %v, want a CriteriaError on waypoints, with no index", err)
+	}
+	if looper.loopCalls != 0 {
+		t.Error("loops were searched for waypoints that cannot meet the target")
+	}
+}
+
+func TestGenerateKeepsWaypointsWhoseDirectLoopIsMuchShorterThanTheTarget(t *testing.T) {
+	short := engineLoop(0)
+	short.Distance = 3_000 // the engine adds detours to reach the 10 km
+	looper := &fakeLooper{direct: short, loops: []*engine.Route{engineLoop(120)}}
+
+	routes, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints))
+
+	if err != nil || len(routes) == 0 || looper.loopCalls != 1 {
+		t.Errorf("%d routes, err = %v, %d searches", len(routes), err, looper.loopCalls)
+	}
+}
+
+func TestGenerateKeepsWaypointsThatClimbMakesLongerThanTheDistanceLeft(t *testing.T) {
+	// 60 min at 6 min/km with 500 m to climb leaves 5 km of distance, but a flat loop of 7 km is only 42 min.
+	climbing := `{"start":[6.1294,45.8992],"target":{"duration":60},"elevationGain":500,"surface":"any","pace":6,"waypoints":[[6.1800,45.8992]]}`
+	direct := engineLoop(0)
+	direct.Distance, direct.Ascent = 7_000, 100
+	looper := &fakeLooper{direct: direct, err: engine.ErrNoLoop}
+
+	_, err := generate(t, looper, context.Background(), climbing)
+
+	if err != nil {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestGenerateJudgesTheDirectLoopOnTheDurationForADurationTarget(t *testing.T) {
+	duration := `{"start":[6.1294,45.8992],"target":{"duration":60},"surface":"any","pace":6,"waypoints":` + twoWaypoints + `}`
+	long := engineLoop(0)
+	long.Distance, long.Ascent = 14_000, 0 // 84 min at 6 min/km, over 60 min plus a quarter
+	_, err := generate(t, &fakeLooper{direct: long}, context.Background(), duration)
+	var ce *contract.CriteriaError
+	if !errors.As(err, &ce) {
+		t.Fatalf("err = %v, want a CriteriaError", err)
+	}
+
+	fine := engineLoop(0)
+	fine.Distance, fine.Ascent = 9_000, 0
+	if _, err := generate(t, &fakeLooper{direct: fine, err: engine.ErrNoLoop}, context.Background(), duration); err != nil {
+		t.Errorf("a direct loop of 54 min for 60: err = %v", err)
+	}
+}
+
+func TestGenerateTellsWhichWaypointOrTheStartPointIsOffTheWays(t *testing.T) {
+	cases := []struct {
+		name  string
+		err   error
+		field string
+		index int
+	}{
+		{"waypoint 2", &engine.WaypointError{Index: 2}, "waypoints", 2},
+		{"start point", engine.ErrOffGraph, "start", 0},
+		{"unreachable", engine.ErrNoRoute, "waypoints", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := generate(t, &fakeLooper{directErr: tc.err}, context.Background(), withWaypoints(twoWaypoints))
+
+			var ce *contract.CriteriaError
+			if !errors.As(err, &ce) || ce.Field != tc.field || ce.Index != tc.index {
+				t.Errorf("err = %v, want a CriteriaError on %s, index %d", err, tc.field, tc.index)
+			}
+			if err != nil && (strings.Contains(err.Error(), "6.1") || strings.Contains(err.Error(), "45.9")) {
+				t.Errorf("message %q holds a position", err)
+			}
+		})
+	}
+}
+
+func TestGenerateKeepsAnEmptyAnswerForAStartPointOffTheWaysWithoutWaypoints(t *testing.T) {
+	routes, err := generate(t, &fakeLooper{err: engine.ErrOffGraph}, context.Background(), body)
+
+	if err != nil || routes == nil || len(routes) != 0 {
+		t.Errorf("routes = %v, err = %v", routes, err)
 	}
 }

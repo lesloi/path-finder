@@ -483,5 +483,160 @@
         "pace": 6
       }
     }
+  },
+  {
+    "name": "keeps the waypoints in order",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "waypoints": [
+        [6.14, 45.9],
+        [6.13, 45.91]
+      ]
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "any",
+        "pace": 6,
+        "waypoints": [
+          [6.14, 45.9],
+          [6.13, 45.91]
+        ]
+      }
+    }
+  },
+  {
+    "name": "accepts the most waypoints",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "waypoints": [
+        [6.1, 45.9],
+        [6.1, 45.9],
+        [6.1, 45.9],
+        [6.1, 45.9],
+        [6.1, 45.9]
+      ]
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "any",
+        "pace": 6,
+        "waypoints": [
+          [6.1, 45.9],
+          [6.1, 45.9],
+          [6.1, 45.9],
+          [6.1, 45.9],
+          [6.1, 45.9]
+        ]
+      }
+    }
+  },
+  {
+    "name": "accepts no waypoints",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "waypoints": []
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "any",
+        "pace": 6
+      }
+    }
+  },
+  {
+    "name": "more waypoints than the most",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "waypoints": [
+        [6.1, 45.9],
+        [6.1, 45.9],
+        [6.1, 45.9],
+        [6.1, 45.9],
+        [6.1, 45.9],
+        [6.1, 45.9]
+      ]
+    },
+    "expect": {
+      "field": "waypoints"
+    }
+  },
+  {
+    "name": "waypoints that are not a list",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "waypoints": {
+        "lon": 6.1
+      }
+    },
+    "expect": {
+      "field": "waypoints"
+    }
+  },
+  {
+    "name": "a waypoint that is not a longitude and a latitude",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "waypoints": [[6.1]]
+    },
+    "expect": {
+      "field": "waypoints"
+    }
+  },
+  {
+    "name": "a waypoint latitude out of range",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "waypoints": [[6.1, 91]]
+    },
+    "expect": {
+      "field": "waypoints"
+    }
   }
 ]

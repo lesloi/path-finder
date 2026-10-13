@@ -75,10 +75,13 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   without them. An earlier switch to allow them, off by default, was removed: it hid every mountain route behind a
   setting, and the badge tells what a route holds. The change moved the graph format to `PFGRAPH7`, and a graph of an
   older format is refused.
-- **Loops go through 2–4 waypoints on a circle through the start point**, each leg avoiding what the
+- **Loops go through 2–4 control points on a circle through the start point**, each leg avoiding what the
   earlier ones used, resized up to four times, then ranked on distance, overlap and elevation gain.
-  Criteria whose waypoints alone exceed the target are refused. A waypoint is moved to the nearest way
-  within 250 m, beyond which the criteria are refused.
+  With waypoints, the circle's points are only detours: each goes into the leg between two
+  fixed points that it is nearest to, and only the detour is resized. The loop straight through
+  the waypoints is a candidate too. Criteria whose waypoints alone exceed the target are refused, by
+  the straight lines first and by the loop through them then. A waypoint is moved to the nearest way
+  within 250 m, beyond which the criteria are refused, naming the waypoint by its number.
 - **A route set sends what it has when time is up.** Loops are searched in parallel and the search
   stops at five matches or at the timeout; the routes found by then are ranked and sent, and `504` is
   for none at all. Asking for more would only make the user wait longer for what they can already pick.

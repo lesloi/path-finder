@@ -15,12 +15,12 @@ _Avoid_: Origin, departure
 **Criteria**:
 Everything the user sets to ask for routes: start point, a target distance or a
 target duration, an optional target elevation gain, a surface preference,
-and up to three optional waypoints.
+and up to five optional waypoints.
 _Avoid_: Filters, query, search parameters
 
 **Waypoint**:
 A point a route must pass through between its start and its end, in the order the user
-placed it. Up to three per set of criteria. Waypoints never replace the target distance or
+placed it. Up to five per set of criteria. Waypoints never replace the target distance or
 target duration: criteria whose waypoints alone exceed the target are refused. A waypoint
 off the ways a route can use is moved to the nearest one, unless it is too far from any.
 _Avoid_: Stage, via, étape
