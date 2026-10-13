@@ -8,7 +8,7 @@ function invalidLines(language: Language, invalid?: InvalidCriteria): string[] {
   if (invalid?.field === 'start') return [t.startTooFar, t.startTooFarHint];
   if (invalid?.field !== 'waypoints') return [errorText[language]['invalid-criteria']];
   return invalid.waypoint === undefined
-    ? [t.waypointsUnreachable, t.waypointsUnreachableHint]
+    ? [t.waypointsUnreachable]
     : [t.waypointTooFar(invalid.waypoint), t.waypointTooFarHint];
 }
 

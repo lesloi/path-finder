@@ -41,7 +41,6 @@ export const routesText = {
     startTooFar: 'The start point is too far from a path.',
     startTooFarHint: 'Choose a start point closer to a path.',
     waypointsUnreachable: 'No route goes through these waypoints.',
-    waypointsUnreachableHint: 'Remove one, or raise the target.',
   },
   fr: {
     routes: 'Parcours',
@@ -77,6 +76,5 @@ export const routesText = {
     startTooFar: 'Le point de départ est trop loin d’un chemin.',
     startTooFarHint: 'Choisissez un point de départ plus près d’un chemin.',
     waypointsUnreachable: 'Aucun parcours ne passe par ces points.',
-    waypointsUnreachableHint: 'Supprimez-en un, ou augmentez l’objectif.',
   },
 } satisfies Record<Language, { misses: Record<Miss['criterion'], string> } & Record<string, unknown>>;
