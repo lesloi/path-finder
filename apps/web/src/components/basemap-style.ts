@@ -1,6 +1,7 @@
 import type { StyleSpecification } from 'maplibre-gl';
 
 import type { Basemap } from '../core/index.ts';
+import { MAP_COLORS } from './route-colors.ts';
 
 const GEOPF = 'https://data.geopf.fr';
 
@@ -26,4 +27,21 @@ export function basemapStyle(basemap: Basemap): string | StyleSpecification {
     case 'aerial':
       return wmts('ORTHOIMAGERY.ORTHOPHOTOS', 'image/jpeg');
   }
+}
+
+// Tuned by eye: a pale tint over the busy, dark photography needs more opacity than a dark one over the pale plan.
+const VEIL_OPACITY = 0.35;
+const VEIL_ON_PHOTO_OPACITY = 0.55;
+
+/**
+ * The paint of the veil over the places with no routes. A dark veil all but vanishes on the dark aerial photography,
+ * so there it is light, and more opaque; the other basemaps are light.
+ */
+export function veilPaint(basemap: Basemap) {
+  const onPhoto = basemap === 'aerial';
+  return {
+    'fill-color': onPhoto ? MAP_COLORS.veilOnPhoto : MAP_COLORS.veil,
+    'fill-opacity': onPhoto ? VEIL_ON_PHOTO_OPACITY : VEIL_OPACITY,
+    'fill-antialias': false,
+  };
 }

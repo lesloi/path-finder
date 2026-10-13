@@ -4,7 +4,7 @@ import { createRef } from 'react';
 import type { CoverageCell, Position } from '../core/index.ts';
 import { commonText } from '../i18n/index.ts';
 import { maps, markers, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
-import { basemapStyle } from './basemap-style.ts';
+import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { StartPointMap, type MapHandle } from './start-point-map.tsx';
 
 vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
@@ -31,6 +31,14 @@ describe('StartPointMap', () => {
     const veil = map().getSource('coverage') as GeoJSONSource & { data: { geometry: { coordinates: unknown[] } } };
     expect(veil.data.geometry.coordinates).toHaveLength(4); // the four rectangles around the cell
     expect(map().layers.map(({ id }) => id)).toContain('coverage-veil');
+  });
+
+  it('paints the veil for the basemap shown, also on a map that starts on the aerial photography', () => {
+    render(<StartPointMap coverage={[[6, 45.8, 6.1, 45.9]]} basemap="aerial" onStartChange={vi.fn()} />);
+    act(() => map().fire('style.load'));
+
+    const layer = (map().layers as { id: string; paint?: unknown }[]).find(({ id }) => id === 'coverage-veil');
+    expect(layer?.paint).toEqual(veilPaint('aerial'));
   });
 
   it('draws no veil when the coverage is unknown, and draws it again on a new style', () => {
