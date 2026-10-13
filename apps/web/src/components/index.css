@@ -287,3 +287,60 @@
     0 0 3px #fff;
   filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
 }
+
+/*
+ * Browsers that can style a native <select> (`appearance: base-select`) get a dropdown in the app's own look;
+ * the others keep their native one, which is the right one on a phone anyway.
+ */
+@supports (appearance: base-select) {
+  select,
+  select::picker(select) {
+    appearance: base-select;
+  }
+  select {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 3);
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+  select::picker-icon {
+    color: var(--ink-2);
+    transition: rotate 150ms;
+  }
+  select:open::picker-icon {
+    rotate: 180deg;
+  }
+  select::picker(select) {
+    margin-top: calc(var(--spacing) * 1);
+    padding: calc(var(--spacing) * 1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--float);
+  }
+  select option {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    min-height: var(--spacing-touch);
+    padding: 0 calc(var(--spacing) * 3);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  select option:hover,
+  select option:focus-visible {
+    background: var(--surface-2);
+  }
+  select option:checked {
+    background: var(--accent-soft);
+  }
+  select option::checkmark {
+    order: 1;
+    margin-left: auto;
+    color: var(--ink);
+  }
+}
