@@ -27,7 +27,7 @@ import {
   veilPolygon,
 } from '../core/index.ts';
 import { commonText, type Language } from '../i18n/index.ts';
-import { basemapStyle } from './basemap-style.ts';
+import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
 import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
 import {
@@ -49,8 +49,6 @@ const FRAME_MARGIN = 24;
 const NO_ROOM = 0;
 // The smallest part of the map, in px, that the panels leave to the routes: a narrow window shrinks their margins.
 const MIN_FRAME = 240;
-// How much of the map shows through the veil over the places with no routes.
-const VEIL_OPACITY = 0.35;
 // A width that makes a thin route easy to tap.
 const HIT_WIDTH = 22;
 
@@ -325,7 +323,7 @@ export function StartPointMap({
         id: 'coverage-veil',
         type: 'fill',
         source: 'coverage',
-        paint: { 'fill-color': MAP_COLORS.veil, 'fill-opacity': VEIL_OPACITY, 'fill-antialias': false },
+        paint: veilPaint(shownBasemap.current),
       });
       const line = { 'line-join': 'round', 'line-cap': 'round' } as const;
       map.addSource('routes', { type: 'geojson', data: emptyRoutes });
