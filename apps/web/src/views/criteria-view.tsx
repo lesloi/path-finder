@@ -138,8 +138,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   useRootProperty('--sheet-height', `${sheetHeight}px`, !desktop && sheetHeight > 0);
   // The detail of a route takes more than half of a phone's screen: the buttons over the map leave it room.
   const detailOpen = !desktop && browser.detail;
-  const locateShown = !routesShown && !loading && !detailOpen;
-  // In the place of the location button, which the routes hide.
+  // Not on a desktop, where the form has its own button.
+  const locateShown = !desktop && !routesShown && !loading && !detailOpen;
+  // On phones, in the place of the location button, which the routes hide.
   const reframeShown = routesShown && mapView.movedAway && !detailOpen;
 
   // The place of each button in the stack: the location (or reframe) button keeps the corner, within reach of the

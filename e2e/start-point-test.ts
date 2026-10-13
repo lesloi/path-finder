@@ -7,8 +7,9 @@ import { expect, openCriteria, openMap, test } from './test.ts';
 const LONG_PRESS_HOLD_MS = 700;
 
 const startPoint = (page: Page) => page.getByTestId('criteria-start');
-// The one over the map: desktops also show one next to the start point.
-const myLocationButton = (page: Page) => page.getByTestId('criteria-locate');
+// Phones have it over the map, desktops next to the start point.
+const myLocationButton = (page: Page) =>
+  page.locator('[data-testid="criteria-locate"], [data-testid="criteria-start-locate"]');
 
 // A touch on phones, a mouse press on desktops. Playwright's touchscreen only taps, hence the DevTools protocol.
 async function longPress(page: Page, isMobile: boolean) {

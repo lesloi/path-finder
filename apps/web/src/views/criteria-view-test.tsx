@@ -587,7 +587,7 @@ describe('CriteriaView', () => {
       refuse();
       render(<CriteriaView language="en" />);
 
-      fireEvent.click(screen.getByTestId('criteria-locate'));
+      fireEvent.click(screen.getByTestId('criteria-start-locate'));
 
       expect(screen.getByTestId('criteria-toast')).toHaveTextContent(`${en.unavailable}${en.pickHintDesktop}`);
     });
