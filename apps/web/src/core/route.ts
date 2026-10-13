@@ -203,8 +203,10 @@ export function waypointsOnRoute(geometry: Route['geometry'], waypoints: Positio
   let from = 0;
   return waypoints.map((waypoint, k) => {
     let nearest = Math.min(from, geometry.length - 1);
-    for (let j = nearest; j < geometry.length; j++) {
-      if (kmBetween(geometry[j], waypoint) < kmBetween(geometry[nearest], waypoint)) nearest = j;
+    let best = kmBetween(geometry[nearest], waypoint);
+    for (let j = nearest + 1; j < geometry.length; j++) {
+      const km = kmBetween(geometry[j], waypoint);
+      if (km < best) [nearest, best] = [j, km];
     }
     from = nearest + 1;
     const [lon, lat, height] = geometry[nearest] as [number, number, number?];

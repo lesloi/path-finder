@@ -1,4 +1,4 @@
-import { useState, type PointerEvent } from 'react';
+import { useMemo, useState, type PointerEvent } from 'react';
 
 import {
   elevationProfile,
@@ -16,6 +16,9 @@ import { profileScale } from './profile-scale.ts';
 import { SURFACE_CLASSES } from './surface-colors.ts';
 import { WAYPOINT_PIN } from './waypoint-pin.ts';
 
+// A default that keeps its identity, so that the waypoints on the route are not worked out again on every hover.
+const NO_WAYPOINTS: Position[] = [];
+
 const WIDTH = 300;
 const HEIGHT = 60;
 // Space kept above and below the profile, in viewBox units.
@@ -30,7 +33,7 @@ export function ElevationProfile({
   route,
   language,
   onHover,
-  waypoints = [],
+  waypoints = NO_WAYPOINTS,
   testId,
 }: {
   route: Route;
@@ -42,6 +45,7 @@ export function ElevationProfile({
 }) {
   const t = routesText[language];
   const [at, setAt] = useState<number>();
+  const onRoute = useMemo(() => waypointsOnRoute(route.geometry, waypoints), [route.geometry, waypoints]);
   const profile = elevationProfile(route.geometry);
   if (!profile) return null;
 
@@ -154,7 +158,7 @@ export function ElevationProfile({
               );
             })}
           </svg>
-          {waypointsOnRoute(route.geometry, waypoints).map(({ number, distance }) => (
+          {onRoute.map(({ number, distance }) => (
             // The pin in the row of the title, above the plot so that it hides none of the profile, and a line down from its tip.
             <span
               key={number}

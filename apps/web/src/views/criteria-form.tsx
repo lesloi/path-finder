@@ -106,8 +106,7 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
   return !(
     sameTarget &&
     sameGain &&
-    request.start[0] === found.start[0] &&
-    request.start[1] === found.start[1] &&
+    samePositions([request.start], [found.start]) &&
     request.surface === found.surface &&
     samePositions(request.waypoints ?? [], found.waypoints ?? []) &&
     ('distance' in b || request.pace === found.pace)

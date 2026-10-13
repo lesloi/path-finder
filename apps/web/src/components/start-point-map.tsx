@@ -129,14 +129,16 @@ const onMarker = (event?: Event) =>
 
 // Where the bubble of a waypoint sits around its pin, which rises 29 px above the point: clear of the pin, above it or
 // beside it, and just under the point when there is no room above.
+const ABOVE_PIN: [number, number] = [0, -33];
+const BELOW_PIN: [number, number] = [0, 6];
 const PIN_BUBBLE_OFFSET = {
-  center: [0, -33],
-  bottom: [0, -33],
-  'bottom-left': [0, -33],
-  'bottom-right': [0, -33],
-  top: [0, 6],
-  'top-left': [0, 6],
-  'top-right': [0, 6],
+  center: ABOVE_PIN,
+  bottom: ABOVE_PIN,
+  'bottom-left': ABOVE_PIN,
+  'bottom-right': ABOVE_PIN,
+  top: BELOW_PIN,
+  'top-left': BELOW_PIN,
+  'top-right': BELOW_PIN,
   left: [8, -15],
   right: [-8, -15],
 } satisfies Record<string, [number, number]>;
@@ -321,6 +323,7 @@ export function StartPointMap({
   const removeWaypoint = useEffectEvent((index: number) => onWaypointRemove?.(index));
   // The bubble that offers to remove a waypoint.
   const bubbleRef = useRef<Popup>(undefined);
+  const closeBubble = () => bubbleRef.current?.remove();
 
   useEffect(() => {
     const map = new Map({
@@ -611,7 +614,8 @@ export function StartPointMap({
     if (!placing) return;
     const follow = ({ lngLat }: MapMouseEvent) => {
       const cells = coverageNow();
-      map.getCanvas().style.cursor = cells && !isCovered(cells, [lngLat.lng, lngLat.lat]) ? 'not-allowed' : 'crosshair';
+      const cursor = cells && !isCovered(cells, [lngLat.lng, lngLat.lat]) ? 'not-allowed' : 'crosshair';
+      if (map.getCanvas().style.cursor !== cursor) map.getCanvas().style.cursor = cursor;
     };
     map.on('mousemove', follow);
     return () => void map.off('mousemove', follow);
@@ -622,12 +626,12 @@ export function StartPointMap({
   useEffect(() => {
     const map = mapRef.current!;
     const markers = waypoints.map((waypoint, index) => {
-      const element = document.createElement('div');
+      // A button, which brings the focus and the keyboard with it.
+      const element = document.createElement('button');
+      element.type = 'button';
       element.dataset.waypoint = String(index + 1);
-      element.setAttribute('role', 'button');
-      element.tabIndex = 0;
       element.setAttribute('aria-label', criteriaText[language].waypointName(index + 1));
-      element.className = 'relative h-[29px] w-6 cursor-pointer drop-shadow-md';
+      element.className = 'relative block h-[29px] w-6 cursor-pointer p-0 drop-shadow-md';
       // The pin of the waypoint button, white with a dark outline, its tip on the place; the number sits in its head.
       const pin = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       pin.setAttribute('viewBox', WAYPOINT_PIN.viewBox);
@@ -644,13 +648,13 @@ export function StartPointMap({
       number.style.color = WAYPOINT_PIN.ink;
       element.append(pin, number);
       const open = () => {
-        bubbleRef.current?.remove();
+        closeBubble();
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.textContent = criteriaText[language].removeWaypoint;
         remove.className = 'rounded-md px-2 py-1.5 font-semibold text-accent';
         remove.addEventListener('click', () => {
-          bubbleRef.current?.remove();
+          closeBubble();
           removeWaypoint(index);
         });
         bubbleRef.current = new Popup({ closeButton: false, offset: PIN_BUBBLE_OFFSET, className: 'waypoint-bubble' })
@@ -663,16 +667,10 @@ export function StartPointMap({
         event.stopPropagation();
         open();
       });
-      element.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          open();
-        }
-      });
       return new Marker({ element, anchor: 'bottom' }).setLngLat(waypoint).addTo(map);
     });
     return () => {
-      bubbleRef.current?.remove();
+      closeBubble();
       for (const marker of markers) marker.remove();
     };
   }, [waypoints, language]);
