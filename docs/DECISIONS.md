@@ -28,6 +28,11 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   whichever instance has room. A set is short, so a slot frees within a second: the web app retries twice,
   spread at random, and the user rarely sees the refusal. A search watches its `context.Context`, so a
   departed client frees its CPU.
+- **A tab of an old build reloads itself, once per build, and replays its search.** The server answers `426` to
+  a tab left open across a deploy; a toast asking for a reload is noise for a user who only wants routes. The
+  page keeps the interrupted request in the session storage (private to the tab, never sent anywhere) and the
+  build that reloaded, so a rollout that reaches an old server cannot loop: the second `426` of a build shows the
+  notice instead.
 - **The server and the web app share bounds and cases, not code.** `apps/server/contract/contract.json`
   holds the bounds and error codes, and the cases of the tests that both sides run. The server alone
   decides what is valid; the web app checks early to name the wrong field. Two languages, one
