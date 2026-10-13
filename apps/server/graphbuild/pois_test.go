@@ -76,11 +76,11 @@ func TestBuildPOIsWritesOneFilePerTileThatHoldsPOIs(t *testing.T) {
 	}
 	nodeTags := map[int64][][2]string{
 		1: {{"amenity", "drinking_water"}, {"seasonal", "summer"}},
-		2: {{"tourism", "viewpoint"}},
+		2: {{"tourism", "viewpoint"}, {"name", "Tour Eiffel"}},
 		3: {{"amenity", "drinking_water"}, {"drinking_water", "no"}}, // left out
 		4: {{"amenity", "bench"}},                                    // not a POI
 	}
-	ways := []pbfWay{{id: 20, refs: []int64{10, 11, 12, 13, 10}, tags: [][2]string{{"amenity", "fountain"}, {"drinking_water", "yes"}}}}
+	ways := []pbfWay{{id: 20, refs: []int64{10, 11, 12, 13, 10}, tags: [][2]string{{"amenity", "fountain"}, {"drinking_water", "yes"}, {"name", "Fontaine Bellecour"}}}}
 	pbf := filepath.Join(dir, "a.pbf")
 	writeTaggedPBF(t, pbf, nodes, nodeTags, ways)
 
@@ -94,15 +94,15 @@ func TestBuildPOIsWritesOneFilePerTileThatHoldsPOIs(t *testing.T) {
 	paris := readTile(t, out, px, py)
 	want := []contract.POI{
 		{Category: "water", Position: [2]float64{2.3522, 48.8566}, Seasonal: true},
-		{Category: "viewpoint", Position: [2]float64{2.353, 48.857}},
+		{Category: "viewpoint", Position: [2]float64{2.353, 48.857}, Name: "Tour Eiffel"},
 	}
 	if len(paris.POIs) != 2 || paris.POIs[0] != want[0] || paris.POIs[1] != want[1] {
 		t.Errorf("Paris tile = %+v, want %+v", paris.POIs, want)
 	}
 	lx, ly := contract.POITileOf(45.761, 4.841)
 	lyon := readTile(t, out, lx, ly)
-	if len(lyon.POIs) != 1 || lyon.POIs[0].Category != "water" || lyon.POIs[0].Position != [2]float64{4.841, 45.761} {
-		t.Errorf("Lyon tile = %+v, want the centroid of the way", lyon.POIs)
+	if len(lyon.POIs) != 1 || lyon.POIs[0].Category != "water" || lyon.POIs[0].Position != [2]float64{4.841, 45.761} || lyon.POIs[0].Name != "Fontaine Bellecour" {
+		t.Errorf("Lyon tile = %+v, want the centroid of the named way", lyon.POIs)
 	}
 	var files int
 	_ = filepath.Walk(out, func(_ string, info os.FileInfo, _ error) error {

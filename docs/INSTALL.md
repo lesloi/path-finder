@@ -75,7 +75,7 @@ profile and to one graph: build them again after each graph; the server refuses 
 ### Points of interest
 
 `build-pois` reads the same extracts and writes the tiles of the water points (`amenity=drinking_water`, or
-`drinking_water=yes` on any node or way, never `drinking_water=no`; `seasonal` is kept) and of the viewpoints
+`drinking_water=yes` on any node or way, never `drinking_water=no`; `seasonal` and the `name` are kept) and of the viewpoints
 (`tourism=viewpoint`). A tile is a JSON file `pois/{x}/{y}.json` of the zoom-10 grid, about 27 km wide, written only
 when it holds any point. A way stands for the mean of its nodes; relations are left out. Several extracts can
 overlap. A whole country needs no zones.
