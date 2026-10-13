@@ -48,6 +48,9 @@ const isNumber = (value: unknown): value is number => typeof value === 'number' 
 const within = (value: unknown, min: number, max: number): value is number =>
   isNumber(value) && value >= min && value <= max;
 
+const isPosition = (value: unknown): value is Position =>
+  Array.isArray(value) && value.length === 2 && within(value[0], -180, 180) && within(value[1], -90, 90);
+
 /**
  * The distance the criteria make, in kilometres. Throws a `RangeError` when a target duration is
  * too short for the target elevation gain.
@@ -77,11 +80,7 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
   check(isObject(body), 'start', 'Criteria must be an object');
   const { start, target, elevationGain, surface, pace, waypoints } = body;
 
-  check(
-    Array.isArray(start) && start.length === 2 && within(start[0], -180, 180) && within(start[1], -90, 90),
-    'start',
-    'start must be a longitude and a latitude',
-  );
+  check(isPosition(start), 'start', 'start must be a longitude and a latitude');
 
   check(isObject(target) && Object.keys(target).length === 1, 'target', 'target must be a distance or a duration');
   let parsedTarget: Criteria['target'];
@@ -110,14 +109,7 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
     'waypoints must be a short list of longitudes and latitudes',
   );
   for (const waypoint of waypoints ?? []) {
-    check(
-      Array.isArray(waypoint) &&
-        waypoint.length === 2 &&
-        within(waypoint[0], -180, 180) &&
-        within(waypoint[1], -90, 90),
-      'waypoints',
-      'a waypoint must be a longitude and a latitude',
-    );
+    check(isPosition(waypoint), 'waypoints', 'a waypoint must be a longitude and a latitude');
   }
 
   const criteria: Criteria = {

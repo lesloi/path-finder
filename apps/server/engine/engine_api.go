@@ -186,9 +186,9 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if req.Distance <= 0 || req.Candidates <= 0 {
 		return nil, errors.New("engine: loops need a positive distance and candidate count")
 	}
-	start, d, ok := e.sp.nearest(e.g, req.Start.Lat, req.Start.Lon)
-	if !ok || d > maxSnapMeters {
-		return nil, ErrOffGraph
+	start, err := e.snapStart(req.Start)
+	if err != nil {
+		return nil, err
 	}
 	anchors, baseM, err := e.anchorLoop(ctx, start, req.Waypoints)
 	if err != nil {
@@ -239,31 +239,50 @@ func (e *Engine) snapWaypoints(waypoints []Point) ([]uint32, error) {
 	return nodes, nil
 }
 
-// anchorLoop snaps the waypoints and routes the cheapest loop through them: the nodes it goes
-// through in order, from the start node back to it, and its length. Waypoints on the node before them
-// are dropped, and with none left there are no anchors. The anchors are nil for no waypoints.
+// snapStart finds the node of a start point, or fails with ErrOffGraph.
+func (e *Engine) snapStart(p Point) (uint32, error) {
+	n, d, ok := e.sp.nearest(e.g, p.Lat, p.Lon)
+	if !ok || d > maxSnapMeters {
+		return 0, ErrOffGraph
+	}
+	return n, nil
+}
+
+// routeAnchors routes the cheapest loop from the start node through the waypoints in order and back.
+// The anchors are the nodes it goes through, the start node first and last, without a node twice in a row:
+// fewer than two means every waypoint is the start node, and the loop goes nowhere.
+func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Point) (anchors, nodes, edges []uint32, err error) {
+	snapped, err := e.snapWaypoints(waypoints)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	anchors = collapse(append(append([]uint32{start}, snapped...), start))
+	if len(anchors) < 2 {
+		return anchors, []uint32{start}, nil, nil
+	}
+	s := searcherPool.Get().(*searcher)
+	defer searcherPool.Put(s)
+	nodes, edges, ok := chainLegs(ctx, e, s, e.prof.UpPerMeter, anchors)
+	if err := ctx.Err(); err != nil {
+		return nil, nil, nil, err
+	}
+	if !ok {
+		return nil, nil, nil, ErrNoRoute
+	}
+	return anchors, nodes, edges, nil
+}
+
+// anchorLoop gives the anchors of the loops through the waypoints and the length of the cheapest one,
+// or nil anchors when there are no waypoints, or all of them are the start node.
 func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point) (anchors []uint32, length float64, err error) {
 	if len(waypoints) == 0 {
 		return nil, 0, nil
 	}
-	nodes, err := e.snapWaypoints(waypoints)
-	if err != nil {
+	anchors, nodes, edges, err := e.routeAnchors(ctx, start, waypoints)
+	if err != nil || len(anchors) < 2 {
 		return nil, 0, err
 	}
-	anchors = collapse(append(append([]uint32{start}, nodes...), start))
-	if len(anchors) < 2 {
-		return nil, 0, nil
-	}
-	s := searcherPool.Get().(*searcher)
-	defer searcherPool.Put(s)
-	pathNodes, edges, ok := chainLegs(ctx, e, s, e.prof.UpPerMeter, anchors)
-	if err := ctx.Err(); err != nil {
-		return nil, 0, err
-	}
-	if !ok {
-		return nil, 0, ErrNoRoute
-	}
-	length, _, _ = measure(e.g, pathNodes, edges)
+	length, _, _ = measure(e.g, nodes, edges)
 	return anchors, length, nil
 }
 
@@ -271,29 +290,15 @@ func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point
 // over its steps where it must. It fails with ErrOffGraph for a start point off the ways, a
 // *WaypointError for a waypoint off them, and ErrNoRoute when they are not joined.
 func (e *Engine) DirectLoop(ctx context.Context, start Point, waypoints []Point) (*Route, error) {
-	src, d, ok := e.sp.nearest(e.g, start.Lat, start.Lon)
-	if !ok || d > maxSnapMeters {
-		return nil, ErrOffGraph
-	}
-	nodes, err := e.snapWaypoints(waypoints)
+	src, err := e.snapStart(start)
 	if err != nil {
 		return nil, err
 	}
-	anchors := collapse(append(append([]uint32{src}, nodes...), src))
-	if len(anchors) < 2 {
-		// Every waypoint is the start point: the loop goes nowhere.
-		return e.describe([]uint32{src}, nil), nil
-	}
-	s := searcherPool.Get().(*searcher)
-	defer searcherPool.Put(s)
-	pathNodes, edges, ok := chainLegs(ctx, e, s, e.prof.UpPerMeter, anchors)
-	if err := ctx.Err(); err != nil {
+	_, nodes, edges, err := e.routeAnchors(ctx, src, waypoints)
+	if err != nil {
 		return nil, err
 	}
-	if !ok {
-		return nil, ErrNoRoute
-	}
-	return e.describe(pathNodes, edges), nil
+	return e.describe(nodes, edges), nil
 }
 
 // describe measures a path of nodes joined by edges.

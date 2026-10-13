@@ -99,16 +99,10 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 	}
 
 	var c Criteria
-	start, ok := obj["start"].([]any)
-	if !ok || len(start) != 2 {
+	start := obj["start"]
+	if c.Start, ok = position(start); !ok {
 		return fail("start", "start must be a longitude and a latitude")
 	}
-	lon, lonOK := within(start[0], -180, 180)
-	lat, latOK := within(start[1], -90, 90)
-	if !lonOK || !latOK {
-		return fail("start", "start must be a longitude and a latitude")
-	}
-	c.Start = [2]float64{lon, lat}
 
 	target, ok := obj["target"].(map[string]any)
 	if !ok || len(target) != 1 {
@@ -165,16 +159,11 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 			return fail("waypoints", "waypoints must be a short list of longitudes and latitudes")
 		}
 		for _, item := range list {
-			p, ok := item.([]any)
-			if !ok || len(p) != 2 {
+			p, ok := position(item)
+			if !ok {
 				return fail("waypoints", "a waypoint must be a longitude and a latitude")
 			}
-			lon, lonOK := within(p[0], -180, 180)
-			lat, latOK := within(p[1], -90, 90)
-			if !lonOK || !latOK {
-				return fail("waypoints", "a waypoint must be a longitude and a latitude")
-			}
-			c.Waypoints = append(c.Waypoints, [2]float64{lon, lat})
+			c.Waypoints = append(c.Waypoints, p)
 		}
 	}
 
@@ -190,6 +179,17 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 		return fail("target", "target duration makes too long a route at this pace")
 	}
 	return c, nil
+}
+
+// position reads a longitude and a latitude.
+func position(v any) (p [2]float64, ok bool) {
+	pair, isList := v.([]any)
+	if !isList || len(pair) != 2 {
+		return p, false
+	}
+	lon, lonOK := within(pair[0], -180, 180)
+	lat, latOK := within(pair[1], -90, 90)
+	return [2]float64{lon, lat}, lonOK && latOK
 }
 
 func contains(list []string, s string) bool {

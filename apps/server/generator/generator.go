@@ -62,12 +62,12 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	var direct *candidate
 	var seen []*candidate
 	if len(criteria.Waypoints) > 0 {
-		var err error
-		if direct, err = throughWaypoints(ctx, looper, criteria); err != nil {
-			return nil, err
-		}
 		for _, w := range criteria.Waypoints {
 			req.Waypoints = append(req.Waypoints, engine.Point{Lat: w[1], Lon: w[0]})
+		}
+		var err error
+		if direct, err = throughWaypoints(ctx, looper, criteria, req.Waypoints); err != nil {
+			return nil, err
 		}
 		if direct != nil {
 			seen = append(seen, direct)
@@ -95,7 +95,6 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	case errors.Is(err, engine.ErrOffGraph), errors.Is(err, engine.ErrNoLoop):
 		// Nothing more to offer from here: the direct loop through the waypoints, if any, or an empty
 		// route set, not a failure.
-		loops = nil
 	case err != nil && ctx.Err() == nil:
 		return nil, err
 	}
@@ -118,10 +117,8 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 // throughWaypoints routes the direct loop through the waypoints and refuses criteria whose waypoints
 // make a loop too long for the target to be met even by a suggestion, or that the engine cannot match
 // to a way. It returns the direct loop as a candidate, or nil when it goes nowhere.
-func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria) (*candidate, error) {
-	refuse := func(field, message string, index int) error {
-		return &contract.CriteriaError{Field: field, Message: message, Index: index}
-	}
+func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, points []engine.Point) (*candidate, error) {
+	tooLong := &contract.CriteriaError{Field: "waypoints", Message: "waypoints make too long a route for the target"}
 	// A loop is never shorter than the straight lines through its points: no need to search. Climb only
 	// adds to a duration, so a duration target is judged on the flat loop.
 	km := crowFlies(c.Start, c.Waypoints) / 1000
@@ -130,21 +127,17 @@ func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria) (
 		km, limit = km*c.Pace, c.Target.Duration
 	}
 	if km > limit*(1+suggestionTolerance.distance) {
-		return nil, refuse("waypoints", "waypoints make too long a route for the target", 0)
-	}
-	points := make([]engine.Point, len(c.Waypoints))
-	for i, w := range c.Waypoints {
-		points[i] = engine.Point{Lat: w[1], Lon: w[0]}
+		return nil, tooLong
 	}
 	route, err := looper.DirectLoop(ctx, engine.Point{Lat: c.Start[1], Lon: c.Start[0]}, points)
 	var waypoint *engine.WaypointError
 	switch {
 	case errors.As(err, &waypoint):
-		return nil, refuse("waypoints", "waypoint is too far from a way", waypoint.Index)
+		return nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoint is too far from a way", Index: waypoint.Index}
 	case errors.Is(err, engine.ErrOffGraph):
-		return nil, refuse("start", "start point is too far from a way", 0)
+		return nil, &contract.CriteriaError{Field: "start", Message: "start point is too far from a way"}
 	case errors.Is(err, engine.ErrNoRoute):
-		return nil, refuse("waypoints", "waypoints are not joined by a way", 0)
+		return nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoints are not joined by a way"}
 	case err != nil:
 		return nil, err
 	}
@@ -155,7 +148,7 @@ func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria) (
 	estimated := effortDistance(cand.distance, cand.elevationGain) * c.Pace
 	// Only a loop that is too long is refused: detours make up for one that is too short.
 	if tooFar := checks(c, cand, estimated)[0]; tooFar.gap > 0 && !tooFar.suggestion {
-		return nil, refuse("waypoints", "waypoints make too long a route for the target", 0)
+		return nil, tooLong
 	}
 	return cand, nil
 }
