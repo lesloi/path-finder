@@ -9,8 +9,10 @@ const en = { ...commonText.en, ...settingsText.en };
 const fr = { ...commonText.fr, ...settingsText.fr };
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);
 const saved = () => renderHook(() => useSettings()).result.current[0];
-const pick = (control: 'theme' | 'language' | 'basemap', option: string) =>
-  fireEvent.change(screen.getByTestId(`settings-${control}`), { target: { value: option } });
+const pick = (control: 'theme' | 'language' | 'basemap', option: string) => {
+  fireEvent.click(screen.getByTestId(`settings-${control}`));
+  fireEvent.click(screen.getByTestId(`settings-${control}-${option}`));
+};
 
 describe('SettingsView', () => {
   it.each([
@@ -28,14 +30,14 @@ describe('SettingsView', () => {
 
     pick('theme', 'dark');
 
-    expect(screen.getByTestId('settings-theme')).toHaveValue('dark');
+    expect(screen.getByTestId('settings-theme')).toHaveTextContent(en.dark);
     expect(saved().theme).toBe('dark');
   });
 
   it('shows the theme first in the display group', () => {
     renderView();
 
-    expect(screen.getByTestId('settings-theme')).toHaveValue('system');
+    expect(screen.getByTestId('settings-theme')).toHaveTextContent(en.system);
     expect(screen.getAllByRole('combobox')[0]).toBe(screen.getByTestId('settings-theme'));
   });
 
@@ -71,11 +73,11 @@ describe('SettingsView', () => {
   it('shows the saved map background, and saves the one the user picks', () => {
     renderView();
     expect(screen.getByTestId('settings-basemap')).toHaveAccessibleName(en.basemap);
-    expect(screen.getByTestId('settings-basemap')).toHaveValue('plan');
+    expect(screen.getByTestId('settings-basemap')).toHaveTextContent(en.plan);
 
     pick('basemap', 'aerial');
 
-    expect(screen.getByTestId('settings-basemap')).toHaveValue('aerial');
+    expect(screen.getByTestId('settings-basemap')).toHaveTextContent(en.aerial);
     expect(saved().basemap).toBe('aerial');
   });
 
@@ -96,6 +98,8 @@ describe('SettingsView', () => {
 
   it('names the map backgrounds in French', () => {
     renderView('fr');
+
+    fireEvent.click(screen.getByTestId('settings-basemap'));
 
     expect(screen.getByTestId('settings-basemap-aerial')).toHaveTextContent(fr.aerial);
   });
@@ -119,7 +123,7 @@ describe('SettingsView', () => {
 
     expect(screen.getAllByRole('heading', { level: 2 })[0]).toHaveTextContent(fr.display);
     expect(screen.getByTestId('settings-language')).toHaveAccessibleName(fr.language);
-    expect(screen.getByTestId('settings-language')).toHaveValue('fr');
+    expect(screen.getByTestId('settings-language')).toHaveTextContent('Français');
     expect(screen.getByTestId('settings-pace-unit')).toHaveAccessibleName(fr.paceUnit);
   });
 });

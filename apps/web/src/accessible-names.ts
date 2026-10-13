@@ -5,8 +5,7 @@ const CONTROLS = 'a[href], button, input, select, textarea, dialog, [role="slide
  * language that lacks a label fails here and not in front of a screen reader user.
  */
 export function expectNamedControls(container: Element) {
-  // The button of a styleable <select> only shows the picked option: the select is the control and is named.
-  const controls = [...container.querySelectorAll(CONTROLS)].filter((control) => !control.matches('select > button'));
+  const controls = [...container.querySelectorAll(CONTROLS)];
   expect(controls.length).toBeGreaterThan(0);
   for (const control of controls) expect(control).toHaveAccessibleName();
 }
