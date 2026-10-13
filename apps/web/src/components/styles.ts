@@ -64,3 +64,13 @@ export const NOTE = 'text-sm text-ink-2';
 export const PRIMARY_BUTTON =
   'flex min-h-touch w-full items-center justify-center gap-2 rounded-full bg-accent px-4 font-semibold ' +
   'text-on-accent hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-accent';
+
+/**
+ * The name of a control that shows an icon alone, and the tooltip that says it (see `data-tip` in index.css).
+ * `side` is where the tooltip opens, chosen so that it stays on the screen.
+ */
+export const tip = (label: string, side: 'left' | 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end') => ({
+  'aria-label': label,
+  'data-tip': label,
+  'data-tip-side': side,
+});

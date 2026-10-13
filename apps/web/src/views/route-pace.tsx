@@ -1,7 +1,7 @@
 import { Pencil } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-import { PaceSlider } from '../components/index.ts';
+import { PaceSlider, tip } from '../components/index.ts';
 import { formatPace, type PaceUnit } from '../core/index.ts';
 import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 
@@ -35,9 +35,7 @@ export function RoutePace({
       ref={edit}
       data-testid="routes-pace-edit"
       className="grid size-touch flex-none place-items-center rounded-full text-ink hover:bg-surface-2 aria-pressed:text-accent"
-      aria-label={t.editPace}
-      data-tip={t.editPace}
-      data-tip-side="top-end"
+      {...tip(t.editPace, 'top-end')}
       aria-pressed={editing}
       onClick={() => setEditing(!editing)}
     >

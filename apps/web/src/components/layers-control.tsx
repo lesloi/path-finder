@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { POI_LAYER_KEYS, type PoiLayers } from '../core/index.ts';
 import { criteriaText, type Language } from '../i18n/index.ts';
 import { PoiBadge } from './poi-badge.tsx';
-import { FLOATING_BUTTON } from './styles.ts';
+import { FLOATING_BUTTON, tip } from './styles.ts';
 
 const LABELS = { water: 'poiWater', viewpoint: 'poiViewpoint', seasonal: 'poiSeasonal' } as const;
 
@@ -55,9 +55,7 @@ export function LayersControl({
         type="button"
         data-testid="criteria-layers"
         className={FLOATING_BUTTON}
-        aria-label={t.layers}
-        data-tip={t.layers}
-        data-tip-side="left"
+        {...tip(t.layers, 'left')}
         aria-expanded={open}
         aria-controls={`${id}-popover`}
         onClick={() => setOpen(!open)}

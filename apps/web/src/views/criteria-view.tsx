@@ -32,6 +32,7 @@ import {
   PRIMARY_BUTTON,
   SIDE_COLUMN,
   SubPage,
+  tip,
   Toast,
   useToastTimeout,
   useDesktop,
@@ -317,9 +318,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         data-testid="criteria-settings"
         className={`${FLOATING_BUTTON} fixed top-safe-3 right-safe-3 z-5`}
         href="#/settings"
-        aria-label={t.settings}
-        data-tip={t.settings}
-        data-tip-side="bottom-end"
+        {...tip(t.settings, 'bottom-end')}
         // Back from the settings, a crosshair armed before them would come as a surprise.
         onClick={() => setPicking(false)}
       >
@@ -338,9 +337,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               type="button"
               data-testid="criteria-north"
               className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(northSlot)}`}
-              aria-label={t.resetNorth}
-              data-tip={t.resetNorth}
-              data-tip-side="left"
+              {...tip(t.resetNorth, 'left')}
               onClick={() => putBack('resetNorth')}
             >
               {/* The arrow turns against the map, so it keeps pointing north. */}
@@ -355,9 +352,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           type="button"
           data-testid="criteria-locate"
           className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(0)}`}
-          aria-label={t.myLocation}
-          data-tip={t.myLocation}
-          data-tip-side="left"
+          {...tip(t.myLocation, 'left')}
           onClick={locate}
         >
           <LocateFixed size={20} aria-hidden />
@@ -368,9 +363,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           type="button"
           data-testid="criteria-reframe"
           className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(0)}`}
-          aria-label={t.reframe}
-          data-tip={t.reframe}
-          data-tip-side="left"
+          {...tip(t.reframe, 'left')}
           onClick={() => putBack('reframe')}
         >
           <Scan size={20} aria-hidden />
@@ -524,9 +517,7 @@ function CriteriaFields({
           type="button"
           data-testid="criteria-start-pick"
           className={`${ICON_BUTTON} aria-pressed:text-accent`}
-          aria-label={t.chooseOnMap}
-          data-tip={t.chooseOnMap}
-          data-tip-side="bottom-end"
+          {...tip(t.chooseOnMap, 'bottom-end')}
           aria-pressed={picking}
           onClick={onPick}
         >
@@ -536,9 +527,7 @@ function CriteriaFields({
           type="button"
           className={ICON_BUTTON}
           data-testid="criteria-start-locate"
-          aria-label={t.myLocation}
-          data-tip={t.myLocation}
-          data-tip-side="bottom-end"
+          {...tip(t.myLocation, 'bottom-end')}
           onClick={onLocate}
         >
           <LocateFixed size={20} aria-hidden />
