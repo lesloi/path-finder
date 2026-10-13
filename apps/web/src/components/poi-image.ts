@@ -23,8 +23,10 @@ const GLYPHS: Record<PoiCategory, (x: number, y: number) => boolean> = {
     if (y > 0.2) return Math.hypot(x, y - 0.2) <= 0.42;
     return y >= -0.62 && Math.abs(x) <= (0.42 * (y + 0.62)) / 0.82;
   },
-  // An eye: a lens with a hollow pupil.
-  viewpoint: (x, y) => Math.abs(x) <= 0.8 && Math.abs(y) <= 0.5 * (1 - (x / 0.8) ** 2) && Math.hypot(x, y) > 0.2,
+  // A camera: a body under a small bump, with a hollow lens.
+  viewpoint: (x, y) =>
+    ((Math.abs(x) <= 0.8 && y >= -0.4 && y <= 0.62) || (Math.abs(x) <= 0.36 && y >= -0.62 && y < -0.4)) &&
+    Math.hypot(x, y - 0.12) > 0.3,
 };
 
 /** The image of a point of interest's badge: transparent around, ready for `map.addImage`. */

@@ -3,7 +3,8 @@ import { POI_COLORS } from './route-colors.ts';
 
 const GLYPHS: Record<PoiCategory, string> = {
   water: 'M12 5.5C12 5.5 7.5 10.3 7.5 13.6a4.5 4.5 0 0 0 9 0C16.5 10.3 12 5.5 12 5.5Z',
-  viewpoint: 'M4.5 12Q12 5 19.5 12Q12 19 4.5 12ZM12 9.8a2.2 2.2 0 1 0 0 4.4a2.2 2.2 0 1 0 0-4.4Z',
+  viewpoint:
+    'M4.5 10a2 2 0 0 1 2-2h1.8l1-1.6h5.4l1 1.6h1.8a2 2 0 0 1 2 2v6.5a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2ZM12 10.6a2.9 2.9 0 1 0 0 5.8a2.9 2.9 0 1 0 0-5.8Z',
 };
 
 /** The badge the map draws for a point of interest (see `poi-image.ts`), for the popover; hollow for a seasonal one. */
