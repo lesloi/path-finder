@@ -60,7 +60,7 @@ describe('CriteriaView', () => {
         /\bbottom-\[[^\s]+\]/,
       )![0];
 
-    it('sits above the location button on a phone, which keeps the bottom', () => {
+    it('sits beside or above the location button, which keeps the corner', () => {
       render(<CriteriaView language="en" />);
 
       expect(bottomOf('criteria-locate')).toBe('bottom-[calc(var(--sheet-height,0px)+--spacing(3))]');

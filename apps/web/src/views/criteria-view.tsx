@@ -141,11 +141,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // In the place of the location button, which the routes hide.
   const reframeShown = routesShown && mapView.movedAway && !detailOpen;
 
-  // The place of each button in the stack: a phone keeps the location (or reframe) button at the bottom, within reach
-  // of the thumb, and the layers above it; a desktop has the layers at the corner.
+  // The place of each button in the stack: the location (or reframe) button keeps the corner, within reach of the
+  // thumb, then the layers, then the north.
   const locateOrReframe = locateShown || reframeShown;
-  const locateSlot = desktop ? 1 : 0;
-  const layersSlot = desktop ? 0 : locateOrReframe ? 1 : 0;
+  const layersSlot = locateOrReframe ? 1 : 0;
   const northSlot = locateOrReframe ? 2 : 1;
 
   // A button that puts the map back goes away once it has: the focus goes on from the settings.
@@ -351,7 +350,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <button
           type="button"
           data-testid="criteria-locate"
-          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(locateSlot)}`}
+          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(0)}`}
           aria-label={t.myLocation}
           onClick={locate}
         >
@@ -362,7 +361,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <button
           type="button"
           data-testid="criteria-reframe"
-          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(locateSlot)}`}
+          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(0)}`}
           aria-label={t.reframe}
           onClick={() => putBack('reframe')}
         >
