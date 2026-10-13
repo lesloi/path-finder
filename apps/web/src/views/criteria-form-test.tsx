@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { parseCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
-import { criteriaText } from '../i18n/index.ts';
+import { criteriaText, routesText } from '../i18n/index.ts';
 import { CriteriaForm, criteriaChanged } from './criteria-form.tsx';
 import type { Position, RouteSetRequest } from '../core/index.ts';
 
@@ -13,7 +13,7 @@ const START: Position = [6.1294, 45.8992];
 
 const store = (settings: object) => localStorage.setItem('path-finder.settings', JSON.stringify(settings));
 
-function setup(props: { start?: Position; language?: 'en' | 'fr' } = {}) {
+function setup(props: { start?: Position; language?: 'en' | 'fr'; searched?: boolean } = {}) {
   const onSubmit = vi.fn();
   render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} {...props} />);
   const submit = () => fireEvent.click(screen.getByTestId('criteria-submit'));
@@ -44,6 +44,18 @@ describe('CriteriaForm', () => {
       surface: 'any',
       pace: 6,
     });
+  });
+
+  it('offers to search again once routes were found', () => {
+    setup({ searched: true });
+
+    expect(screen.getByTestId('criteria-submit')).toHaveTextContent(routesText.en.searchAgain);
+  });
+
+  it('offers to find routes before any were found', () => {
+    setup();
+
+    expect(screen.getByTestId('criteria-submit')).toHaveTextContent(en.findRoutes);
   });
 
   it('hides Find routes until a start point is set', () => {

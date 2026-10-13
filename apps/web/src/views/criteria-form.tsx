@@ -11,7 +11,7 @@ import {
 } from '../contract/index.ts';
 import { PaceSlider, PRIMARY_BUTTON, SegmentedControl, Slider } from '../components/index.ts';
 import { formatDuration, type Position, type RouteSetRequest } from '../core/index.ts';
-import { commonText, criteriaText, type Language } from '../i18n/index.ts';
+import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
 import { useSettings, type LastCriteria } from '../state/index.ts';
 
 const CRITERIA = ['target', 'surface', 'elevation'] as const;
@@ -119,6 +119,7 @@ export function CriteriaForm({
   start,
   startUncovered = false,
   draft: kept,
+  searched = false,
   onSubmit,
 }: {
   language: Language;
@@ -127,6 +128,8 @@ export function CriteriaForm({
   startUncovered?: boolean;
   /** From `useCriteriaDraft`, for a view that mounts the form in more than one place and keeps what was set. */
   draft?: ReturnType<typeof useCriteriaDraft>;
+  /** Routes were already found: the button then runs the search again. */
+  searched?: boolean;
   onSubmit: (request: RouteSetRequest) => void;
 }) {
   const t = { ...commonText[language], ...criteriaText[language] };
@@ -259,7 +262,7 @@ export function CriteriaForm({
         {...(startUncovered && { 'aria-describedby': uncoveredId })}
         onClick={() => onSubmit(request)}
       >
-        {t.findRoutes}
+        {searched ? routesText[language].searchAgain : t.findRoutes}
       </button>
     </>
   );

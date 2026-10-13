@@ -717,6 +717,17 @@ describe('CriteriaView', () => {
       });
     });
 
+    it('renames the search button once routes were found', async () => {
+      onDesktop();
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      await submit();
+
+      await screen.findByTestId('routes-count');
+      expect(screen.getByTestId('criteria-submit')).toHaveTextContent(routesText.en.searchAgain);
+    });
+
     it('shows a loading state while the API works, beside the criteria, with a way to cancel', async () => {
       onDesktop();
       ask(new Promise(() => {}));

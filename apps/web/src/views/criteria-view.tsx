@@ -264,6 +264,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       language={language}
       picking={picking}
       draft={draft}
+      searched={routesShown}
       onStartChange={moveStart}
       onUnreadable={() => warn('unreadable')}
       onPick={() => {
@@ -487,6 +488,7 @@ function CriteriaFields({
   language,
   picking,
   draft,
+  searched,
   onStartChange,
   onUnreadable,
   onPick,
@@ -498,6 +500,7 @@ function CriteriaFields({
   language: Language;
   picking: boolean;
   draft: ReturnType<typeof useCriteriaDraft>;
+  searched: boolean;
   onStartChange: (start: Position) => void;
   onUnreadable: () => void;
   onPick: () => void;
@@ -539,6 +542,7 @@ function CriteriaFields({
         start={start}
         startUncovered={startUncovered}
         draft={draft}
+        searched={searched}
         onSubmit={onSubmit}
       />
     </>
