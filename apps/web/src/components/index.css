@@ -298,25 +298,26 @@
     appearance: base-select;
   }
   select {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--spacing) * 3);
     border: 1px solid var(--border);
     cursor: pointer;
   }
-  /* A thin chevron instead of the default triangle. */
-  select button {
+  /* An icon beside its label, in the button, its copy of the picked option and each option. */
+  select,
+  select button,
+  select selectedcontent,
+  select option {
     display: flex;
     align-items: center;
     gap: calc(var(--spacing) * 2);
+  }
+  select {
+    gap: calc(var(--spacing) * 3);
+  }
+  select button {
     flex: 1;
     font: inherit;
   }
-  select selectedcontent {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--spacing) * 2);
-  }
+  /* A thin chevron instead of the default triangle. */
   select::picker-icon {
     content: '';
     width: 6px;
@@ -344,9 +345,6 @@
     box-shadow: var(--float);
   }
   select option {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--spacing) * 2);
     min-height: var(--spacing-touch);
     padding: 0 calc(var(--spacing) * 3);
     border-radius: var(--radius-md);
