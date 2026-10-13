@@ -85,9 +85,9 @@ const isLevel = (value: unknown): value is ElevationLevel => LEVELS.includes(val
 
 function parsePoiLayers(stored: unknown): PoiLayers {
   const layers = isObject(stored) ? stored : {};
-  const shown = (category: keyof PoiLayers) =>
-    typeof layers[category] === 'boolean' ? layers[category] : DEFAULT_POI_LAYERS[category];
-  return Object.fromEntries(POI_LAYER_KEYS.map((category) => [category, shown(category)])) as PoiLayers;
+  return Object.fromEntries(
+    POI_LAYER_KEYS.map((key) => [key, typeof layers[key] === 'boolean' ? layers[key] : DEFAULT_POI_LAYERS[key]]),
+  ) as PoiLayers;
 }
 
 function parseLastCriteria(stored: unknown): LastCriteria {

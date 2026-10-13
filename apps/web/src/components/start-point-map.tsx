@@ -121,6 +121,7 @@ const TAG_HALF: [number, number] = [56, 28];
 // Half the size of a distance marker.
 const MARKER_HALF = 16;
 
+const poiLayerId = (category: PoiCategory) => `pois-${category}`;
 const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
 const emptyRoutes = { type: 'FeatureCollection', features: [] } as const;
 
@@ -255,8 +256,7 @@ export function StartPointMap({
   const swappedFrom = useRef<Basemap>(undefined);
   const desktop = useDesktop();
   const scale = useRef<ScaleControl>(null);
-  const initialLanguage = useEffectEvent(() => language);
-  const currentLanguage = useEffectEvent(() => language);
+  const languageNow = useEffectEvent(() => language);
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
@@ -290,7 +290,7 @@ export function StartPointMap({
       zoom: 5,
       attributionControl: false,
       // MapLibre words the names of its controls in English: ours are in the language of the app.
-      locale: mapLocale(initialLanguage()),
+      locale: mapLocale(languageNow()),
       // A flat map: the app draws no relief and no 3D, so a tilt would only skew it.
       maxPitch: 0,
       pitchWithRotate: false,
@@ -348,7 +348,7 @@ export function StartPointMap({
       map.addSource('pois', { type: 'geojson', data: emptyRoutes });
       for (const category of POI_CATEGORIES) {
         map.addLayer({
-          id: `pois-${category}`,
+          id: poiLayerId(category),
           type: 'symbol',
           source: 'pois',
           minzoom: POI_MIN_ZOOM,
@@ -480,13 +480,13 @@ export function StartPointMap({
 
     // The label of a point of interest: its name, else what it is. By hover where there is a pointer, and on a tap
     // where there is not. OSM names come from anyone, so they are text, never markup.
-    const poiLayers = POI_CATEGORIES.map((category) => `pois-${category}`);
+    const poiLayers = POI_CATEGORIES.map(poiLayerId);
     let label: Popup | undefined;
     const showLabel = ({ features }: { features?: { properties: Record<string, unknown>; geometry: unknown }[] }) => {
       const feature = features?.[0];
       if (!feature) return;
       const { category, seasonal, name } = feature.properties;
-      const words = commonText[currentLanguage()];
+      const words = commonText[languageNow()];
       const what = category === 'viewpoint' ? words.viewpoint : seasonal ? words.seasonalWaterPoint : words.waterPoint;
       label?.remove();
       label = new Popup({ closeButton: false, offset: 14 })

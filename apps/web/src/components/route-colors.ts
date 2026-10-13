@@ -1,7 +1,12 @@
+import type { PoiCategory } from '../core/index.ts';
+
 /**
  * The colour of each route on the map, as the `route-*` tokens of `index.css`: MapLibre and the
  * thumbnails paint with raw colours, so change both together (DESIGN.md).
  */
+/** The red, green and blue channels of a `#rrggbb` colour. */
+export const hexToRgb = (hex: string) => [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
+
 export const ROUTE_COLORS = ['#e0115f', '#2563eb', '#7a3fc4', '#0b7a75', '#c25e00'];
 
 /** The left border of a route's row, in the route's colour. */
@@ -37,4 +42,4 @@ export const MAP_COLORS = {
 export const MAP_INK = '#1c1d1b';
 
 /** The colour of each category of points of interest on the map; the layers popover paints its swatches with them. */
-export const POI_COLORS = { water: '#0e7490', viewpoint: '#a16207' };
+export const POI_COLORS: Record<PoiCategory, string> = { water: '#0e7490', viewpoint: '#a16207' };

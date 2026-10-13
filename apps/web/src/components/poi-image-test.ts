@@ -1,7 +1,5 @@
 import { poiImage, poiImageId } from './poi-image.ts';
-import { POI_COLORS } from './route-colors.ts';
-
-const hex = (colour: string) => [1, 3, 5].map((start) => Number.parseInt(colour.slice(start, start + 2), 16));
+import { hexToRgb as hex, POI_COLORS } from './route-colors.ts';
 
 function pixel(image: ReturnType<typeof poiImage>, x: number, y: number) {
   const at = (y * image.width + x) * 4;
