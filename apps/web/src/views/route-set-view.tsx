@@ -233,12 +233,16 @@ function RouteRow({
           </strong>
           <span className="flex items-center gap-3 text-sm text-ink-2">
             {gain && (
-              <span data-testid={`routes-row-${index}-gain`} className="flex items-center gap-1">
+              <span
+                data-testid={`routes-row-${index}-gain`}
+                title={t.elevationGain}
+                className="flex items-center gap-1"
+              >
                 <ArrowUpRight size={14} aria-hidden />
                 {gain}
               </span>
             )}
-            <span className="flex items-center gap-1">
+            <span title={t.estimatedDuration} className="flex items-center gap-1">
               <Clock size={14} aria-hidden />
               {duration}
             </span>

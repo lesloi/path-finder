@@ -79,7 +79,14 @@ export function SubPage({
         }
       >
         {(!desktop || back !== HOME) && (
-          <a className={ICON_BUTTON} data-testid="sub-page-back" href={back} aria-label={t.back} onClick={follow(back)}>
+          <a
+            className={ICON_BUTTON}
+            data-testid="sub-page-back"
+            href={back}
+            aria-label={t.back}
+            title={t.back}
+            onClick={follow(back)}
+          >
             <ArrowLeft aria-hidden />
           </a>
         )}
@@ -98,6 +105,7 @@ export function SubPage({
             data-testid="sub-page-close"
             href={HOME}
             aria-label={t.close}
+            title={t.close}
             onClick={follow(HOME)}
           >
             <X aria-hidden />

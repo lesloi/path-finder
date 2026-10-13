@@ -10,7 +10,13 @@ export function SurfaceBar({ unpavedShare, label, testId }: { unpavedShare: numb
     { surface: 'unpaved', share: unpavedShare },
   ] as const;
   return (
-    <span data-testid={testId} role="img" aria-label={label} className="flex h-1.5 w-full overflow-hidden rounded-full">
+    <span
+      data-testid={testId}
+      role="img"
+      aria-label={label}
+      title={label}
+      className="flex h-1.5 w-full overflow-hidden rounded-full"
+    >
       {segments.map(
         ({ surface, share }) =>
           share > 0 && (
