@@ -55,7 +55,7 @@ export function LayersControl({
         type="button"
         data-testid="criteria-layers"
         className={FLOATING_BUTTON}
-        {...tip(t.layers, 'stack')}
+        {...tip(t.pointsOfInterest, 'stack')}
         aria-expanded={open}
         aria-controls={`${id}-popover`}
         onClick={() => setOpen(!open)}
@@ -66,7 +66,7 @@ export function LayersControl({
         <div
           id={`${id}-popover`}
           role="group"
-          aria-label={t.layers}
+          aria-label={t.pointsOfInterest}
           className="absolute right-0 bottom-full mb-2 w-max max-w-[calc(100vw-2*--spacing(4))] rounded-lg border border-border bg-surface p-2 shadow-float"
         >
           {POI_LAYER_KEYS.map((key) => {

@@ -236,14 +236,14 @@ function RouteRow({
             {gain && (
               <span
                 data-testid={`routes-row-${index}-gain`}
-                {...hint(t.elevationGain, 'bottom-start')}
+                {...hint(t.elevationGain, 'top-start')}
                 className="flex items-center gap-1"
               >
                 <ArrowUpRight size={14} aria-hidden />
                 {gain}
               </span>
             )}
-            <span {...hint(t.estimatedDuration, 'bottom-start')} className="flex items-center gap-1">
+            <span {...hint(t.estimatedDuration, 'top-start')} className="flex items-center gap-1">
               <Clock size={14} aria-hidden />
               {duration}
             </span>
