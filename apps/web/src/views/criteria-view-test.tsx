@@ -1576,7 +1576,7 @@ describe('CriteriaView', () => {
       expect(waypointMarkers().map((marker) => marker.position)).toEqual([[6.21, 45.81]]);
     });
 
-    it('says so when a tap falls on the veiled part of the map, then asks again for a point', async () => {
+    it('says so under the banner when a tap falls on the veiled part of the map', async () => {
       vi.stubGlobal('fetch', (url: string) =>
         url === '/api/v1/coverage'
           ? Promise.resolve(Response.json({ cells: [[6, 45.7, 6.3, 45.9]] }))
@@ -1587,10 +1587,11 @@ describe('CriteriaView', () => {
       await act(async () => {});
 
       place(2.3, 48.8);
-      expect(banner()).toHaveTextContent(en.waypointUncovered);
+      expect(screen.getByTestId('criteria-waypoint-refused')).toHaveTextContent(en.waypointUncovered);
+      expect(banner()).toHaveTextContent(en.placeWaypoint);
 
       place(6.21, 45.81);
-      expect(banner()).toHaveTextContent(en.placeWaypoint);
+      expect(screen.queryByTestId('criteria-waypoint-refused')).not.toBeInTheDocument();
     });
 
     it('stops placing once the search starts', () => {

@@ -72,10 +72,10 @@ const MAP_NOTICE =
   'desktop:top-auto desktop:bottom-[calc(var(--edge-bottom)+--spacing(8))] desktop:left-(--map-centre) ' +
   'desktop:max-w-none';
 
-// A notice over the top of the map, under the bar on phones; on desktops in line with the settings button, clear of
+// The notices over the top of the map, one under the other, under the bar on phones; on desktops in line with the settings button, clear of
 // the buttons at the bottom right.
-const TOP_NOTICE =
-  'fixed z-4 w-max -translate-x-1/2 rounded-md bg-surface text-sm text-ink-2 shadow-float ' +
+const TOP_NOTICES =
+  'fixed z-4 flex w-max -translate-x-1/2 flex-col items-center gap-2 text-sm ' +
   'top-[calc(var(--top-reserved)+--spacing(2))] left-1/2 max-w-[calc(100vw-2*--spacing(4))] ' +
   'desktop:top-safe-3 desktop:left-(--map-centre) desktop:max-w-[calc(100vw-var(--column-inset)-2*var(--spacing-touch)-(--spacing(12)))]';
 
@@ -376,7 +376,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             <button
               type="button"
               data-testid="criteria-waypoint"
-              className={`${FLOATING_BUTTON} fixed z-5 disabled:text-ink-2 ${stackedAbove(waypointSlot)}`}
+              className={`${FLOATING_BUTTON} fixed z-5 aria-pressed:bg-accent! aria-pressed:text-on-accent! disabled:text-ink-2 ${stackedAbove(waypointSlot)}`}
               {...tip(t.addWaypoint, 'stack')}
               aria-pressed={placing}
               disabled={!placing && waypoints.length >= MAX_WAYPOINTS}
@@ -529,16 +529,31 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         </div>
       )}
       {placing && (
-        <div data-testid="criteria-waypoint-bar" className={`${TOP_NOTICE} flex items-center gap-3 py-1 pr-1 pl-4`}>
-          {refused ? t.waypointUncovered : desktop ? t.placeWaypoint : t.placeWaypointTouch}
-          <button
-            type="button"
-            data-testid="criteria-waypoint-done"
-            className="min-h-touch rounded-full px-3 font-semibold text-accent"
-            onClick={() => setPlacing(false)}
+        <div className={TOP_NOTICES}>
+          <div
+            data-testid="criteria-waypoint-bar"
+            className="flex items-center gap-3 rounded-md bg-surface py-1 pr-1 pl-4 text-ink-2 shadow-float"
           >
-            {t.waypointsDone}
-          </button>
+            {desktop ? t.placeWaypoint : t.placeWaypointTouch}
+            <button
+              type="button"
+              data-testid="criteria-waypoint-done"
+              className="min-h-touch rounded-full px-3 font-semibold text-accent"
+              onClick={() => setPlacing(false)}
+            >
+              {t.waypointsDone}
+            </button>
+          </div>
+          {/* Under the banner, which keeps asking for a point. */}
+          {refused && (
+            <p
+              role="status"
+              data-testid="criteria-waypoint-refused"
+              className="m-0 rounded-md bg-surface px-4 py-2 text-ink shadow-float"
+            >
+              {t.waypointUncovered}
+            </p>
+          )}
         </div>
       )}
       {browser.error && (
