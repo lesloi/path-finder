@@ -144,3 +144,25 @@ func TestCoverageMatchesTheWebAppsSample(t *testing.T) {
 		t.Errorf("coverage JSON changed; testdata/coverage.json is what the web app reads: %s", again)
 	}
 }
+
+func TestPOITileOfCutsTheWorldOnAGridOfPoiTileZoom(t *testing.T) {
+	cases := []struct {
+		name     string
+		lat, lon float64
+		x, y     int
+	}{
+		{"north-east of the origin", 0.1, 0.1, 512, 511},
+		{"south-west of the origin", -0.1, -0.1, 511, 512},
+		{"the antimeridian stays on the grid", 0, 180, 1023, 512},
+		{"a pole stays on the grid", 89.99, -180, 0, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			x, y := POITileOf(c.lat, c.lon)
+
+			if x != c.x || y != c.y {
+				t.Errorf("POITileOf(%v, %v) = %d, %d; want %d, %d", c.lat, c.lon, x, y, c.x, c.y)
+			}
+		})
+	}
+}

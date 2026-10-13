@@ -492,3 +492,86 @@ func TestCoverageOfNothingIsAnEmptyList(t *testing.T) {
 		t.Errorf("body %s", got)
 	}
 }
+
+func poiDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "518"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "518", "352.json"), []byte(`{"pois":[{"category":"water","position":[2.35,48.85]}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func TestPOITileIsServedFromTheDirectory(t *testing.T) {
+	h := newServer(t, func(c *Config) { c.POIDir = poiDir(t) })
+
+	got := do(h, http.MethodGet, "/api/v1/poi-tiles/518/352", "", "", nil)
+
+	if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), `"water"`) {
+		t.Errorf("status %d, body %q", got.Code, got.Body.String())
+	}
+	if ct := got.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q", ct)
+	}
+	if cc := got.Header().Get("Cache-Control"); cc != "public, max-age=86400" {
+		t.Errorf("Cache-Control = %q", cc)
+	}
+}
+
+func TestPOITileWithoutPOIsIsEmpty(t *testing.T) {
+	for name, dir := range map[string]string{"no tile": poiDir(t), "no directory": filepath.Join(t.TempDir(), "missing")} {
+		t.Run(name, func(t *testing.T) {
+			h := newServer(t, func(c *Config) { c.POIDir = dir })
+
+			got := do(h, http.MethodGet, "/api/v1/poi-tiles/1/2", "", "", nil)
+
+			if got.Code != http.StatusOK || strings.TrimSpace(got.Body.String()) != `{"pois":[]}` {
+				t.Errorf("status %d, body %q", got.Code, got.Body.String())
+			}
+			if cc := got.Header().Get("Cache-Control"); cc != "public, max-age=86400" {
+				t.Errorf("Cache-Control = %q", cc)
+			}
+		})
+	}
+}
+
+func TestPOITileRefusesWhatIsNotATileOfTheGrid(t *testing.T) {
+	h := newServer(t, func(c *Config) { c.POIDir = poiDir(t) })
+	for _, path := range []string{
+		"/api/v1/poi-tiles/1024/0", "/api/v1/poi-tiles/0/1024", "/api/v1/poi-tiles/-1/0",
+		"/api/v1/poi-tiles/a/0", "/api/v1/poi-tiles/518/352.json", "/api/v1/poi-tiles/518/352/x", "/api/v1/poi-tiles/%2e%2e/etc",
+		"/api/v1/poi-tiles/0518/352", "/api/v1/poi-tiles/+518/352",
+	} {
+		if got := do(h, http.MethodGet, path, "", "", nil); got.Code != http.StatusNotFound {
+			t.Errorf("%s: status %d, want 404", path, got.Code)
+		}
+	}
+}
+
+func TestPOITilesAreNeverLogged(t *testing.T) {
+	var out strings.Builder
+	h := newServer(t, func(c *Config) {
+		c.Log = log.New(&out, "", 0)
+		c.POIDir = poiDir(t)
+	})
+
+	do(h, http.MethodGet, "/api/v1/poi-tiles/518/352", "", "", nil)
+	do(h, http.MethodGet, "/api/v1/poi-tiles/1/1", "", "", nil)
+
+	if out.Len() != 0 {
+		t.Errorf("a tile request was logged: %s", out.String())
+	}
+}
+
+func TestWithoutPOIDirTheTileRouteIsNotServed(t *testing.T) {
+	h := newServer(t, nil)
+
+	got := do(h, http.MethodGet, "/api/v1/poi-tiles/518/352", "", "", nil)
+
+	if strings.Contains(got.Body.String(), "pois") {
+		t.Errorf("body %q", got.Body.String())
+	}
+}

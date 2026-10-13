@@ -22,6 +22,7 @@ type limits struct {
 	ClimbPerEffortKm float64                    `json:"climbPerEffortKm"`
 	HillyMatchPerKm  float64                    `json:"hillyMatchPerKm"`
 	CoverageCell     float64                    `json:"coverageCellDegrees"`
+	POITileZoom      int                        `json:"poiTileZoom"`
 	Surfaces         []string                   `json:"surfaces"`
 	ErrorCodes       []string                   `json:"errorCodes"`
 }
@@ -82,4 +83,30 @@ func CoverageCellsPerDegree() int { return int(math.Round(1 / bounds.CoverageCel
 // west, south, east and north in degrees. A place in none of them has no way in the graph served.
 type Coverage struct {
 	Cells [][4]float64 `json:"cells"`
+}
+
+// POI is a point of interest of a tile: a water point or a viewpoint, at longitude and latitude.
+type POI struct {
+	Category string     `json:"category"` // water or viewpoint
+	Position [2]float64 `json:"position"`
+	Seasonal bool       `json:"seasonal,omitempty"` // water points only
+}
+
+// POITile is what a tile of points of interest holds; a tile with none holds an empty list.
+type POITile struct {
+	POIs []POI `json:"pois"`
+}
+
+// POITileZoom is the zoom of the grid that POI tiles are cut on. A tile is about 27 km wide at the latitudes of France.
+func POITileZoom() int { return bounds.POITileZoom }
+
+// POITileOf is the tile of the grid (Web Mercator, x from the west and y from the north, as the XYZ scheme of
+// web maps) that holds a position.
+func POITileOf(lat, lon float64) (x, y int) {
+	n := float64(int(1) << bounds.POITileZoom)
+	latRad := lat * math.Pi / 180
+	fx := (lon + 180) / 360 * n
+	fy := (1 - math.Asinh(math.Tan(latRad))/math.Pi) / 2 * n
+	clamp := func(v float64) int { return int(math.Max(0, math.Min(n-1, math.Floor(v)))) }
+	return clamp(fx), clamp(fy)
 }

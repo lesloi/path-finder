@@ -72,6 +72,24 @@ default): more make long searches faster and the file bigger. A way with no BD A
 it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one surface-preference
 profile and to one graph: build them again after each graph; the server refuses those of another graph.
 
+### Points of interest
+
+`build-pois` reads the same extracts and writes the tiles of the water points (`amenity=drinking_water`, or
+`drinking_water=yes` on any node or way, never `drinking_water=no`; `seasonal` is kept) and of the viewpoints
+(`tourism=viewpoint`). A tile is a JSON file `pois/{x}/{y}.json` of the zoom-10 grid, about 27 km wide, written only
+when it holds any point. A way stands for the mean of its nodes; relations are left out. Several extracts can
+overlap. A whole country needs no zones.
+
+```sh
+./path-finder build-pois -pbf $DATA_DIR/osm/france.osm.pbf -out $DATA_DIR/pois
+```
+
+The server reads the tiles on each request, so a new build needs no restart. It only writes into an empty or new
+directory: build into `pois.<stamp>` and put it in service by renaming a link `pois` over the previous one, the way the
+zones are, rather than writing into the directory that is served. Without `pois/`, or for a tile with no point, the
+answer is an empty tile and the map shows no point of interest. The tile requests are never logged, not even in
+development.
+
 ### A country, by zones
 
 The graph of a country does not build in a couple of gigabytes of memory, so build it by zone, each into its
@@ -137,18 +155,18 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable             | Required | Default       | Description                                                                                                                 |
-| -------------------- | -------- | ------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                                                    |
-| `PORT`               | no       | `3000`        | Port the server listens on                                                                                                  |
-| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                                                           |
-| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin` and the optional `any.alt`, `paved.alt` and `unpaved.alt`, or one such subdirectory per zone |
-| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                                                  |
-| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))                                  |
-| `SEARCH_SEED`        | no       | random        | A whole number that fixes the seed of every search, so that the same criteria bring the same loops (for tests)              |
-| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none                                          |
-| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                                                |
-| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                                                 |
+| Variable             | Required | Default       | Description                                                                                                                                           |
+| -------------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                                                                              |
+| `PORT`               | no       | `3000`        | Port the server listens on                                                                                                                            |
+| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                                                                                     |
+| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin` and the optional `any.alt`, `paved.alt` and `unpaved.alt`, or one such subdirectory per zone, and the optional `pois/` |
+| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                                                                            |
+| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))                                                            |
+| `SEARCH_SEED`        | no       | random        | A whole number that fixes the seed of every search, so that the same criteria bring the same loops (for tests)                                        |
+| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none                                                                    |
+| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                                                                          |
+| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                                                                           |
 
 ### How many at once
 

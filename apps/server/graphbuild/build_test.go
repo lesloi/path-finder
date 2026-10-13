@@ -66,6 +66,12 @@ type pbfWay struct {
 // writePBF writes a file holding the nodes, then the ways.
 func writePBF(t *testing.T, path string, nodes []pbfNode, ways []pbfWay) {
 	t.Helper()
+	writeTaggedPBF(t, path, nodes, nil, ways)
+}
+
+// writeTaggedPBF is writePBF with tags on some of the nodes, by id.
+func writeTaggedPBF(t *testing.T, path string, nodes []pbfNode, nodeTags map[int64][][2]string, ways []pbfWay) {
+	t.Helper()
 	strs := [][]byte{nil} // index 0 is the empty string
 	index := map[string]uint64{}
 	str := func(s string) uint64 {
@@ -86,6 +92,16 @@ func writePBF(t *testing.T, path string, nodes []pbfNode, ways []pbfWay) {
 			id, lat, lon = n.id, la, lo
 		}
 		dense := append(append(packed(1, ids), packed(8, lats)...), packed(9, lons)...)
+		if len(nodeTags) > 0 { // keys_vals: the key and value indexes of each node, closed by a 0
+			var kv []uint64
+			for _, n := range nodes {
+				for _, tag := range nodeTags[n.id] {
+					kv = append(kv, str(tag[0]), str(tag[1]))
+				}
+				kv = append(kv, 0)
+			}
+			dense = append(dense, packed(10, kv)...)
+		}
 		group = append(group, bytesField(2, dense)...)
 	}
 	for _, w := range ways {

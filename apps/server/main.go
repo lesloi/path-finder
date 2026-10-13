@@ -76,6 +76,13 @@ func run(command string, args []string) error {
 			fmt.Fprintf(os.Stderr, "%s: %d nodes\n", z.Name, z.Nodes)
 		}
 		return nil
+	case "build-pois":
+		fs := flag.NewFlagSet(command, flag.ExitOnError)
+		var pbfs stringList
+		fs.Var(&pbfs, "pbf", "OSM PBF file (repeatable)")
+		out := fs.String("out", filepath.Join(dataDir(), poiDirName), "directory to write the tiles in (empty or new)")
+		_ = fs.Parse(args)
+		return graphbuild.BuildPOIs(pbfs, *out, os.Stderr)
 	case "build-alt":
 		fs := flag.NewFlagSet(command, flag.ExitOnError)
 		graph := fs.String("graph", filepath.Join(dataDir(), engine.GraphFileName), "graph file")
@@ -88,7 +95,7 @@ func run(command string, args []string) error {
 		}
 		return engine.WriteLandmarks(*graph, *out, *profile, *count)
 	}
-	return fmt.Errorf("unknown command %q: use build-graph, build-alt, plan-zones, or none to serve", command)
+	return fmt.Errorf("unknown command %q: use build-graph, build-alt, build-pois, plan-zones, or none to serve", command)
 }
 
 type stringList []string
@@ -135,6 +142,7 @@ func serve() {
 	}
 	cfg.Generator = gen
 	cfg.Coverage = zones
+	cfg.POIDir = filepath.Join(dataDir(), poiDirName)
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 
@@ -155,6 +163,9 @@ func serve() {
 		log.Fatal(err)
 	}
 }
+
+// poiDirName is the directory of the data directory that holds the tiles of points of interest; the map shows none without it.
+const poiDirName = "pois"
 
 // dataDir is the directory holding the graph and the landmarks: a volume, when hosted.
 func dataDir() string { return envOr("DATA_DIR", "data") }
