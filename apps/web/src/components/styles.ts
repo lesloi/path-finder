@@ -69,7 +69,7 @@ export const PRIMARY_BUTTON =
  * The name of a control that shows an icon alone, and the tooltip that says it (see `data-tip` in index.css).
  * `side` is where the tooltip opens, chosen so that it stays on the screen.
  */
-export const tip = (label: string, side: 'left' | 'bottom-start' | 'bottom-end' | 'top-start' | 'top-end') => ({
+export const tip = (label: string, side: 'left' | 'bottom-start' | 'bottom-end' | 'top-start') => ({
   'aria-label': label,
   'data-tip': label,
   'data-tip-side': side,
