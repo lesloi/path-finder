@@ -155,13 +155,13 @@ export function ElevationProfile({
             })}
           </svg>
           {waypointsOnRoute(route.geometry, waypoints).map(({ number, distance }) => (
-            // The pin at the top of the plot, so that it hides little of the profile, and a line down from its tip.
+            // The pin in the row of the title, above the plot so that it hides none of the profile, and a line down from its tip.
             <span
               key={number}
               data-testid={testId && `${testId}-waypoint-${number}`}
               role="img"
               aria-label={`${criteriaText[language].waypointName(number)}, ${formatDistance(distance, language)}`}
-              className="pointer-events-none absolute inset-y-0 w-[18px] -translate-x-1/2"
+              className="pointer-events-none absolute -top-6 bottom-0 w-[18px] -translate-x-1/2"
               style={{ left: `${total ? (distance / total) * 100 : 0}%` }}
             >
               <span className="absolute top-[22px] bottom-0 left-1/2 w-px -translate-x-1/2 bg-ink-2" />
