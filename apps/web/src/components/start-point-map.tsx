@@ -34,7 +34,8 @@ import { commonText, type Language } from '../i18n/index.ts';
 import { requestPoiTile } from '../state/index.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
-import { MAP_COLORS, MAP_INK, POI_COLORS, ROUTE_COLORS, routeColor } from './route-colors.ts';
+import { POI_IMAGE_RATIO, poiImage, poiImageId } from './poi-image.ts';
+import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
 import {
   ROUTE_TAG_MUTED,
   ROUTE_TAG_PADDING,
@@ -333,20 +334,23 @@ export function StartPointMap({
         source: 'coverage',
         paint: veilPaint(shownBasemap.current),
       });
-      // Above the veil and under the routes. A seasonal point is hollow: it may be dry.
+      // Above the veil and under the routes. A seasonal point has the reverse badge: it may be dry.
+      for (const category of POI_CATEGORIES) {
+        for (const seasonal of [false, true]) {
+          map.addImage(poiImageId(category, seasonal), poiImage(category, seasonal), { pixelRatio: POI_IMAGE_RATIO });
+        }
+      }
       map.addSource('pois', { type: 'geojson', data: emptyRoutes });
       for (const category of POI_CATEGORIES) {
         map.addLayer({
           id: `pois-${category}`,
-          type: 'circle',
+          type: 'symbol',
           source: 'pois',
           minzoom: POI_MIN_ZOOM,
           filter: ['==', ['get', 'category'], category],
-          paint: {
-            'circle-radius': 6,
-            'circle-color': ['case', ['get', 'seasonal'], MAP_COLORS.white, POI_COLORS[category]],
-            'circle-stroke-color': POI_COLORS[category],
-            'circle-stroke-width': 2.5,
+          layout: {
+            'icon-image': ['case', ['get', 'seasonal'], poiImageId(category, true), poiImageId(category, false)],
+            'icon-allow-overlap': true,
           },
         });
       }
