@@ -45,15 +45,6 @@ export function SettingsView({ language }: { language: Language }) {
             onChange={(picked) => update({ language: picked })}
           />
         </SettingRow>
-        <SettingRow label={t.paceUnit}>
-          <SegmentedControl
-            testId="settings-pace-unit"
-            label={t.paceUnit}
-            value={settings.paceUnit}
-            options={PACE_UNITS.map((value) => ({ value, label: value }))}
-            onChange={(paceUnit: PaceUnit) => update({ paceUnit })}
-          />
-        </SettingRow>
         <SettingRow label={t.basemap}>
           <SegmentedControl
             testId="settings-basemap"
@@ -71,6 +62,15 @@ export function SettingsView({ language }: { language: Language }) {
               {t.basemapFailed}
             </p>
           )}
+        </SettingRow>
+        <SettingRow label={t.paceUnit}>
+          <SegmentedControl
+            testId="settings-pace-unit"
+            label={t.paceUnit}
+            value={settings.paceUnit}
+            options={PACE_UNITS.map((value) => ({ value, label: value }))}
+            onChange={(paceUnit: PaceUnit) => update({ paceUnit })}
+          />
         </SettingRow>
       </div>
       <h2 className={GROUP_TITLE}>{t.about}</h2>
