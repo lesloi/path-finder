@@ -11,8 +11,8 @@ import (
 type CriteriaError struct {
 	Field   string // start, target, elevationGain, surface, pace or waypoints
 	Message string
-	// Index is the waypoint at fault, counted from 1, or 0 when none is singled out.
-	Index int
+	// Waypoint is the waypoint at fault, counted from 1, or 0 when none is singled out.
+	Waypoint int
 }
 
 func (e *CriteriaError) Error() string { return e.Message }

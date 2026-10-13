@@ -299,3 +299,28 @@ func TestZonesFindTheDirectLoopInTheZoneOfTheStart(t *testing.T) {
 		t.Errorf("a waypoint in another zone: err = %v, want ErrOffGraph", err)
 	}
 }
+
+// A zone whose box holds the start with no way near it answers ErrOffGraph for the start: that must not hide
+// the zone that has the start and lacks a waypoint.
+func TestAWaypointOffTheWaysIsNotTakenForTheStartWhenAnotherZoneAnswersFirst(t *testing.T) {
+	dir := t.TempDir()
+	real, centre := zoneGraph(0, 0)
+	writeZone(t, filepath.Join(dir, "real"), real)
+	sparse := &testGraph{}
+	a := sparse.addNode(-5_000, -5_000, 100)
+	b := sparse.addNode(8_000, 8_000, 100)
+	sparse.connect(a, b, KindPath)
+	writeZone(t, filepath.Join(dir, "a-sparse"), sparse)
+	z, err := OpenZones(dir, "any")
+	if err != nil {
+		t.Fatal(err)
+	}
+	offTheWays := Point{centre.Lat + 3000/metersPerDegree, centre.Lon} // 1 km north of the lattice's last row
+
+	_, err = z.Profile("any").DirectLoop(context.Background(), centre, []Point{offTheWays})
+
+	var we *WaypointError
+	if !errors.As(err, &we) || we.Index != 1 {
+		t.Errorf("err = %v, want a *WaypointError for waypoint 1", err)
+	}
+}

@@ -377,7 +377,9 @@ func inZones[T any](a *ProfileZones, start Point, search func(*Engine) (T, error
 		if !errors.Is(err, ErrOffGraph) {
 			return found, err
 		}
-		if first == nil {
+		// A waypoint off the ways says more than a start point off them, which another zone may be the one to lack.
+		var waypoint *WaypointError
+		if first == nil || errors.As(err, &waypoint) && !errors.As(first, &waypoint) {
 			first = err
 		}
 	}

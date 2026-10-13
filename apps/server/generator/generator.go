@@ -133,7 +133,7 @@ func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, p
 	var waypoint *engine.WaypointError
 	switch {
 	case errors.As(err, &waypoint):
-		return nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoint is too far from a way", Index: waypoint.Index}
+		return nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoint is too far from a way", Waypoint: waypoint.Index}
 	case errors.Is(err, engine.ErrOffGraph):
 		return nil, &contract.CriteriaError{Field: "start", Message: "start point is too far from a way"}
 	case errors.Is(err, engine.ErrNoRoute):

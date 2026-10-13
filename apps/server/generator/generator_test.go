@@ -311,7 +311,7 @@ func TestGenerateRefusesWaypointsBeyondTheTargetBeforeSearching(t *testing.T) {
 	_, err := generate(t, looper, context.Background(), withWaypoints(far))
 
 	var ce *contract.CriteriaError
-	if !errors.As(err, &ce) || ce.Field != "waypoints" || ce.Index != 0 {
+	if !errors.As(err, &ce) || ce.Field != "waypoints" || ce.Waypoint != 0 {
 		t.Fatalf("err = %v, want a CriteriaError on waypoints, with no index", err)
 	}
 	if looper.directCalls+looper.loopCalls != 0 {
@@ -327,7 +327,7 @@ func TestGenerateRefusesADirectLoopBeyondTheTarget(t *testing.T) {
 	_, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints))
 
 	var ce *contract.CriteriaError
-	if !errors.As(err, &ce) || ce.Field != "waypoints" || ce.Index != 0 {
+	if !errors.As(err, &ce) || ce.Field != "waypoints" || ce.Waypoint != 0 {
 		t.Fatalf("err = %v, want a CriteriaError on waypoints, with no index", err)
 	}
 	if looper.loopCalls != 0 {
@@ -394,7 +394,7 @@ func TestGenerateTellsWhichWaypointOrTheStartPointIsOffTheWays(t *testing.T) {
 			_, err := generate(t, &fakeLooper{directErr: tc.err}, context.Background(), withWaypoints(twoWaypoints))
 
 			var ce *contract.CriteriaError
-			if !errors.As(err, &ce) || ce.Field != tc.field || ce.Index != tc.index {
+			if !errors.As(err, &ce) || ce.Field != tc.field || ce.Waypoint != tc.index {
 				t.Errorf("err = %v, want a CriteriaError on %s, index %d", err, tc.field, tc.index)
 			}
 			if err != nil && (strings.Contains(err.Error(), "6.1") || strings.Contains(err.Error(), "45.9")) {
