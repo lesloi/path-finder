@@ -717,6 +717,17 @@ describe('CriteriaView', () => {
       });
     });
 
+    it('renames the search button once routes were found', async () => {
+      onDesktop();
+      ask(answer(route(0)));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      await submit();
+
+      await screen.findByTestId('routes-count');
+      expect(screen.getByTestId('criteria-submit')).toHaveTextContent(criteriaText.en.searchAgain);
+    });
+
     it('shows a loading state while the API works, beside the criteria, with a way to cancel', async () => {
       onDesktop();
       ask(new Promise(() => {}));
@@ -1035,7 +1046,7 @@ describe('CriteriaView', () => {
       expect(screen.queryByTestId('criteria-pick-bar')).not.toBeInTheDocument();
     });
 
-    it('says the routes are stale once the criteria change, and searches again on request', async () => {
+    it('says the routes are stale once the criteria change, until a new search', async () => {
       onDesktop();
       // A response body is read once: each search gets its own.
       const routeSets = vi.fn(() => Promise.resolve(answer(route(0))));
@@ -1051,7 +1062,7 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('routes-stale')).toHaveTextContent(routesText.en.stale);
       // The routes stay on the list and the map, to compare with.
       expect(screen.getByTestId('routes-row-0')).toBeInTheDocument();
-      fireEvent.click(screen.getByTestId('routes-search-again'));
+      fireEvent.click(screen.getByTestId('criteria-submit'));
 
       expect(routeSets).toHaveBeenCalledTimes(2);
       await screen.findByTestId('routes-count');
@@ -1075,7 +1086,6 @@ describe('CriteriaView', () => {
       fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
 
       expect(screen.getByTestId('routes-stale')).toBeInTheDocument();
-      expect(screen.queryByTestId('routes-search-again')).not.toBeInTheDocument();
       expect(screen.getByTestId('criteria-submit')).toBeDisabled();
     });
 
@@ -1099,7 +1109,7 @@ describe('CriteriaView', () => {
         expect(kept()).toMatchObject({ distance: 21, surface: 'paved', level: 'target', gain: 450 });
       });
 
-      it('are kept by a new search from the stale notice too', async () => {
+      it('are kept by a new search once routes were found', async () => {
         onDesktop();
         stubFetch(() => Promise.resolve(answer(route(0))));
         render(<CriteriaView language="en" />);
@@ -1109,7 +1119,7 @@ describe('CriteriaView', () => {
         fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
         fireEvent.change(screen.getByTestId('criteria-distance'), { target: { value: '21' } });
         expect(kept()).toBeUndefined();
-        fireEvent.click(screen.getByTestId('routes-search-again'));
+        fireEvent.click(screen.getByTestId('criteria-submit'));
 
         expect(kept()).toMatchObject({ surface: 'unpaved', distance: 21 });
       });
@@ -1123,7 +1133,7 @@ describe('CriteriaView', () => {
       await submit();
       await screen.findByTestId('routes-count');
       fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
-      fireEvent.click(screen.getByTestId('routes-search-again'));
+      fireEvent.click(screen.getByTestId('criteria-submit'));
       await screen.findByTestId('routes-toast');
 
       // The routes that came back are those of the first criteria: they still do not match the form.
@@ -1172,7 +1182,7 @@ describe('CriteriaView', () => {
       fireEvent.change(screen.getByTestId('criteria-gain'), { target: { value: '2000' } });
 
       expect(screen.getByTestId('routes-stale')).toBeInTheDocument();
-      expect(screen.queryByTestId('routes-search-again')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-submit')).not.toBeInTheDocument();
     });
 
     it('puts the routes back in view after the user moved the map', async () => {
@@ -1410,8 +1420,8 @@ describe('CriteriaView', () => {
       expect(map().fitted?.options).toMatchObject({ padding: expect.objectContaining({ top: 24, bottom: 24 }) });
     });
 
-    it('calls the routes stale in the sheet once the criteria changed, and searches again from there', async () => {
-      const routeSets = ask(answer(route(0)));
+    it('calls the routes stale in the sheet once the criteria changed', async () => {
+      ask(answer(route(0)));
       render(<CriteriaView language="en" />);
       await submitOnPhone();
       await screen.findByTestId('routes-count');
@@ -1420,12 +1430,9 @@ describe('CriteriaView', () => {
       fireEvent.click(screen.getByTestId('criteria-bar'));
       fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
       fireEvent.click(screen.getByTestId('sub-page-back'));
+
       expect(screen.getByTestId('routes-stale')).toHaveTextContent(routesText.en.stale);
       expect(screen.getByTestId('routes-row-0')).toBeInTheDocument();
-
-      fireEvent.click(screen.getByTestId('routes-search-again'));
-
-      expect(routeSets).toHaveBeenCalledTimes(2);
     });
 
     it('cancels a search from the sheet', async () => {

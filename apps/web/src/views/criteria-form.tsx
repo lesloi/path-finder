@@ -119,6 +119,7 @@ export function CriteriaForm({
   start,
   startUncovered = false,
   draft: kept,
+  searched = false,
   onSubmit,
 }: {
   language: Language;
@@ -127,6 +128,8 @@ export function CriteriaForm({
   startUncovered?: boolean;
   /** From `useCriteriaDraft`, for a view that mounts the form in more than one place and keeps what was set. */
   draft?: ReturnType<typeof useCriteriaDraft>;
+  /** Routes were already found: the button then runs the search again. */
+  searched?: boolean;
   onSubmit: (request: RouteSetRequest) => void;
 }) {
   const t = { ...commonText[language], ...criteriaText[language] };
@@ -259,7 +262,7 @@ export function CriteriaForm({
         {...(startUncovered && { 'aria-describedby': uncoveredId })}
         onClick={() => onSubmit(request)}
       >
-        {t.findRoutes}
+        {searched ? t.searchAgain : t.findRoutes}
       </button>
     </>
   );
