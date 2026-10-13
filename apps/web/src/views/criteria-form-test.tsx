@@ -13,9 +13,7 @@ const START: Position = [6.1294, 45.8992];
 
 const store = (settings: object) => localStorage.setItem('path-finder.settings', JSON.stringify(settings));
 
-function setup(
-  props: { start?: Position; waypoints?: Position[]; language?: 'en' | 'fr'; searched?: boolean } = {},
-) {
+function setup(props: { start?: Position; waypoints?: Position[]; language?: 'en' | 'fr'; searched?: boolean } = {}) {
   const onSubmit = vi.fn();
   render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} {...props} />);
   const submit = () => fireEvent.click(screen.getByTestId('criteria-submit'));
