@@ -54,6 +54,12 @@ export async function openCriteria(page: Page) {
   if ((await bar.isVisible()) && !(await page.getByTestId('sub-page').isVisible())) await bar.click();
 }
 
+/** Picks an option in one of the settings' dropdowns, the way a user does: open the list, click the option. */
+export async function selectOption(page: Page, testId: string, option: string) {
+  await page.getByTestId(testId).click();
+  await page.getByTestId(`${testId}-${option}`).click();
+}
+
 /** Opens the map view once the map has loaded its style, tiles and glyphs. */
 export async function openMap(page: Page) {
   await page.goto('/');

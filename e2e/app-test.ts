@@ -1,5 +1,5 @@
-import { commonText } from '../apps/web/src/i18n/index.ts';
-import { expect, openMap, test } from './test.ts';
+import { commonText, settingsText } from '../apps/web/src/i18n/index.ts';
+import { expect, openMap, selectOption, test } from './test.ts';
 
 test.describe('the app', () => {
   test('loads with no console error and serves every file with no referrer and a content security policy', async ({
@@ -53,7 +53,7 @@ test.describe('the app', () => {
 
     // The language changes while the map stays mounted: MapLibre has named its controls by then.
     await page.getByTestId('criteria-settings').click();
-    await page.getByTestId('settings-language').selectOption('fr');
+    await selectOption(page, 'settings-language', 'fr');
     await page.keyboard.press('Escape');
 
     await expect(map).toHaveAccessibleName(commonText.fr.mapName);
@@ -72,10 +72,10 @@ test.describe('the app', () => {
     await openMap(page);
 
     await page.getByTestId('criteria-settings').click();
-    await page.getByTestId('settings-basemap').selectOption('minimal');
+    await selectOption(page, 'settings-basemap', 'minimal');
     await page.reload();
 
-    await expect(page.getByTestId('settings-basemap')).toHaveValue('minimal');
+    await expect(page.getByTestId('settings-basemap')).toHaveText(settingsText.en.minimal);
   });
 
   test('goes back to the previous map background when the style of the new one fails to load', async ({
@@ -87,11 +87,11 @@ test.describe('the app', () => {
     await context.route('**/PLAN.IGN/epure.json', (route) => route.abort('failed'));
 
     await page.getByTestId('criteria-settings').click();
-    await page.getByTestId('settings-basemap').selectOption('minimal');
+    await selectOption(page, 'settings-basemap', 'minimal');
 
     const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('path-finder.settings')!).basemap);
     await expect.poll(saved).toBe('plan');
-    await expect(page.getByTestId('settings-basemap')).toHaveValue('plan');
+    await expect(page.getByTestId('settings-basemap')).toHaveText(settingsText.en.plan);
     await expect(page.getByTestId('settings-basemap-error')).toBeVisible();
   });
 });

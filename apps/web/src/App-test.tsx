@@ -218,7 +218,8 @@ describe('App', () => {
     render(<App />);
 
     fireEvent.click(screen.getByTestId('criteria-settings'));
-    fireEvent.change(await screen.findByTestId('settings-language'), { target: { value: 'fr' } });
+    fireEvent.click(await screen.findByTestId('settings-language'));
+    fireEvent.click(screen.getByTestId('settings-language-fr'));
 
     expect(screen.getByTestId('sub-page-title')).toHaveTextContent(commonText.fr.settings);
     expect(document.documentElement.lang).toBe('fr');
