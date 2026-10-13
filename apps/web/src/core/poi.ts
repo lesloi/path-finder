@@ -19,8 +19,8 @@ export const DEFAULT_POI_LAYERS: PoiLayers = { water: true, viewpoint: false, se
 /** From this zoom, the map shows points of interest and asks for their tiles; a lower view would span too many. */
 export const POI_MIN_ZOOM = 12;
 
-/** A point of interest as the map draws it. */
-export type Poi = { category: PoiCategory; position: Position; seasonal: boolean };
+/** A point of interest as the map draws it; `name` is the OSM name, when it has one. */
+export type Poi = { category: PoiCategory; position: Position; seasonal: boolean; name?: string };
 
 /** The categories that are on. */
 export const shownPoiCategories = (layers: PoiLayers): PoiCategory[] =>
@@ -56,11 +56,16 @@ export function parsePoiTile(body: unknown): Poi[] {
   const pois: Poi[] = [];
   for (const item of body.pois as unknown[]) {
     if (typeof item !== 'object' || item === null) continue;
-    const { category, position, seasonal } = item as Record<string, unknown>;
+    const { category, position, seasonal, name } = item as Record<string, unknown>;
     if (!isCategory(category) || !Array.isArray(position) || position.length !== 2) continue;
     const [lon, lat] = position as unknown[];
     if (!isNumber(lon) || !isNumber(lat)) continue;
-    pois.push({ category, position: [lon, lat], seasonal: seasonal === true });
+    pois.push({
+      category,
+      position: [lon, lat],
+      seasonal: seasonal === true,
+      ...(typeof name === 'string' && name && { name }),
+    });
   }
   return pois;
 }

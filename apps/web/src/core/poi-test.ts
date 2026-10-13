@@ -44,6 +44,22 @@ describe('parsePoiTile', () => {
     ]);
   });
 
+  it('keeps the name of a point that has one, and only a real one', () => {
+    const body = {
+      pois: [
+        { category: 'viewpoint', position: [2.2, 48.9], name: 'Tour Eiffel' },
+        { category: 'viewpoint', position: [2.3, 48.9], name: '' },
+        { category: 'viewpoint', position: [2.4, 48.9], name: 12 },
+      ],
+    };
+
+    expect(parsePoiTile(body)).toEqual([
+      { category: 'viewpoint', position: [2.2, 48.9], seasonal: false, name: 'Tour Eiffel' },
+      { category: 'viewpoint', position: [2.3, 48.9], seasonal: false },
+      { category: 'viewpoint', position: [2.4, 48.9], seasonal: false },
+    ]);
+  });
+
   it('drops what it does not know, and keeps the rest', () => {
     const body = {
       pois: [

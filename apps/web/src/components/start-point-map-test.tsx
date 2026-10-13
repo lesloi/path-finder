@@ -4,7 +4,7 @@ import { createRef } from 'react';
 import type { CoverageCell, Position } from '../core/index.ts';
 import { requestPoiTile } from '../state/index.ts';
 import { commonText } from '../i18n/index.ts';
-import { maps, markers, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
+import { maps, markers, popups, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { StartPointMap, type MapHandle } from './start-point-map.tsx';
 
@@ -17,6 +17,7 @@ const touch = { touches: [{}] };
 beforeEach(() => {
   maps.length = 0;
   markers.length = 0;
+  popups.length = 0;
   vi.useFakeTimers();
 });
 
@@ -1146,5 +1147,67 @@ describe('StartPointMap points of interest', () => {
     await act(async () => map().fire('moveend'));
 
     expect(shown().map(({ properties }) => properties)).toEqual([expect.objectContaining({ category: 'water' })]);
+  });
+  describe('the label of a point', () => {
+    const hover = (properties: object, layer = 'pois-viewpoint') =>
+      act(() =>
+        map().fire('mouseenter', { features: [{ properties, geometry: { coordinates: [6.05, 45.05] } }] }, layer),
+      );
+
+    beforeEach(() => render(<StartPointMap onStartChange={vi.fn()} language="fr" />));
+
+    it('says the name of the point under the pointer, as plain text', () => {
+      hover({ category: 'viewpoint', seasonal: false, name: '<b>Tour Eiffel</b>' });
+
+      expect(popups.at(-1)).toMatchObject({ text: '<b>Tour Eiffel</b>', position: [6.05, 45.05], shown: true });
+      expect(popups.at(-1)!.html).toBeUndefined();
+    });
+
+    it.each([
+      ['water', false, commonText.fr.waterPoint],
+      ['water', true, commonText.fr.seasonalWaterPoint],
+      ['viewpoint', false, commonText.fr.viewpoint],
+    ])('names a %s point with no name (seasonal: %s) by what it is', (category, seasonal, text) => {
+      hover({ category, seasonal }, `pois-${category}`);
+
+      expect(popups.at(-1)!.text).toBe(text);
+    });
+
+    it('goes away with the pointer', () => {
+      hover({ category: 'water', seasonal: false }, 'pois-water');
+
+      act(() => map().fire('mouseleave', {}, 'pois-water'));
+
+      expect(popups.at(-1)!.shown).toBe(false);
+    });
+
+    it('shows on a tap too, where there is no pointer to hover with', () => {
+      act(() =>
+        map().fire(
+          'click',
+          {
+            features: [
+              {
+                properties: { category: 'viewpoint', seasonal: false, name: 'Belvédère' },
+                geometry: { coordinates: [6, 45] },
+              },
+            ],
+          },
+          'pois-viewpoint',
+        ),
+      );
+
+      expect(popups.at(-1)!.text).toBe('Belvédère');
+    });
+
+    it('is not a click on the background, which would close the dock', () => {
+      const onBackgroundClick = vi.fn();
+      render(<StartPointMap onBackgroundClick={onBackgroundClick} onStartChange={vi.fn()} />);
+      map().rendered = [{}];
+
+      act(() => map().fire('click', { lngLat: { lng: 6, lat: 45 }, point: { x: 1, y: 1 } }));
+
+      expect(onBackgroundClick).not.toHaveBeenCalled();
+    });
   });
 });

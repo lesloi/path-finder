@@ -154,6 +154,41 @@ export class Map {
   remove() {}
 }
 
+/** Every popup created since the test started. */
+export const popups: Popup[] = [];
+
+export class Popup {
+  options: unknown;
+  position?: unknown;
+  text?: string;
+  html?: string;
+  shown = false;
+  constructor(options?: unknown) {
+    this.options = options;
+    popups.push(this);
+  }
+  setLngLat(position: unknown) {
+    this.position = position;
+    return this;
+  }
+  setText(text: string) {
+    this.text = text;
+    return this;
+  }
+  setHTML(html: string) {
+    this.html = html;
+    return this;
+  }
+  addTo() {
+    this.shown = true;
+    return this;
+  }
+  remove() {
+    this.shown = false;
+    return this;
+  }
+}
+
 export class Marker {
   options: unknown;
   position?: unknown;

@@ -20,7 +20,12 @@ export function PoiBadge({ category, seasonal = false }: { category: PoiCategory
         stroke={seasonal ? colour : '#ffffff'}
         strokeWidth="2"
       />
-      <path d={GLYPHS[category]} fill={seasonal ? colour : '#ffffff'} fillRule="evenodd" />
+      <path
+        transform={category === 'viewpoint' ? 'translate(12 12) scale(0.8) translate(-12 -12)' : undefined}
+        d={GLYPHS[category]}
+        fill={seasonal ? colour : '#ffffff'}
+        fillRule="evenodd"
+      />
     </svg>
   );
 }

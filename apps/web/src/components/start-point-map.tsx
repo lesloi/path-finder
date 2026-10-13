@@ -2,6 +2,7 @@ import {
   AttributionControl,
   Map,
   Marker,
+  Popup,
   ScaleControl,
   type GeoJSONSource,
   type MapMouseEvent,
@@ -255,6 +256,7 @@ export function StartPointMap({
   const desktop = useDesktop();
   const scale = useRef<ScaleControl>(null);
   const initialLanguage = useEffectEvent(() => language);
+  const currentLanguage = useEffectEvent(() => language);
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
@@ -476,10 +478,39 @@ export function StartPointMap({
     map.on('mouseenter', 'routes-hit', () => (map.getCanvas().style.cursor = 'pointer'));
     map.on('mouseleave', 'routes-hit', () => (map.getCanvas().style.cursor = ''));
 
+    // The label of a point of interest: its name, else what it is. By hover where there is a pointer, and on a tap
+    // where there is not. OSM names come from anyone, so they are text, never markup.
+    const poiLayers = POI_CATEGORIES.map((category) => `pois-${category}`);
+    let label: Popup | undefined;
+    const showLabel = ({ features }: { features?: { properties: Record<string, unknown>; geometry: unknown }[] }) => {
+      const feature = features?.[0];
+      if (!feature) return;
+      const { category, seasonal, name } = feature.properties;
+      const words = commonText[currentLanguage()];
+      const what = category === 'viewpoint' ? words.viewpoint : seasonal ? words.seasonalWaterPoint : words.waterPoint;
+      label?.remove();
+      label = new Popup({ closeButton: false, offset: 14 })
+        .setLngLat((feature.geometry as { coordinates: [number, number] }).coordinates)
+        .setText(typeof name === 'string' && name ? name : what)
+        .addTo(map);
+    };
+    for (const layer of poiLayers) {
+      map.on('mouseenter', layer, (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        showLabel(event as never);
+      });
+      map.on('mouseleave', layer, () => {
+        map.getCanvas().style.cursor = '';
+        label?.remove();
+      });
+      map.on('click', layer, (event) => showLabel(event as never));
+    }
+
     map.on('click', ({ lngLat, point }) => {
       pick('click', lngLat);
-      // A route has its own click, on its wide hit line: anywhere else is the background.
-      if (!map.queryRenderedFeatures(point, { layers: ['routes-hit'] }).length) clickedBackground();
+      // A route has its own click, on its wide hit line, and a point of interest its label: anywhere else is the
+      // background.
+      if (!map.queryRenderedFeatures(point, { layers: ['routes-hit', ...poiLayers] }).length) clickedBackground();
     });
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -500,6 +531,7 @@ export function StartPointMap({
 
     return () => {
       clearTimeout(timer);
+      label?.remove();
       map.remove();
     };
   }, []);
@@ -577,10 +609,10 @@ export function StartPointMap({
         const features = tiles
           .flat()
           .filter(({ category, seasonal }) => categories.includes(category) && (poiSeasonal || !seasonal))
-          .map(({ category, position, seasonal }) => ({
+          .map(({ category, position, seasonal, name }) => ({
             type: 'Feature' as const,
             geometry: point(position),
-            properties: { category, seasonal },
+            properties: { category, seasonal, ...(name && { name }) },
           }));
         source.setData({ type: 'FeatureCollection', features });
       },

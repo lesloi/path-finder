@@ -16,6 +16,12 @@ export const poiImageId = (category: PoiCategory, seasonal: boolean) => `poi-${c
 
 const rgb = (hex: string) => [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
 
+// A camera: a body under a small bump, with a hollow lens. It is drawn full size, then shrunk, to stay clear of the ring.
+const CAMERA_SCALE = 0.8;
+const camera = (x: number, y: number) =>
+  ((Math.abs(x) <= 0.8 && y >= -0.4 && y <= 0.62) || (Math.abs(x) <= 0.36 && y >= -0.62 && y < -0.4)) &&
+  Math.hypot(x, y - 0.12) > 0.3;
+
 // Whether a point of the glyph's square, from -1 to 1 with y down, is inside the glyph.
 const GLYPHS: Record<PoiCategory, (x: number, y: number) => boolean> = {
   // A drop: a round belly under a tip.
@@ -23,10 +29,7 @@ const GLYPHS: Record<PoiCategory, (x: number, y: number) => boolean> = {
     if (y > 0.2) return Math.hypot(x, y - 0.2) <= 0.42;
     return y >= -0.62 && Math.abs(x) <= (0.42 * (y + 0.62)) / 0.82;
   },
-  // A camera: a body under a small bump, with a hollow lens.
-  viewpoint: (x, y) =>
-    ((Math.abs(x) <= 0.8 && y >= -0.4 && y <= 0.62) || (Math.abs(x) <= 0.36 && y >= -0.62 && y < -0.4)) &&
-    Math.hypot(x, y - 0.12) > 0.3,
+  viewpoint: (x, y) => camera(x / CAMERA_SCALE, y / CAMERA_SCALE),
 };
 
 /** The image of a point of interest's badge: transparent around, ready for `map.addImage`. */
