@@ -1,6 +1,6 @@
 import { Suspense, useDeferredValue, useEffect, type ComponentType } from 'react';
 
-import { LoadErrorBoundary, SubPage, lazyChunk } from './components/index.ts';
+import { LoadErrorBoundary, SubPage, lazyChunk, useTipDismiss } from './components/index.ts';
 import { applyDescription } from './core/index.ts';
 import { commonText, type Language } from './i18n/index.ts';
 import { goTo, languageOf, useHash, useSettings } from './state/index.ts';
@@ -56,6 +56,7 @@ export function App() {
   // A page shows once its code is there, with its content: until then the one on screen stays, or the map alone.
   const shownHash = useDeferredValue(hash);
   const page = pages[shownHash];
+  useTipDismiss();
 
   useEffect(() => {
     document.documentElement.lang = language;

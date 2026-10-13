@@ -55,7 +55,7 @@ export function LayersControl({
         type="button"
         data-testid="criteria-layers"
         className={FLOATING_BUTTON}
-        {...tip(t.layers, 'left')}
+        {...tip(t.layers, 'stack')}
         aria-expanded={open}
         aria-controls={`${id}-popover`}
         onClick={() => setOpen(!open)}

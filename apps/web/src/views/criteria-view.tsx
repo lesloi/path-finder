@@ -337,7 +337,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               type="button"
               data-testid="criteria-north"
               className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(northSlot)}`}
-              {...tip(t.resetNorth, 'left')}
+              {...tip(t.resetNorth, 'stack')}
               onClick={() => putBack('resetNorth')}
             >
               {/* The arrow turns against the map, so it keeps pointing north. */}
@@ -352,7 +352,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           type="button"
           data-testid="criteria-locate"
           className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(0)}`}
-          {...tip(t.myLocation, 'left')}
+          {...tip(t.myLocation, 'stack')}
           onClick={locate}
         >
           <LocateFixed size={20} aria-hidden />
@@ -363,7 +363,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           type="button"
           data-testid="criteria-reframe"
           className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(0)}`}
-          {...tip(t.reframe, 'left')}
+          {...tip(t.reframe, 'stack')}
           onClick={() => putBack('reframe')}
         >
           <Scan size={20} aria-hidden />

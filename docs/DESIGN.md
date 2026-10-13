@@ -39,6 +39,9 @@ The target is [WCAG 2.2](https://www.w3.org/TR/WCAG22/) level AA. In practice:
 
 - Touch targets are at least 44 px, except the map credits, which keep the 24 px of MapLibre's control (WCAG 2.5.8).
 - Every control has an accessible name, in both languages; icons are decorative (`aria-hidden`).
+- A control that shows an icon alone also has a tooltip, drawn by the app: `tip()` of `components/styles.ts`
+  (`data-tip`), never the native `title`, which cannot be styled. Open it on a side that keeps it on the screen and
+  out of a scrolling panel, which would cut it. Escape dismisses it (WCAG 1.4.13).
 - Text and controls keep enough contrast in light and dark mode.
 - The whole app works with the keyboard, with a visible focus.
 - What a control shows of its state is also exposed to assistive technology (`aria-pressed`, `aria-expanded`,

@@ -15,6 +15,7 @@ import { useRef, type PointerEvent } from 'react';
 import type { Miss } from '../contract/index.ts';
 import {
   ElevationProfile,
+  hint,
   PRIMARY_BUTTON,
   ProfileSparkline,
   routeBorder,
@@ -235,15 +236,14 @@ function RouteRow({
             {gain && (
               <span
                 data-testid={`routes-row-${index}-gain`}
-                data-tip={t.elevationGain}
-                data-tip-side="bottom-start"
+                {...hint(t.elevationGain, 'bottom-start')}
                 className="flex items-center gap-1"
               >
                 <ArrowUpRight size={14} aria-hidden />
                 {gain}
               </span>
             )}
-            <span data-tip={t.estimatedDuration} data-tip-side="bottom-start" className="flex items-center gap-1">
+            <span {...hint(t.estimatedDuration, 'bottom-start')} className="flex items-center gap-1">
               <Clock size={14} aria-hidden />
               {duration}
             </span>

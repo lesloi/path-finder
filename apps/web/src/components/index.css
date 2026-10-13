@@ -306,9 +306,12 @@
 }
 
 /*
- * A tooltip for a control that shows an icon alone: `data-tip` holds its text, `data-tip-side` the side it opens on
- * (`left`, `bottom-start`, `bottom-end`, `top-start`, `top-end`), chosen so that it stays on the screen. It wears the
- * colours of the layers popover. A touch screen has no hover to open it: the control's `aria-label` is its name.
+ * A tooltip for a control that shows an icon alone, or for a figure's icon: `data-tip` holds its text and
+ * `data-tip-side` the side it opens on (`left`, `stack`, `bottom-start`, `bottom-end`, `top-start`), chosen so that
+ * it stays on the screen and out of a scrolling panel, which would cut it. `stack` is for the buttons that stack up
+ * on phones and line up on desktops: it opens to the left of a stack, and above a line. It wears the colours of the
+ * layers popover. A touch screen has no hover to open it: the control's `aria-label` is its name, and an icon beside
+ * a figure is named by the accessible name of its row. Escape dismisses it (`useTipDismiss`).
  */
 [data-tip]:where(:not(.fixed, .absolute)) {
   position: relative;
@@ -334,15 +337,24 @@
   pointer-events: none;
 }
 @media (hover: hover) {
-  [data-tip]:hover::after,
-  [data-tip]:focus-visible::after {
+  [data-tip]:not([data-tip-dismissed]):hover::after,
+  [data-tip]:not([data-tip-dismissed]):focus-visible::after {
     display: block;
   }
 }
-[data-tip-side='left']::after {
+[data-tip-side='left']::after,
+[data-tip-side='stack']::after {
   top: 50%;
   right: calc(100% + var(--spacing) * 2);
   translate: 0 -50%;
+}
+[data-tip-side='stack']::after {
+  @variant desktop {
+    top: auto;
+    right: 0;
+    bottom: calc(100% + var(--spacing) * 2);
+    translate: none;
+  }
 }
 [data-tip-side^='bottom']::after {
   top: calc(100% + var(--spacing) * 2);
