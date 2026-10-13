@@ -635,10 +635,9 @@ export function StartPointMap({
     map.getCanvas().setAttribute('aria-label', mapName);
     for (const toggle of map.getContainer().querySelectorAll('.maplibregl-ctrl-attrib-button')) {
       toggle.setAttribute('aria-label', toggleAttribution);
-      // The styled tooltip (`data-tip`, in index.css) replaces the native one MapLibre puts on its button.
+      // The tooltip of the app replaces MapLibre's native one.
       toggle.removeAttribute('title');
-      toggle.setAttribute('data-tip', toggleAttribution);
-      toggle.setAttribute('data-tip-side', 'top-start');
+      Object.assign((toggle as HTMLElement).dataset, { tip: toggleAttribution, tipSide: 'top-start' });
     }
   }, [language]);
 
