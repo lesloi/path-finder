@@ -9,8 +9,8 @@ const en = { ...commonText.en, ...settingsText.en };
 const fr = { ...commonText.fr, ...settingsText.fr };
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);
 const saved = () => renderHook(() => useSettings()).result.current[0];
-const pick = (control: 'theme' | 'language' | 'pace-unit' | 'basemap', option: string) =>
-  fireEvent.click(screen.getByTestId(`settings-${control}-${option}`));
+const pick = (control: 'theme' | 'language' | 'basemap', option: string) =>
+  fireEvent.change(screen.getByTestId(`settings-${control}`), { target: { value: option } });
 
 describe('SettingsView', () => {
   it.each([
@@ -28,15 +28,15 @@ describe('SettingsView', () => {
 
     pick('theme', 'dark');
 
-    expect(screen.getByTestId('settings-theme-dark')).toBeChecked();
+    expect(screen.getByTestId('settings-theme')).toHaveValue('dark');
     expect(saved().theme).toBe('dark');
   });
 
   it('shows the theme first in the display group', () => {
     renderView();
 
-    expect(screen.getByTestId('settings-theme-system')).toBeChecked();
-    expect(screen.getAllByRole('radio')[0]).toBe(screen.getByTestId('settings-theme-system'));
+    expect(screen.getByTestId('settings-theme')).toHaveValue('system');
+    expect(screen.getAllByRole('combobox')[0]).toBe(screen.getByTestId('settings-theme'));
   });
 
   it('shows the display and about groups in this order, and no pace', () => {
@@ -62,7 +62,7 @@ describe('SettingsView', () => {
   it('saves the pace unit the user picks', () => {
     renderView('fr');
 
-    pick('pace-unit', 'km/h');
+    fireEvent.click(screen.getByTestId('settings-pace-unit-km/h'));
 
     expect(screen.getByTestId('settings-pace-unit-km/h')).toBeChecked();
     expect(saved().paceUnit).toBe('km/h');
@@ -71,11 +71,11 @@ describe('SettingsView', () => {
   it('shows the saved map background, and saves the one the user picks', () => {
     renderView();
     expect(screen.getByTestId('settings-basemap')).toHaveAccessibleName(en.basemap);
-    expect(screen.getByTestId('settings-basemap-plan')).toBeChecked();
+    expect(screen.getByTestId('settings-basemap')).toHaveValue('plan');
 
     pick('basemap', 'aerial');
 
-    expect(screen.getByTestId('settings-basemap-aerial')).toBeChecked();
+    expect(screen.getByTestId('settings-basemap')).toHaveValue('aerial');
     expect(saved().basemap).toBe('aerial');
   });
 
@@ -97,7 +97,7 @@ describe('SettingsView', () => {
   it('names the map backgrounds in French', () => {
     renderView('fr');
 
-    expect(screen.getByTestId('settings-basemap-aerial')).toHaveAccessibleName(fr.aerial);
+    expect(screen.getByTestId('settings-basemap-aerial')).toHaveTextContent(fr.aerial);
   });
 
   it('saves the language the user picks', () => {
@@ -119,7 +119,7 @@ describe('SettingsView', () => {
 
     expect(screen.getAllByRole('heading', { level: 2 })[0]).toHaveTextContent(fr.display);
     expect(screen.getByTestId('settings-language')).toHaveAccessibleName(fr.language);
-    expect(screen.getByTestId('settings-language-fr')).toBeChecked();
+    expect(screen.getByTestId('settings-language')).toHaveValue('fr');
     expect(screen.getByTestId('settings-pace-unit')).toHaveAccessibleName(fr.paceUnit);
   });
 });

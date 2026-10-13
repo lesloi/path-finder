@@ -4,7 +4,7 @@ import { useId, useState, type ReactNode } from 'react';
 import { BASEMAPS, PACE_UNITS, type Basemap, type PaceUnit, type Theme } from '../core/index.ts';
 import { commonText, settingsText, type Language } from '../i18n/index.ts';
 import { useSettings } from '../state/index.ts';
-import { GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON, SegmentedControl } from '../components/index.ts';
+import { GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON, SegmentedControl, SelectControl } from '../components/index.ts';
 
 const FLAG_CLASSES = 'flex-none ring-1 ring-border';
 
@@ -21,7 +21,7 @@ export function SettingsView({ language }: { language: Language }) {
       <h2 className={GROUP_TITLE}>{t.display}</h2>
       <div className={LIST}>
         <SettingRow label={t.theme}>
-          <SegmentedControl
+          <SelectControl
             testId="settings-theme"
             label={t.theme}
             value={settings.theme}
@@ -34,7 +34,7 @@ export function SettingsView({ language }: { language: Language }) {
           />
         </SettingRow>
         <SettingRow label={t.language}>
-          <SegmentedControl
+          <SelectControl
             testId="settings-language"
             label={t.language}
             value={language}
@@ -46,7 +46,7 @@ export function SettingsView({ language }: { language: Language }) {
           />
         </SettingRow>
         <SettingRow label={t.basemap}>
-          <SegmentedControl
+          <SelectControl
             testId="settings-basemap"
             label={t.basemap}
             value={settings.basemap}

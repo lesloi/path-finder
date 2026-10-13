@@ -287,3 +287,82 @@
     0 0 3px #fff;
   filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
 }
+
+/*
+ * Browsers that can style a native <select> (`appearance: base-select`, which includes Chrome on Android) get a
+ * dropdown in the app's own look; the others keep their native one.
+ */
+@supports (appearance: base-select) {
+  select,
+  select::picker(select) {
+    appearance: base-select;
+  }
+  select {
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+  /* An icon beside its label, in the button, its copy of the picked option and each option. */
+  select,
+  select button,
+  select selectedcontent,
+  select option {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+  }
+  select {
+    gap: calc(var(--spacing) * 3);
+  }
+  select button {
+    flex: 1;
+    font: inherit;
+  }
+  /* A thin chevron instead of the default triangle. */
+  select::picker-icon {
+    content: '';
+    width: 6px;
+    height: 6px;
+    margin-bottom: 3px;
+    border: solid var(--ink-2);
+    border-width: 0 1.5px 1.5px 0;
+    rotate: 45deg;
+    transition: rotate 150ms;
+  }
+  select:open::picker-icon {
+    rotate: 225deg;
+  }
+  select::picker(select) {
+    /* Under the button and aligned on its right edge; above it, then aligned on its left edge, when there is no room. */
+    position-area: bottom span-left;
+    position-try-fallbacks:
+      flip-block,
+      flip-inline,
+      flip-block flip-inline;
+    margin: calc(var(--spacing) * 2) 0;
+    min-width: anchor-size(width);
+    padding: calc(var(--spacing) * 2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--float);
+  }
+  select option {
+    min-height: var(--spacing-touch);
+    padding: 0 calc(var(--spacing) * 3);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+  select option:hover,
+  select option:focus-visible {
+    background: var(--surface-2);
+  }
+  select option::checkmark {
+    order: 1;
+    margin-left: auto;
+    padding-left: calc(var(--spacing) * 6);
+    color: var(--ink-2);
+  }
+}
