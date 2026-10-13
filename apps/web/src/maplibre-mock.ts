@@ -130,6 +130,9 @@ export class Map {
   getSource(id: string) {
     return this.sources[id];
   }
+  getLayer(id: string) {
+    return this.layers.find((layer) => layer.id === id);
+  }
   addLayer(layer: { id: string }, beforeId?: string) {
     const before = this.layers.findIndex(({ id }) => id === beforeId);
     if (before >= 0) this.layers.splice(before, 0, layer);

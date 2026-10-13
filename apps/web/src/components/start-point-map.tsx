@@ -257,6 +257,8 @@ export function StartPointMap({
   const desktop = useDesktop();
   const scale = useRef<ScaleControl>(null);
   const languageNow = useEffectEvent(() => language);
+  // The label of the point of interest under the pointer.
+  const labelRef = useRef<Popup>(undefined);
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
@@ -481,15 +483,15 @@ export function StartPointMap({
     // The label of a point of interest: its name, else what it is. By hover where there is a pointer, and on a tap
     // where there is not. OSM names come from anyone, so they are text, never markup.
     const poiLayers = POI_CATEGORIES.map(poiLayerId);
-    let label: Popup | undefined;
+    const label = labelRef;
     const showLabel = ({ features }: { features?: { properties: Record<string, unknown>; geometry: unknown }[] }) => {
       const feature = features?.[0];
       if (!feature) return;
       const { category, seasonal, name } = feature.properties;
       const words = commonText[languageNow()];
       const what = category === 'viewpoint' ? words.viewpoint : seasonal ? words.seasonalWaterPoint : words.waterPoint;
-      label?.remove();
-      label = new Popup({ closeButton: false, offset: 14 })
+      label.current?.remove();
+      label.current = new Popup({ closeButton: false, offset: 14 })
         .setLngLat((feature.geometry as { coordinates: [number, number] }).coordinates)
         .setText(typeof name === 'string' && name ? name : what)
         .addTo(map);
@@ -501,7 +503,7 @@ export function StartPointMap({
       });
       map.on('mouseleave', layer, () => {
         map.getCanvas().style.cursor = '';
-        label?.remove();
+        label.current?.remove();
       });
       map.on('click', layer, (event) => showLabel(event as never));
     }
@@ -510,7 +512,9 @@ export function StartPointMap({
       pick('click', lngLat);
       // A route has its own click, on its wide hit line, and a point of interest its label: anywhere else is the
       // background.
-      if (!map.queryRenderedFeatures(point, { layers: ['routes-hit', ...poiLayers] }).length) clickedBackground();
+      // A style on its way holds none of these layers yet, and asking for a layer that is not there is an error.
+      const present = ['routes-hit', ...poiLayers].filter((id) => map.getLayer(id));
+      if (!present.length || !map.queryRenderedFeatures(point, { layers: present }).length) clickedBackground();
     });
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -531,7 +535,7 @@ export function StartPointMap({
 
     return () => {
       clearTimeout(timer);
-      label?.remove();
+      label.current?.remove();
       map.remove();
     };
   }, []);
@@ -596,6 +600,8 @@ export function StartPointMap({
     const map = mapRef.current;
     const source = map?.getSource('pois') as GeoJSONSource | undefined;
     if (!map || !loaded || !source) return;
+    // The point it names may be gone with the new data, and a pointer leaving a point that is gone is never heard.
+    labelRef.current?.remove();
     const categories = categoriesKey ? (categoriesKey.split(',') as PoiCategory[]) : [];
     if (categories.length === 0 || map.getZoom() < POI_MIN_ZOOM) {
       source.setData(emptyRoutes);

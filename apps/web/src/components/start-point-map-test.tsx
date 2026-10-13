@@ -1200,9 +1200,33 @@ describe('StartPointMap points of interest', () => {
       expect(popups.at(-1)!.text).toBe('Belvédère');
     });
 
+    it('goes away with its point when the layer is turned off', async () => {
+      const { rerender } = render(<StartPointMap poiCategories={['viewpoint']} onStartChange={vi.fn()} />);
+      map().zoom = 14;
+      await act(async () => map().fire('style.load'));
+      await act(async () => map().fire('moveend'));
+      hover({ category: 'viewpoint', seasonal: false });
+
+      rerender(<StartPointMap poiCategories={[]} onStartChange={vi.fn()} />);
+
+      expect(popups.at(-1)!.shown).toBe(false);
+    });
+
+    it('asks for no layer that the style has not loaded yet when it looks for what was clicked', () => {
+      const onBackgroundClick = vi.fn();
+      render(<StartPointMap onBackgroundClick={onBackgroundClick} onStartChange={vi.fn()} />);
+      const query = vi.spyOn(map(), 'queryRenderedFeatures');
+
+      act(() => map().fire('click', { lngLat: { lng: 6, lat: 45 }, point: { x: 1, y: 1 } }));
+
+      expect(query).not.toHaveBeenCalled();
+      expect(onBackgroundClick).toHaveBeenCalledOnce();
+    });
+
     it('is not a click on the background, which would close the dock', () => {
       const onBackgroundClick = vi.fn();
       render(<StartPointMap onBackgroundClick={onBackgroundClick} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
       map().rendered = [{}];
 
       act(() => map().fire('click', { lngLat: { lng: 6, lat: 45 }, point: { x: 1, y: 1 } }));

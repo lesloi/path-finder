@@ -1,4 +1,4 @@
-import { requestPoiTile } from './poi-tiles.ts';
+import { POI_RETRY_MS, requestPoiTile } from './poi-tiles.ts';
 
 const tile = { pois: [{ category: 'water', position: [2, 48] }] };
 
@@ -15,7 +15,8 @@ describe('requestPoiTile', () => {
     expect(pois).toEqual([{ category: 'water', position: [2, 48], seasonal: false }]);
   });
 
-  it('reads an answer that is not the tile as none, and tries again next time', async () => {
+  it('reads an answer that is not the tile as none, and tries again only after a while', async () => {
+    vi.useFakeTimers();
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response('<html>', { status: 200 }))
@@ -23,10 +24,15 @@ describe('requestPoiTile', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const first = await requestPoiTile(3, 4);
-    const second = await requestPoiTile(3, 4);
+    const soon = await requestPoiTile(3, 4);
+    vi.advanceTimersByTime(POI_RETRY_MS);
+    const later = await requestPoiTile(3, 4);
 
     expect(first).toEqual([]);
-    expect(second).toHaveLength(1);
+    expect(soon).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(later).toHaveLength(1);
+    vi.useRealTimers();
   });
 
   it.each([404, 426, 500])('reads a %d as none', async (status) => {
