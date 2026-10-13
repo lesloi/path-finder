@@ -76,7 +76,8 @@ export function RouteDock({
         data-testid="route-close"
         className={`${ICON_BUTTON} absolute top-2 right-2`}
         aria-label={t.closeRoute}
-        title={t.closeRoute}
+        data-tip={t.closeRoute}
+        data-tip-side="bottom-end"
         onClick={onClose}
       >
         <X size={20} aria-hidden />

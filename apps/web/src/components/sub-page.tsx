@@ -84,7 +84,8 @@ export function SubPage({
             data-testid="sub-page-back"
             href={back}
             aria-label={t.back}
-            title={t.back}
+            data-tip={t.back}
+            data-tip-side="bottom-start"
             onClick={follow(back)}
           >
             <ArrowLeft aria-hidden />
@@ -105,7 +106,8 @@ export function SubPage({
             data-testid="sub-page-close"
             href={HOME}
             aria-label={t.close}
-            title={t.close}
+            data-tip={t.close}
+            data-tip-side="bottom-end"
             onClick={follow(HOME)}
           >
             <X aria-hidden />

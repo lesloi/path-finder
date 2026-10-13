@@ -36,7 +36,8 @@ export function RoutePace({
       data-testid="routes-pace-edit"
       className="grid size-touch flex-none place-items-center rounded-full text-ink hover:bg-surface-2 aria-pressed:text-accent"
       aria-label={t.editPace}
-      title={t.editPace}
+      data-tip={t.editPace}
+      data-tip-side="top-end"
       aria-pressed={editing}
       onClick={() => setEditing(!editing)}
     >

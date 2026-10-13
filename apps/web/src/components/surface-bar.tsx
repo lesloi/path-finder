@@ -14,7 +14,7 @@ export function SurfaceBar({ unpavedShare, label, testId }: { unpavedShare: numb
       data-testid={testId}
       role="img"
       aria-label={label}
-      title={label}
+
       className="flex h-1.5 w-full overflow-hidden rounded-full"
     >
       {segments.map(

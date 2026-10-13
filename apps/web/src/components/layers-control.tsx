@@ -56,6 +56,8 @@ export function LayersControl({
         data-testid="criteria-layers"
         className={FLOATING_BUTTON}
         aria-label={t.layers}
+        data-tip={t.layers}
+        data-tip-side="left"
         aria-expanded={open}
         aria-controls={`${id}-popover`}
         onClick={() => setOpen(!open)}

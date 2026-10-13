@@ -304,3 +304,55 @@
     0 0 3px #fff;
   filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
 }
+
+/*
+ * A tooltip for a control that shows an icon alone: `data-tip` holds its text, `data-tip-side` the side it opens on
+ * (`left`, `bottom-start`, `bottom-end`, `top-start`, `top-end`), chosen so that it stays on the screen. It wears the
+ * colours of the layers popover. A touch screen has no hover to open it: the control's `aria-label` is its name.
+ */
+[data-tip]:where(:not(.fixed, .absolute)) {
+  position: relative;
+}
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 10;
+  display: none;
+  width: max-content;
+  max-width: calc(var(--spacing) * 56);
+  padding: calc(var(--spacing) * 2) calc(var(--spacing) * 3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: left;
+  white-space: normal;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  [data-tip]:hover::after,
+  [data-tip]:focus-visible::after {
+    display: block;
+  }
+}
+[data-tip-side='left']::after {
+  top: 50%;
+  right: calc(100% + var(--spacing) * 2);
+  translate: 0 -50%;
+}
+[data-tip-side^='bottom']::after {
+  top: calc(100% + var(--spacing) * 2);
+}
+[data-tip-side^='top']::after {
+  bottom: calc(100% + var(--spacing) * 2);
+}
+[data-tip-side$='-start']::after {
+  left: 0;
+}
+[data-tip-side$='-end']::after {
+  right: 0;
+}
