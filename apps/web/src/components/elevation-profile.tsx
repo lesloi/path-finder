@@ -7,10 +7,11 @@ import {
   gradeAt,
   positionAt,
   surfaceAt,
+  waypointsOnRoute,
   type Position,
   type Route,
 } from '../core/index.ts';
-import { routesText, type Language } from '../i18n/index.ts';
+import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 import { profileScale } from './profile-scale.ts';
 import { SURFACE_CLASSES } from './surface-colors.ts';
 
@@ -28,11 +29,14 @@ export function ElevationProfile({
   route,
   language,
   onHover,
+  waypoints = [],
   testId,
 }: {
   route: Route;
   language: Language;
   onHover: (position: Position | undefined) => void;
+  /** The points the route was asked to go through: numbered where it passes them. */
+  waypoints?: Position[];
   testId?: string;
 }) {
   const t = routesText[language];
@@ -149,6 +153,21 @@ export function ElevationProfile({
               );
             })}
           </svg>
+          {waypointsOnRoute(route.geometry, waypoints).map(({ number, distance, height }) => (
+            <span
+              key={number}
+              data-testid={testId && `${testId}-waypoint-${number}`}
+              role="img"
+              aria-label={`${criteriaText[language].waypointName(number)}, ${formatDistance(distance, language)}`}
+              className="pointer-events-none absolute grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-ink bg-white text-xs leading-none font-bold text-ink"
+              style={{
+                left: `${total ? (distance / total) * 100 : 0}%`,
+                top: `${(y(height ?? middle) / HEIGHT) * 100}%`,
+              }}
+            >
+              {number}
+            </span>
+          ))}
           {/* The keyboard's way along the profile: a native slider, hidden, whose ring shows on the plot. */}
           <input
             type="range"

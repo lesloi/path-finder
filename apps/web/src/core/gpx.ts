@@ -1,4 +1,6 @@
-import { commonText, LINKS, type Language } from '../i18n/index.ts';
+import { commonText, criteriaText, LINKS, type Language } from '../i18n/index.ts';
+import { waypointsOnRoute } from './route.ts';
+import type { Position } from './coordinates.ts';
 import { formatDistance, formatHeight, formatPace, type PaceUnit } from './units.ts';
 
 /**
@@ -28,8 +30,8 @@ export const MAX_GPX_POINTS = 2_000;
 export function gpxExport(
   route: GpxRoute,
   exportedAt: Date,
-  /** The language the export is written in, and how its pace is. */
-  { language, paceUnit }: { language: Language; paceUnit: PaceUnit },
+  /** The language the export is written in, how its pace is, and the waypoints the route was asked to go through. */
+  { language, paceUnit, waypoints = [] }: { language: Language; paceUnit: PaceUnit; waypoints?: Position[] },
   /** Minutes per km, the one the estimated duration was computed at. */
   pace: number,
 ): { fileName: string; content: string } {
@@ -39,6 +41,12 @@ export function gpxExport(
   const points = simplify(route.geometry, MAX_GPX_POINTS).map(trackPoint).join('\n');
   const climb = route.elevationGain === undefined ? [] : [`+${formatHeight(route.elevationGain, language)}`];
   const description = `${[...climb, duration].join(' · ')} (${formatPace(pace, paceUnit, language)})`;
+  const waypointPoints = waypointsOnRoute(route.geometry, waypoints)
+    .map(({ number, position: [lon, lat], height }) => {
+      const ele = height === undefined ? '' : `<ele>${height.toFixed(1)}</ele>`;
+      return `<wpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${ele}<name>${criteriaText[language].waypointName(number)}</name></wpt>`;
+    })
+    .join('\n');
   // The schema fixes the order of the elements, in the metadata as in the track.
   const content = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Path finder" xmlns="http://www.topografix.com/GPX/1/1">
@@ -47,7 +55,7 @@ export function gpxExport(
 <link href="${LINKS.app}"><text>Path finder</text></link>
 <time>${exportedAt.toISOString()}</time>
 </metadata>
-<trk>
+${waypointPoints ? `${waypointPoints}\n` : ''}<trk>
 <name>${name}</name>
 <desc>${description}</desc>
 <type>${TRAVEL_MODE.type}</type>

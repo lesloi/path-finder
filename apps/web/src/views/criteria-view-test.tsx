@@ -1685,6 +1685,19 @@ describe('CriteriaView', () => {
       expect(screen.queryByTestId('criteria-waypoint')).not.toBeInTheDocument();
     });
 
+    it('numbers the waypoints on the elevation profile of the route selected', async () => {
+      stubFetch(() => Promise.resolve(Response.json({ routes: [route] })));
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      place(6.21, 45.81);
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+      await screen.findByTestId('routes-count');
+
+      fireEvent.click(await screen.findByTestId('routes-row-0'));
+
+      expect(await screen.findByTestId('route-profile-waypoint-1')).toBeInTheDocument();
+    });
+
     it('drops the routes once a waypoint is removed, since the criteria changed', async () => {
       stubFetch(() => Promise.resolve(Response.json({ routes: [route] })));
       render(<CriteriaView language="en" />);
