@@ -65,11 +65,11 @@ describe('parsePoiTile', () => {
 
 describe('shownPoiCategories', () => {
   it('lists the categories that are on', () => {
-    expect(shownPoiCategories({ water: true, viewpoint: false })).toEqual(['water']);
+    expect(shownPoiCategories({ water: true, viewpoint: false, seasonal: true })).toEqual(['water']);
   });
 
   it('lists none when all are off', () => {
-    expect(shownPoiCategories({ water: false, viewpoint: false })).toEqual([]);
+    expect(shownPoiCategories({ water: false, viewpoint: false, seasonal: true })).toEqual([]);
   });
 });
 

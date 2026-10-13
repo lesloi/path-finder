@@ -175,6 +175,7 @@ export function StartPointMap({
   coverage,
   language = 'en',
   poiCategories = [],
+  poiSeasonal = true,
   selectedRoute,
   markedRoute,
   framing = 'all',
@@ -201,6 +202,8 @@ export function StartPointMap({
   language?: Language;
   /** The categories of points of interest to draw, from zoom 13; no tile is asked for while there are none. */
   poiCategories?: PoiCategory[];
+  /** Whether seasonal water points are drawn among them. */
+  poiSeasonal?: boolean;
   selectedRoute?: number;
   /** The route that carries distance markers while the others stay drawn, such as the one selected on a desktop. */
   markedRoute?: number;
@@ -573,7 +576,7 @@ export function StartPointMap({
         if (!current) return;
         const features = tiles
           .flat()
-          .filter(({ category }) => categories.includes(category))
+          .filter(({ category, seasonal }) => categories.includes(category) && (poiSeasonal || !seasonal))
           .map(({ category, position, seasonal }) => ({
             type: 'Feature' as const,
             geometry: point(position),
@@ -585,7 +588,7 @@ export function StartPointMap({
     return () => {
       current = false;
     };
-  }, [loaded, categoriesKey, viewVersion, styleVersion]);
+  }, [loaded, categoriesKey, poiSeasonal, viewVersion, styleVersion]);
 
   // MapLibre names its controls once, when it draws them: a language picked since is applied by hand.
   useEffect(() => {

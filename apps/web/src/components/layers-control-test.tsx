@@ -5,7 +5,7 @@ import { LayersControl } from './layers-control.tsx';
 
 const t = criteriaText.en;
 
-function setup(layers = { water: true, viewpoint: false }) {
+function setup(layers = { water: true, viewpoint: false, seasonal: true }) {
   const onChange = vi.fn();
   render(<LayersControl language="en" layers={layers} onChange={onChange} className="" />);
   const button = screen.getByTestId('criteria-layers');
@@ -23,13 +23,29 @@ describe('LayersControl', () => {
     expect(screen.getByTestId('layers-viewpoint')).toHaveAccessibleName(t.poiViewpoint);
   });
 
+  it('turns the seasonal water points off on their own row', () => {
+    const { onChange, open } = setup();
+    open();
+
+    fireEvent.click(screen.getByTestId('layers-seasonal'));
+
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ water: true, viewpoint: false, seasonal: false });
+  });
+
+  it('has no seasonal row to use while the water points are hidden', () => {
+    const { open } = setup({ water: false, viewpoint: false, seasonal: true });
+    open();
+
+    expect(screen.getByTestId('layers-seasonal')).toBeDisabled();
+  });
+
   it('turns a category on without touching the other', () => {
     const { onChange, open } = setup();
     open();
 
     fireEvent.click(screen.getByTestId('layers-viewpoint'));
 
-    expect(onChange).toHaveBeenCalledExactlyOnceWith({ water: true, viewpoint: true });
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({ water: true, viewpoint: true, seasonal: true });
   });
 
   it('closes on Escape and gives the focus back to its button', () => {

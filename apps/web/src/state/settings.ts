@@ -11,7 +11,7 @@ import {
 import {
   BASEMAPS,
   DEFAULT_POI_LAYERS,
-  POI_CATEGORIES,
+  POI_LAYER_KEYS,
   type PoiLayers,
   DEFAULT_BASEMAP,
   DEFAULT_PACE,
@@ -87,7 +87,7 @@ function parsePoiLayers(stored: unknown): PoiLayers {
   const layers = isObject(stored) ? stored : {};
   const shown = (category: keyof PoiLayers) =>
     typeof layers[category] === 'boolean' ? layers[category] : DEFAULT_POI_LAYERS[category];
-  return Object.fromEntries(POI_CATEGORIES.map((category) => [category, shown(category)])) as PoiLayers;
+  return Object.fromEntries(POI_LAYER_KEYS.map((category) => [category, shown(category)])) as PoiLayers;
 }
 
 function parseLastCriteria(stored: unknown): LastCriteria {

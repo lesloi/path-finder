@@ -1114,6 +1114,20 @@ describe('StartPointMap points of interest', () => {
     );
   });
 
+  it('leaves out the seasonal water points when asked', async () => {
+    let first: string | undefined;
+    vi.mocked(requestPoiTile).mockImplementation(async (x, y) => {
+      first ??= `${x}/${y}`;
+      return (first === `${x}/${y}` ? [water, { ...water, seasonal: true }] : []) as never;
+    });
+    render(<StartPointMap poiCategories={['water']} poiSeasonal={false} onStartChange={vi.fn()} />);
+    map().zoom = 14;
+    await act(async () => map().fire('style.load'));
+    await act(async () => map().fire('moveend'));
+
+    expect(shown().map(({ properties }) => properties)).toEqual([{ category: 'water', seasonal: false }]);
+  });
+
   it('draws them above the veil and under the routes', async () => {
     await openAt(14, ['water']);
 

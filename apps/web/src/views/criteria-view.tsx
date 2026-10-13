@@ -290,6 +290,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         coverage={coverage}
         language={language}
         poiCategories={shownPoiCategories(poiLayers)}
+        poiSeasonal={poiLayers.seasonal}
         // A desktop highlights the route it points at in the list, and marks the one selected.
         selectedRoute={desktop ? (browser.preview ?? selected) : selected}
         {...(desktop && { markedRoute: selected })}
