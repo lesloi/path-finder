@@ -23,10 +23,7 @@ type cellVisit struct {
 // cellsAlong returns the grid cells a geometry of longitude, latitude points passes through, in
 // order, farther than startRadius metres from the start point.
 func cellsAlong(geometry [][]float64, start [2]float64, startRadius float64) []cellVisit {
-	cosLat := math.Cos(start[1] * math.Pi / 180)
-	toMetres := func(p []float64) (x, y float64) {
-		return (p[0] - start[0]) * math.Pi / 180 * earthRadius * cosLat, (p[1] - start[1]) * math.Pi / 180 * earthRadius
-	}
+	toMetres := metresFrom(start)
 	var visits []cellVisit
 	visit := func(x, y, along float64) {
 		if math.Hypot(x, y) <= startRadius {
@@ -39,12 +36,12 @@ func cellsAlong(geometry [][]float64, start [2]float64, startRadius float64) []c
 	}
 	along := 0.0
 	for i, p := range geometry {
-		x, y := toMetres(p)
+		x, y := toMetres(p[0], p[1])
 		if i+1 == len(geometry) {
 			visit(x, y, along)
 			break
 		}
-		nx, ny := toMetres(geometry[i+1])
+		nx, ny := toMetres(geometry[i+1][0], geometry[i+1][1])
 		length := math.Hypot(nx-x, ny-y)
 		steps := max(1, int(math.Ceil(length/sampleStep)))
 		for s := 0; s < steps; s++ {
@@ -91,4 +88,25 @@ func retraceShare(visits []cellVisit) float64 {
 		last[v.cell] = i
 	}
 	return float64(len(twice)) / float64(len(visits))
+}
+
+// metresFrom returns the projection of longitude and latitude to metres east and north of start, flat
+// enough for the tens of kilometres a route set covers.
+func metresFrom(start [2]float64) func(lon, lat float64) (x, y float64) {
+	cosLat := math.Cos(start[1] * math.Pi / 180)
+	return func(lon, lat float64) (x, y float64) {
+		return (lon - start[0]) * math.Pi / 180 * earthRadius * cosLat, (lat - start[1]) * math.Pi / 180 * earthRadius
+	}
+}
+
+// crowFlies is the length in metres of the straight lines from start through the points and back.
+func crowFlies(start [2]float64, points [][2]float64) float64 {
+	toMetres := metresFrom(start)
+	var total, px, py float64
+	for _, p := range append(append([][2]float64{}, points...), start) {
+		x, y := toMetres(p[0], p[1])
+		total += math.Hypot(x-px, y-py)
+		px, py = x, y
+	}
+	return total
 }

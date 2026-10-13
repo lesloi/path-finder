@@ -12,6 +12,9 @@ import (
 // maxSnapMeters is how far a requested point may be from the nearest graph node.
 const maxSnapMeters = 400
 
+// maxWaypointSnapMeters is how far a waypoint may be from the nearest graph node: it is moved there.
+const maxWaypointSnapMeters = 250
+
 var (
 	// ErrOffGraph means a point is too far from any way of the graph.
 	ErrOffGraph = errors.New("engine: point is off the graph")
@@ -20,6 +23,17 @@ var (
 	// ErrNoLoop means no loop was found from the start point.
 	ErrNoLoop = errors.New("engine: no loop found")
 )
+
+// WaypointError means a waypoint is too far from any way of the graph. It is an ErrOffGraph.
+type WaypointError struct {
+	Index int // counted from 1, in the order the waypoints were given
+}
+
+func (e *WaypointError) Error() string {
+	return fmt.Sprintf("engine: waypoint %d is off the graph", e.Index)
+}
+
+func (e *WaypointError) Unwrap() error { return ErrOffGraph }
 
 // Point is a position in degrees.
 type Point struct{ Lat, Lon float64 }
@@ -55,6 +69,9 @@ type LoopRequest struct {
 	Ascent     float64
 	Candidates int
 	Seed       uint64
+	// Waypoints every loop goes through, in this order, between leaving Start and coming back to it. A
+	// route may retrace its steps to reach one. At most as many as the caller allows.
+	Waypoints []Point
 	// Enough, when set, is called with the loops found so far after each new one, one call at a time
 	// and without retaining the slice. Returning true ends the search: the loops still being
 	// searched are dropped, so a caller that has what it needs spares the CPU.
@@ -162,16 +179,20 @@ func (e *Engine) Route(ctx context.Context, from, to Point) (*Route, error) {
 	return e.describe(r.nodes, r.edges), nil
 }
 
-// Loops generates req.Candidates loops that differ by their waypoints, each close to the target
+// Loops generates req.Candidates loops that differ by their control points, each close to the target
 // distance, in no particular order. When ctx ends first it returns the loops finished so far,
 // possibly none, with ctx's error: the caller decides whether they are enough.
 func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if req.Distance <= 0 || req.Candidates <= 0 {
 		return nil, errors.New("engine: loops need a positive distance and candidate count")
 	}
-	start, d, ok := e.sp.nearest(e.g, req.Start.Lat, req.Start.Lon)
-	if !ok || d > maxSnapMeters {
-		return nil, ErrOffGraph
+	start, err := e.snapStart(req.Start)
+	if err != nil {
+		return nil, err
+	}
+	anchors, baseM, err := e.anchorLoop(ctx, start, req.Waypoints)
+	if err != nil {
+		return nil, err
 	}
 	// Loops are described as they are found, for Enough, which sees the finished form.
 	var loops []*Route
@@ -187,6 +208,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	}
 	found, failure := generate(ctx, e, e.sp, &loopParams{
 		distM: req.Distance, ascentM: req.Ascent, candidates: req.Candidates, seed: req.Seed,
+		anchors: anchors, baseM: baseM,
 	}, start, enough)
 	if failure != nil {
 		return nil, failure
@@ -202,6 +224,81 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 		return nil, ErrNoLoop
 	}
 	return loops, nil
+}
+
+// snapWaypoints finds the node of each waypoint, or the *WaypointError of the first one too far from a way.
+func (e *Engine) snapWaypoints(waypoints []Point) ([]uint32, error) {
+	nodes := make([]uint32, len(waypoints))
+	for i, w := range waypoints {
+		n, d, ok := e.sp.nearest(e.g, w.Lat, w.Lon)
+		if !ok || d > maxWaypointSnapMeters {
+			return nil, &WaypointError{Index: i + 1}
+		}
+		nodes[i] = n
+	}
+	return nodes, nil
+}
+
+// snapStart finds the node of a start point, or fails with ErrOffGraph.
+func (e *Engine) snapStart(p Point) (uint32, error) {
+	n, d, ok := e.sp.nearest(e.g, p.Lat, p.Lon)
+	if !ok || d > maxSnapMeters {
+		return 0, ErrOffGraph
+	}
+	return n, nil
+}
+
+// routeAnchors routes the cheapest loop from the start node through the waypoints in order and back.
+// The anchors are the nodes it goes through, the start node first and last, without a node twice in a row:
+// fewer than two means every waypoint is the start node, and the loop goes nowhere.
+func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Point) (anchors, nodes, edges []uint32, err error) {
+	snapped, err := e.snapWaypoints(waypoints)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	anchors = collapse(append(append([]uint32{start}, snapped...), start))
+	if len(anchors) < 2 {
+		return anchors, []uint32{start}, nil, nil
+	}
+	s := searcherPool.Get().(*searcher)
+	defer searcherPool.Put(s)
+	nodes, edges, ok := chainLegs(ctx, e, s, e.prof.UpPerMeter, anchors)
+	if err := ctx.Err(); err != nil {
+		return nil, nil, nil, err
+	}
+	if !ok {
+		return nil, nil, nil, ErrNoRoute
+	}
+	return anchors, nodes, edges, nil
+}
+
+// anchorLoop gives the anchors of the loops through the waypoints and the length of the cheapest one,
+// or nil anchors when there are no waypoints, or all of them are the start node.
+func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point) (anchors []uint32, length float64, err error) {
+	if len(waypoints) == 0 {
+		return nil, 0, nil
+	}
+	anchors, nodes, edges, err := e.routeAnchors(ctx, start, waypoints)
+	if err != nil || len(anchors) < 2 {
+		return nil, 0, err
+	}
+	length, _, _ = measure(e.g, nodes, edges)
+	return anchors, length, nil
+}
+
+// DirectLoop finds the cheapest loop from start through the waypoints in order and back, going back
+// over its steps where it must. It fails with ErrOffGraph for a start point off the ways, a
+// *WaypointError for a waypoint off them, and ErrNoRoute when they are not joined.
+func (e *Engine) DirectLoop(ctx context.Context, start Point, waypoints []Point) (*Route, error) {
+	src, err := e.snapStart(start)
+	if err != nil {
+		return nil, err
+	}
+	_, nodes, edges, err := e.routeAnchors(ctx, src, waypoints)
+	if err != nil {
+		return nil, err
+	}
+	return e.describe(nodes, edges), nil
 }
 
 // describe measures a path of nodes joined by edges.

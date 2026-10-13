@@ -587,3 +587,202 @@ func TestAnOpenedGraphUsesTheSpatialIndexOfItsFile(t *testing.T) {
 		t.Errorf("a file cut in its index: err = %v, want it to say it is too short", err)
 	}
 }
+
+// offset is the point latM metres north and lonM metres east of the lattice's corner.
+func offset(latM, lonM float64) Point {
+	return Point{baseLat + latM/metersPerDegree, baseLon + lonM/(metersPerDegree*math.Cos(baseLat*rad))}
+}
+
+// visitOrder tells whether the loop passes through the points in this order, going back over a point
+// being allowed.
+func visitOrder(l *Route, points ...Point) bool {
+	next := 0
+	for _, p := range l.Points {
+		if next < len(points) && p.Point == points[next] {
+			next++
+		}
+	}
+	return next == len(points)
+}
+
+func TestLoopsGoThroughTheWaypointsInOrder(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	cases := map[string][]int{
+		"one waypoint":    {at(14, 10)},
+		"three waypoints": {at(14, 10), at(14, 14), at(8, 15)},
+	}
+	for name, nodes := range cases {
+		t.Run(name, func(t *testing.T) {
+			req := loopRequest(g, at)
+			var want []Point
+			for _, n := range nodes {
+				req.Waypoints = append(req.Waypoints, pointOf(g, n))
+				want = append(want, pointOf(g, n))
+			}
+
+			loops, err := e.Loops(context.Background(), req)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(loops) < 4 {
+				t.Fatalf("%d loops out of 12 candidates", len(loops))
+			}
+			for _, l := range loops {
+				if first, last := l.Points[0], l.Points[len(l.Points)-1]; first != last || first.Point != req.Start {
+					t.Errorf("loop does not start and end at the start point")
+				}
+				if !visitOrder(l, want...) {
+					t.Errorf("loop misses the waypoints or visits them out of order")
+				}
+				near(t, l.Distance, 3000, 1500, "distance")
+			}
+		})
+	}
+}
+
+func TestLoopsReachTheTargetThroughWaypoints(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+	req.Waypoints = []Point{pointOf(g, at(12, 10))} // 400 m there and back: the loop must detour for 3 km
+
+	loops, err := e.Loops(context.Background(), req)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	var close int
+	for _, l := range loops {
+		if math.Abs(l.Distance-3000) < 600 {
+			close++
+		}
+	}
+	if close == 0 {
+		t.Errorf("none of %d loops is within 600 m of the target", len(loops))
+	}
+}
+
+func TestLoopsAcceptAWaypointOnTheStartPointOrRepeated(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	start, w := pointOf(g, at(10, 10)), pointOf(g, at(13, 10))
+	cases := map[string][]Point{
+		"on the start point": {start, w},
+		"repeated":           {w, w},
+	}
+	for name, waypoints := range cases {
+		t.Run(name, func(t *testing.T) {
+			req := loopRequest(g, at)
+			req.Waypoints = waypoints
+
+			loops, err := e.Loops(context.Background(), req)
+
+			if err != nil || len(loops) < 4 {
+				t.Errorf("%d loops, err = %v", len(loops), err)
+			}
+		})
+	}
+}
+
+func TestLoopsMoveAWaypointToTheNearestWayWithinItsRange(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat) // spans 0 to 2000 m
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+	req.Waypoints = []Point{offset(2200, 1000)} // 200 m north of the lattice's last row
+
+	loops, err := e.Loops(context.Background(), req)
+
+	if err != nil || len(loops) == 0 {
+		t.Fatalf("%d loops, err = %v", len(loops), err)
+	}
+	if !visitOrder(loops[0], pointOf(g, at(10, 20))) {
+		t.Error("loop does not go through the way nearest to the waypoint")
+	}
+}
+
+func TestLoopsRefuseAWaypointFarFromAnyWay(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+	req.Waypoints = []Point{pointOf(g, at(12, 10)), offset(2300, 1000), pointOf(g, at(8, 10))}
+
+	_, err := e.Loops(context.Background(), req)
+
+	var we *WaypointError
+	if !errors.As(err, &we) || we.Index != 2 {
+		t.Fatalf("err = %v, want a *WaypointError for waypoint 2", err)
+	}
+	if !errors.Is(err, ErrOffGraph) {
+		t.Error("a refused waypoint is not an ErrOffGraph")
+	}
+}
+
+func TestLoopsWithoutWaypointsAreTheSameWhateverTheEmptyForm(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+	withEmpty := req
+	withEmpty.Waypoints = []Point{}
+
+	a, errA := e.Loops(context.Background(), req)
+	b, errB := e.Loops(context.Background(), withEmpty)
+
+	if errA != nil || errB != nil {
+		t.Fatal(errA, errB)
+	}
+	sum := func(loops []*Route) (s float64) {
+		for _, l := range loops {
+			s += l.Distance
+		}
+		return
+	}
+	if len(a) != len(b) || sum(a) != sum(b) {
+		t.Errorf("%d loops (%.0f m) against %d (%.0f m)", len(a), sum(a), len(b), sum(b))
+	}
+}
+
+func TestDirectLoopGoesThroughTheWaypointsByTheCheapestWay(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	start := pointOf(g, at(10, 10))
+
+	r, err := e.DirectLoop(context.Background(), start, []Point{pointOf(g, at(14, 10)), pointOf(g, at(14, 13))})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	near(t, r.Distance, 400+300+700, 1, "distance") // 400 m up, 300 m across, then 300 m and 400 m back
+	if !visitOrder(r, pointOf(g, at(14, 10)), pointOf(g, at(14, 13))) || r.Points[len(r.Points)-1].Point != start {
+		t.Error("the loop is not start, waypoints in order, start")
+	}
+}
+
+func TestDirectLoopErrors(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	start, w := pointOf(g, at(10, 10)), pointOf(g, at(12, 10))
+
+	var we *WaypointError
+	if _, err := e.DirectLoop(context.Background(), start, []Point{w, offset(2300, 1000)}); !errors.As(err, &we) || we.Index != 2 {
+		t.Errorf("waypoint off the graph: err = %v, want a *WaypointError for waypoint 2", err)
+	}
+	if _, err := e.DirectLoop(context.Background(), Point{46, 7}, []Point{w}); !errors.Is(err, ErrOffGraph) || errors.As(err, &we) {
+		t.Errorf("start off the graph: err = %v, want ErrOffGraph and no waypoint", err)
+	}
+	g.addNode(2100, 2100, 100) // a way of its own, joined to nothing
+	e = openTest(t, g, false)
+	island := offset(2100, 2100)
+	if _, err := e.DirectLoop(context.Background(), start, []Point{island}); !errors.Is(err, ErrNoRoute) {
+		t.Errorf("unreachable waypoint: err = %v, want ErrNoRoute", err)
+	}
+}

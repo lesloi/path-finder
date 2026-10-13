@@ -9,8 +9,10 @@ import (
 // CriteriaError is a request body that is not valid criteria, with the field that failed.
 // Messages name the field, never its value: the server keeps no location.
 type CriteriaError struct {
-	Field   string // start, target, elevationGain, surface or pace
+	Field   string // start, target, elevationGain, surface, pace or waypoints
 	Message string
+	// Waypoint is the waypoint at fault, counted from 1, or 0 when none is singled out.
+	Waypoint int
 }
 
 func (e *CriteriaError) Error() string { return e.Message }
@@ -42,6 +44,8 @@ type Criteria struct {
 	ElevationGain *ElevationGain `json:"elevationGain,omitempty"`
 	Surface       string         `json:"surface"`
 	Pace          float64        `json:"pace"`
+	// Waypoints a route goes through, in this order.
+	Waypoints [][2]float64 `json:"waypoints,omitempty"` // longitude, latitude
 }
 
 // TargetDistanceKm is the distance to ask the engine for. It fails when a target duration is too
@@ -95,16 +99,10 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 	}
 
 	var c Criteria
-	start, ok := obj["start"].([]any)
-	if !ok || len(start) != 2 {
+	start := obj["start"]
+	if c.Start, ok = position(start); !ok {
 		return fail("start", "start must be a longitude and a latitude")
 	}
-	lon, lonOK := within(start[0], -180, 180)
-	lat, latOK := within(start[1], -90, 90)
-	if !lonOK || !latOK {
-		return fail("start", "start must be a longitude and a latitude")
-	}
-	c.Start = [2]float64{lon, lat}
 
 	target, ok := obj["target"].(map[string]any)
 	if !ok || len(target) != 1 {
@@ -155,6 +153,20 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 	}
 	c.Pace = pace
 
+	if raw, present := obj["waypoints"]; present {
+		list, ok := raw.([]any)
+		if !ok || len(list) > bounds.MaxWaypoints {
+			return fail("waypoints", "waypoints must be a short list of longitudes and latitudes")
+		}
+		for _, item := range list {
+			p, ok := position(item)
+			if !ok {
+				return fail("waypoints", "a waypoint must be a longitude and a latitude")
+			}
+			c.Waypoints = append(c.Waypoints, p)
+		}
+	}
+
 	if countElevationGain {
 		c.ElevationGain = gain
 	}
@@ -167,6 +179,17 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 		return fail("target", "target duration makes too long a route at this pace")
 	}
 	return c, nil
+}
+
+// position reads a longitude and a latitude.
+func position(v any) (p [2]float64, ok bool) {
+	pair, isList := v.([]any)
+	if !isList || len(pair) != 2 {
+		return p, false
+	}
+	lon, lonOK := within(pair[0], -180, 180)
+	lat, latOK := within(pair[1], -90, 90)
+	return [2]float64{lon, lat}, lonOK && latOK
 }
 
 func contains(list []string, s string) bool {

@@ -275,3 +275,52 @@ func TestADataDirectoryCanBeALink(t *testing.T) {
 		t.Errorf("a data directory that is a link: %v zones, %v", z, err)
 	}
 }
+
+func TestZonesFindTheDirectLoopInTheZoneOfTheStart(t *testing.T) {
+	dir := t.TempDir()
+	west, westCentre := zoneGraph(0, 0)
+	east, eastCentre := zoneGraph(10_000, 0)
+	writeZone(t, filepath.Join(dir, "west"), west)
+	writeZone(t, filepath.Join(dir, "east"), east)
+	z, err := OpenZones(dir, "any")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile := z.Profile("any")
+	toward := func(p Point, northM float64) Point { return Point{p.Lat + northM/metersPerDegree, p.Lon} }
+
+	r, err := profile.DirectLoop(context.Background(), eastCentre, []Point{toward(eastCentre, 300)})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	near(t, r.Distance, 700, 101, "distance") // 600 m there and back, or 800 m when the way back avoids the way there
+	if _, err := profile.DirectLoop(context.Background(), westCentre, []Point{toward(eastCentre, 300)}); !errors.Is(err, ErrOffGraph) {
+		t.Errorf("a waypoint in another zone: err = %v, want ErrOffGraph", err)
+	}
+}
+
+// A zone whose box holds the start with no way near it answers ErrOffGraph for the start: that must not hide
+// the zone that has the start and lacks a waypoint.
+func TestAWaypointOffTheWaysIsNotTakenForTheStartWhenAnotherZoneAnswersFirst(t *testing.T) {
+	dir := t.TempDir()
+	real, centre := zoneGraph(0, 0)
+	writeZone(t, filepath.Join(dir, "real"), real)
+	sparse := &testGraph{}
+	a := sparse.addNode(-5_000, -5_000, 100)
+	b := sparse.addNode(8_000, 8_000, 100)
+	sparse.connect(a, b, KindPath)
+	writeZone(t, filepath.Join(dir, "a-sparse"), sparse)
+	z, err := OpenZones(dir, "any")
+	if err != nil {
+		t.Fatal(err)
+	}
+	offTheWays := Point{centre.Lat + 3000/metersPerDegree, centre.Lon} // 1 km north of the lattice's last row
+
+	_, err = z.Profile("any").DirectLoop(context.Background(), centre, []Point{offTheWays})
+
+	var we *WaypointError
+	if !errors.As(err, &we) || we.Index != 1 {
+		t.Errorf("err = %v, want a *WaypointError for waypoint 1", err)
+	}
+}

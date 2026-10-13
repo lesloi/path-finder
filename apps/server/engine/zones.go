@@ -343,6 +343,18 @@ type ProfileZones struct {
 // overlapping, the one with the most room already holds every way the others have round the start, and a
 // second failing search would only take the time of the request. When none answers, the error is the first's.
 func (a *ProfileZones) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
+	return inZones(a, req.Start, func(e *Engine) ([]*Route, error) { return e.Loops(ctx, req) })
+}
+
+// DirectLoop asks the zones as Loops does, for the cheapest loop through the waypoints.
+func (a *ProfileZones) DirectLoop(ctx context.Context, start Point, waypoints []Point) (*Route, error) {
+	return inZones(a, start, func(e *Engine) (*Route, error) { return e.DirectLoop(ctx, start, waypoints) })
+}
+
+// inZones runs search on the engine of each zone whose box holds start, as Loops describes, until one
+// does not answer ErrOffGraph.
+func inZones[T any](a *ProfileZones, start Point, search func(*Engine) (T, error)) (T, error) {
+	var none T
 	z := a.src.hold()
 	defer a.src.drop(z)
 	type candidate struct {
@@ -351,25 +363,27 @@ func (a *ProfileZones) Loops(ctx context.Context, req LoopRequest) ([]*Route, er
 	}
 	var candidates []candidate
 	for _, zn := range z.zones {
-		if m := edgeDistance(zn.box, req.Start.Lat, req.Start.Lon); m >= 0 {
+		if m := edgeDistance(zn.box, start.Lat, start.Lon); m >= 0 {
 			candidates = append(candidates, candidate{zn.engines[a.name], m})
 		}
 	}
 	if len(candidates) == 0 {
-		return nil, ErrOffGraph
+		return none, ErrOffGraph
 	}
 	sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].margin > candidates[j].margin })
 	var first error
 	for _, c := range candidates {
-		loops, err := c.engine.Loops(ctx, req)
+		found, err := search(c.engine)
 		if !errors.Is(err, ErrOffGraph) {
-			return loops, err
+			return found, err
 		}
-		if first == nil {
+		// A waypoint off the ways says more than a start point off them, which another zone may be the one to lack.
+		var waypoint *WaypointError
+		if first == nil || errors.As(err, &waypoint) && !errors.As(first, &waypoint) {
 			first = err
 		}
 	}
-	return nil, first
+	return none, first
 }
 
 // edgeDistance is the distance in metres from a point to the nearest edge of a box, negative outside it.

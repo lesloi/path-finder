@@ -21,6 +21,10 @@ import (
 // loopLegMaxSettled caps the nodes a single loop leg may settle.
 const loopLegMaxSettled = 300_000
 
+// minDetourShare is the least a loop through waypoints adds to the direct loop, as a share of the target
+// distance, so that loops differ even when the waypoints alone nearly make the target.
+const minDetourShare = 0.15
+
 // metersPerDegree converts degrees of latitude to metres.
 const metersPerDegree = 111194.9
 
@@ -698,6 +702,11 @@ type loopParams struct {
 	distM, ascentM float64
 	candidates     int
 	seed           uint64
+	// anchors are the nodes every loop goes through in order, from the start node back to it: the start
+	// node, the user's waypoints, the start node. Nil for a loop with no waypoints. baseM is the length
+	// of the cheapest loop through them.
+	anchors []uint32
+	baseM   float64
 }
 
 type loopResult struct {
@@ -731,16 +740,101 @@ func measure(g *graph, nodes, edges []uint32) (dist, trail, overlap float64) {
 	return
 }
 
+// chainLegs routes each leg between consecutive points, a leg avoiding the ways the earlier ones used.
+// It reports false when a leg has no route, or joins a node to itself.
+func chainLegs(ctx context.Context, cx *Engine, s *searcher, climb float32, points []uint32) (nodes, edges []uint32, ok bool) {
+	avoid := newAvoidSet()
+	for j := 1; j < len(points); j++ {
+		if points[j-1] == points[j] {
+			return nil, nil, false
+		}
+		var av *avoidSet
+		if avoid.n > 0 {
+			av = avoid
+		}
+		leg := s.route(ctx, cx, climb, av, searchLimits{loopLegMaxSettled}, points[j-1], points[j])
+		if leg == nil {
+			return nil, nil, false
+		}
+		if len(nodes) == 0 {
+			nodes = append(nodes, leg.nodes...)
+		} else {
+			nodes = append(nodes, leg.nodes[1:]...)
+		}
+		edges = append(edges, leg.edges...)
+		for q := 1; q < len(leg.nodes); q++ {
+			avoid.insert(pairKey(leg.nodes[q-1], leg.nodes[q]))
+		}
+	}
+	return nodes, edges, true
+}
+
+// withControlPoints inserts the control points into the legs between the anchors, each into the leg it
+// is nearest to, and in the order along that leg. Positions are metres east and north of the start.
+func withControlPoints(anchors, control []uint32, xy func(uint32) (x, y float64)) []uint32 {
+	type placed struct {
+		node uint32
+		t    float64
+	}
+	legs := make([][]placed, len(anchors)-1)
+	for _, c := range control {
+		cx, cy := xy(c)
+		bestLeg, bestT, bestD := 0, 0.0, math.Inf(1)
+		for i := range legs {
+			ax, ay := xy(anchors[i])
+			bx, by := xy(anchors[i+1])
+			dx, dy := bx-ax, by-ay
+			t := 0.0
+			if l2 := dx*dx + dy*dy; l2 > 0 {
+				t = math.Max(0, math.Min(1, ((cx-ax)*dx+(cy-ay)*dy)/l2))
+			}
+			if d := math.Hypot(cx-(ax+t*dx), cy-(ay+t*dy)); d < bestD {
+				bestLeg, bestT, bestD = i, t, d
+			}
+		}
+		legs[bestLeg] = append(legs[bestLeg], placed{c, bestT})
+	}
+	out := []uint32{anchors[0]}
+	for i, leg := range legs {
+		sort.SliceStable(leg, func(a, b int) bool { return leg[a].t < leg[b].t })
+		for _, p := range leg {
+			out = append(out, p.node)
+		}
+		out = append(out, anchors[i+1])
+	}
+	return out
+}
+
+// collapse drops the points equal to the one before them.
+func collapse(points []uint32) []uint32 {
+	out := points[:0:0]
+	for _, p := range points {
+		if n := len(out); n == 0 || out[n-1] != p {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *loopParams, start uint32, index int) *loopResult {
 	g := cx.g
 	rng := newSplitmix(lp.seed, uint64(index))
 	climb := cx.prof.UpPerMeter * float32(2*rng.f64())
 	k := 2 + int(rng.below(3))
 	theta := rng.f64() * 2 * math.Pi
-	rc := lp.distM / (2 * math.Pi * 1.3)
+	// With waypoints, the circle only has to make up what the loop through them lacks.
+	extraM := lp.distM
+	if lp.anchors != nil {
+		extraM = math.Max(lp.distM-lp.baseM, minDetourShare*lp.distM)
+	}
+	rc := extraM / (2 * math.Pi * 1.3)
 	sn := g.nodes[start]
 	slat, slon := float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7
 	cosl := math.Cos(slat * rad)
+	xy := func(n uint32) (float64, float64) {
+		nd := g.nodes[n]
+		return (float64(nd.Lon)*1e-7 - slon) * metersPerDegree * cosl, (float64(nd.Lat)*1e-7 - slat) * metersPerDegree
+	}
 	jitter := make([]float64, k)
 	for j := range jitter {
 		jitter[j] = 0.85 + 0.3*rng.f64()
@@ -762,29 +856,13 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 			points = append(points, n)
 		}
 		points = append(points, start)
-		avoid := newAvoidSet()
-		var nodes, edges []uint32
-		for j := 1; j < len(points); j++ {
-			if points[j-1] == points[j] {
-				return best
-			}
-			var av *avoidSet
-			if avoid.n > 0 {
-				av = avoid
-			}
-			leg := s.route(ctx, cx, climb, av, searchLimits{loopLegMaxSettled}, points[j-1], points[j])
-			if leg == nil {
-				return best
-			}
-			if len(nodes) == 0 {
-				nodes = append(nodes, leg.nodes...)
-			} else {
-				nodes = append(nodes, leg.nodes[1:]...)
-			}
-			edges = append(edges, leg.edges...)
-			for q := 1; q < len(leg.nodes); q++ {
-				avoid.insert(pairKey(leg.nodes[q-1], leg.nodes[q]))
-			}
+		if lp.anchors != nil {
+			// The user's waypoints fix the order; the circle's points only add detours between them.
+			points = collapse(withControlPoints(lp.anchors, points[1:len(points)-1], xy))
+		}
+		nodes, edges, ok := chainLegs(ctx, cx, s, climb, points)
+		if !ok {
+			return best
 		}
 		dist, trail, overlap := measure(g, nodes, edges)
 		asc := ascent(g, nodes)
@@ -795,7 +873,16 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 		if math.Abs(dist-lp.distM) < 0.03*lp.distM {
 			break
 		}
-		rc *= lp.distM / dist
+		if lp.anchors != nil {
+			// Only the detour is resized: the loop through the waypoints stays what it is.
+			if added := dist - lp.baseM; added > 1 {
+				rc *= extraM / added
+			} else {
+				rc *= 2
+			}
+		} else {
+			rc *= lp.distM / dist
+		}
 	}
 	return best
 }

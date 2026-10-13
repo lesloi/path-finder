@@ -283,18 +283,22 @@ export function CriteriaForm({
   );
 }
 
+// The fields the form sets: it places no waypoints yet.
+type FormField = Exclude<CriteriaField, 'waypoints'>;
+
 // The first field `parseCriteria` rejects, as the API would.
-export function invalidField(request: RouteSetRequest): CriteriaField | undefined {
+export function invalidField(request: RouteSetRequest): FormField | undefined {
   try {
     parseCriteria(request);
   } catch (error) {
-    if (error instanceof CriteriaError) return error.field;
+    // The form cannot make an invalid waypoint, so one would be a bug, not something to word.
+    if (error instanceof CriteriaError && error.field !== 'waypoints') return error.field;
     throw error;
   }
 }
 
 function message(
-  field: CriteriaField,
+  field: FormField,
   target: Target,
   {
     language,
@@ -307,7 +311,7 @@ function message(
   },
 ): string {
   const t = criteriaText[language];
-  const messages: Record<CriteriaField, string> = {
+  const messages: Record<FormField, string> = {
     start: t.startError,
     target: target === 'distance' ? t.distanceError(distance.min, distance.max, 'km') : t.durationError,
     elevationGain: t.elevationGainError(gain.max, 'm'),

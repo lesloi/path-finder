@@ -6,6 +6,7 @@ export const MIN_TARGET_DISTANCE = contract.minDistanceKm;
 export const MAX_TARGET_DISTANCE = contract.maxDistanceKm;
 export const TARGET_DURATION = { min: contract.durationMinutes.min, max: contract.durationMinutes.max };
 export const MAX_TARGET_ELEVATION_GAIN = contract.maxElevationGainMetres;
+export const MAX_WAYPOINTS = contract.maxWaypoints;
 export const CLIMB_PER_EFFORT_KM = contract.climbPerEffortKm;
 export const HILLY_MATCH_PER_KM = contract.hillyMatchPerKm;
 export const POI_TILE_ZOOM = contract.poiTileZoom;

@@ -3,6 +3,7 @@ import {
   HILLY_MATCH_PER_KM,
   MAX_TARGET_DISTANCE,
   MAX_TARGET_ELEVATION_GAIN,
+  MAX_WAYPOINTS,
   MIN_TARGET_DISTANCE,
   SURFACES,
   TARGET_DURATION,
@@ -20,10 +21,12 @@ export type Criteria = {
   surface: 'paved' | 'unpaved' | 'any';
   /** Minutes per kilometre on flat ground. */
   pace: number;
+  /** Points the route goes through, in this order. */
+  waypoints?: Position[];
 };
 
 /** The criteria fields `parseCriteria` checks, so a form can say which one is wrong. */
-export type CriteriaField = 'start' | 'target' | 'elevationGain' | 'surface' | 'pace';
+export type CriteriaField = 'start' | 'target' | 'elevationGain' | 'surface' | 'pace' | 'waypoints';
 
 /** Criteria that are not valid, with the field that failed. */
 export class CriteriaError extends RangeError {
@@ -44,6 +47,9 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const within = (value: unknown, min: number, max: number): value is number =>
   isNumber(value) && value >= min && value <= max;
+
+const isPosition = (value: unknown): value is Position =>
+  Array.isArray(value) && value.length === 2 && within(value[0], -180, 180) && within(value[1], -90, 90);
 
 /**
  * The distance the criteria make, in kilometres. Throws a `RangeError` when a target duration is
@@ -72,13 +78,9 @@ function targetDistance(criteria: Criteria): number {
  */
 export function parseCriteria(body: unknown, { countElevationGain = true } = {}): Criteria {
   check(isObject(body), 'start', 'Criteria must be an object');
-  const { start, target, elevationGain, surface, pace } = body;
+  const { start, target, elevationGain, surface, pace, waypoints } = body;
 
-  check(
-    Array.isArray(start) && start.length === 2 && within(start[0], -180, 180) && within(start[1], -90, 90),
-    'start',
-    'start must be a longitude and a latitude',
-  );
+  check(isPosition(start), 'start', 'start must be a longitude and a latitude');
 
   check(isObject(target) && Object.keys(target).length === 1, 'target', 'target must be a distance or a duration');
   let parsedTarget: Criteria['target'];
@@ -101,6 +103,15 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
   check(SURFACES.includes(surface as Criteria['surface']), 'surface', 'Unknown surface preference');
   check(isNumber(pace) && pace > 0, 'pace', 'pace must be a positive number');
 
+  check(
+    waypoints === undefined || (Array.isArray(waypoints) && waypoints.length <= MAX_WAYPOINTS),
+    'waypoints',
+    'waypoints must be a short list of longitudes and latitudes',
+  );
+  for (const waypoint of waypoints ?? []) {
+    check(isPosition(waypoint), 'waypoints', 'a waypoint must be a longitude and a latitude');
+  }
+
   const criteria: Criteria = {
     start: [start[0], start[1]],
     target: parsedTarget,
@@ -108,6 +119,8 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
       elevationGain !== undefined && { elevationGain: elevationGain as Criteria['elevationGain'] }),
     surface: surface as Criteria['surface'],
     pace,
+    ...(waypoints !== undefined &&
+      waypoints.length > 0 && { waypoints: (waypoints as Position[]).map(([lon, lat]): Position => [lon, lat]) }),
   };
   let distance: number;
   try {
