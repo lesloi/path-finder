@@ -13,6 +13,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,6 +40,9 @@ type Config struct {
 	Generator RouteSetGenerator
 	// Coverage answers GET /api/v1/coverage; without it the route is not served.
 	Coverage CoverageSource
+	// POIDir holds the tiles of points of interest, as build-pois writes them. Without it the route is not served;
+	// with it, a missing directory or tile answers an empty tile.
+	POIDir string
 	// Limits turns on the rate limit and the cap on concurrent generations; off in development.
 	Limits bool
 	// LoopLimit caps the generations running at once (default 1, which main replaces with one that follows
@@ -76,7 +80,7 @@ func New(cfg Config) http.Handler {
 
 	r := chi.NewRouter()
 	if cfg.Log != nil {
-		r.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: cfg.Log}))
+		r.Use(skipPOITiles(middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: cfg.Log})))
 	}
 	// A panic answers 500 here, rather than in net/http, which would log the client's address.
 	r.Use(middleware.Recoverer, securityHeaders, middleware.Heartbeat("/healthz"), middleware.ClientIPFromRemoteAddr)
@@ -97,6 +101,9 @@ func New(cfg Config) http.Handler {
 	routeSets.Post("/api/v1/route-sets", a.routeSets)
 	if cfg.Coverage != nil {
 		r.With(a.checkBuild).Get("/api/v1/coverage", a.coverage)
+	}
+	if cfg.POIDir != "" {
+		r.With(a.checkBuild).Get(poiTilesPath+"{x}/{y}", a.poiTile)
 	}
 	r.NotFound(staticFiles(cfg.WebRoot).ServeHTTP)
 	return r
@@ -237,4 +244,55 @@ func readBuildID(webRoot string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(data))
+}
+
+// poiTilesPath is where tiles are served. A tile request says which ~27 km of the map the user looks at, so it is
+// the one request kept out of the development log.
+const poiTilesPath = "/api/v1/poi-tiles/"
+
+func skipPOITiles(logger func(http.Handler) http.Handler) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		logged := logger(next)
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, poiTilesPath) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			logged.ServeHTTP(w, r)
+		})
+	}
+}
+
+// poiTile answers GET /api/v1/poi-tiles/{x}/{y}. The file is named from the two numbers parsed, never from the
+// path of the request.
+func (a *app) poiTile(w http.ResponseWriter, r *http.Request) {
+	x, okX := tileIndex(chi.URLParam(r, "x"))
+	y, okY := tileIndex(chi.URLParam(r, "y"))
+	if !okX || !okY {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=86400") // the tiles change with a monthly rebuild
+	f, err := os.Open(filepath.Join(a.cfg.POIDir, strconv.Itoa(x), strconv.Itoa(y)+".json"))
+	if err != nil {
+		_, _ = io.WriteString(w, `{"pois":[]}`+"\n")
+		return
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || info.IsDir() {
+		_, _ = io.WriteString(w, `{"pois":[]}`+"\n")
+		return
+	}
+	http.ServeContent(w, r, "", info.ModTime(), f)
+}
+
+// tileIndex reads a column or row of the grid in its canonical form: digits only, no sign and no leading zero.
+func tileIndex(s string) (int, bool) {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 || n >= 1<<contract.POITileZoom() || strconv.Itoa(n) != s {
+		return 0, false
+	}
+	return n, true
 }
