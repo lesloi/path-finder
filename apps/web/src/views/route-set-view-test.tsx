@@ -57,6 +57,7 @@ function View({
   onPreview,
   onHover = () => {},
   onPaceChange,
+  onClear = () => {},
   pace = 6,
   open = false,
 }: {
@@ -67,6 +68,7 @@ function View({
   onPreview?: (index: number | undefined) => void;
   onHover?: (position: unknown) => void;
   onPaceChange?: (pace: number) => void;
+  onClear?: () => void;
   pace?: number;
   open?: boolean;
 }) {
@@ -87,6 +89,7 @@ function View({
       onPreview={onPreview}
       onDetailChange={setDetail}
       onPaceChange={onPaceChange}
+      onClear={onClear}
       onHover={onHover}
     />
   );
@@ -103,6 +106,21 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('RouteSetView', () => {
   describe('the list', () => {
+    it('names the clear button for what it does', () => {
+      render(<View />);
+
+      expect(screen.getByTestId('routes-clear')).toHaveAccessibleName(en.clearRoutes);
+    });
+
+    it('clears the results from the button', () => {
+      const onClear = vi.fn();
+      render(<View onClear={onClear} />);
+
+      fireEvent.click(screen.getByTestId('routes-clear'));
+
+      expect(onClear).toHaveBeenCalledOnce();
+    });
+
     it('counts the routes and shows a row for each', () => {
       render(<View />);
 

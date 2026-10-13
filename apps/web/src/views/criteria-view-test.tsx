@@ -738,6 +738,69 @@ describe('CriteriaView', () => {
       expect(document.documentElement.style.getPropertyValue('--list-inset')).toBe('');
     });
 
+    describe('clearing the routes', () => {
+      async function findRoutes({ phone = false } = {}) {
+        if (!phone) onDesktop();
+        ask(answer(route(0), route(1)));
+        render(<CriteriaView language="en" />);
+        act(() => map().fire('style.load'));
+        // On a phone, the criteria are behind the bar.
+        if (phone) fireEvent.click(screen.getByTestId('criteria-bar'));
+        await submit();
+        await screen.findByTestId('routes-count');
+      }
+
+      it('forgets the routes on a desktop, with the one selected', async () => {
+        await findRoutes();
+        fireEvent.click(screen.getByTestId('routes-row-0'));
+        expect(screen.getByTestId('route-dock')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId('routes-clear'));
+
+        expect(screen.queryByTestId('routes-list')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('route-dock')).not.toBeInTheDocument();
+        expect(document.documentElement.style.getPropertyValue('--list-inset')).toBe('');
+      });
+
+      it('forgets the routes on a phone', async () => {
+        await findRoutes({ phone: true });
+
+        fireEvent.click(screen.getByTestId('routes-clear'));
+
+        expect(screen.queryByTestId('routes-list')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('routes-clear')).not.toBeInTheDocument();
+      });
+
+      it('forgets routes that no longer match the criteria', async () => {
+        await findRoutes();
+        fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
+        expect(screen.getByTestId('routes-stale')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId('routes-clear'));
+
+        expect(screen.queryByTestId('routes-stale')).not.toBeInTheDocument();
+      });
+
+      it('hands the focus to the settings link, and says the routes are gone', async () => {
+        await findRoutes();
+        const status = screen.getByTestId('routes-announcement');
+
+        fireEvent.click(screen.getByTestId('routes-clear'));
+
+        expect(screen.getByTestId('criteria-settings')).toHaveFocus();
+        expect(status).toHaveTextContent(routesText.en.routesCleared);
+      });
+
+      it('stops announcing it once another search starts', async () => {
+        await findRoutes();
+        fireEvent.click(screen.getByTestId('routes-clear'));
+
+        await submit();
+
+        expect(screen.getByTestId('routes-announcement')).not.toHaveTextContent(routesText.en.routesCleared);
+      });
+    });
+
     it('announces the routes found in a status that is there before them and empty while searching', async () => {
       onDesktop();
       ask(answer(route(0), route(1)));

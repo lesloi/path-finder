@@ -104,6 +104,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const pageWasOpen = useRef(pageOpen);
   const [{ basemap, pace, paceUnit, poiLayers }, update] = useSettings();
   const browser = useRouteBrowser();
+  // Clearing leaves nothing on screen: a status says it, for those who cannot see the list go.
+  const [cleared, setCleared] = useState(false);
   const { routeSet, loading } = browser;
   const atPace = useMemo(() => routeSet && routesAtPace(routeSet.request, routeSet.routes, pace), [routeSet, pace]);
   const summaries = useMemo(
@@ -119,6 +121,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const current = criteriaRequest(draft[0], { pace, start });
   // Every search keeps the criteria it was made with, whichever button asked for it.
   const search = (request: RouteSetRequest) => {
+    setCleared(false);
     draft[2]();
     browser.ask(request);
   };
@@ -224,6 +227,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         onDetailChange={browser.openDetail}
         // By duration, a new pace is another search, which the criteria ask for: the list only says the pace.
         onPaceChange={'distance' in routeSet.request.target ? (value) => update({ pace: value }) : undefined}
+        onClear={() => {
+          browser.drop();
+          setCleared(true);
+          // The button is gone: the focus goes on from the settings, as after a button that puts the map back.
+          settingsLink.current?.focus();
+        }}
         onHover={browser.setHover}
       />
     ) : undefined;
@@ -283,7 +292,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       {/* Always there, and empty while the search goes on, which has its own status: a region that comes with its
           text is not announced. Its text changes when the routes arrive, even for a count that did not. */}
       <p role="status" className="sr-only" data-testid="routes-announcement">
-        {routeSet && !loading ? t.routeCount(routeSet.routes.length) : ''}
+        {routeSet && !loading ? t.routeCount(routeSet.routes.length) : cleared ? t.routesCleared : ''}
       </p>
       <LazyStartPointMap
         ref={map}
