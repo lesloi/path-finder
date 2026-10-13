@@ -526,7 +526,7 @@ function CriteriaFields({
           className={`${ICON_BUTTON} aria-pressed:text-accent`}
           aria-label={t.chooseOnMap}
           data-tip={t.chooseOnMap}
-          data-tip-side="top-end"
+          data-tip-side="bottom-end"
           aria-pressed={picking}
           onClick={onPick}
         >
@@ -538,7 +538,7 @@ function CriteriaFields({
           data-testid="criteria-start-locate"
           aria-label={t.myLocation}
           data-tip={t.myLocation}
-          data-tip-side="top-end"
+          data-tip-side="bottom-end"
           onClick={onLocate}
         >
           <LocateFixed size={20} aria-hidden />
