@@ -332,7 +332,7 @@
   }
   select::picker(select) {
     /* Under the button and aligned on its right edge, above it when there is no room. */
-    position-area: block-end span-left;
+    position-area: bottom span-left;
     position-try-fallbacks: flip-block;
     margin: calc(var(--spacing) * 2) 0;
     min-width: anchor-size(width);

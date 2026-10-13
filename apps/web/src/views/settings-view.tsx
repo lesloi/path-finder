@@ -4,7 +4,7 @@ import { useId, useState, type ReactNode } from 'react';
 import { BASEMAPS, PACE_UNITS, type Basemap, type PaceUnit, type Theme } from '../core/index.ts';
 import { commonText, settingsText, type Language } from '../i18n/index.ts';
 import { useSettings } from '../state/index.ts';
-import { GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON, SelectControl } from '../components/index.ts';
+import { GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON, SegmentedControl, SelectControl } from '../components/index.ts';
 
 const FLAG_CLASSES = 'flex-none ring-1 ring-border';
 
@@ -64,7 +64,7 @@ export function SettingsView({ language }: { language: Language }) {
           )}
         </SettingRow>
         <SettingRow label={t.paceUnit}>
-          <SelectControl
+          <SegmentedControl
             testId="settings-pace-unit"
             label={t.paceUnit}
             value={settings.paceUnit}

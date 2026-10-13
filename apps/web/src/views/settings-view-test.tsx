@@ -9,7 +9,7 @@ const en = { ...commonText.en, ...settingsText.en };
 const fr = { ...commonText.fr, ...settingsText.fr };
 const renderView = (language: 'en' | 'fr' = 'en') => render(<SettingsView language={language} />);
 const saved = () => renderHook(() => useSettings()).result.current[0];
-const pick = (control: 'theme' | 'language' | 'pace-unit' | 'basemap', option: string) =>
+const pick = (control: 'theme' | 'language' | 'basemap', option: string) =>
   fireEvent.change(screen.getByTestId(`settings-${control}`), { target: { value: option } });
 
 describe('SettingsView', () => {
@@ -20,7 +20,7 @@ describe('SettingsView', () => {
     renderView(language);
 
     expect(screen.getByTestId('settings-pace-unit')).toHaveAccessibleName(text.paceUnit);
-    expect(screen.getByTestId('settings-pace-unit')).toHaveValue('min/km');
+    expect(screen.getByTestId('settings-pace-unit-min/km')).toBeChecked();
   });
 
   it('saves the picked theme', () => {
@@ -62,9 +62,9 @@ describe('SettingsView', () => {
   it('saves the pace unit the user picks', () => {
     renderView('fr');
 
-    pick('pace-unit', 'km/h');
+    fireEvent.click(screen.getByTestId('settings-pace-unit-km/h'));
 
-    expect(screen.getByTestId('settings-pace-unit')).toHaveValue('km/h');
+    expect(screen.getByTestId('settings-pace-unit-km/h')).toBeChecked();
     expect(saved().paceUnit).toBe('km/h');
   });
 
