@@ -154,18 +154,22 @@ export function ElevationProfile({
             })}
           </svg>
           {waypointsOnRoute(route.geometry, waypoints).map(({ number, distance, height }) => (
+            // A line down the whole plot, with the numbered circle on the profile at its height.
             <span
               key={number}
               data-testid={testId && `${testId}-waypoint-${number}`}
               role="img"
               aria-label={`${criteriaText[language].waypointName(number)}, ${formatDistance(distance, language)}`}
-              className="pointer-events-none absolute grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-[#1c1d1b] bg-white text-xs leading-none font-bold text-[#1c1d1b]"
-              style={{
-                left: `${total ? (distance / total) * 100 : 0}%`,
-                top: `${(y(height ?? middle) / HEIGHT) * 100}%`,
-              }}
+              className="pointer-events-none absolute inset-y-0 w-5 -translate-x-1/2"
+              style={{ left: `${total ? (distance / total) * 100 : 0}%` }}
             >
-              {number}
+              <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-ink-2" />
+              <span
+                className="absolute left-0 grid size-5 -translate-y-1/2 place-items-center rounded-full border-2 border-[#1c1d1b] bg-white text-xs leading-none font-bold text-[#1c1d1b]"
+                style={{ top: `${(y(height ?? middle) / HEIGHT) * 100}%` }}
+              >
+                {number}
+              </span>
             </span>
           ))}
           {/* The keyboard's way along the profile: a native slider, hidden, whose ring shows on the plot. */}
