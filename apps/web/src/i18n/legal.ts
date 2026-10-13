@@ -105,7 +105,7 @@ export const legalText = {
           },
           {
             paragraph: {
-              text: 'From zoom 13, the map also asks our server for the tiles of points of interest (water points, viewpoints) of the area you view. A tile covers about 30 km, so the request reveals that area to our server, with your IP address as with any connection. These requests are never logged.',
+              text: 'From zoom 12, the map also asks our server for the tiles of points of interest (water points, viewpoints) of the area you view. A tile covers about 30 km, so the request reveals that area to our server, with your IP address as with any connection. These requests are never logged.',
             },
           },
           {
@@ -263,7 +263,7 @@ export const legalText = {
           },
           {
             paragraph: {
-              text: 'À partir du zoom 13, la carte demande aussi à notre serveur les tuiles des points d’intérêt (points d’eau, points de vue) de la zone affichée. Une tuile couvre environ 30 km : la requête révèle donc cette zone à notre serveur, avec votre adresse IP, comme pour toute connexion. Ces requêtes ne sont jamais journalisées.',
+              text: 'À partir du zoom 12, la carte demande aussi à notre serveur les tuiles des points d’intérêt (points d’eau, points de vue) de la zone affichée. Une tuile couvre environ 30 km : la requête révèle donc cette zone à notre serveur, avec votre adresse IP, comme pour toute connexion. Ces requêtes ne sont jamais journalisées.',
             },
           },
           {

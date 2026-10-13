@@ -11,13 +11,13 @@ export const POI_CATEGORIES: PoiCategory[] = ['water', 'viewpoint'];
 export type PoiLayers = Record<PoiCategory | 'seasonal', boolean>;
 
 /** The keys of the layers, in the order the popover lists them. */
-export const POI_LAYER_KEYS: (keyof PoiLayers)[] = [...POI_CATEGORIES, 'seasonal'];
+export const POI_LAYER_KEYS: (keyof PoiLayers)[] = ['water', 'seasonal', 'viewpoint'];
 
 /** Water points are shown, seasonal ones too, until the user hides them; viewpoints once the user shows them. */
 export const DEFAULT_POI_LAYERS: PoiLayers = { water: true, viewpoint: false, seasonal: true };
 
 /** From this zoom, the map shows points of interest and asks for their tiles; a lower view would span too many. */
-export const POI_MIN_ZOOM = 13;
+export const POI_MIN_ZOOM = 12;
 
 /** A point of interest as the map draws it. */
 export type Poi = { category: PoiCategory; position: Position; seasonal: boolean };

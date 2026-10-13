@@ -73,6 +73,6 @@ describe('shownPoiCategories', () => {
   });
 });
 
-it('shows points of interest from zoom 13', () => {
-  expect(POI_MIN_ZOOM).toBe(13);
+it('shows points of interest from zoom 12', () => {
+  expect(POI_MIN_ZOOM).toBe(12);
 });
