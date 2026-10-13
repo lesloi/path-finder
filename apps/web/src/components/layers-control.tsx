@@ -96,11 +96,10 @@ export function LayersControl({
               {t[LABELS[category]]}
             </label>
           ))}
-          <p className="flex items-center gap-2 px-3 pt-1 pb-2 text-xs text-ink-2">
+          <p className="flex items-center gap-2 px-3 pt-1 pb-1 text-xs text-ink-2">
             <Swatch category="water" hollow />
             {t.poiSeasonalLegend}
           </p>
-          <p className="px-3 pb-1 text-xs text-ink-2">{t.poiZoomHint}</p>
         </div>
       )}
     </div>
