@@ -289,8 +289,8 @@
 }
 
 /*
- * Browsers that can style a native <select> (`appearance: base-select`) get a dropdown in the app's own look;
- * the others keep their native one, which is the right one on a phone anyway.
+ * Browsers that can style a native <select> (`appearance: base-select`, which includes Chrome on Android) get a
+ * dropdown in the app's own look; the others keep their native one.
  */
 @supports (appearance: base-select) {
   select,
@@ -332,9 +332,12 @@
     rotate: 225deg;
   }
   select::picker(select) {
-    /* Under the button and aligned on its right edge, above it when there is no room. */
+    /* Under the button and aligned on its right edge; above it, then aligned on its left edge, when there is no room. */
     position-area: bottom span-left;
-    position-try-fallbacks: flip-block;
+    position-try-fallbacks:
+      flip-block,
+      flip-inline,
+      flip-block flip-inline;
     margin: calc(var(--spacing) * 2) 0;
     min-width: anchor-size(width);
     padding: calc(var(--spacing) * 2);

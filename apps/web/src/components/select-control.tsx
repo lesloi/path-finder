@@ -32,9 +32,7 @@ export function SelectControl<Value extends string>({
       }
     >
       {/* Where a browser can style the select, the button shows a copy of the picked option, icon included. */}
-      <button type="button" aria-label={label}>
-        {createElement('selectedcontent')}
-      </button>
+      <button type="button">{createElement('selectedcontent')}</button>
       {options.map((option) => (
         <option key={option.value} value={option.value} data-testid={testId && `${testId}-${option.value}`}>
           {option.icon}

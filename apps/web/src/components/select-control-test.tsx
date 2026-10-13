@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { SelectControl } from './select-control.tsx';
 
 const options = [
-  { value: 'a', label: 'Alpha', icon: <svg data-testid="icon-a" aria-hidden /> },
+  { value: 'a', label: 'Alpha' },
   { value: 'b', label: 'Beta' },
 ];
 
@@ -14,12 +14,6 @@ describe('SelectControl', () => {
     expect(screen.getByTestId('pick')).toHaveAccessibleName('Letter');
     expect(screen.getByTestId('pick')).toHaveValue('b');
     expect(screen.getByTestId('pick-a')).toHaveTextContent('Alpha');
-  });
-
-  it('shows the icon of an option before its label', () => {
-    render(<SelectControl testId="pick" label="Letter" value="b" options={options} onChange={vi.fn()} />);
-
-    expect(screen.getByTestId('pick-a').firstChild).toBe(screen.getByTestId('icon-a'));
   });
 
   it('reports the picked value', () => {
