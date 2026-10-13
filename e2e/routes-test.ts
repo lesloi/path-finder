@@ -183,6 +183,8 @@ test.describe('the route set', () => {
       await expect(page.getByTestId('route-dock')).toHaveCount(0);
 
       await page.getByTestId('routes-row-0').click();
+      // Escape dismisses a tooltip first: the pointer leaves the icons of the row, which have one.
+      await page.mouse.move(0, 0);
       await page.keyboard.press('Escape');
       await expect(page.getByTestId('route-dock')).toHaveCount(0);
 
