@@ -7,6 +7,7 @@ import {
   Mountain,
   Ruler,
   Timer,
+  Trash2,
   TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
@@ -57,7 +58,7 @@ const words = (language: Language) => ({ ...criteriaText[language], ...routesTex
  * alone: the route selected has its detail in the dock (`RouteDock`), and pointing at a row only previews its
  * route. `onSelect` hears the route shown in the carousel, the list or the detail, `onHover` a place the user
  * points at on the elevation profile. The durations of the routes are at `pace`; `onPaceChange`, when given,
- * lets the user change it in the list.
+ * lets the user change it in the list. `onClear` forgets the route set.
  */
 export function RouteSetView({
   language,
@@ -71,6 +72,7 @@ export function RouteSetView({
   onPreview,
   onDetailChange,
   onPaceChange,
+  onClear,
   onHover,
 }: {
   language: Language;
@@ -90,6 +92,7 @@ export function RouteSetView({
   onDetailChange: (detail: boolean) => void;
   /** Absent when the pace cannot change the routes' durations alone, such as by duration. */
   onPaceChange?: (pace: number) => void;
+  onClear: () => void;
   onHover: (position: Position | undefined) => void;
 }) {
   const desktop = useDesktop();
@@ -141,6 +144,15 @@ export function RouteSetView({
             <span className="sr-only">{t.route(selected + 1, routes.length)}</span>
           </span>
         )}
+        <button
+          type="button"
+          data-testid="routes-clear"
+          className="ml-auto flex min-h-touch items-center gap-1 rounded-full px-2 text-accent"
+          onClick={onClear}
+        >
+          <Trash2 size={18} aria-hidden />
+          {t.clearRoutes}
+        </button>
       </div>
       <RoutePace paceUnit={paceUnit} language={language} pace={pace} onChange={onPaceChange} />
       {desktop ? (
