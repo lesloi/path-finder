@@ -126,6 +126,20 @@ const MARKER_HALF = 16;
 const onMarker = (event?: Event) =>
   event?.target instanceof Element && event.target.closest('[data-waypoint]') !== null;
 
+// Where the bubble of a waypoint sits around its pin, which rises 34 px above the point: clear of the pin, above it or
+// beside it, and just under the point when there is no room above.
+const PIN_BUBBLE_OFFSET = {
+  center: [0, -38],
+  bottom: [0, -38],
+  'bottom-left': [0, -38],
+  'bottom-right': [0, -38],
+  top: [0, 6],
+  'top-left': [0, 6],
+  'top-right': [0, 6],
+  left: [8, -17],
+  right: [-8, -17],
+} satisfies Record<string, [number, number]>;
+
 const poiLayerId = (category: PoiCategory) => `pois-${category}`;
 const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
 const emptyRoutes = { type: 'FeatureCollection', features: [] } as const;
@@ -602,20 +616,33 @@ export function StartPointMap({
     return () => void map.off('mousemove', follow);
   }, [placing]);
 
-  // A white circle with a dark border and its number, in the order the waypoints were placed. Tapping one opens a
+  // A pin with its number, in the order the waypoints were placed. Tapping one opens a
   // bubble with a button to remove it; the guard in the map's handlers keeps that tap from doing anything else.
   useEffect(() => {
     const map = mapRef.current!;
     const markers = waypoints.map((waypoint, index) => {
       const element = document.createElement('div');
       element.dataset.waypoint = String(index + 1);
-      element.textContent = String(index + 1);
       element.setAttribute('role', 'button');
       element.tabIndex = 0;
       element.setAttribute('aria-label', criteriaText[language].waypointName(index + 1));
-      element.className =
-        'grid size-7 cursor-pointer place-items-center rounded-full border-2 border-[#1c1d1b] bg-white ' +
-        'text-sm font-bold text-[#1c1d1b] shadow-float';
+      element.className = 'relative h-[34px] w-7 cursor-pointer drop-shadow-md';
+      // The pin of the waypoint button, white with a dark outline, its tip on the place; the number sits in its head.
+      const pin = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      pin.setAttribute('viewBox', '3 1 18 22');
+      pin.setAttribute('class', 'size-full fill-white stroke-[#1c1d1b]');
+      pin.setAttribute('stroke-width', '2');
+      pin.setAttribute('aria-hidden', 'true');
+      const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      outline.setAttribute(
+        'd',
+        'M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0',
+      );
+      pin.append(outline);
+      const number = document.createElement('span');
+      number.textContent = String(index + 1);
+      number.className = 'absolute inset-x-0 top-[7px] text-center text-sm leading-none font-bold text-[#1c1d1b]';
+      element.append(pin, number);
       const open = () => {
         bubbleRef.current?.remove();
         const remove = document.createElement('button');
@@ -626,7 +653,7 @@ export function StartPointMap({
           bubbleRef.current?.remove();
           removeWaypoint(index);
         });
-        bubbleRef.current = new Popup({ closeButton: false, offset: 18, className: 'waypoint-bubble' })
+        bubbleRef.current = new Popup({ closeButton: false, offset: PIN_BUBBLE_OFFSET, className: 'waypoint-bubble' })
           .setLngLat(waypoint)
           .setDOMContent(remove)
           .addTo(map);
@@ -642,7 +669,7 @@ export function StartPointMap({
           open();
         }
       });
-      return new Marker({ element }).setLngLat(waypoint).addTo(map);
+      return new Marker({ element, anchor: 'bottom' }).setLngLat(waypoint).addTo(map);
     });
     return () => {
       bubbleRef.current?.remove();
