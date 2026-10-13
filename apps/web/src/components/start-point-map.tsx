@@ -47,6 +47,7 @@ import {
   routeTagImage,
 } from './route-tag-image.ts';
 import { useDesktop } from './use-desktop.ts';
+import { WAYPOINT_PIN } from './waypoint-pin.ts';
 import { NORTH_EPSILON, useRouteSnapshot } from './use-route-snapshot.ts';
 
 const LONG_PRESS_MS = 500;
@@ -126,18 +127,18 @@ const MARKER_HALF = 16;
 const onMarker = (event?: Event) =>
   event?.target instanceof Element && event.target.closest('[data-waypoint]') !== null;
 
-// Where the bubble of a waypoint sits around its pin, which rises 34 px above the point: clear of the pin, above it or
+// Where the bubble of a waypoint sits around its pin, which rises 29 px above the point: clear of the pin, above it or
 // beside it, and just under the point when there is no room above.
 const PIN_BUBBLE_OFFSET = {
-  center: [0, -38],
-  bottom: [0, -38],
-  'bottom-left': [0, -38],
-  'bottom-right': [0, -38],
+  center: [0, -33],
+  bottom: [0, -33],
+  'bottom-left': [0, -33],
+  'bottom-right': [0, -33],
   top: [0, 6],
   'top-left': [0, 6],
   'top-right': [0, 6],
-  left: [8, -17],
-  right: [-8, -17],
+  left: [8, -15],
+  right: [-8, -15],
 } satisfies Record<string, [number, number]>;
 
 const poiLayerId = (category: PoiCategory) => `pois-${category}`;
@@ -626,22 +627,21 @@ export function StartPointMap({
       element.setAttribute('role', 'button');
       element.tabIndex = 0;
       element.setAttribute('aria-label', criteriaText[language].waypointName(index + 1));
-      element.className = 'relative h-[34px] w-7 cursor-pointer drop-shadow-md';
+      element.className = 'relative h-[29px] w-6 cursor-pointer drop-shadow-md';
       // The pin of the waypoint button, white with a dark outline, its tip on the place; the number sits in its head.
       const pin = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      pin.setAttribute('viewBox', '3 1 18 22');
-      pin.setAttribute('class', 'size-full fill-white stroke-[#1c1d1b]');
+      pin.setAttribute('viewBox', WAYPOINT_PIN.viewBox);
+      pin.setAttribute('class', 'size-full fill-white');
+      pin.setAttribute('stroke', WAYPOINT_PIN.ink);
       pin.setAttribute('stroke-width', '2');
       pin.setAttribute('aria-hidden', 'true');
       const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      outline.setAttribute(
-        'd',
-        'M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0',
-      );
+      outline.setAttribute('d', WAYPOINT_PIN.path);
       pin.append(outline);
       const number = document.createElement('span');
       number.textContent = String(index + 1);
-      number.className = 'absolute inset-x-0 top-[7px] text-center text-sm leading-none font-bold text-[#1c1d1b]';
+      number.className = 'absolute inset-x-0 top-[6px] text-center text-xs leading-none font-bold';
+      number.style.color = WAYPOINT_PIN.ink;
       element.append(pin, number);
       const open = () => {
         bubbleRef.current?.remove();

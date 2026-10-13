@@ -14,6 +14,7 @@ import {
 import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 import { profileScale } from './profile-scale.ts';
 import { SURFACE_CLASSES } from './surface-colors.ts';
+import { WAYPOINT_PIN } from './waypoint-pin.ts';
 
 const WIDTH = 300;
 const HEIGHT = 60;
@@ -153,20 +154,29 @@ export function ElevationProfile({
               );
             })}
           </svg>
-          {waypointsOnRoute(route.geometry, waypoints).map(({ number, distance, height }) => (
-            // A line down the whole plot, with the numbered circle on the profile at its height.
+          {waypointsOnRoute(route.geometry, waypoints).map(({ number, distance }) => (
+            // The pin at the top of the plot, so that it hides little of the profile, and a line down from its tip.
             <span
               key={number}
               data-testid={testId && `${testId}-waypoint-${number}`}
               role="img"
               aria-label={`${criteriaText[language].waypointName(number)}, ${formatDistance(distance, language)}`}
-              className="pointer-events-none absolute inset-y-0 w-5 -translate-x-1/2"
+              className="pointer-events-none absolute inset-y-0 w-[18px] -translate-x-1/2"
               style={{ left: `${total ? (distance / total) * 100 : 0}%` }}
             >
-              <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-ink-2" />
+              <span className="absolute top-[22px] bottom-0 left-1/2 w-px -translate-x-1/2 bg-ink-2" />
+              <svg
+                viewBox={WAYPOINT_PIN.viewBox}
+                className="absolute top-0 left-0 h-[22px] w-[18px] fill-white"
+                stroke={WAYPOINT_PIN.ink}
+                strokeWidth="2"
+                aria-hidden
+              >
+                <path d={WAYPOINT_PIN.path} />
+              </svg>
               <span
-                className="absolute left-0 grid size-5 -translate-y-1/2 place-items-center rounded-full border-2 border-[#1c1d1b] bg-white text-xs leading-none font-bold text-[#1c1d1b]"
-                style={{ top: `${(y(height ?? middle) / HEIGHT) * 100}%` }}
+                className="absolute inset-x-0 top-[3px] text-center text-[11px] leading-none font-bold"
+                style={{ color: WAYPOINT_PIN.ink }}
               >
                 {number}
               </span>
