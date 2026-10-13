@@ -62,7 +62,8 @@ export function RouteDock({
           </button>
         </div>
       </div>
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
+      {/* Room on the right for the close button, which the pins of the profile would otherwise sit under. */}
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 pr-10">
         <ElevationProfile
           testId="route-profile"
           route={route}
