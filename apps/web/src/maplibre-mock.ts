@@ -165,10 +165,15 @@ export class Popup {
   position?: unknown;
   text?: string;
   html?: string;
+  content?: HTMLElement;
   shown = false;
   constructor(options?: unknown) {
     this.options = options;
     popups.push(this);
+  }
+  setDOMContent(content: HTMLElement) {
+    this.content = content;
+    return this;
   }
   setLngLat(position: unknown) {
     this.position = position;
@@ -193,10 +198,10 @@ export class Popup {
 }
 
 export class Marker {
-  options: unknown;
+  options: { element?: HTMLElement } | undefined;
   position?: unknown;
   shown = false;
-  constructor(options?: unknown) {
+  constructor(options?: { element?: HTMLElement }) {
     this.options = options;
     markers.push(this);
   }

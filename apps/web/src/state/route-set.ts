@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { ErrorCode } from '../contract/index.ts';
+import type { CriteriaField, ErrorCode } from '../contract/index.ts';
 import { parseRoutes, type Route, type RouteSetRequest } from '../core/index.ts';
 import { buildIdHeader } from './api.ts';
 
@@ -9,6 +9,9 @@ import { buildIdHeader } from './api.ts';
  * something that is not a route set.
  */
 export type RouteSetError = ErrorCode | 'unreachable' | 'failed';
+
+/** What an `invalid-criteria` refusal names: the field, and for a waypoint its number counted from 1. */
+export type InvalidCriteria = { field: CriteriaField; waypoint?: number };
 
 // A gateway or a proxy answers these when the API behind it is down.
 const GATEWAY_STATUSES = [502, 503, 504];
@@ -23,18 +26,37 @@ const ERROR_CODES = {
   'generation-timeout': true,
 } satisfies Record<ErrorCode, true>;
 
+const FIELDS = {
+  start: true,
+  target: true,
+  elevationGain: true,
+  surface: true,
+  pace: true,
+  waypoints: true,
+} satisfies Record<CriteriaField, true>;
+
 const isErrorCode = (value: unknown): value is ErrorCode =>
   typeof value === 'string' && Object.hasOwn(ERROR_CODES, value);
 
+// The field and waypoint of a refusal, or none when the body names a field this build does not know.
+function invalidCriteria(body: object): InvalidCriteria | undefined {
+  const { field, waypoint } = body as { field?: unknown; waypoint?: unknown };
+  if (typeof field !== 'string' || !Object.hasOwn(FIELDS, field)) return undefined;
+  const known = field as CriteriaField;
+  return known === 'waypoints' && typeof waypoint === 'number' && Number.isInteger(waypoint) && waypoint > 0
+    ? { field: known, waypoint }
+    : { field: known };
+}
+
 /**
  * Asks our own API for a route set, the only request that carries the start point. Returns the
- * routes, or why there are none (`stale-build` when the API runs a newer build). Rejects only
- * once `signal` aborts.
+ * routes, or why there are none (`stale-build` when the API runs a newer build), with the field at fault
+ * for `invalid-criteria`. Rejects only once `signal` aborts.
  */
 export async function requestRouteSet(
   request: RouteSetRequest,
   signal?: AbortSignal,
-): Promise<{ routes: Route[] } | { error: RouteSetError; retryAfter?: number }> {
+): Promise<{ routes: Route[] } | { error: RouteSetError; retryAfter?: number; invalid?: InvalidCriteria }> {
   let response: Response;
   try {
     response = await fetch('/api/v1/route-sets', {
@@ -56,7 +78,8 @@ export async function requestRouteSet(
     if (!isErrorCode(code)) return { error: GATEWAY_STATUSES.includes(response.status) ? 'unreachable' : 'failed' };
     // Seconds the server asks to wait, which it sets for `overloaded` and `rate-limited`.
     const retryAfter = Number(response.headers.get('Retry-After'));
-    return { error: code, ...(retryAfter > 0 && { retryAfter }) };
+    const invalid = code === 'invalid-criteria' ? invalidCriteria(body as object) : undefined;
+    return { error: code, ...(retryAfter > 0 && { retryAfter }), ...(invalid && { invalid }) };
   }
   const routes = parseRoutes(body);
   return routes ? { routes } : { error: 'failed' };
@@ -108,7 +131,7 @@ async function requestWithRetries(request: RouteSetRequest, signal: AbortSignal)
  * cleared or when the app closes. `onError` hears why a request gave no routes, `no-routes` when
  * the API found none; after an error the routes shown before the request come back.
  */
-export function useRouteSet(onError: (error: RouteSetError | 'no-routes') => void) {
+export function useRouteSet(onError: (error: RouteSetError | 'no-routes', invalid?: InvalidCriteria) => void) {
   const [routeSet, setRouteSet] = useState<{ request: RouteSetRequest; routes: Route[] }>();
   const [loading, setLoading] = useState(false);
   const running = useRef<AbortController>(undefined);
@@ -134,7 +157,8 @@ export function useRouteSet(onError: (error: RouteSetError | 'no-routes') => voi
         setLoading(false);
         if ('error' in result) {
           setRouteSet(previous.current);
-          report.current(result.error);
+          if (result.invalid) report.current(result.error, result.invalid);
+          else report.current(result.error);
         } else if (result.routes.length === 0) {
           previous.current = undefined;
           report.current('no-routes');

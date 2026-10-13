@@ -31,7 +31,7 @@ import {
   type Position,
   veilPolygon,
 } from '../core/index.ts';
-import { commonText, type Language } from '../i18n/index.ts';
+import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { requestPoiTile } from '../state/index.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
@@ -121,6 +121,10 @@ const TAG_HALF: [number, number] = [56, 28];
 // Half the size of a distance marker.
 const MARKER_HALF = 16;
 
+// Whether a DOM event of the map happened on a waypoint marker, which the map's own handlers must leave alone.
+const onMarker = (event?: Event) =>
+  event?.target instanceof Element && event.target.closest('[data-waypoint]') !== null;
+
 const poiLayerId = (category: PoiCategory) => `pois-${category}`;
 const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
 const emptyRoutes = { type: 'FeatureCollection', features: [] } as const;
@@ -172,6 +176,8 @@ export function StartPointMap({
   start,
   focus,
   pickOnClick = false,
+  waypoints = [],
+  placing = false,
   routes,
   summaries,
   coverage,
@@ -188,6 +194,8 @@ export function StartPointMap({
   onBackgroundClick,
   onSnapshot,
   onStartChange,
+  onWaypointAdd,
+  onWaypointRemove,
   onBasemapFail,
   onViewChange,
   ref,
@@ -238,6 +246,13 @@ export function StartPointMap({
   /** Desktops arm a click once the user asks to pick the start point. */
   pickOnClick?: boolean;
   onStartChange: (start: Position) => void;
+  /** The waypoints, numbered in this order. Tapping a marker offers to remove it. */
+  waypoints?: Position[];
+  /** A click or a tap places a waypoint, and a long press no longer sets the start point. */
+  placing?: boolean;
+  onWaypointAdd?: (waypoint: Position) => void;
+  /** The user asked to remove the waypoint at this index, from its bubble. */
+  onWaypointRemove?: (index: number) => void;
   /** The style of a new basemap could not be loaded: the map went back to this one, which the app should show. */
   onBasemapFail?: (basemap: Basemap) => void;
   /** The user turned or moved the map, or it was put back. */
@@ -262,7 +277,7 @@ export function StartPointMap({
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
-  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick;
+  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick && !placing;
   const view = useRef<MapView>({ bearing: 0, rotated: false, movedAway: false });
   // Tells the app what changed in the view, and only when something did: the map moves many times a second.
   const changeView = useEffectEvent((change: Partial<MapView>) => {
@@ -272,17 +287,24 @@ export function StartPointMap({
     onViewChange?.(next);
   });
   const pick = useEffectEvent((how: 'long-press' | 'click', { lng, lat }: { lng: number; lat: number }) => {
+    if (placing) {
+      if (how === 'click') onWaypointAdd?.([lng, lat]);
+      return;
+    }
     // A tap on a route selects it: it must not move the start point too.
     if (interactive) return;
     if (how === 'long-press' || pickOnClick) onStartChange([lng, lat]);
   });
   const clickedBackground = useEffectEvent(() => {
-    if (!pickOnClick) onBackgroundClick?.();
+    if (!pickOnClick && !placing) onBackgroundClick?.();
   });
   const basemapFailed = useEffectEvent((previous: Basemap) => onBasemapFail?.(previous));
   const selectRoute = useEffectEvent((index: number) => {
     if (interactive) onRouteSelect?.(index);
   });
+  const removeWaypoint = useEffectEvent((index: number) => onWaypointRemove?.(index));
+  // The bubble that offers to remove a waypoint.
+  const bubbleRef = useRef<Popup>(undefined);
 
   useEffect(() => {
     const map = new Map({
@@ -476,7 +498,9 @@ export function StartPointMap({
       basemapFailed(previous);
     });
     // Once, not per style: the listeners belong to the map and look the layer up when they fire.
-    map.on('click', 'routes-hit', ({ features }) => selectRoute(features![0].properties.index as number));
+    map.on('click', 'routes-hit', ({ features, originalEvent }) => {
+      if (!onMarker(originalEvent)) selectRoute(features![0].properties.index as number);
+    });
     map.on('mouseenter', 'routes-hit', () => (map.getCanvas().style.cursor = 'pointer'));
     map.on('mouseleave', 'routes-hit', () => (map.getCanvas().style.cursor = ''));
 
@@ -508,7 +532,9 @@ export function StartPointMap({
       map.on('click', layer, (event) => showLabel(event as never));
     }
 
-    map.on('click', ({ lngLat, point }) => {
+    map.on('click', ({ lngLat, point, originalEvent }) => {
+      // A marker sits on the map, and its tap is its own: the bubble that offers to remove it.
+      if (onMarker(originalEvent)) return;
       pick('click', lngLat);
       // A route has its own click, on its wide hit line, and a point of interest its label: anywhere else is the
       // background.
@@ -518,8 +544,9 @@ export function StartPointMap({
     });
 
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const press = ({ lngLat }: MapMouseEvent | MapTouchEvent) => {
+    const press = ({ lngLat, originalEvent }: MapMouseEvent | MapTouchEvent) => {
       clearTimeout(timer);
+      if (onMarker(originalEvent)) return;
       timer = setTimeout(() => pick('long-press', lngLat), LONG_PRESS_MS);
     };
     const cancel = () => clearTimeout(timer);
@@ -536,6 +563,7 @@ export function StartPointMap({
     return () => {
       clearTimeout(timer);
       label.current?.remove();
+      bubbleRef.current?.remove();
       map.remove();
     };
   }, []);
@@ -558,6 +586,50 @@ export function StartPointMap({
       marker.remove();
     };
   }, [start]);
+
+  // A white circle with a dark border and its number, in the order the waypoints were placed. Tapping one opens a
+  // bubble with a button to remove it; the guard in the map's handlers keeps that tap from doing anything else.
+  useEffect(() => {
+    const map = mapRef.current!;
+    const markers = waypoints.map((waypoint, index) => {
+      const element = document.createElement('div');
+      element.dataset.waypoint = String(index + 1);
+      element.textContent = String(index + 1);
+      element.setAttribute('role', 'button');
+      element.tabIndex = 0;
+      element.setAttribute('aria-label', criteriaText[language].waypointName(index + 1));
+      element.className =
+        'grid size-7 cursor-pointer place-items-center rounded-full border-2 border-ink bg-white text-sm ' +
+        'font-bold text-ink shadow-float';
+      const open = () => {
+        bubbleRef.current?.remove();
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = criteriaText[language].removeWaypoint;
+        remove.className = 'min-h-touch rounded-full px-3 font-semibold text-accent';
+        remove.addEventListener('click', () => {
+          bubbleRef.current?.remove();
+          removeWaypoint(index);
+        });
+        bubbleRef.current = new Popup({ closeButton: false, offset: 18 })
+          .setLngLat(waypoint)
+          .setDOMContent(remove)
+          .addTo(map);
+      };
+      element.addEventListener('click', open);
+      element.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          open();
+        }
+      });
+      return new Marker({ element }).setLngLat(waypoint).addTo(map);
+    });
+    return () => {
+      bubbleRef.current?.remove();
+      for (const marker of markers) marker.remove();
+    };
+  }, [waypoints, language]);
 
   useEffect(() => {
     if (focus) mapRef.current!.easeTo({ center: focus, zoom: 14 });

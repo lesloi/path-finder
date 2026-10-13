@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { parseCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
 import { criteriaText } from '../i18n/index.ts';
-import { CriteriaForm, criteriaChanged } from './criteria-form.tsx';
+import { CriteriaForm, criteriaChanged, criteriaRequest, invalidField } from './criteria-form.tsx';
 import type { Position, RouteSetRequest } from '../core/index.ts';
 
 const en = criteriaText.en;
@@ -13,7 +13,9 @@ const START: Position = [6.1294, 45.8992];
 
 const store = (settings: object) => localStorage.setItem('path-finder.settings', JSON.stringify(settings));
 
-function setup(props: { start?: Position; language?: 'en' | 'fr'; searched?: boolean } = {}) {
+function setup(
+  props: { start?: Position; waypoints?: Position[]; language?: 'en' | 'fr'; searched?: boolean } = {},
+) {
   const onSubmit = vi.fn();
   render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} {...props} />);
   const submit = () => fireEvent.click(screen.getByTestId('criteria-submit'));
@@ -56,6 +58,27 @@ describe('CriteriaForm', () => {
     setup();
 
     expect(screen.getByTestId('criteria-submit')).toHaveTextContent(en.findRoutes);
+  });
+
+  it('sends the waypoints in the order they were placed', () => {
+    const waypoints: Position[] = [
+      [6.14, 45.91],
+      [6.12, 45.88],
+    ];
+    const { onSubmit, submit } = setup({ waypoints });
+
+    submit();
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ waypoints }));
+    expect(() => parseCriteria(onSubmit.mock.calls[0][0])).not.toThrow();
+  });
+
+  it('sends no waypoints field when none is placed', () => {
+    const { onSubmit, submit } = setup({ waypoints: [] });
+
+    submit();
+
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('waypoints');
   });
 
   it('hides Find routes until a start point is set', () => {
@@ -266,6 +289,31 @@ describe('CriteriaForm', () => {
   });
 });
 
+describe('invalidField', () => {
+  const request: RouteSetRequest = { start: START, target: { distance: 10 }, surface: 'any', pace: 6 };
+
+  it('names an invalid waypoints field instead of throwing', () => {
+    const tooMany = Array.from({ length: 6 }, (): Position => [6.1, 45.9]);
+
+    expect(invalidField({ ...request, waypoints: tooMany })).toBe('waypoints');
+  });
+
+  it('finds nothing wrong with valid criteria', () => {
+    expect(invalidField({ ...request, waypoints: [[6.1, 45.9]] })).toBeUndefined();
+  });
+});
+
+describe('criteriaRequest', () => {
+  it('leaves out a start point-less request, and carries the waypoints of a complete one', () => {
+    const draft = { target: 'distance', distance: 10, duration: 60, level: 'any', gain: 0, surface: 'any' } as const;
+
+    expect(criteriaRequest(draft, { pace: 6, waypoints: [[6.1, 45.9]] })).toBeUndefined();
+    expect(criteriaRequest(draft, { pace: 6, start: START, waypoints: [[6.1, 45.9]] })).toMatchObject({
+      waypoints: [[6.1, 45.9]],
+    });
+  });
+});
+
 describe('criteriaChanged', () => {
   const found: RouteSetRequest = {
     start: [6.1, 45.8],
@@ -289,6 +337,21 @@ describe('criteriaChanged', () => {
     ['the surface', { surface: 'paved' as const }],
   ])('sees a change of %s', (_, changes) => {
     expect(changed(changes)).toBe(true);
+  });
+
+  it('sees a waypoint added, moved, removed or reordered, but not an empty list for none', () => {
+    const [a, b]: Position[] = [
+      [6.14, 45.91],
+      [6.12, 45.88],
+    ];
+    const withWaypoints = { ...found, waypoints: [a, b] };
+
+    expect(criteriaChanged({ ...found, waypoints: [] }, found)).toBe(false);
+    expect(criteriaChanged(withWaypoints, withWaypoints)).toBe(false);
+    expect(criteriaChanged({ ...found, waypoints: [a] }, found)).toBe(true);
+    expect(criteriaChanged(found, withWaypoints)).toBe(true);
+    expect(criteriaChanged({ ...found, waypoints: [b, a] }, withWaypoints)).toBe(true);
+    expect(criteriaChanged({ ...found, waypoints: [a, [6.12, 45.89]] }, withWaypoints)).toBe(true);
   });
 
   it('sees a change of the pace by duration only', () => {

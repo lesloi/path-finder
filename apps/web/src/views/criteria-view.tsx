@@ -1,6 +1,7 @@
-import { Crosshair, LocateFixed, Navigation2, Scan, Settings } from 'lucide-react';
+import { Crosshair, LocateFixed, MapPinPlus, Navigation2, Scan, Settings } from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
+import { MAX_WAYPOINTS } from '../contract/index.ts';
 import { useCoverage, useSettings } from '../state/index.ts';
 import { CriteriaBar } from './criteria-bar.tsx';
 import { CriteriaForm, criteriaChanged, criteriaRequest, useCriteriaDraft } from './criteria-form.tsx';
@@ -38,7 +39,7 @@ import {
   useDesktop,
 } from '../components/index.ts';
 
-// The bottom-right buttons: the layers, the location or reframe one, the north. On phones they stack up from the
+// The bottom-right buttons: the layers, the waypoint one, the location or reframe one, the north. On phones they stack up from the
 // bottom, over the sheet; on desktops they line up from the right, above the dock when it is shown (`--edge-bottom`).
 // Each class is written whole for Tailwind; `below` counts the buttons the one stands on or beside.
 const STACKED_ABOVE = [
@@ -47,8 +48,10 @@ const STACKED_ABOVE = [
     'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2))]',
   'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+2*(var(--spacing-touch)+--spacing(2)))] ' +
     'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+2*(var(--spacing-touch)+--spacing(2)))]',
+  'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+3*(var(--spacing-touch)+--spacing(2)))] ' +
+    'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+3*(var(--spacing-touch)+--spacing(2)))]',
 ];
-const stackedAbove = (below: 0 | 1 | 2) =>
+const stackedAbove = (below: 0 | 1 | 2 | 3) =>
   `right-safe-3 transition-[bottom] duration-250 ease-[ease] motion-reduce:transition-none desktop:bottom-(--edge-bottom) ${STACKED_ABOVE[below]}`;
 
 // Sets a custom property of the page while `shown`.
@@ -89,6 +92,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
   const [picking, setPicking] = useState(false);
+  // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
+  const [waypoints, setWaypoints] = useState<Position[]>([]);
+  const [placing, setPlacing] = useState(false);
   // On phones, the criteria are a layer over the map; the height of the sheet is what the routes are framed clear of.
   const [layerOpen, setLayerOpen] = useState(false);
   // The sheet says it, and describes its button by it, only while the form does not show its own message.
@@ -116,7 +122,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const selected = desktop ? browser.selected : (browser.selected ?? 0);
   const dockRoute = desktop ? atPace?.routes[selected ?? -1] : undefined;
   const dockShown = Boolean(dockRoute);
-  const current = criteriaRequest(draft[0], { pace, start });
+  const current = criteriaRequest(draft[0], { pace, start, waypoints });
   // Every search keeps the criteria it was made with, whichever button asked for it.
   const search = (request: RouteSetRequest) => {
     setCleared(false);
@@ -135,11 +141,15 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // On phones, in the place of the location button, which the routes hide.
   const reframeShown = routesShown && mapView.movedAway && !detailOpen;
 
+  // Waypoints are for criteria not yet searched: the button goes away with the route set, and with the search.
+  const waypointShown = Boolean(start) && !routesShown && !loading;
+
   // The place of each button in the stack: the location (or reframe) button keeps the corner, within reach of the
-  // thumb, then the layers, then the north.
+  // thumb, then the waypoint one, then the layers, then the north.
   const locateOrReframe = locateShown || reframeShown;
-  const layersSlot = locateOrReframe ? 1 : 0;
-  const northSlot = locateOrReframe ? 2 : 1;
+  const waypointSlot = locateOrReframe ? 1 : 0;
+  const layersSlot = (waypointSlot + (waypointShown ? 1 : 0)) as 0 | 1 | 2;
+  const northSlot = (layersSlot + 1) as 1 | 2 | 3;
 
   // A button that puts the map back goes away once it has: the focus goes on from the settings.
   function putBack(action: 'resetNorth' | 'reframe') {
@@ -155,7 +165,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   useToastTimeout(toast, () => setToast(undefined));
 
-  // Escape steps back on a desktop: first out of picking the start point on the map, then out of the route selected.
+  // Escape steps back on a desktop: first out of placing waypoints, then out of picking the start point on the map, then out of the route selected.
   const deselect = () => {
     browser.select(undefined);
     browser.setPreview(undefined);
@@ -163,7 +173,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   };
   const onKey = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
-    if (picking) setPicking(false);
+    if (placing) setPlacing(false);
+    else if (picking) setPicking(false);
     else if (dockShown) deselect();
   });
   useEffect(() => {
@@ -171,6 +182,26 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [desktop, pageOpen]);
+
+  // The criteria change with their waypoints: the routes found no longer answer them.
+  function togglePlacing() {
+    if (placing) return setPlacing(false);
+    browser.drop();
+    setPicking(false);
+    setPlacing(true);
+  }
+
+  function addWaypoint(position: Position) {
+    if (waypoints.length >= MAX_WAYPOINTS) return;
+    setWaypoints([...waypoints, position]);
+    // The last one ends placing on its own.
+    if (waypoints.length + 1 >= MAX_WAYPOINTS) setPlacing(false);
+  }
+
+  function removeWaypoint(index: number) {
+    browser.drop();
+    setWaypoints(waypoints.filter((_, i) => i !== index));
+  }
 
   function changeStart(position: Position) {
     // Routes from another start point would be stale.
@@ -247,12 +278,14 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       startUncovered={startUncovered}
       language={language}
       picking={picking}
+      waypoints={waypoints}
       draft={draft}
       searched={routesShown}
       onStartChange={moveStart}
       onUnreadable={() => warn('unreadable')}
       onPick={() => {
         setPicking(!picking);
+        setPlacing(false);
         setLayerOpen(false);
       }}
       onLocate={locate}
@@ -297,6 +330,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         {...(desktop && { onBackgroundClick: deselect })}
         onSnapshot={browser.setSnapshot}
         onStartChange={changeStart}
+        waypoints={waypoints}
+        placing={placing}
+        onWaypointAdd={addWaypoint}
+        onWaypointRemove={removeWaypoint}
         onBasemapFail={(previous) => update({ basemap: previous })}
       />
       <a
@@ -306,7 +343,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         href="#/settings"
         {...tip(t.settings, 'bottom-end')}
         // Back from the settings, a crosshair armed before them would come as a surprise.
-        onClick={() => setPicking(false)}
+        onClick={() => {
+          setPicking(false);
+          setPlacing(false);
+        }}
       >
         <Settings size={20} aria-hidden />
       </a>
@@ -318,6 +358,19 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             onChange={(layers) => update({ poiLayers: layers })}
             className={`fixed z-5 ${stackedAbove(layersSlot)}`}
           />
+          {waypointShown && (
+            <button
+              type="button"
+              data-testid="criteria-waypoint"
+              className={`${FLOATING_BUTTON} fixed z-5 disabled:text-ink-2 ${stackedAbove(waypointSlot)}`}
+              {...tip(t.addWaypoint, 'stack')}
+              aria-pressed={placing}
+              disabled={!placing && waypoints.length >= MAX_WAYPOINTS}
+              onClick={togglePlacing}
+            >
+              <MapPinPlus size={20} aria-hidden />
+            </button>
+          )}
           {mapView.rotated && (
             <button
               type="button"
@@ -367,6 +420,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           {listShown && (
             <aside className={LIST_COLUMN} aria-label={t.routes}>
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+                {routeSet && !loading && (
+                  <p data-testid="routes-summary" className="text-sm text-ink-2">
+                    {criteriaSummary(routeSet.request, language)}
+                  </p>
+                )}
                 {staleNotice}
                 {panel}
                 {cancelButton}
@@ -378,7 +436,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <>
           <CriteriaBar
             language={language}
-            summary={criteriaSummary(criteriaRequest(draft[0], { pace, start: start ?? NO_START })!, language)}
+            summary={criteriaSummary(
+              criteriaRequest(draft[0], { pace, start: start ?? NO_START, waypoints })!,
+              language,
+            )}
             start={start && formatPosition(start, language)}
             onClick={() => setLayerOpen(true)}
           />
@@ -453,7 +514,27 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           </button>
         </div>
       )}
-      {browser.error && <RouteErrorToast language={language} error={browser.error} onDismiss={browser.dismissError} />}
+      {placing && (
+        <div data-testid="criteria-waypoint-bar" className={`${MAP_NOTICE} flex items-center gap-3 py-1 pr-1 pl-4`}>
+          {(desktop ? t.placeWaypoint : t.placeWaypointTouch)(waypoints.length + 1)}
+          <button
+            type="button"
+            data-testid="criteria-waypoint-done"
+            className="min-h-touch rounded-full px-3 font-semibold text-accent"
+            onClick={() => setPlacing(false)}
+          >
+            {t.waypointsDone}
+          </button>
+        </div>
+      )}
+      {browser.error && (
+        <RouteErrorToast
+          language={language}
+          error={browser.error}
+          {...(browser.invalid && { invalid: browser.invalid })}
+          onDismiss={browser.dismissError}
+        />
+      )}
       {toast && toast.start === start && (
         <Toast testId="criteria-toast" onDismiss={() => setToast(undefined)}>
           {toast.problem === 'unavailable' ? t.unavailable : t.unreadable}
@@ -471,6 +552,7 @@ function CriteriaFields({
   startUncovered,
   language,
   picking,
+  waypoints,
   draft,
   searched,
   onStartChange,
@@ -483,6 +565,7 @@ function CriteriaFields({
   startUncovered: boolean;
   language: Language;
   picking: boolean;
+  waypoints: Position[];
   draft: ReturnType<typeof useCriteriaDraft>;
   searched: boolean;
   onStartChange: (start: Position) => void;
@@ -525,6 +608,7 @@ function CriteriaFields({
         language={language}
         start={start}
         startUncovered={startUncovered}
+        waypoints={waypoints}
         draft={draft}
         searched={searched}
         onSubmit={onSubmit}

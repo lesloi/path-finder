@@ -82,6 +82,37 @@ describe('requestRouteSet', () => {
     expect(await requestRouteSet(request)).toEqual({ error: 'rate-limited' });
   });
 
+  it('returns the field and the waypoint an invalid criteria refusal names', async () => {
+    answer(Response.json({ error: 'invalid-criteria', field: 'waypoints', waypoint: 2 }, { status: 400 }));
+
+    expect(await requestRouteSet(request)).toEqual({
+      error: 'invalid-criteria',
+      invalid: { field: 'waypoints', waypoint: 2 },
+    });
+  });
+
+  it('returns the field alone when the refusal names no waypoint', async () => {
+    answer(Response.json({ error: 'invalid-criteria', field: 'start' }, { status: 400 }));
+
+    expect(await requestRouteSet(request)).toEqual({ error: 'invalid-criteria', invalid: { field: 'start' } });
+  });
+
+  it.each([
+    ['an unknown field', { field: 'colour' }],
+    ['a waypoint that is not a position in the list', { field: 'waypoints', waypoint: 0 }],
+    ['a waypoint that is not a whole number', { field: 'waypoints', waypoint: 1.5 }],
+  ])('keeps only what it knows of %s', async (_name, detail) => {
+    answer(Response.json({ error: 'invalid-criteria', ...detail }, { status: 400 }));
+
+    const result = await requestRouteSet(request);
+
+    expect(result).toEqual(
+      detail.field === 'waypoints'
+        ? { error: 'invalid-criteria', invalid: { field: 'waypoints' } }
+        : { error: 'invalid-criteria' },
+    );
+  });
+
   it('leaves the page alone when the app is older than the API', async () => {
     const reload = vi.fn();
     vi.stubGlobal('location', { reload });
@@ -149,6 +180,16 @@ describe('useRouteSet', () => {
 
     await waitFor(() => expect(onError).toHaveBeenCalledWith('rate-limited'));
     expect(result.current).toMatchObject({ loading: false, routeSet: undefined });
+  });
+
+  it('reports which field was invalid along with the error', async () => {
+    answer(Response.json({ error: 'invalid-criteria', field: 'waypoints', waypoint: 3 }, { status: 400 }));
+    const onError = vi.fn();
+    const { result } = renderHook(() => useRouteSet(onError));
+
+    act(() => result.current.find(request));
+
+    await waitFor(() => expect(onError).toHaveBeenCalledWith('invalid-criteria', { field: 'waypoints', waypoint: 3 }));
   });
 
   it('reports an empty route set as no routes', async () => {
@@ -264,7 +305,7 @@ describe('retrying while the server is busy', () => {
     await wait(10_000);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(code);
+    expect(onError).toHaveBeenCalledWith(code, ...(code === 'invalid-criteria' ? [{ field: 'pace' }] : []));
   });
 
   it('stops waiting when cleared, or when a newer request replaces it', async () => {

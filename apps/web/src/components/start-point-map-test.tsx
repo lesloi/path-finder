@@ -3,7 +3,7 @@ import { createRef } from 'react';
 
 import type { CoverageCell, Position } from '../core/index.ts';
 import { requestPoiTile } from '../state/index.ts';
-import { commonText } from '../i18n/index.ts';
+import { commonText, criteriaText } from '../i18n/index.ts';
 import { maps, markers, popups, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { StartPointMap, type MapHandle } from './start-point-map.tsx';
@@ -1233,5 +1233,112 @@ describe('StartPointMap points of interest', () => {
 
       expect(onBackgroundClick).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('StartPointMap waypoints', () => {
+  const waypoints: Position[] = [
+    [6.1, 45.9],
+    [6.2, 45.8],
+  ];
+  const shown = () => markers.filter((marker) => marker.shown && marker.options?.element?.dataset.waypoint);
+  const pressed = (marker: (typeof markers)[number]) => marker.options!.element!;
+
+  it('draws a numbered marker at each waypoint, in the order placed', () => {
+    render(<StartPointMap waypoints={waypoints} onStartChange={vi.fn()} />);
+
+    expect(shown().map((marker) => [pressed(marker).textContent, marker.position])).toEqual([
+      ['1', [6.1, 45.9]],
+      ['2', [6.2, 45.8]],
+    ]);
+  });
+
+  it('takes a waypoint off the map once it is removed', () => {
+    const view = render(<StartPointMap waypoints={waypoints} onStartChange={vi.fn()} />);
+
+    view.rerender(<StartPointMap waypoints={[waypoints[1]!]} onStartChange={vi.fn()} />);
+
+    expect(shown().map((marker) => [pressed(marker).textContent, marker.position])).toEqual([['1', [6.2, 45.8]]]);
+  });
+
+  it('adds a waypoint on a click while placing, and leaves the start point alone', () => {
+    const [onWaypointAdd, onStartChange] = [vi.fn(), vi.fn()];
+    render(<StartPointMap placing onWaypointAdd={onWaypointAdd} onStartChange={onStartChange} />);
+
+    act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
+
+    expect(onWaypointAdd).toHaveBeenCalledExactlyOnceWith([6.2, 45.8]);
+    expect(onStartChange).not.toHaveBeenCalled();
+  });
+
+  it('adds nothing on a click when not placing', () => {
+    const onWaypointAdd = vi.fn();
+    render(<StartPointMap onWaypointAdd={onWaypointAdd} onStartChange={vi.fn()} />);
+
+    act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
+
+    expect(onWaypointAdd).not.toHaveBeenCalled();
+  });
+
+  it('does not take a long press for a start point while placing', () => {
+    const [onWaypointAdd, onStartChange] = [vi.fn(), vi.fn()];
+    render(<StartPointMap placing onWaypointAdd={onWaypointAdd} onStartChange={onStartChange} />);
+
+    act(() => {
+      map().fire('touchstart', { lngLat: { lng: 6.2, lat: 45.8 }, originalEvent: touch });
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(onStartChange).not.toHaveBeenCalled();
+  });
+
+  it('takes a tap on a marker for neither a waypoint, a start point, a route nor the background', () => {
+    const [onWaypointAdd, onStartChange, onRouteSelect, onBackgroundClick] = [vi.fn(), vi.fn(), vi.fn(), vi.fn()];
+    render(
+      <StartPointMap
+        placing
+        waypoints={waypoints}
+        routes={[[[6, 45]]]}
+        onWaypointAdd={onWaypointAdd}
+        onStartChange={onStartChange}
+        onRouteSelect={onRouteSelect}
+        onBackgroundClick={onBackgroundClick}
+      />,
+    );
+    const originalEvent = { target: pressed(shown()[0]!) };
+
+    act(() => {
+      map().fire('click', { lngLat: { lng: 6.1, lat: 45.9 }, originalEvent });
+      map().fire('click', { features: [{ properties: { index: 0 } }], originalEvent }, 'routes-hit');
+      map().fire('mousedown', { lngLat: { lng: 6.1, lat: 45.9 }, originalEvent: { ...originalEvent, button: 0 } });
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(onWaypointAdd).not.toHaveBeenCalled();
+    expect(onStartChange).not.toHaveBeenCalled();
+    expect(onRouteSelect).not.toHaveBeenCalled();
+    expect(onBackgroundClick).not.toHaveBeenCalled();
+  });
+
+  it('offers to remove a waypoint on a tap on its marker', () => {
+    const onWaypointRemove = vi.fn();
+    render(<StartPointMap waypoints={waypoints} onWaypointRemove={onWaypointRemove} onStartChange={vi.fn()} />);
+
+    act(() => pressed(shown()[1]!).click());
+    const popup = popups.at(-1)!;
+    expect(popup.shown).toBe(true);
+    expect(popup.position).toEqual([6.2, 45.8]);
+    act(() => popup.content!.click());
+
+    expect(onWaypointRemove).toHaveBeenCalledExactlyOnceWith(1);
+    expect(popup.shown).toBe(false);
+  });
+
+  it('names the marker and its button in French', () => {
+    render(<StartPointMap language="fr" waypoints={waypoints} onStartChange={vi.fn()} />);
+
+    expect(pressed(shown()[0]!)).toHaveAttribute('aria-label', criteriaText.fr.waypointName(1));
+    act(() => pressed(shown()[0]!).click());
+    expect(popups.at(-1)!.content).toHaveTextContent(criteriaText.fr.removeWaypoint);
   });
 });

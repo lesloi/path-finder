@@ -32,6 +32,40 @@ describe('RouteErrorToast', () => {
     expect(screen.getByTestId('routes-toast')).toHaveTextContent(errorText.en['rate-limited']);
   });
 
+  describe.each(['en', 'fr'] as const)('an invalid criteria refusal, in %s', (language) => {
+    const t = routesText[language];
+    const toast = (invalid?: { field: 'waypoints' | 'start' | 'pace'; waypoint?: number }) => {
+      render(
+        <RouteErrorToast
+          language={language}
+          error="invalid-criteria"
+          {...(invalid && { invalid })}
+          onDismiss={vi.fn()}
+        />,
+      );
+      return screen.getByTestId('routes-toast');
+    };
+
+    it('names the waypoint that is too far from a way, as numbered on the map', () => {
+      expect(toast({ field: 'waypoints', waypoint: 3 })).toHaveTextContent(t.waypointTooFar(3));
+    });
+
+    it('says the start point is too far from a way', () => {
+      expect(toast({ field: 'start' })).toHaveTextContent(t.startTooFar);
+    });
+
+    it('says the waypoints make too long a route when no waypoint is named', () => {
+      expect(toast({ field: 'waypoints' })).toHaveTextContent(t.waypointsUnreachable);
+    });
+
+    it.each([
+      ['another field', { field: 'pace' as const }],
+      ['no field', undefined],
+    ])('keeps the general words for %s', (_name, invalid) => {
+      expect(toast(invalid)).toHaveTextContent(errorText[language]['invalid-criteria']);
+    });
+  });
+
   it('is an alert that a click drops', () => {
     const onDismiss = vi.fn();
     render(<RouteErrorToast language="en" error="unreachable" onDismiss={onDismiss} />);

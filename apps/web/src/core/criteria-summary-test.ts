@@ -31,6 +31,17 @@ describe('criteriaSummary', () => {
     expect(criteriaSummary({ ...request, surface: 'unpaved' }, metric)).toBe(`10.0 km · ${criteriaText.en.unpaved}`);
   });
 
+  it('counts the waypoints', () => {
+    const waypoints: [number, number][] = [
+      [6.1, 45.9],
+      [6.2, 45.9],
+    ];
+
+    expect(criteriaSummary({ ...request, waypoints: [waypoints[0]!] }, metric)).toBe('10.0 km · 1 waypoint');
+    expect(criteriaSummary({ ...request, waypoints }, metric)).toBe('10.0 km · 2 waypoints');
+    expect(criteriaSummary({ ...request, waypoints }, 'fr')).toBe('10,0 km · 2 points de passage');
+  });
+
   it('follows the language', () => {
     expect(criteriaSummary({ ...request, elevationGain: 300, surface: 'paved' }, 'fr')).toBe(
       `10,0 km · 300 m · ${criteriaText.fr.paved}`,

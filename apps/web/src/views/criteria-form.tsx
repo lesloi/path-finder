@@ -67,7 +67,7 @@ export function useCriteriaDraft(): [Draft, (draft: Draft) => void, () => void] 
  */
 export function criteriaRequest(
   draft: Draft,
-  { pace, start }: { pace: number; start?: Position },
+  { pace, start, waypoints }: { pace: number; start?: Position; waypoints?: Position[] },
 ): RouteSetRequest | undefined {
   const distance = clamp(draft.distance, BOUNDS.distance.min, BOUNDS.distance.max);
   const gain = clamp(draft.gain, 0, BOUNDS.gain.max);
@@ -80,9 +80,13 @@ export function criteriaRequest(
       ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
       surface: draft.surface,
       pace,
+      ...(waypoints?.length && { waypoints }),
     }
   );
 }
+
+const samePositions = (a: Position[], b: Position[]) =>
+  a.length === b.length && a.every(([lon, lat], i) => lon === b[i]![0] && lat === b[i]![1]);
 
 /**
  * Whether `request` asks for something other than `found`, the request of the routes shown. A distance or an
@@ -105,6 +109,7 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
     request.start[0] === found.start[0] &&
     request.start[1] === found.start[1] &&
     request.surface === found.surface &&
+    samePositions(request.waypoints ?? [], found.waypoints ?? []) &&
     ('distance' in b || request.pace === found.pace)
   );
 }
@@ -117,6 +122,7 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
 export function CriteriaForm({
   language,
   start,
+  waypoints,
   startUncovered = false,
   draft: kept,
   searched = false,
@@ -124,6 +130,8 @@ export function CriteriaForm({
 }: {
   language: Language;
   start?: Position;
+  /** The points the routes go through, in order: they are placed on the map, not in the form. */
+  waypoints?: Position[];
   /** The start point is where the server has no routes: asking would only fail. */
   startUncovered?: boolean;
   /** From `useCriteriaDraft`, for a view that mounts the form in more than one place and keeps what was set. */
@@ -142,7 +150,7 @@ export function CriteriaForm({
   const level = draft.level;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
-  const request = criteriaRequest(draft, { pace: settings.pace, start });
+  const request = criteriaRequest(draft, { pace: settings.pace, start, ...(waypoints && { waypoints }) });
   const field = request && invalidField(request);
 
   const sections: Record<Criterion, { title: string; content: ReactNode }> = {
@@ -286,22 +294,18 @@ export function CriteriaForm({
   );
 }
 
-// The fields the form sets: it places no waypoints yet.
-type FormField = Exclude<CriteriaField, 'waypoints'>;
-
 // The first field `parseCriteria` rejects, as the API would.
-export function invalidField(request: RouteSetRequest): FormField | undefined {
+export function invalidField(request: RouteSetRequest): CriteriaField | undefined {
   try {
     parseCriteria(request);
   } catch (error) {
-    // The form cannot make an invalid waypoint, so one would be a bug, not something to word.
-    if (error instanceof CriteriaError && error.field !== 'waypoints') return error.field;
+    if (error instanceof CriteriaError) return error.field;
     throw error;
   }
 }
 
 function message(
-  field: FormField,
+  field: CriteriaField,
   target: Target,
   {
     language,
@@ -314,12 +318,13 @@ function message(
   },
 ): string {
   const t = criteriaText[language];
-  const messages: Record<FormField, string> = {
+  const messages: Record<CriteriaField, string> = {
     start: t.startError,
     target: target === 'distance' ? t.distanceError(distance.min, distance.max, 'km') : t.durationError,
     elevationGain: t.elevationGainError(gain.max, 'm'),
     surface: t.surfaceError,
     pace: t.paceError,
+    waypoints: t.waypointsError,
   };
   return messages[field];
 }

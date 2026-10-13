@@ -36,6 +36,12 @@ export const routesText = {
     unreachableHint: 'Check your connection, then try again.',
     failed: 'The service did not answer properly.',
     failedHint: 'Try again in a moment.',
+    waypointTooFar: (waypoint: number) => `Waypoint ${waypoint} is too far from a path.`,
+    waypointTooFarHint: 'Move it closer to a path, or remove it.',
+    startTooFar: 'The start point is too far from a path.',
+    startTooFarHint: 'Choose a start point closer to a path.',
+    waypointsUnreachable: 'These waypoints make too long a route for the target, or no path joins them.',
+    waypointsUnreachableHint: 'Remove a waypoint, or raise the target.',
   },
   fr: {
     routes: 'Parcours',
@@ -66,5 +72,12 @@ export const routesText = {
     unreachableHint: 'Vérifiez votre connexion, puis réessayez.',
     failed: 'Le service n’a pas répondu correctement.',
     failedHint: 'Réessayez dans un instant.',
+    waypointTooFar: (waypoint: number) => `Le point de passage ${waypoint} est trop loin d’un chemin.`,
+    waypointTooFarHint: 'Rapprochez-le d’un chemin, ou supprimez-le.',
+    startTooFar: 'Le point de départ est trop loin d’un chemin.',
+    startTooFarHint: 'Choisissez un point de départ plus près d’un chemin.',
+    waypointsUnreachable:
+      'Ces points de passage font un parcours trop long pour l’objectif, ou aucun chemin ne les relie.',
+    waypointsUnreachableHint: 'Supprimez un point de passage, ou augmentez l’objectif.',
   },
 } satisfies Record<Language, { misses: Record<Miss['criterion'], string> } & Record<string, unknown>>;
