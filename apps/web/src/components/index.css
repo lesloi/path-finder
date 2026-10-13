@@ -305,6 +305,18 @@
     cursor: pointer;
   }
   /* A thin chevron instead of the default triangle. */
+  select button {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    flex: 1;
+    font: inherit;
+  }
+  select selectedcontent {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+  }
   select::picker-icon {
     content: '';
     width: 6px;
@@ -319,7 +331,11 @@
     rotate: 225deg;
   }
   select::picker(select) {
-    margin-top: calc(var(--spacing) * 2);
+    /* Under the button and aligned on its right edge, above it when there is no room. */
+    position-area: block-end span-left;
+    position-try-fallbacks: flip-block;
+    margin: calc(var(--spacing) * 2) 0;
+    min-width: anchor-size(width);
     padding: calc(var(--spacing) * 2);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);

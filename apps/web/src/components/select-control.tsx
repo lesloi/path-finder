@@ -1,3 +1,5 @@
+import { createElement, type ReactNode } from 'react';
+
 /** Exclusive choices in a native dropdown, which stays compact however many there are; the label names it. */
 export function SelectControl<Value extends string>({
   label,
@@ -9,7 +11,7 @@ export function SelectControl<Value extends string>({
 }: {
   label: string;
   value: Value;
-  options: { value: Value; label: string }[];
+  options: { value: Value; label: string; /** Decorative, before the label. */ icon?: ReactNode }[];
   onChange: (value: Value) => void;
   /** Prefix of the test ids: the select, then `-<value>` for each option. */
   testId?: string;
@@ -29,8 +31,13 @@ export function SelectControl<Value extends string>({
         'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none'
       }
     >
+      {/* Where a browser can style the select, the button shows a copy of the picked option, icon included. */}
+      <button type="button" aria-label={label}>
+        {createElement('selectedcontent')}
+      </button>
       {options.map((option) => (
         <option key={option.value} value={option.value} data-testid={testId && `${testId}-${option.value}`}>
+          {option.icon}
           {option.label}
         </option>
       ))}

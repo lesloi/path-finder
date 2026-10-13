@@ -1,10 +1,12 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Monitor, Moon, Sun } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 
 import { BASEMAPS, PACE_UNITS, type Basemap, type PaceUnit, type Theme } from '../core/index.ts';
 import { commonText, settingsText, type Language } from '../i18n/index.ts';
 import { useSettings } from '../state/index.ts';
 import { GROUP_TITLE, LIST, LIST_ROW, LIST_ROW_CHEVRON, SelectControl } from '../components/index.ts';
+
+const FLAG_CLASSES = 'flex-none ring-1 ring-border';
 
 export function SettingsView({ language }: { language: Language }) {
   const t = { ...commonText[language], ...settingsText[language] };
@@ -24,9 +26,9 @@ export function SettingsView({ language }: { language: Language }) {
             label={t.theme}
             value={settings.theme}
             options={[
-              { value: 'system', label: t.system },
-              { value: 'light', label: t.light },
-              { value: 'dark', label: t.dark },
+              { value: 'system', label: t.system, icon: <Monitor size={16} aria-hidden className="flex-none" /> },
+              { value: 'light', label: t.light, icon: <Sun size={16} aria-hidden className="flex-none" /> },
+              { value: 'dark', label: t.dark, icon: <Moon size={16} aria-hidden className="flex-none" /> },
             ]}
             onChange={(theme: Theme) => update({ theme })}
           />
@@ -37,8 +39,8 @@ export function SettingsView({ language }: { language: Language }) {
             label={t.language}
             value={language}
             options={[
-              { value: 'fr', label: 'Français' },
-              { value: 'en', label: 'English' },
+              { value: 'fr', label: 'Français', icon: <FrenchFlag /> },
+              { value: 'en', label: 'English', icon: <BritishFlag /> },
             ]}
             onChange={(picked) => update({ language: picked })}
           />
@@ -95,5 +97,27 @@ function SettingRow({ label, children }: { label: string; children: ReactNode })
       <span className="font-semibold">{label}</span>
       {children}
     </div>
+  );
+}
+
+function FrenchFlag() {
+  return (
+    <svg className={FLAG_CLASSES} viewBox="0 0 3 2" width="24" height="16" aria-hidden>
+      <path fill="#002395" d="M0 0h1v2H0z" />
+      <path fill="#ffffff" d="M1 0h1v2H1z" />
+      <path fill="#ed2939" d="M2 0h1v2H2z" />
+    </svg>
+  );
+}
+
+function BritishFlag() {
+  return (
+    <svg className={FLAG_CLASSES} viewBox="0 0 60 30" width="24" height="16" aria-hidden>
+      <path fill="#012169" d="M0 0h60v30H0z" />
+      <path stroke="#ffffff" strokeWidth="6" d="M0 0l60 30M60 0L0 30" />
+      <path stroke="#c8102e" strokeWidth="2" d="M0 0l60 30M60 0L0 30" />
+      <path stroke="#ffffff" strokeWidth="10" d="M30 0v30M0 15h60" />
+      <path stroke="#c8102e" strokeWidth="6" d="M30 0v30M0 15h60" />
+    </svg>
   );
 }
