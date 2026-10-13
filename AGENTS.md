@@ -38,7 +38,7 @@ choice that is costly to reverse and whose reason the code does not show.
 - After a change: `pnpm format`, then `pnpm check` (static and quick: formatting, lint, types, `gofmt`, `go vet`).
 - Before committing: the tests of what you touched, unless already run since the last change: `pnpm test`
   (unit, web and server), `pnpm test:integration` (server, through HTTP), `pnpm test:e2e`, and `pnpm coverage`
-  (90 % for the web app and for the server). CI runs `check`, `web` and `server`, one workflow each.
+  (90 % for the web app and for the server).
 - Run `pnpm install` after a pull, merge or rebase that changes dependencies.
 - A benchmark or a long build is never started without the owner's go-ahead.
 - Branches: `type/short-description` (`feature`, `bugfix`, `hotfix`, `release`, `chore`). Commits:

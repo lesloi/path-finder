@@ -7,14 +7,29 @@ on:
 permissions:
   contents: read
 
-# Every run on main finishes.
+# One run at a time on main. A run waiting behind the running one is replaced by a newer push, which is fine: only the
+# latest commit is tested and deployed, and it contains the others.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  # Builds the multi-platform image and pushes it to GitHub Container Registry; the pull requests build the app through the e2e tests (workflow `web`).
+  # The checks and tests run here on `main`, so that nothing is published or deployed before they pass. A called workflow
+  # sees this workflow's name in `github.workflow`, so their concurrency groups carry their own name to stay distinct from
+  # this one. The quick check goes first, so a failure does not leave the long jobs running.
+  check:
+    uses: ./.github/workflows/check.yml
+  web:
+    needs: check
+    uses: ./.github/workflows/web.yml
+  server:
+    needs: check
+    uses: ./.github/workflows/server.yml
+
+  # Builds the multi-platform image and pushes it to GitHub Container Registry once the checks and tests pass; the pull requests
+  # build the app through the e2e tests (workflow `web`).
   container:
+    needs: [check, web, server]
     runs-on: ubuntu-latest
     outputs:
       digest: ${{ steps.build.outputs.digest }}

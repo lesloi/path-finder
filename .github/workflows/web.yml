@@ -1,16 +1,17 @@
 name: Web
 
+# On `main` the workflow runs inside `release.yml`, which deploys only once it has passed.
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
 
-# A new push to a pull request cancels the run it replaces; runs on main all finish.
+# A new push to a pull request cancels the run it replaces. The workflow name in the group keeps it distinct
+# from the one of `release.yml` (see there).
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-web-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
