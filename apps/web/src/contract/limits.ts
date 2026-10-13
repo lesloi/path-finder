@@ -8,5 +8,6 @@ export const TARGET_DURATION = { min: contract.durationMinutes.min, max: contrac
 export const MAX_TARGET_ELEVATION_GAIN = contract.maxElevationGainMetres;
 export const CLIMB_PER_EFFORT_KM = contract.climbPerEffortKm;
 export const HILLY_MATCH_PER_KM = contract.hillyMatchPerKm;
+export const POI_TILE_ZOOM = contract.poiTileZoom;
 export const SURFACES = contract.surfaces as Criteria['surface'][];
 export const ERROR_CODES = contract.errorCodes;

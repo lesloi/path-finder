@@ -53,6 +53,22 @@ describe('CriteriaView', () => {
     expect(screen.getByTestId('criteria-settings')).toHaveAttribute('href', '#/settings');
   });
 
+  describe('the layers button', () => {
+    it('keeps the layers chosen across reloads', () => {
+      const first = render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-layers'));
+      fireEvent.click(screen.getByTestId('layers-viewpoint'));
+      fireEvent.click(screen.getByTestId('layers-water'));
+      first.unmount();
+
+      render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-layers'));
+
+      expect(screen.getByTestId('layers-viewpoint')).toBeChecked();
+      expect(screen.getByTestId('layers-water')).not.toBeChecked();
+    });
+  });
+
   describe('the north button', () => {
     it('shows once the map is turned, and turns it back', () => {
       render(<CriteriaView language="en" />);

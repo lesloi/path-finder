@@ -17,6 +17,10 @@ import {
   formatDistance,
   formatHeight,
   isWithin,
+  POI_MIN_ZOOM,
+  poiTilesCovering,
+  type PoiCategory,
+  POI_CATEGORIES,
   markerInterval,
   midpointWithin,
   type PixelRect,
@@ -27,9 +31,10 @@ import {
   veilPolygon,
 } from '../core/index.ts';
 import { commonText, type Language } from '../i18n/index.ts';
+import { requestPoiTile } from '../state/index.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
-import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
+import { MAP_COLORS, MAP_INK, POI_COLORS, ROUTE_COLORS, routeColor } from './route-colors.ts';
 import {
   ROUTE_TAG_MUTED,
   ROUTE_TAG_PADDING,
@@ -168,6 +173,7 @@ export function StartPointMap({
   summaries,
   coverage,
   language = 'en',
+  poiCategories = [],
   selectedRoute,
   markedRoute,
   framing = 'all',
@@ -192,6 +198,8 @@ export function StartPointMap({
   coverage?: CoverageCell[] | undefined;
   /** The language of the labels. */
   language?: Language;
+  /** The categories of points of interest to draw, from zoom 13; no tile is asked for while there are none. */
+  poiCategories?: PoiCategory[];
   selectedRoute?: number;
   /** The route that carries distance markers while the others stay drawn, such as the one selected on a desktop. */
   markedRoute?: number;
@@ -325,6 +333,23 @@ export function StartPointMap({
         source: 'coverage',
         paint: veilPaint(shownBasemap.current),
       });
+      // Above the veil and under the routes. A seasonal point is hollow: it may be dry.
+      map.addSource('pois', { type: 'geojson', data: emptyRoutes });
+      for (const category of POI_CATEGORIES) {
+        map.addLayer({
+          id: `pois-${category}`,
+          type: 'circle',
+          source: 'pois',
+          minzoom: POI_MIN_ZOOM,
+          filter: ['==', ['get', 'category'], category],
+          paint: {
+            'circle-radius': 6,
+            'circle-color': ['case', ['get', 'seasonal'], MAP_COLORS.white, POI_COLORS[category]],
+            'circle-stroke-color': POI_COLORS[category],
+            'circle-stroke-width': 2.5,
+          },
+        });
+      }
       const line = { 'line-join': 'round', 'line-cap': 'round' } as const;
       map.addSource('routes', { type: 'geojson', data: emptyRoutes });
       // The selected route has a white casing and a dashed white marking along its line, and its own colour;
@@ -524,6 +549,39 @@ export function StartPointMap({
     if (!loaded || !source) return;
     source.setData(coverage?.length ? veilPolygon(coverage) : emptyRoutes);
   }, [loaded, coverage, styleVersion]);
+
+  // The points of interest in view: the tiles of the view are asked for only from zoom 13 and while a category is on,
+  // since a tile says which ~30 km the user looks at. A view that moved on meanwhile drops the late answer.
+  const categoriesKey = poiCategories.join();
+  useEffect(() => {
+    const map = mapRef.current;
+    const source = map?.getSource('pois') as GeoJSONSource | undefined;
+    if (!map || !loaded || !source) return;
+    const categories = categoriesKey ? (categoriesKey.split(',') as PoiCategory[]) : [];
+    if (categories.length === 0 || map.getZoom() < POI_MIN_ZOOM) {
+      source.setData(emptyRoutes);
+      return;
+    }
+    let current = true;
+    const [[west, south], [east, north]] = map.getBounds().toArray();
+    void Promise.all(poiTilesCovering([west!, south!, east!, north!]).map(([x, y]) => requestPoiTile(x, y))).then(
+      (tiles) => {
+        if (!current) return;
+        const features = tiles
+          .flat()
+          .filter(({ category }) => categories.includes(category))
+          .map(({ category, position, seasonal }) => ({
+            type: 'Feature' as const,
+            geometry: point(position),
+            properties: { category, seasonal },
+          }));
+        source.setData({ type: 'FeatureCollection', features });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [loaded, categoriesKey, viewVersion, styleVersion]);
 
   // MapLibre names its controls once, when it draws them: a language picked since is applied by hand.
   useEffect(() => {
