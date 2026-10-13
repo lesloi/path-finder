@@ -587,6 +587,11 @@ export function StartPointMap({
     };
   }, [start]);
 
+  // A crosshair tells the user a tap now places a waypoint.
+  useEffect(() => {
+    mapRef.current!.getCanvas().style.cursor = placing ? 'crosshair' : '';
+  }, [placing]);
+
   // A white circle with a dark border and its number, in the order the waypoints were placed. Tapping one opens a
   // bubble with a button to remove it; the guard in the map's handlers keeps that tap from doing anything else.
   useEffect(() => {
