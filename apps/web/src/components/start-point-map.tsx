@@ -606,12 +606,12 @@ export function StartPointMap({
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.textContent = criteriaText[language].removeWaypoint;
-        remove.className = 'min-h-touch rounded-full px-3 font-semibold text-accent';
+        remove.className = 'rounded-md px-2 py-1.5 font-semibold text-accent';
         remove.addEventListener('click', () => {
           bubbleRef.current?.remove();
           removeWaypoint(index);
         });
-        bubbleRef.current = new Popup({ closeButton: false, offset: 18 })
+        bubbleRef.current = new Popup({ closeButton: false, offset: 18, className: 'waypoint-bubble' })
           .setLngLat(waypoint)
           .setDOMContent(remove)
           .addTo(map);

@@ -1520,13 +1520,13 @@ describe('CriteriaView', () => {
     it('asks for the next waypoint in a banner, and places one on each tap', () => {
       render(<CriteriaView language="en" />);
       startPlacing();
-      expect(banner()).toHaveTextContent(en.placeWaypoint(1));
+      expect(banner()).toHaveTextContent(en.placeWaypoint);
       expect(waypointButton()).toHaveAttribute('aria-pressed', 'true');
 
       place(6.21, 45.81);
       place(6.22, 45.82);
 
-      expect(banner()).toHaveTextContent(en.placeWaypoint(3));
+      expect(banner()).toHaveTextContent(en.placeWaypoint);
       expect(waypointMarkers().map((marker) => [marker.options?.element?.textContent, marker.position])).toEqual([
         ['1', [6.21, 45.81]],
         ['2', [6.22, 45.82]],
@@ -1558,6 +1558,22 @@ describe('CriteriaView', () => {
       expect(screen.queryByTestId('criteria-waypoint-bar')).not.toBeInTheDocument();
       expect(waypointMarkers()).toHaveLength(5);
       expect(waypointButton()).toBeDisabled();
+    });
+
+    it('places no waypoint on the veiled part of the map, where the server cannot route', async () => {
+      vi.stubGlobal('fetch', (url: string) =>
+        url === '/api/v1/coverage'
+          ? Promise.resolve(Response.json({ cells: [[6, 45.7, 6.3, 45.9]] }))
+          : new Promise(() => {}),
+      );
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      await act(async () => {});
+
+      place(2.3, 48.8);
+      place(6.21, 45.81);
+
+      expect(waypointMarkers().map((marker) => marker.position)).toEqual([[6.21, 45.81]]);
     });
 
     it('does not move the start point while placing', () => {

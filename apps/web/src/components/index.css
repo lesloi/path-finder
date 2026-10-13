@@ -217,6 +217,9 @@
   line-height: 1;
   box-shadow: var(--float);
 }
+.maplibregl-popup.waypoint-bubble .maplibregl-popup-content {
+  padding: calc(var(--spacing) * 0.5);
+}
 .maplibregl-popup .maplibregl-popup-tip {
   display: none;
 }

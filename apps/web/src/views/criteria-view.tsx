@@ -193,6 +193,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   function addWaypoint(position: Position) {
     if (waypoints.length >= MAX_WAYPOINTS) return;
+    // The veiled part of the map is where the server cannot route: a waypoint there would only be refused.
+    if (coverage && !isCovered(coverage, position)) return;
     setWaypoints([...waypoints, position]);
     // The last one ends placing on its own.
     if (waypoints.length + 1 >= MAX_WAYPOINTS) setPlacing(false);
@@ -516,7 +518,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       )}
       {placing && (
         <div data-testid="criteria-waypoint-bar" className={`${MAP_NOTICE} flex items-center gap-3 py-1 pr-1 pl-4`}>
-          {(desktop ? t.placeWaypoint : t.placeWaypointTouch)(waypoints.length + 1)}
+          {desktop ? t.placeWaypoint : t.placeWaypointTouch}
           <button
             type="button"
             data-testid="criteria-waypoint-done"
