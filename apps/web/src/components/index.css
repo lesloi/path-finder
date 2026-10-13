@@ -205,6 +205,23 @@
 }
 
 /*
+ * The label of a point of interest wears the UI colours, not MapLibre's white (unreadable in dark mode): a rounded
+ * surface with the same room on all four sides. Its tip is left out, as the label floats a little above the point.
+ */
+.maplibregl-popup .maplibregl-popup-content {
+  padding: calc(var(--spacing) * 3);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  line-height: 1;
+  box-shadow: var(--float);
+}
+.maplibregl-popup .maplibregl-popup-tip {
+  display: none;
+}
+
+/*
  * The compact attribution keeps MapLibre's size (24 px, one text line, `--spacing-credits`): a credit is not an action
  * to reach. It wears the UI colours, not MapLibre's white, and its "i" is a mask so that it follows the ink.
  */

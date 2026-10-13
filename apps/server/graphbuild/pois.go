@@ -54,11 +54,13 @@ type poiPoint struct {
 	category string
 	lat, lon float64
 	seasonal bool
+	name     string
 }
 
 type poiWay struct {
 	category string
 	seasonal bool
+	name     string
 	refs     []int64
 }
 
@@ -106,7 +108,7 @@ func BuildPOIs(pbfs []string, out string, log io.Writer) error {
 			}
 		}
 		if n > 0 {
-			scan.points = append(scan.points, poiPoint{w.category, lat / float64(n), lon / float64(n), w.seasonal})
+			scan.points = append(scan.points, poiPoint{w.category, lat / float64(n), lon / float64(n), w.seasonal, w.name})
 		}
 	}
 
@@ -114,7 +116,7 @@ func BuildPOIs(pbfs []string, out string, log io.Writer) error {
 	for _, p := range scan.points {
 		x, y := contract.POITileOf(p.lat, p.lon)
 		tiles[[2]int{x, y}] = append(tiles[[2]int{x, y}], contract.POI{
-			Category: p.category, Position: [2]float64{round5(p.lon), round5(p.lat)}, Seasonal: p.seasonal,
+			Category: p.category, Position: [2]float64{round5(p.lon), round5(p.lat)}, Seasonal: p.seasonal, Name: p.name,
 		})
 	}
 	fmt.Fprintf(log, "%d points of interest in %d tiles\n", len(scan.points), len(tiles))
@@ -138,7 +140,7 @@ func (s *poiScan) read(path string) error {
 			category, seasonal := classifyPOI(o.Tags)
 			if key := "n" + strconv.FormatInt(int64(o.ID), 10); category != "" && !s.seen[key] {
 				s.seen[key] = true
-				s.points = append(s.points, poiPoint{category, o.Lat, o.Lon, seasonal})
+				s.points = append(s.points, poiPoint{category, o.Lat, o.Lon, seasonal, o.Tags.Find("name")})
 			}
 		case *osm.Way:
 			category, seasonal := classifyPOI(o.Tags)
@@ -148,7 +150,7 @@ func (s *poiScan) read(path string) error {
 				for i, n := range o.Nodes {
 					refs[i] = int64(n.ID)
 				}
-				s.ways = append(s.ways, poiWay{category, seasonal, refs})
+				s.ways = append(s.ways, poiWay{category, seasonal, o.Tags.Find("name"), refs})
 			}
 		}
 	}

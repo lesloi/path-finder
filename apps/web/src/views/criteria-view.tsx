@@ -17,6 +17,7 @@ import {
   routesAtPace,
   type Position,
   type RouteSetRequest,
+  shownPoiCategories,
 } from '../core/index.ts';
 import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
@@ -26,6 +27,7 @@ import {
   BottomSheet,
   FLOATING_BUTTON,
   ICON_BUTTON,
+  LayersControl,
   LIST_COLUMN,
   PRIMARY_BUTTON,
   SIDE_COLUMN,
@@ -35,15 +37,17 @@ import {
   useDesktop,
 } from '../components/index.ts';
 
-// The bottom-right buttons: the location or reframe one, the north. On phones they stack up from the
+// The bottom-right buttons: the layers, the location or reframe one, the north. On phones they stack up from the
 // bottom, over the sheet; on desktops they line up from the right, above the dock when it is shown (`--edge-bottom`).
 // Each class is written whole for Tailwind; `below` counts the buttons the one stands on or beside.
 const STACKED_ABOVE = [
   'bottom-[calc(var(--sheet-height,0px)+--spacing(3))]',
   'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2))] ' +
     'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2))]',
+  'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+2*(var(--spacing-touch)+--spacing(2)))] ' +
+    'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+2*(var(--spacing-touch)+--spacing(2)))]',
 ];
-const stackedAbove = (below: 0 | 1) =>
+const stackedAbove = (below: 0 | 1 | 2) =>
   `right-safe-3 transition-[bottom] duration-250 ease-[ease] motion-reduce:transition-none desktop:bottom-(--edge-bottom) ${STACKED_ABOVE[below]}`;
 
 // Sets a custom property of the page while `shown`.
@@ -97,7 +101,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const map = useRef<MapHandle>(null);
   const [mapView, setMapView] = useState<MapView>({ bearing: 0, rotated: false, movedAway: false });
   const pageWasOpen = useRef(pageOpen);
-  const [{ basemap, pace, paceUnit }, update] = useSettings();
+  const [{ basemap, pace, paceUnit, poiLayers }, update] = useSettings();
   const browser = useRouteBrowser();
   const { routeSet, loading } = browser;
   const atPace = useMemo(() => routeSet && routesAtPace(routeSet.request, routeSet.routes, pace), [routeSet, pace]);
@@ -136,6 +140,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const locateShown = !routesShown && !loading && !detailOpen;
   // In the place of the location button, which the routes hide.
   const reframeShown = routesShown && mapView.movedAway && !detailOpen;
+
+  // The place of each button in the stack: the location (or reframe) button keeps the corner, within reach of the
+  // thumb, then the layers, then the north.
+  const locateOrReframe = locateShown || reframeShown;
+  const layersSlot = locateOrReframe ? 1 : 0;
+  const northSlot = locateOrReframe ? 2 : 1;
 
   // A button that puts the map back goes away once it has: the focus goes on from the settings.
   function putBack(action: 'resetNorth' | 'reframe') {
@@ -285,6 +295,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         summaries={summaries}
         coverage={coverage}
         language={language}
+        poiCategories={shownPoiCategories(poiLayers)}
+        poiSeasonal={poiLayers.seasonal}
         // A desktop highlights the route it points at in the list, and marks the one selected.
         selectedRoute={desktop ? (browser.preview ?? selected) : selected}
         {...(desktop && { markedRoute: selected })}
@@ -313,11 +325,17 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       </a>
       {!detailOpen && (
         <>
+          <LayersControl
+            language={language}
+            layers={poiLayers}
+            onChange={(layers) => update({ poiLayers: layers })}
+            className={`fixed z-5 ${stackedAbove(layersSlot)}`}
+          />
           {mapView.rotated && (
             <button
               type="button"
               data-testid="criteria-north"
-              className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(locateShown || reframeShown ? 1 : 0)}`}
+              className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(northSlot)}`}
               aria-label={t.resetNorth}
               onClick={() => putBack('resetNorth')}
             >

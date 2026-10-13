@@ -90,6 +90,7 @@ type POI struct {
 	Category string     `json:"category"` // water or viewpoint
 	Position [2]float64 `json:"position"`
 	Seasonal bool       `json:"seasonal,omitempty"` // water points only
+	Name     string     `json:"name,omitempty"`     // the OSM name, when it has one
 }
 
 // POITile is what a tile of points of interest holds; a tile with none holds an empty list.

@@ -7,6 +7,7 @@ export * from './gpx.ts';
 export * from './gpx-save.ts';
 export * from './pace.ts';
 export * from './page-meta.ts';
+export * from './poi.ts';
 export * from './route.ts';
 export * from './theme.ts';
 export * from './units.ts';

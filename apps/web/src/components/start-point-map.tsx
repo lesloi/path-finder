@@ -2,6 +2,7 @@ import {
   AttributionControl,
   Map,
   Marker,
+  Popup,
   ScaleControl,
   type GeoJSONSource,
   type MapMouseEvent,
@@ -17,6 +18,10 @@ import {
   formatDistance,
   formatHeight,
   isWithin,
+  POI_MIN_ZOOM,
+  poiTilesCovering,
+  type PoiCategory,
+  POI_CATEGORIES,
   markerInterval,
   midpointWithin,
   type PixelRect,
@@ -27,8 +32,10 @@ import {
   veilPolygon,
 } from '../core/index.ts';
 import { commonText, type Language } from '../i18n/index.ts';
+import { requestPoiTile } from '../state/index.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
+import { POI_IMAGE_RATIO, poiImage, poiImageId } from './poi-image.ts';
 import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
 import {
   ROUTE_TAG_MUTED,
@@ -114,6 +121,7 @@ const TAG_HALF: [number, number] = [56, 28];
 // Half the size of a distance marker.
 const MARKER_HALF = 16;
 
+const poiLayerId = (category: PoiCategory) => `pois-${category}`;
 const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
 const emptyRoutes = { type: 'FeatureCollection', features: [] } as const;
 
@@ -168,6 +176,8 @@ export function StartPointMap({
   summaries,
   coverage,
   language = 'en',
+  poiCategories = [],
+  poiSeasonal = true,
   selectedRoute,
   markedRoute,
   framing = 'all',
@@ -192,6 +202,10 @@ export function StartPointMap({
   coverage?: CoverageCell[] | undefined;
   /** The language of the labels. */
   language?: Language;
+  /** The categories of points of interest to draw, from zoom 12; no tile is asked for while there are none. */
+  poiCategories?: PoiCategory[];
+  /** Whether seasonal water points are drawn among them. */
+  poiSeasonal?: boolean;
   selectedRoute?: number;
   /** The route that carries distance markers while the others stay drawn, such as the one selected on a desktop. */
   markedRoute?: number;
@@ -242,7 +256,9 @@ export function StartPointMap({
   const swappedFrom = useRef<Basemap>(undefined);
   const desktop = useDesktop();
   const scale = useRef<ScaleControl>(null);
-  const initialLanguage = useEffectEvent(() => language);
+  const languageNow = useEffectEvent(() => language);
+  // The label of the point of interest under the pointer.
+  const labelRef = useRef<Popup>(undefined);
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
@@ -276,7 +292,7 @@ export function StartPointMap({
       zoom: 5,
       attributionControl: false,
       // MapLibre words the names of its controls in English: ours are in the language of the app.
-      locale: mapLocale(initialLanguage()),
+      locale: mapLocale(languageNow()),
       // A flat map: the app draws no relief and no 3D, so a tilt would only skew it.
       maxPitch: 0,
       pitchWithRotate: false,
@@ -325,6 +341,26 @@ export function StartPointMap({
         source: 'coverage',
         paint: veilPaint(shownBasemap.current),
       });
+      // Above the veil and under the routes. A seasonal point has the reverse badge: it may be dry.
+      for (const category of POI_CATEGORIES) {
+        for (const seasonal of [false, true]) {
+          map.addImage(poiImageId(category, seasonal), poiImage(category, seasonal), { pixelRatio: POI_IMAGE_RATIO });
+        }
+      }
+      map.addSource('pois', { type: 'geojson', data: emptyRoutes });
+      for (const category of POI_CATEGORIES) {
+        map.addLayer({
+          id: poiLayerId(category),
+          type: 'symbol',
+          source: 'pois',
+          minzoom: POI_MIN_ZOOM,
+          filter: ['==', ['get', 'category'], category],
+          layout: {
+            'icon-image': ['case', ['get', 'seasonal'], poiImageId(category, true), poiImageId(category, false)],
+            'icon-allow-overlap': true,
+          },
+        });
+      }
       const line = { 'line-join': 'round', 'line-cap': 'round' } as const;
       map.addSource('routes', { type: 'geojson', data: emptyRoutes });
       // The selected route has a white casing and a dashed white marking along its line, and its own colour;
@@ -444,10 +480,41 @@ export function StartPointMap({
     map.on('mouseenter', 'routes-hit', () => (map.getCanvas().style.cursor = 'pointer'));
     map.on('mouseleave', 'routes-hit', () => (map.getCanvas().style.cursor = ''));
 
+    // The label of a point of interest: its name, else what it is. By hover where there is a pointer, and on a tap
+    // where there is not. OSM names come from anyone, so they are text, never markup.
+    const poiLayers = POI_CATEGORIES.map(poiLayerId);
+    const label = labelRef;
+    const showLabel = ({ features }: { features?: { properties: Record<string, unknown>; geometry: unknown }[] }) => {
+      const feature = features?.[0];
+      if (!feature) return;
+      const { category, seasonal, name } = feature.properties;
+      const words = commonText[languageNow()];
+      const what = category === 'viewpoint' ? words.viewpoint : seasonal ? words.seasonalWaterPoint : words.waterPoint;
+      label.current?.remove();
+      label.current = new Popup({ closeButton: false, offset: 14 })
+        .setLngLat((feature.geometry as { coordinates: [number, number] }).coordinates)
+        .setText(typeof name === 'string' && name ? name : what)
+        .addTo(map);
+    };
+    for (const layer of poiLayers) {
+      map.on('mouseenter', layer, (event) => {
+        map.getCanvas().style.cursor = 'pointer';
+        showLabel(event as never);
+      });
+      map.on('mouseleave', layer, () => {
+        map.getCanvas().style.cursor = '';
+        label.current?.remove();
+      });
+      map.on('click', layer, (event) => showLabel(event as never));
+    }
+
     map.on('click', ({ lngLat, point }) => {
       pick('click', lngLat);
-      // A route has its own click, on its wide hit line: anywhere else is the background.
-      if (!map.queryRenderedFeatures(point, { layers: ['routes-hit'] }).length) clickedBackground();
+      // A route has its own click, on its wide hit line, and a point of interest its label: anywhere else is the
+      // background.
+      // A style on its way holds none of these layers yet, and asking for a layer that is not there is an error.
+      const present = ['routes-hit', ...poiLayers].filter((id) => map.getLayer(id));
+      if (!present.length || !map.queryRenderedFeatures(point, { layers: present }).length) clickedBackground();
     });
 
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -468,6 +535,7 @@ export function StartPointMap({
 
     return () => {
       clearTimeout(timer);
+      label.current?.remove();
       map.remove();
     };
   }, []);
@@ -524,6 +592,41 @@ export function StartPointMap({
     if (!loaded || !source) return;
     source.setData(coverage?.length ? veilPolygon(coverage) : emptyRoutes);
   }, [loaded, coverage, styleVersion]);
+
+  // The points of interest in view: the tiles of the view are asked for only from zoom 12 and while a category is on,
+  // since a tile says which ~30 km the user looks at. A view that moved on meanwhile drops the late answer.
+  const categoriesKey = poiCategories.join();
+  useEffect(() => {
+    const map = mapRef.current;
+    const source = map?.getSource('pois') as GeoJSONSource | undefined;
+    if (!map || !loaded || !source) return;
+    // The point it names may be gone with the new data, and a pointer leaving a point that is gone is never heard.
+    labelRef.current?.remove();
+    const categories = categoriesKey ? (categoriesKey.split(',') as PoiCategory[]) : [];
+    if (categories.length === 0 || map.getZoom() < POI_MIN_ZOOM) {
+      source.setData(emptyRoutes);
+      return;
+    }
+    let current = true;
+    const [[west, south], [east, north]] = map.getBounds().toArray();
+    void Promise.all(poiTilesCovering([west!, south!, east!, north!]).map(([x, y]) => requestPoiTile(x, y))).then(
+      (tiles) => {
+        if (!current) return;
+        const features = tiles
+          .flat()
+          .filter(({ category, seasonal }) => categories.includes(category) && (poiSeasonal || !seasonal))
+          .map(({ category, position, seasonal, name }) => ({
+            type: 'Feature' as const,
+            geometry: point(position),
+            properties: { category, seasonal, ...(name && { name }) },
+          }));
+        source.setData({ type: 'FeatureCollection', features });
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, [loaded, categoriesKey, poiSeasonal, viewVersion, styleVersion]);
 
   // MapLibre names its controls once, when it draws them: a language picked since is applied by hand.
   useEffect(() => {

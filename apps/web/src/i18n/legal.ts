@@ -32,7 +32,7 @@ export const legalText = {
           {
             list: [
               {
-                text: 'Routes built on data © OpenStreetMap contributors, available under the {odbl}.',
+                text: 'Routes and points of interest built on data © OpenStreetMap contributors, available under the {odbl}.',
                 links: { odbl: 'ODbL' },
               },
               {
@@ -73,7 +73,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Your settings (pace and its unit, language, last criteria) are kept in your browser’s storage. Routes are never saved. We receive neither. Clearing the site’s data in your browser erases them.',
+              text: 'Your settings (pace and its unit, language, last criteria, map layers) are kept in your browser’s storage. Routes are never saved. We receive neither. Clearing the site’s data in your browser erases them.',
             },
           },
         ],
@@ -101,6 +101,11 @@ export const legalText = {
           {
             paragraph: {
               text: 'When the app opens, it also asks our server which areas it can generate routes in, to grey out the others on the map. This request holds nothing about you: your IP address, as with any connection, and no location.',
+            },
+          },
+          {
+            paragraph: {
+              text: 'From zoom 12, the map also asks our server for the tiles of points of interest (drinking water, viewpoints) of the area you view. A tile covers about 30 km, so the request reveals that area to our server, with your IP address as with any connection. These requests are never logged.',
             },
           },
           {
@@ -185,7 +190,7 @@ export const legalText = {
           {
             list: [
               {
-                text: 'Itinéraires calculés sur les données © contributeurs OpenStreetMap, disponibles sous licence {odbl}.',
+                text: 'Itinéraires et points d’intérêt issus des données © contributeurs OpenStreetMap, disponibles sous licence {odbl}.',
                 links: { odbl: 'ODbL' },
               },
               {
@@ -226,7 +231,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Vos réglages (allure et son unité, langue, derniers critères) sont enregistrés dans le stockage de votre navigateur. Les itinéraires ne sont jamais enregistrés. Nous ne recevons ni les uns ni les autres. Effacer les données du site dans votre navigateur les supprime.',
+              text: 'Vos réglages (allure et son unité, langue, derniers critères, calques de la carte) sont enregistrés dans le stockage de votre navigateur. Les itinéraires ne sont jamais enregistrés. Nous ne recevons ni les uns ni les autres. Effacer les données du site dans votre navigateur les supprime.',
             },
           },
         ],
@@ -254,6 +259,11 @@ export const legalText = {
           {
             paragraph: {
               text: 'À l’ouverture, l’application demande aussi à notre serveur dans quelles zones il peut calculer des itinéraires, pour griser les autres sur la carte. Cette requête ne contient rien sur vous : votre adresse IP, comme pour toute connexion, et aucune position.',
+            },
+          },
+          {
+            paragraph: {
+              text: 'À partir du zoom 12, la carte demande aussi à notre serveur les tuiles des points d’intérêt (eau potable, points de vue) de la zone affichée. Une tuile couvre environ 30 km : la requête révèle donc cette zone à notre serveur, avec votre adresse IP, comme pour toute connexion. Ces requêtes ne sont jamais journalisées.',
             },
           },
           {

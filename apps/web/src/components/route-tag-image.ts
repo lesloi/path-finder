@@ -1,4 +1,4 @@
-import { ROUTE_COLORS } from './route-colors.ts';
+import { hexToRgb, ROUTE_COLORS } from './route-colors.ts';
 
 // The rounded box behind a route's tag, drawn pixel by pixel like the distance markers' disc: the
 // map takes raw RGBA data, and a canvas would need a browser.
@@ -26,14 +26,13 @@ export const ROUTE_TAG_MUTED = 'route-tag';
 export const routeTagId = (index: number) => `route-tag-${index % ROUTE_COLORS.length}`;
 
 // The red, green and blue of a `#rrggbb` colour.
-const rgb = (hex: string) => [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
 
 // How much of a pixel lies inside a shape whose signed distance to the pixel's centre is this, from 0 to 1.
 const coverage = (signedDistance: number) => Math.min(1, Math.max(0, 0.5 - signedDistance));
 
 /** The image of a route tag's box: filled, ringed in a border colour, transparent around. */
 export function routeTagImage(fill: string, border: string) {
-  const [fillRgb, borderRgb] = [rgb(fill), rgb(border)];
+  const [fillRgb, borderRgb] = [hexToRgb(fill), hexToRgb(border)];
   const data = new Uint8Array(SIZE * SIZE * 4);
   const half = SIZE / 2;
   for (let y = 0; y < SIZE; y++) {

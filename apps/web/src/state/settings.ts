@@ -10,6 +10,9 @@ import {
 } from '../contract/index.ts';
 import {
   BASEMAPS,
+  DEFAULT_POI_LAYERS,
+  POI_LAYER_KEYS,
+  type PoiLayers,
   DEFAULT_BASEMAP,
   DEFAULT_PACE,
   DEFAULT_PACE_UNIT,
@@ -48,6 +51,8 @@ export type Settings = {
   paceUnit: PaceUnit;
   theme: Theme;
   basemap: Basemap;
+  /** Which categories of points of interest the map shows. */
+  poiLayers: PoiLayers;
   lastCriteria: LastCriteria;
 };
 
@@ -78,6 +83,13 @@ const isSurface = (value: unknown): value is LastCriteria['surface'] =>
   SURFACES.includes(value as LastCriteria['surface']);
 const isLevel = (value: unknown): value is ElevationLevel => LEVELS.includes(value as ElevationLevel);
 
+function parsePoiLayers(stored: unknown): PoiLayers {
+  const layers = isObject(stored) ? stored : {};
+  return Object.fromEntries(
+    POI_LAYER_KEYS.map((key) => [key, typeof layers[key] === 'boolean' ? layers[key] : DEFAULT_POI_LAYERS[key]]),
+  ) as PoiLayers;
+}
+
 function parseLastCriteria(stored: unknown): LastCriteria {
   const { target, distance, duration, surface, level, gain } = isObject(stored) ? stored : {};
   return {
@@ -99,13 +111,14 @@ function parse(raw: string | null): Settings {
   } catch {
     stored = {};
   }
-  const { pace, language, paceUnit, theme, basemap, lastCriteria } = isObject(stored) ? stored : {};
+  const { pace, language, paceUnit, theme, basemap, poiLayers, lastCriteria } = isObject(stored) ? stored : {};
   return {
     pace: isPace(pace) ? pace : DEFAULT_PACE,
     ...((language === 'fr' || language === 'en') && { language }),
     paceUnit: PACE_UNITS.includes(paceUnit as PaceUnit) ? (paceUnit as PaceUnit) : DEFAULT_PACE_UNIT,
     theme: theme === 'light' || theme === 'dark' ? theme : DEFAULT_THEME,
     basemap: BASEMAPS.includes(basemap as Basemap) ? (basemap as Basemap) : DEFAULT_BASEMAP,
+    poiLayers: parsePoiLayers(poiLayers),
     lastCriteria: parseLastCriteria(lastCriteria),
   };
 }

@@ -2,12 +2,14 @@ import { act, render } from '@testing-library/react';
 import { createRef } from 'react';
 
 import type { CoverageCell, Position } from '../core/index.ts';
+import { requestPoiTile } from '../state/index.ts';
 import { commonText } from '../i18n/index.ts';
-import { maps, markers, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
+import { maps, markers, popups, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { StartPointMap, type MapHandle } from './start-point-map.tsx';
 
 vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
+vi.mock('../state/index.ts', () => ({ requestPoiTile: vi.fn() }));
 
 const map = () => maps.at(-1)!;
 const touch = { touches: [{}] };
@@ -15,6 +17,7 @@ const touch = { touches: [{}] };
 beforeEach(() => {
   maps.length = 0;
   markers.length = 0;
+  popups.length = 0;
   vi.useFakeTimers();
 });
 
@@ -250,6 +253,8 @@ describe('StartPointMap', () => {
       expect(map().layers.map(({ id }) => id)).toEqual([
         'background',
         'coverage-veil',
+        'pois-water',
+        'pois-viewpoint',
         'routes-others',
         'routes-casing',
         'routes-line',
@@ -618,6 +623,8 @@ describe('StartPointMap', () => {
       expect(map().layers.map(({ id }) => id)).toEqual([
         'background',
         'coverage-veil',
+        'pois-water',
+        'pois-viewpoint',
         'routes-others',
         'routes-casing',
         'routes-line',
@@ -1048,6 +1055,183 @@ describe('StartPointMap', () => {
       expect(
         (map().getSource('route-hover') as GeoJSONSource & { data: { features: unknown[] } }).data.features,
       ).toHaveLength(1);
+    });
+  });
+});
+
+describe('StartPointMap points of interest', () => {
+  const water = { category: 'water', position: [6.05, 45.05], seasonal: false };
+  const viewpoint = { category: 'viewpoint', position: [6.06, 45.06], seasonal: true };
+  const shown = () =>
+    (map().getSource('pois') as GeoJSONSource & { data: { features: { properties: object }[] } }).data.features;
+
+  beforeEach(() => {
+    vi.mocked(requestPoiTile).mockReset();
+    // The view spans several tiles, which hold different points: the points sit in the first one asked for.
+    let first: string | undefined;
+    vi.mocked(requestPoiTile).mockImplementation(async (x, y) => {
+      first ??= `${x}/${y}`;
+      return (first === `${x}/${y}` ? [water, viewpoint] : []) as never;
+    });
+  });
+
+  async function openAt(zoom: number, categories: ('water' | 'viewpoint')[]) {
+    render(<StartPointMap poiCategories={categories} onStartChange={vi.fn()} />);
+    map().zoom = zoom;
+    await act(async () => map().fire('style.load'));
+    await act(async () => map().fire('moveend'));
+  }
+
+  it('asks for no tile below zoom 12, which would reveal a wide area for nothing', async () => {
+    await openAt(11.9, ['water', 'viewpoint']);
+
+    expect(requestPoiTile).not.toHaveBeenCalled();
+  });
+
+  it('asks for no tile while every category is off', async () => {
+    await openAt(14, []);
+
+    expect(requestPoiTile).not.toHaveBeenCalled();
+  });
+
+  it('draws the points of the categories that are on, from zoom 12', async () => {
+    await openAt(12, ['water']);
+
+    expect(requestPoiTile).toHaveBeenCalledWith(expect.any(Number), expect.any(Number));
+    expect(shown()).toHaveLength(1);
+    expect(shown()[0]!.properties).toMatchObject({ category: 'water', seasonal: false });
+    expect(
+      (map().layers as { id: string; minzoom?: number }[])
+        .filter(({ id }) => id.startsWith('pois'))
+        .map(({ minzoom }) => minzoom),
+    ).toEqual([12, 12]);
+  });
+
+  it('marks a seasonal point', async () => {
+    await openAt(14, ['water', 'viewpoint']);
+
+    expect(shown().map(({ properties }) => properties)).toContainEqual(
+      expect.objectContaining({ category: 'viewpoint', seasonal: true }),
+    );
+  });
+
+  it('leaves out the seasonal water points when asked', async () => {
+    let first: string | undefined;
+    vi.mocked(requestPoiTile).mockImplementation(async (x, y) => {
+      first ??= `${x}/${y}`;
+      return (first === `${x}/${y}` ? [water, { ...water, seasonal: true }] : []) as never;
+    });
+    render(<StartPointMap poiCategories={['water']} poiSeasonal={false} onStartChange={vi.fn()} />);
+    map().zoom = 14;
+    await act(async () => map().fire('style.load'));
+    await act(async () => map().fire('moveend'));
+
+    expect(shown().map(({ properties }) => properties)).toEqual([{ category: 'water', seasonal: false }]);
+  });
+
+  it('draws them above the veil and under the routes', async () => {
+    await openAt(14, ['water']);
+
+    const ids = (map().layers as { id: string }[]).map(({ id }) => id);
+    expect(ids.indexOf('pois-water')).toBeGreaterThan(ids.indexOf('coverage-veil'));
+    expect(ids.indexOf('pois-water')).toBeLessThan(ids.indexOf('routes-others'));
+  });
+
+  it('hides a category as soon as it is turned off', async () => {
+    const { rerender } = render(<StartPointMap poiCategories={['water', 'viewpoint']} onStartChange={vi.fn()} />);
+    map().zoom = 14;
+    await act(async () => map().fire('style.load'));
+    await act(async () => map().fire('moveend'));
+
+    rerender(<StartPointMap poiCategories={['water']} onStartChange={vi.fn()} />);
+    await act(async () => map().fire('moveend'));
+
+    expect(shown().map(({ properties }) => properties)).toEqual([expect.objectContaining({ category: 'water' })]);
+  });
+  describe('the label of a point', () => {
+    const hover = (properties: object, layer = 'pois-viewpoint') =>
+      act(() =>
+        map().fire('mouseenter', { features: [{ properties, geometry: { coordinates: [6.05, 45.05] } }] }, layer),
+      );
+
+    beforeEach(() => render(<StartPointMap onStartChange={vi.fn()} language="fr" />));
+
+    it('says the name of the point under the pointer, as plain text', () => {
+      hover({ category: 'viewpoint', seasonal: false, name: '<b>Tour Eiffel</b>' });
+
+      expect(popups.at(-1)).toMatchObject({ text: '<b>Tour Eiffel</b>', position: [6.05, 45.05], shown: true });
+      expect(popups.at(-1)!.html).toBeUndefined();
+    });
+
+    it.each([
+      ['water', false, commonText.fr.waterPoint],
+      ['water', true, commonText.fr.seasonalWaterPoint],
+      ['viewpoint', false, commonText.fr.viewpoint],
+    ])('names a %s point with no name (seasonal: %s) by what it is', (category, seasonal, text) => {
+      hover({ category, seasonal }, `pois-${category}`);
+
+      expect(popups.at(-1)!.text).toBe(text);
+    });
+
+    it('goes away with the pointer', () => {
+      hover({ category: 'water', seasonal: false }, 'pois-water');
+
+      act(() => map().fire('mouseleave', {}, 'pois-water'));
+
+      expect(popups.at(-1)!.shown).toBe(false);
+    });
+
+    it('shows on a tap too, where there is no pointer to hover with', () => {
+      act(() =>
+        map().fire(
+          'click',
+          {
+            features: [
+              {
+                properties: { category: 'viewpoint', seasonal: false, name: 'Belvédère' },
+                geometry: { coordinates: [6, 45] },
+              },
+            ],
+          },
+          'pois-viewpoint',
+        ),
+      );
+
+      expect(popups.at(-1)!.text).toBe('Belvédère');
+    });
+
+    it('goes away with its point when the layer is turned off', async () => {
+      const { rerender } = render(<StartPointMap poiCategories={['viewpoint']} onStartChange={vi.fn()} />);
+      map().zoom = 14;
+      await act(async () => map().fire('style.load'));
+      await act(async () => map().fire('moveend'));
+      hover({ category: 'viewpoint', seasonal: false });
+
+      rerender(<StartPointMap poiCategories={[]} onStartChange={vi.fn()} />);
+
+      expect(popups.at(-1)!.shown).toBe(false);
+    });
+
+    it('asks for no layer that the style has not loaded yet when it looks for what was clicked', () => {
+      const onBackgroundClick = vi.fn();
+      render(<StartPointMap onBackgroundClick={onBackgroundClick} onStartChange={vi.fn()} />);
+      const query = vi.spyOn(map(), 'queryRenderedFeatures');
+
+      act(() => map().fire('click', { lngLat: { lng: 6, lat: 45 }, point: { x: 1, y: 1 } }));
+
+      expect(query).not.toHaveBeenCalled();
+      expect(onBackgroundClick).toHaveBeenCalledOnce();
+    });
+
+    it('is not a click on the background, which would close the dock', () => {
+      const onBackgroundClick = vi.fn();
+      render(<StartPointMap onBackgroundClick={onBackgroundClick} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
+      map().rendered = [{}];
+
+      act(() => map().fire('click', { lngLat: { lng: 6, lat: 45 }, point: { x: 1, y: 1 } }));
+
+      expect(onBackgroundClick).not.toHaveBeenCalled();
     });
   });
 });
