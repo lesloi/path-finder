@@ -1,6 +1,6 @@
 import { Download, X } from 'lucide-react';
 
-import { DOCK, ElevationProfile, ICON_BUTTON, PRIMARY_BUTTON } from '../components/index.ts';
+import { DOCK, ElevationProfile, ICON_BUTTON, PRIMARY_BUTTON, tip } from '../components/index.ts';
 import { gpxExport, missText, saveGpx, type PaceUnit, type Position, type Route } from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
 import { RouteFigures, SurfaceShare } from './route-figures.tsx';
@@ -75,7 +75,7 @@ export function RouteDock({
         type="button"
         data-testid="route-close"
         className={`${ICON_BUTTON} absolute top-2 right-2`}
-        aria-label={t.closeRoute}
+        {...tip(t.closeRoute, 'bottom-end')}
         onClick={onClose}
       >
         <X size={20} aria-hidden />

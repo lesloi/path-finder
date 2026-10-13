@@ -16,6 +16,7 @@ export * from './route-colors.ts';
 export * from './elevation-profile.tsx';
 export * from './route-thumbnail.tsx';
 export * from './toast.tsx';
+export * from './use-tip-dismiss.ts';
 export * from './use-toast-timeout.ts';
 export * from './surface-colors.ts';
 export * from './surface-bar.tsx';
