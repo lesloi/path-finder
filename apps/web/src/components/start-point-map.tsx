@@ -614,8 +614,8 @@ export function StartPointMap({
       element.tabIndex = 0;
       element.setAttribute('aria-label', criteriaText[language].waypointName(index + 1));
       element.className =
-        'grid size-7 cursor-pointer place-items-center rounded-full border-2 border-ink bg-white text-sm ' +
-        'font-bold text-ink shadow-float';
+        'grid size-7 cursor-pointer place-items-center rounded-full border-2 border-[#1c1d1b] bg-white ' +
+        'text-sm font-bold text-[#1c1d1b] shadow-float';
       const open = () => {
         bubbleRef.current?.remove();
         const remove = document.createElement('button');
