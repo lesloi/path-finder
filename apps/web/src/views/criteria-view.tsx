@@ -141,6 +141,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // In the place of the location button, which the routes hide.
   const reframeShown = routesShown && mapView.movedAway && !detailOpen;
 
+  // The place of each button in the stack: a phone keeps the location (or reframe) button at the bottom, within reach
+  // of the thumb, and the layers above it; a desktop has the layers at the corner.
+  const locateOrReframe = locateShown || reframeShown;
+  const locateSlot = desktop ? 1 : 0;
+  const layersSlot = desktop ? 0 : locateOrReframe ? 1 : 0;
+  const northSlot = locateOrReframe ? 2 : 1;
+
   // A button that puts the map back goes away once it has: the focus goes on from the settings.
   function putBack(action: 'resetNorth' | 'reframe') {
     map.current?.[action]();
@@ -323,13 +330,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             language={language}
             layers={poiLayers}
             onChange={(layers) => update({ poiLayers: layers })}
-            className={`fixed z-5 ${stackedAbove(0)}`}
+            className={`fixed z-5 ${stackedAbove(layersSlot)}`}
           />
           {mapView.rotated && (
             <button
               type="button"
               data-testid="criteria-north"
-              className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(locateShown || reframeShown ? 2 : 1)}`}
+              className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(northSlot)}`}
               aria-label={t.resetNorth}
               onClick={() => putBack('resetNorth')}
             >
@@ -344,7 +351,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <button
           type="button"
           data-testid="criteria-locate"
-          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(1)}`}
+          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(locateSlot)}`}
           aria-label={t.myLocation}
           onClick={locate}
         >
@@ -355,7 +362,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <button
           type="button"
           data-testid="criteria-reframe"
-          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(1)}`}
+          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(locateSlot)}`}
           aria-label={t.reframe}
           onClick={() => putBack('reframe')}
         >

@@ -54,6 +54,19 @@ describe('CriteriaView', () => {
   });
 
   describe('the layers button', () => {
+    // The classes of a button's place are on the button, or on the element that wraps it.
+    const bottomOf = (testId: string) =>
+      (screen.getByTestId(testId).closest('[class*="bottom-["]') as HTMLElement).className.match(
+        /\bbottom-\[[^\s]+\]/,
+      )![0];
+
+    it('sits above the location button on a phone, which keeps the bottom', () => {
+      render(<CriteriaView language="en" />);
+
+      expect(bottomOf('criteria-locate')).toBe('bottom-[calc(var(--sheet-height,0px)+--spacing(3))]');
+      expect(bottomOf('criteria-layers')).not.toBe(bottomOf('criteria-locate'));
+    });
+
     it('keeps the layers chosen across reloads', () => {
       const first = render(<CriteriaView language="en" />);
       fireEvent.click(screen.getByTestId('criteria-layers'));
