@@ -40,6 +40,7 @@ export const criteriaText = {
     anySurface: 'Any',
     unpaved: 'Unpaved',
     findRoutes: 'Find routes',
+    searchAgain: 'Search again',
     uncoveredStart: 'This area is not covered: choose another start point.',
     pace: 'Pace',
     distanceError: (min: number, max: number, unit: string) =>
@@ -88,6 +89,7 @@ export const criteriaText = {
     anySurface: 'Indifférent',
     unpaved: 'Non goudronné',
     findRoutes: 'Trouver des parcours',
+    searchAgain: 'Relancer la recherche',
     uncoveredStart: 'Zone non couverte : choisissez un autre point de départ.',
     pace: 'Allure',
     distanceError: (min: number, max: number, unit: string) =>

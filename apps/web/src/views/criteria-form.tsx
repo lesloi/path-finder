@@ -11,7 +11,7 @@ import {
 } from '../contract/index.ts';
 import { PaceSlider, PRIMARY_BUTTON, SegmentedControl, Slider } from '../components/index.ts';
 import { formatDuration, type Position, type RouteSetRequest } from '../core/index.ts';
-import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
+import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { useSettings, type LastCriteria } from '../state/index.ts';
 
 const CRITERIA = ['target', 'surface', 'elevation'] as const;
@@ -262,7 +262,7 @@ export function CriteriaForm({
         {...(startUncovered && { 'aria-describedby': uncoveredId })}
         onClick={() => onSubmit(request)}
       >
-        {searched ? routesText[language].searchAgain : t.findRoutes}
+        {searched ? t.searchAgain : t.findRoutes}
       </button>
     </>
   );

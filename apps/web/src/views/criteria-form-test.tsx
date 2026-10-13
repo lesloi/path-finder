@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { parseCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
-import { criteriaText, routesText } from '../i18n/index.ts';
+import { criteriaText } from '../i18n/index.ts';
 import { CriteriaForm, criteriaChanged } from './criteria-form.tsx';
 import type { Position, RouteSetRequest } from '../core/index.ts';
 
@@ -49,7 +49,7 @@ describe('CriteriaForm', () => {
   it('offers to search again once routes were found', () => {
     setup({ searched: true });
 
-    expect(screen.getByTestId('criteria-submit')).toHaveTextContent(routesText.en.searchAgain);
+    expect(screen.getByTestId('criteria-submit')).toHaveTextContent(criteriaText.en.searchAgain);
   });
 
   it('offers to find routes before any were found', () => {

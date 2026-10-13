@@ -725,7 +725,7 @@ describe('CriteriaView', () => {
       await submit();
 
       await screen.findByTestId('routes-count');
-      expect(screen.getByTestId('criteria-submit')).toHaveTextContent(routesText.en.searchAgain);
+      expect(screen.getByTestId('criteria-submit')).toHaveTextContent(criteriaText.en.searchAgain);
     });
 
     it('shows a loading state while the API works, beside the criteria, with a way to cancel', async () => {
