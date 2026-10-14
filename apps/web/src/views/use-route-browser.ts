@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 
-import { useToastTimeout } from '../components/index.ts';
+import { useToastTimeout, type SheetState } from '../components/index.ts';
 import type { MapSnapshot, Position, RouteSetRequest } from '../core/index.ts';
 import { useRouteSet, type Refusal } from '../state/index.ts';
 
 /**
  * What the user does with a route set: asking for it, the route selected (none until they pick one), the route
- * they point at in the list, whether the detail of the selected one is open (on phones), and the place they point
+ * they point at in the list, the stop of the phone's sheet (its expanded one is the detail of the selected route), and the place they point
  * at on its elevation profile. The route set is gone once cleared.
  */
 export function useRouteBrowser() {
@@ -15,9 +15,8 @@ export function useRouteBrowser() {
   const [selected, setSelected] = useState<number>();
   // The route a pointer or the focus is on in the list: the map highlights it without selecting it.
   const [preview, setPreview] = useState<number>();
-  const [detail, setDetail] = useState(false);
-  // Whether the phone's sheet is folded down to its handle, to see more of the map.
-  const [folded, setFolded] = useState(false);
+  // The stop of the phone's sheet: folded down to its handle to see more of the map, or expanded for the detail.
+  const [sheet, setSheet] = useState<SheetState>('collapsed');
   const [hover, setHover] = useState<Position>();
   const [mapSnapshot, setSnapshot] = useState<MapSnapshot>();
   // Kept while the route set does, so the map's effects only run for a new one.
@@ -40,9 +39,8 @@ export function useRouteBrowser() {
     refusal,
     selected,
     preview,
-    detail,
-    folded,
-    setFolded,
+    sheet,
+    detail: sheet === 'expanded',
     hover,
     geometries,
     select: setSelected,
@@ -53,8 +51,7 @@ export function useRouteBrowser() {
       setRefusal(undefined);
       setSelected(undefined);
       setPreview(undefined);
-      setDetail(false);
-      setFolded(false);
+      setSheet('collapsed');
       find(request);
     },
     /** Forgets the route set, and any search under way, such as when a new start point makes it stale. */
@@ -62,14 +59,15 @@ export function useRouteBrowser() {
       clear();
       setSelected(undefined);
       setPreview(undefined);
-      setDetail(false);
-      setFolded(false);
+      setSheet('collapsed');
+      setHover(undefined);
+    },
+    changeSheet(state: SheetState) {
+      setSheet(state);
       setHover(undefined);
     },
     openDetail(open: boolean) {
-      setDetail(open);
-      // A detail is read, not folded away.
-      if (open) setFolded(false);
+      setSheet(open ? 'expanded' : 'collapsed');
       setHover(undefined);
     },
   };
