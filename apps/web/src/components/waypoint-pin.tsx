@@ -35,7 +35,7 @@ export function WaypointPin({
     return (
       <span
         className="pointer-events-auto absolute top-0 left-0 h-[22px] w-[18px]"
-        {...(poiLabel && hint(poiLabel, 'bottom-start'))}
+        {...(poiLabel && hint(poiLabel, 'top-start'))}
       >
         <PoiBadge category={poi.category} seasonal={poi.seasonal} className="absolute top-0 left-0 size-[18px]" />
         <span
