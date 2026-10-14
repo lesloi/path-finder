@@ -1,4 +1,5 @@
 import { gpxExport, MAX_GPX_POINTS, type GpxRoute } from './gpx.ts';
+import { waypointPoiKey } from './poi.ts';
 
 const DAY = new Date(2026, 8, 28, 12);
 /** Minutes per km. */
@@ -49,6 +50,46 @@ describe('gpxExport', () => {
       const { content } = gpxExport(route, DAY, { paceUnit: 'min/km', language: 'en', waypoints }, PACE);
 
       expect(parse(content).querySelector('wpt > name')?.textContent).toBe('Waypoint 1');
+    });
+
+    describe('made from a point of interest', () => {
+      // The loop passes its second and fourth points at the same place.
+      const distinct: [number, number][] = [
+        [route.geometry[1][0], route.geometry[1][1]],
+        [route.geometry[2][0], route.geometry[2][1]],
+      ];
+      const poi = (name?: string) =>
+        ({ [waypointPoiKey(distinct[0]!)]: { category: 'water', seasonal: false, ...(name && { name }) } }) as const;
+      const names = (content: string) =>
+        [...parse(content).querySelectorAll('wpt > name')].map((element) => element.textContent);
+
+      it('is named after the point of interest', () => {
+        const { content } = gpxExport(
+          route,
+          DAY,
+          { ...french, waypoints: distinct, waypointPois: poi('Fontaine') },
+          PACE,
+        );
+
+        expect(names(content)).toEqual(['Fontaine', 'Point de passage 2']);
+      });
+
+      it('is named after its category when the point has no name', () => {
+        const { content } = gpxExport(route, DAY, { ...french, waypoints: distinct, waypointPois: poi() }, PACE);
+
+        expect(names(content)[0]).toBe('Eau potable');
+      });
+
+      it('escapes a name, which comes from anyone', () => {
+        const { content } = gpxExport(
+          route,
+          DAY,
+          { ...french, waypoints: distinct, waypointPois: poi('<b>&Co') },
+          PACE,
+        );
+
+        expect(names(content)[0]).toBe('<b>&Co');
+      });
     });
 
     it('adds none when the route has none', () => {

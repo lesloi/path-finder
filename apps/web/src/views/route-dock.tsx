@@ -1,7 +1,7 @@
 import { Download, X } from 'lucide-react';
 
 import { DOCK, ElevationProfile, ICON_BUTTON, PRIMARY_BUTTON, tip } from '../components/index.ts';
-import { exportRoute, missText, type PaceUnit, type Position, type Route } from '../core/index.ts';
+import { exportRoute, missText, type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
 import { RouteFigures, SurfaceShare } from './route-figures.tsx';
 
@@ -20,6 +20,7 @@ export function RouteDock({
   onClose,
   onHover,
   waypoints,
+  waypointPois,
 }: {
   language: Language;
   paceUnit: PaceUnit;
@@ -33,6 +34,7 @@ export function RouteDock({
   onHover: (position: Position | undefined) => void;
   /** The points the route was asked to go through, shown on its profile and kept in its GPX file. */
   waypoints?: Position[] | undefined;
+  waypointPois?: WaypointPois | undefined;
 }) {
   const t = routesText[language];
   return (
@@ -53,7 +55,7 @@ export function RouteDock({
             data-testid="route-export"
             className={PRIMARY_BUTTON}
             // Nothing awaited before the share sheet: it needs the click that opened it.
-            onClick={() => void exportRoute(route, { language, paceUnit, waypoints }, pace)}
+            onClick={() => void exportRoute(route, { language, paceUnit, waypoints, waypointPois }, pace)}
           >
             <Download size={18} aria-hidden />
             {t.exportGpx}
@@ -68,6 +70,7 @@ export function RouteDock({
           language={language}
           onHover={onHover}
           waypoints={waypoints}
+          waypointPois={waypointPois}
         />
         <SurfaceShare route={route} language={language} />
         {/* Here rather than in the figures' column, which has no room left for them. */}

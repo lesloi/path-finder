@@ -7,9 +7,12 @@ import {
   gradeAt,
   positionAt,
   surfaceAt,
+  poiLabel,
+  waypointPoiAt,
   waypointsOnRoute,
   type Position,
   type Route,
+  type WaypointPois,
 } from '../core/index.ts';
 import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 import { profileScale } from './profile-scale.ts';
@@ -18,6 +21,7 @@ import { WaypointPin } from './waypoint-pin.tsx';
 
 // A default that keeps its identity, so that the waypoints on the route are not worked out again on every hover.
 const NO_WAYPOINTS: Position[] = [];
+const NO_POIS: WaypointPois = {};
 
 const WIDTH = 300;
 const HEIGHT = 60;
@@ -34,6 +38,7 @@ export function ElevationProfile({
   language,
   onHover,
   waypoints = NO_WAYPOINTS,
+  waypointPois = NO_POIS,
   testId,
 }: {
   route: Route;
@@ -41,6 +46,8 @@ export function ElevationProfile({
   onHover: (position: Position | undefined) => void;
   /** The points the route was asked to go through: numbered where it passes them. */
   waypoints?: Position[] | undefined;
+  /** The points of interest some of them were made from: their icon replaces the pin, and their name the number in the label. */
+  waypointPois?: WaypointPois | undefined;
   testId?: string;
 }) {
   const t = routesText[language];
@@ -158,20 +165,24 @@ export function ElevationProfile({
               );
             })}
           </svg>
-          {onRoute.map(({ number, distance }) => (
-            // The pin in the row of the title, above the plot so that it hides none of the profile, and a line down from its tip.
-            <span
-              key={number}
-              data-testid={testId && `${testId}-waypoint-${number}`}
-              role="img"
-              aria-label={`${criteriaText[language].waypointName(number)}, ${formatDistance(distance, language)}`}
-              className="pointer-events-none absolute -top-6 bottom-0 w-[18px] -translate-x-1/2"
-              style={{ left: `${total ? (distance / total) * 100 : 0}%` }}
-            >
-              <span className="absolute top-[22px] bottom-0 left-1/2 w-px -translate-x-1/2 bg-ink-2" />
-              <WaypointPin number={number} variant="profile" />
-            </span>
-          ))}
+          {onRoute.map(({ number, distance }) => {
+            // By the position placed: the one on the route may be a way's, not the point's.
+            const poi = waypointPoiAt(waypointPois, waypoints[number - 1]!);
+            return (
+              // The pin in the row of the title, above the plot so that it hides none of the profile, and a line down from its tip.
+              <span
+                key={number}
+                data-testid={testId && `${testId}-waypoint-${number}`}
+                role="img"
+                aria-label={`${poi ? poiLabel(poi, language) : criteriaText[language].waypointName(number)}, ${formatDistance(distance, language)}`}
+                className="pointer-events-none absolute -top-6 bottom-0 w-[18px] -translate-x-1/2"
+                style={{ left: `${total ? (distance / total) * 100 : 0}%` }}
+              >
+                <span className="absolute top-[22px] bottom-0 left-1/2 w-px -translate-x-1/2 bg-ink-2" />
+                <WaypointPin number={number} variant="profile" poi={poi} />
+              </span>
+            );
+          })}
           {/* The keyboard's way along the profile: a native slider, hidden, whose ring shows on the plot. */}
           <input
             type="range"

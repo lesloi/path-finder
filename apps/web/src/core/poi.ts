@@ -1,4 +1,5 @@
 import { POI_TILE_ZOOM } from '../contract/index.ts';
+import { commonText, type Language } from '../i18n/index.ts';
 import type { Position } from './coordinates.ts';
 
 /** The kinds of points of interest the map can show. */
@@ -21,6 +22,24 @@ export const POI_MIN_ZOOM = 12;
 
 /** A point of interest as the map draws it; `name` is the OSM name, when it has one. */
 export type Poi = { category: PoiCategory; position: Position; seasonal: boolean; name?: string };
+
+/** What a waypoint keeps of the point of interest it was made from. */
+export type WaypointPoi = Pick<Poi, 'category' | 'seasonal' | 'name'>;
+
+/** The points of interest behind waypoints, by the waypoint's position: the server is only ever sent positions. */
+export type WaypointPois = Record<string, WaypointPoi>;
+
+export const waypointPoiKey = ([lon, lat]: Position) => `${lon},${lat}`;
+
+/** The point of interest a waypoint was made from; it sits at the very position of the point, so an exact match is right. */
+export const waypointPoiAt = (pois: WaypointPois, position: Position): WaypointPoi | undefined =>
+  pois[waypointPoiKey(position)];
+
+/** What a point of interest is called: its OSM name, else what it is. */
+export function poiLabel({ category, seasonal, name }: WaypointPoi, language: Language): string {
+  const words = commonText[language];
+  return name ?? (category === 'viewpoint' ? words.viewpoint : seasonal ? words.seasonalWaterPoint : words.waterPoint);
+}
 
 /** The categories that are on. */
 export const shownPoiCategories = (layers: PoiLayers): PoiCategory[] =>

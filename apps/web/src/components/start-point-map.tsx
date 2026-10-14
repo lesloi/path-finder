@@ -22,6 +22,7 @@ import {
   samePositions,
   isWithin,
   POI_MIN_ZOOM,
+  poiLabel,
   poiTilesCovering,
   type PoiCategory,
   POI_CATEGORIES,
@@ -32,6 +33,7 @@ import {
   type MapSnapshot,
   type CoverageCell,
   type Position,
+  type WaypointPoi,
   veilPolygon,
 } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
@@ -270,7 +272,8 @@ export function StartPointMap({
   waypoints?: Position[];
   /** A click or a tap places a waypoint, and a long press no longer sets the start point. */
   placing?: boolean;
-  onWaypointAdd?: (waypoint: Position) => void;
+  /** `poi` is given when the tap fell on a point of interest: the waypoint is then at the point. */
+  onWaypointAdd?: (waypoint: Position, poi?: WaypointPoi) => void;
   /** A tap fell on the veiled part of the map, where the server cannot route: no waypoint was placed. */
   onWaypointRefused?: () => void;
   /** The user asked to remove the waypoint at this index, from its bubble. */
@@ -311,19 +314,28 @@ export function StartPointMap({
   // The veiled part of the map is where the server cannot route: a waypoint there would only be refused.
   const canPlace = useEffectEvent(([lng, lat]: Position) => !coverage || isCovered(coverage, [lng, lat]));
   // What the pointer looks like where nothing else sets it: a crosshair while placing, which says a tap places a waypoint.
+  const isPlacing = useEffectEvent(() => Boolean(placing));
   const idleCursor = useEffectEvent(() => (placing ? 'crosshair' : ''));
-  const pick = useEffectEvent((how: 'long-press' | 'click', { lng, lat }: { lng: number; lat: number }) => {
-    if (placing) {
-      if (how === 'click') {
-        if (canPlace([lng, lat])) onWaypointAdd?.([lng, lat]);
-        else onWaypointRefused?.();
+  const pick = useEffectEvent(
+    (
+      how: 'long-press' | 'click',
+      { lng, lat }: { lng: number; lat: number },
+      poi?: { position: Position; poi: WaypointPoi },
+    ) => {
+      if (placing) {
+        if (how === 'click') {
+          const position = poi?.position ?? [lng, lat];
+          if (!canPlace(position)) onWaypointRefused?.();
+          else if (poi) onWaypointAdd?.(position, poi.poi);
+          else onWaypointAdd?.(position);
+        }
+        return;
       }
-      return;
-    }
-    // A tap on a route selects it: it must not move the start point too.
-    if (interactive) return;
-    if (how === 'long-press' || pickOnClick) onStartChange([lng, lat]);
-  });
+      // A tap on a route selects it: it must not move the start point too.
+      if (interactive) return;
+      if (how === 'long-press' || pickOnClick) onStartChange([lng, lat]);
+    },
+  );
   const clickedBackground = useEffectEvent(() => {
     if (!pickOnClick && !placing) onBackgroundClick?.();
   });
@@ -540,12 +552,15 @@ export function StartPointMap({
       const feature = features?.[0];
       if (!feature) return;
       const { category, seasonal, name } = feature.properties;
-      const words = commonText[languageNow()];
-      const what = category === 'viewpoint' ? words.viewpoint : seasonal ? words.seasonalWaterPoint : words.waterPoint;
+      const poi = {
+        category,
+        seasonal: Boolean(seasonal),
+        ...(typeof name === 'string' && name && { name }),
+      } as WaypointPoi;
       label.current?.remove();
       label.current = new Popup({ closeButton: false, offset: 14 })
         .setLngLat((feature.geometry as { coordinates: [number, number] }).coordinates)
-        .setText(typeof name === 'string' && name ? name : what)
+        .setText(poiLabel(poi, languageNow()))
         .addTo(map);
     };
     for (const layer of poiLayers) {
@@ -557,11 +572,25 @@ export function StartPointMap({
         map.getCanvas().style.cursor = idleCursor();
         label.current?.remove();
       });
-      map.on('click', layer, (event) => showLabel(event as never));
+      // While placing, a tap makes the point a waypoint: its label would only sit over the new pin.
+      map.on('click', layer, (event) => !isPlacing() && showLabel(event as never));
     }
 
+    // The point of interest under a tap, when the style has its layers yet.
+    const poiAt = (point: MapMouseEvent['point']) => {
+      const present = poiLayers.filter((id) => map.getLayer(id));
+      const feature = present.length ? map.queryRenderedFeatures(point, { layers: present })[0] : undefined;
+      const { category, seasonal, name } = feature?.properties ?? {};
+      if (category !== 'water' && category !== 'viewpoint') return undefined;
+      const [lon, lat] = (feature!.geometry as unknown as { coordinates: number[] }).coordinates;
+      return {
+        position: [lon!, lat!] as Position,
+        poi: { category, seasonal: Boolean(seasonal), ...(typeof name === 'string' && name && { name }) },
+      };
+    };
+
     map.on('click', ({ lngLat, point }) => {
-      pick('click', lngLat);
+      pick('click', lngLat, poiAt(point));
       // A route has its own click, on its wide hit line, and a point of interest its label: anywhere else is the
       // background.
       // A style on its way holds none of these layers yet, and asking for a layer that is not there is an error.

@@ -1597,6 +1597,23 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
     });
 
+    it('refuses a point of interest that already is a waypoint, and says so', async () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      await act(async () => {});
+      act(() => map().fire('style.load'));
+      map().rendered = [
+        { properties: { category: 'water', seasonal: false }, geometry: { coordinates: [6.21, 45.81] } },
+      ];
+
+      act(() => map().fire('click', { lngLat: { lng: 6.2101, lat: 45.8101 }, point: { x: 1, y: 1 } }));
+      expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
+      act(() => map().fire('click', { lngLat: { lng: 6.2099, lat: 45.8099 }, point: { x: 1, y: 1 } }));
+
+      expect(waypointMarkers().map((marker) => marker.position)).toEqual([[6.21, 45.81]]);
+      expect(screen.getByTestId('criteria-waypoint-refused')).toHaveTextContent(en.waypointDuplicate);
+    });
+
     it('does not say a tap was refused once placing starts again', async () => {
       vi.stubGlobal('fetch', (url: string) =>
         url === '/api/v1/coverage'

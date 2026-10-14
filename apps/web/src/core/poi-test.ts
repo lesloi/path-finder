@@ -1,4 +1,12 @@
-import { POI_MIN_ZOOM, parsePoiTile, poiTileOf, poiTilesCovering, shownPoiCategories } from './poi.ts';
+import {
+  POI_MIN_ZOOM,
+  parsePoiTile,
+  poiTileOf,
+  poiTilesCovering,
+  shownPoiCategories,
+  waypointPoiAt,
+  waypointPoiKey,
+} from './poi.ts';
 
 describe('poiTileOf', () => {
   // The same cases as the server's `TestPOITileOfCutsTheWorldOnAGridOfPoiTileZoom`.
@@ -91,4 +99,14 @@ describe('shownPoiCategories', () => {
 
 it('shows points of interest from zoom 12', () => {
   expect(POI_MIN_ZOOM).toBe(12);
+});
+
+describe('waypointPoiAt', () => {
+  it('finds the point of interest a waypoint was made from, by its exact position', () => {
+    const fountain = { category: 'water', seasonal: false, name: 'Fontaine' } as const;
+    const pois = { [waypointPoiKey([6.1, 45.9])]: fountain };
+
+    expect(waypointPoiAt(pois, [6.1, 45.9])).toBe(fountain);
+    expect(waypointPoiAt(pois, [6.1, 45.90001])).toBeUndefined();
+  });
 });

@@ -1,4 +1,5 @@
 import { commonText, criteriaText, LINKS, type Language } from '../i18n/index.ts';
+import { poiLabel, waypointPoiAt, type WaypointPois } from './poi.ts';
 import { waypointsOnRoute } from './route.ts';
 import type { Position } from './coordinates.ts';
 import { formatDistance, formatHeight, formatPace, type PaceUnit } from './units.ts';
@@ -35,7 +36,14 @@ export function gpxExport(
     language,
     paceUnit,
     waypoints = [],
-  }: { language: Language; paceUnit: PaceUnit; waypoints?: Position[] | undefined },
+    waypointPois = {},
+  }: {
+    language: Language;
+    paceUnit: PaceUnit;
+    waypoints?: Position[] | undefined;
+    /** The points of interest some waypoints were made from, which name them. */
+    waypointPois?: WaypointPois | undefined;
+  },
   /** Minutes per km, the one the estimated duration was computed at. */
   pace: number,
 ): { fileName: string; content: string } {
@@ -47,8 +55,10 @@ export function gpxExport(
   const description = `${[...climb, duration].join(' · ')} (${formatPace(pace, paceUnit, language)})`;
   const waypointPoints = waypointsOnRoute(route.geometry, waypoints)
     .map(({ number, position: [lon, lat], height }) => {
+      const poi = waypointPoiAt(waypointPois, waypoints[number - 1]!);
+      const label = poi ? poiLabel(poi, language) : criteriaText[language].waypointName(number);
       const ele = height === undefined ? '' : `<ele>${height.toFixed(1)}</ele>`;
-      return `<wpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${ele}<name>${criteriaText[language].waypointName(number)}</name></wpt>`;
+      return `<wpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${ele}<name>${escapeXml(label)}</name></wpt>`;
     })
     .join('\n');
   // The schema fixes the order of the elements, in the metadata as in the track.
@@ -122,3 +132,7 @@ function simplify(geometry: [number, number, number?][], max: number): [number, 
     if (kept.size <= max) return [...kept].sort((a, b) => a - b).map((k) => geometry[k]);
   }
 }
+
+// OSM names come from anyone: they are text in the file, never markup.
+const escapeXml = (text: string) =>
+  text.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!);

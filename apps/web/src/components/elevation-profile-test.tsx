@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import type { Route } from '../core/index.ts';
+import { waypointPoiKey, type Route, type WaypointPois } from '../core/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
 import { ElevationProfile } from './elevation-profile.tsx';
 
@@ -30,7 +30,7 @@ function plot(onHover = vi.fn(), props: Partial<Route> = {}, language: 'en' | 'f
 describe('ElevationProfile', () => {
   describe('waypoints', () => {
     const at = (k: number): [number, number] => [route.geometry[k][0], route.geometry[k][1]];
-    const show = (waypoints?: [number, number][]) =>
+    const show = (waypoints?: [number, number][], waypointPois?: WaypointPois) =>
       render(
         <ElevationProfile
           testId="profile"
@@ -38,8 +38,32 @@ describe('ElevationProfile', () => {
           language="en"
           onHover={vi.fn()}
           {...(waypoints && { waypoints })}
+          {...(waypointPois && { waypointPois })}
         />,
       );
+
+    it('draws the icon of the point of interest a waypoint was made from, still numbered, and names it', () => {
+      const pois = { [waypointPoiKey(at(1))]: { category: 'water', seasonal: false, name: 'Fontaine' } } as const;
+
+      show([at(1), at(3)], pois);
+
+      expect(screen.getByTestId('profile-waypoint-1').querySelector('circle')).not.toBeNull();
+      expect(screen.getByTestId('profile-waypoint-1')).toHaveTextContent('1');
+      expect(screen.getByTestId('profile-waypoint-1')).toHaveAttribute(
+        'aria-label',
+        expect.stringContaining('Fontaine'),
+      );
+      expect(screen.getByTestId('profile-waypoint-2').querySelector('circle')).toBeNull();
+    });
+
+    it('names a point of interest without a name by what it is', () => {
+      show([at(1)], { [waypointPoiKey(at(1))]: { category: 'water', seasonal: false } });
+
+      expect(screen.getByTestId('profile-waypoint-1')).toHaveAttribute(
+        'aria-label',
+        expect.stringContaining('Drinking water'),
+      );
+    });
 
     it('numbers each waypoint where the route passes it', () => {
       show([at(1), at(3)]);

@@ -8,10 +8,18 @@ const GLYPHS: Record<PoiCategory, string> = {
 };
 
 /** The badge the map draws for a point of interest (see `poi-image.ts`), for the popover; hollow for a seasonal one. */
-export function PoiBadge({ category, seasonal = false }: { category: PoiCategory; seasonal?: boolean }) {
+export function PoiBadge({
+  category,
+  seasonal = false,
+  className = 'size-6 flex-none',
+}: {
+  category: PoiCategory;
+  seasonal?: boolean;
+  className?: string;
+}) {
   const colour = POI_COLORS[category];
   return (
-    <svg aria-hidden viewBox="0 0 24 24" className="size-6 flex-none">
+    <svg aria-hidden viewBox="0 0 24 24" className={className}>
       <circle
         cx="12"
         cy="12"
