@@ -25,6 +25,11 @@ export function useRouteBrowser() {
     [routeSet],
   );
 
+  const changeSheet = (state: SheetState) => {
+    setSheet(state);
+    setHover(undefined);
+  };
+
   // The notice of a newer version stays: the user has to reload, and a click drops it.
   useToastTimeout(refusal?.error === 'stale-build' ? undefined : refusal, () => setRefusal(undefined));
 
@@ -62,13 +67,7 @@ export function useRouteBrowser() {
       setSheet('collapsed');
       setHover(undefined);
     },
-    changeSheet(state: SheetState) {
-      setSheet(state);
-      setHover(undefined);
-    },
-    openDetail(open: boolean) {
-      setSheet(open ? 'expanded' : 'collapsed');
-      setHover(undefined);
-    },
+    changeSheet,
+    openDetail: (open: boolean) => changeSheet(open ? 'expanded' : 'collapsed'),
   };
 }

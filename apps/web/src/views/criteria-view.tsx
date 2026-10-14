@@ -54,12 +54,12 @@ import {
   useDesktop,
 } from '../components/index.ts';
 
-// The bottom-right buttons: the location or reframe one, the waypoint one, the layers, the north. On phones they stack up
-// from the bottom, over the sheet; on desktops they line up from the right, above the dock when it is shown
-// (`--edge-bottom`). `--slot` counts the buttons the one stands on or beside.
 // A route set can fold its sheet down to the handle, the sheet of the form cannot.
 const SHEET_STOPS = ['folded', 'collapsed', 'expanded'] as const;
 
+// The bottom-right buttons: the location or reframe one, the waypoint one, the layers, the north. On phones they stack up
+// from the bottom, over the sheet; on desktops they line up from the right, above the dock when it is shown
+// (`--edge-bottom`). `--slot` counts the buttons the one stands on or beside.
 const STACKED =
   'right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--slot)*(var(--spacing-touch)+--spacing(2)))] ' +
   'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--slot)*(var(--spacing-touch)+--spacing(2)))] ' +

@@ -10,7 +10,7 @@ const LONG_SWIPE = 0.3;
 // A folded sheet dragged up by this much, in px, shows its content in full.
 const FADE_IN_PX = 120;
 
-/** The stops of a sheet, from the lowest to the highest. */
+/** The stops of a sheet, from the lowest to the highest. A list of stops always has `collapsed`. */
 export type SheetState = 'folded' | 'collapsed' | 'expanded';
 
 const DEFAULT_STOPS: readonly SheetState[] = ['collapsed', 'expanded'];
@@ -69,7 +69,6 @@ export function BottomSheet({
   }, [settled]);
 
   const canMove = onStateChange !== undefined;
-  // Without a handle, a sheet left folded or expanded could not be brought back.
   const shown = canMove && stops.includes(state) ? state : 'collapsed';
   const index = Math.max(stops.indexOf(shown), 0);
   const top = stops.length - 1;
@@ -80,8 +79,7 @@ export function BottomSheet({
     const moved = event.clientY - drag.current.y;
     drag.current.reach = Math.max(drag.current.reach, Math.abs(moved));
     // A sheet at its lowest stop does not shrink, nor one at its highest grow: the finger may go on, not the sheet.
-    const { index: from } = drag.current;
-    const allowed = (moved > 0 ? from > 0 : from < top) ? moved : 0;
+    const allowed = (moved > 0 ? drag.current.index > 0 : drag.current.index < top) ? moved : 0;
     sheet.current!.style.height = `${drag.current.height - allowed}px`;
     // A folded sheet shows what it opens onto as it grows, fading in rather than showing an empty panel.
     if (folded) {
