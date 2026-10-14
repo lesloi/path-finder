@@ -1604,6 +1604,16 @@ describe('CriteriaView', () => {
       expect(screen.queryByTestId('criteria-waypoint-bar')).not.toBeInTheDocument();
     });
 
+    it('keeps placing when the start point is typed meanwhile', () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+
+      fireEvent.change(field(), { target: { value: '45.9, 6.3' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(banner()).toBeInTheDocument();
+    });
+
     it('does not move the start point while placing', () => {
       render(<CriteriaView language="en" />);
       startPlacing();

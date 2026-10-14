@@ -98,10 +98,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const startUncovered = useMemo(() => Boolean(start && coverage && !isCovered(coverage, start)), [start, coverage]);
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
-  const [picking, setPicking] = useState(false);
+  // What a tap on the map is for: the start point (`pick`, from the crosshair) or a waypoint (`place`); one at a time.
+  const [mode, setMode] = useState<'pick' | 'place'>();
+  const picking = mode === 'pick';
+  const placing = mode === 'place';
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
-  const [placing, setPlacing] = useState(false);
   // A tap on the veiled part of the map was refused: the banner says why for a while.
   const [refused, setRefused] = useState(false);
   // On phones, the criteria are a layer over the map; the height of the sheet is what the routes are framed clear of.
@@ -135,7 +137,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Every search keeps the criteria it was made with, whichever button asked for it.
   const search = (request: RouteSetRequest) => {
     setCleared(false);
-    setPlacing(false);
+    setMode((current) => (current === 'place' ? undefined : current));
     draft[2]();
     browser.ask(request);
   };
@@ -184,8 +186,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   };
   const onKey = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
-    if (placing) setPlacing(false);
-    else if (picking) setPicking(false);
+    if (mode) setMode(undefined);
     else if (dockShown) deselect();
   });
   useEffect(() => {
@@ -196,10 +197,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   // The criteria change with their waypoints: the routes found no longer answer them.
   function togglePlacing() {
-    if (placing) return setPlacing(false);
+    if (placing) return setMode(undefined);
     browser.drop();
-    setPicking(false);
-    setPlacing(true);
+    setMode('place');
   }
 
   function addWaypoint(position: Position) {
@@ -209,7 +209,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     setRefused(false);
     setWaypoints([...waypoints, position]);
     // The last one ends placing on its own.
-    if (waypoints.length + 1 >= MAX_WAYPOINTS) setPlacing(false);
+    if (waypoints.length + 1 >= MAX_WAYPOINTS) setMode(undefined);
   }
 
   function removeWaypoint(index: number) {
@@ -221,7 +221,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     // Routes from another start point would be stale.
     if (start && (start[0] !== position[0] || start[1] !== position[1])) browser.drop();
     setStart(position);
-    setPicking(false);
+    setMode((current) => (current === 'pick' ? undefined : current));
   }
 
   // The device location and typed coordinates move the map there; a pick on the map does not.
@@ -299,8 +299,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       onStartChange={moveStart}
       onUnreadable={() => warn('unreadable')}
       onPick={() => {
-        setPicking(!picking);
-        setPlacing(false);
+        setMode(picking ? undefined : 'pick');
         setLayerOpen(false);
       }}
       onLocate={locate}
@@ -359,8 +358,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         {...tip(t.settings, 'bottom-end')}
         // Back from the settings, a crosshair armed before them would come as a surprise.
         onClick={() => {
-          setPicking(false);
-          setPlacing(false);
+          setMode(undefined);
         }}
       >
         <Settings size={20} aria-hidden />
@@ -524,7 +522,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             type="button"
             data-testid="criteria-pick-cancel"
             className="min-h-touch rounded-full px-3 font-semibold text-accent"
-            onClick={() => setPicking(false)}
+            onClick={() => setMode(undefined)}
           >
             {t.cancelPick}
           </button>
@@ -541,7 +539,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               type="button"
               data-testid="criteria-waypoint-done"
               className="min-h-touch rounded-full px-3 font-semibold text-accent"
-              onClick={() => setPlacing(false)}
+              onClick={() => setMode(undefined)}
             >
               {t.waypointsDone}
             </button>
