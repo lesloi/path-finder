@@ -308,6 +308,32 @@ describe('BottomSheet', () => {
       expect(screen.getByTestId('content').parentElement).toHaveAttribute('inert');
     });
 
+    it('names its handle after the folded state while folded', () => {
+      const { rerender } = render(
+        <BottomSheet
+          testId="sheet"
+          label="Route"
+          foldedLabel="Route, folded"
+          onExpandedChange={vi.fn()}
+          onFoldedChange={vi.fn()}
+          folded
+        />,
+      );
+      expect(screen.getByTestId('sheet-handle')).toHaveAccessibleName('Route, folded');
+
+      rerender(
+        <BottomSheet
+          testId="sheet"
+          label="Route"
+          foldedLabel="Route, folded"
+          onExpandedChange={vi.fn()}
+          onFoldedChange={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId('sheet-handle')).toHaveAccessibleName('Route');
+    });
+
     it('unfolds on a tap of its handle', () => {
       render(<FoldableSheet initial="folded" />);
 

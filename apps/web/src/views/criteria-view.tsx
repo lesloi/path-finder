@@ -492,6 +492,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               onExpandedChange: browser.openDetail,
               folded: browser.folded,
               onFoldedChange: browser.setFolded,
+              foldedLabel: t.routesFolded,
             })}
             onHeightChange={setSheetHeight}
           >

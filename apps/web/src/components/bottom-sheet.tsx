@@ -25,6 +25,7 @@ export function BottomSheet({
   onExpandedChange,
   folded = false,
   onFoldedChange,
+  foldedLabel,
   onHeightChange,
   testId,
   children,
@@ -35,6 +36,8 @@ export function BottomSheet({
   /** Folded down to the handle alone, to leave the map free. Only a sheet with `onFoldedChange` folds. */
   folded?: boolean;
   onFoldedChange?: (folded: boolean) => void;
+  /** The name of the handle while folded, since the sheet then shows nothing else of its state. */
+  foldedLabel?: string;
   onHeightChange?: (height: number) => void;
   /** Prefix of the test ids: the sheet, then `-handle` for its handle. */
   testId?: string;
@@ -71,22 +74,15 @@ export function BottomSheet({
     if (drag.current?.pointerId !== event.pointerId) return;
     const moved = event.clientY - drag.current.y;
     drag.current.reach = Math.max(drag.current.reach, Math.abs(moved));
-    const style = sheet.current!.style;
-    // The screen units bound it: the pixels of the finger may go beyond.
-    style.minHeight = canFold ? '0px' : DRAG_MIN;
-    style.maxHeight = DRAG_MAX;
     // A sheet already collapsed does not shrink further (unless it folds), nor does an expanded one grow, nor a folded one
     // shrink: the finger may go on, not the sheet.
     const { expanded: wasExpanded } = drag.current;
     const mayShrink = wasExpanded || (canFold && !shut);
     const allowed = (moved > 0 ? mayShrink : !wasExpanded) ? moved : 0;
-    style.height = `${drag.current.height - allowed}px`;
+    sheet.current!.style.height = `${drag.current.height - allowed}px`;
     // A folded sheet shows what it opens onto as it grows, fading in rather than showing an empty panel.
     if (shut) {
-      Object.assign(content.current!.style, {
-        maxHeight: 'none',
-        opacity: String(Math.min(-allowed / FADE_IN_PX, 1)),
-      });
+      content.current!.style.opacity = String(Math.min(-allowed / FADE_IN_PX, 1));
     }
   };
 
@@ -124,12 +120,21 @@ export function BottomSheet({
           // As tall as a touch target, with the mark in the middle. The negative margin takes back most of the half-leading
           // of the first line below, so the space under the mark looks the same as the one above it.
           className="-mb-1 grid h-touch w-full flex-none cursor-grab place-items-center touch-none before:block before:h-1 before:w-10 before:rounded-full before:bg-border"
-          aria-label={label}
+          aria-label={shut && foldedLabel ? foldedLabel : label}
           aria-expanded={expanded && !shut}
           onPointerDown={(event) => {
             if (drag.current) return;
             const { pointerId, clientY: y } = event;
-            drag.current = { pointerId, y, height: sheet.current!.getBoundingClientRect().height, expanded, reach: 0 };
+            const height = sheet.current!.getBoundingClientRect().height;
+            drag.current = { pointerId, y, height, expanded, reach: 0 };
+            // Set once, not at every move. The screen units bound the sheet: the pixels of the finger may go beyond. The
+            // height is pinned too, so that lifting these bounds does not resize a sheet that is only touched.
+            Object.assign(sheet.current!.style, {
+              height: `${height}px`,
+              minHeight: canFold ? '0px' : DRAG_MIN,
+              maxHeight: DRAG_MAX,
+            });
+            if (shut) content.current!.style.maxHeight = 'none';
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerMove={follow}
