@@ -69,8 +69,11 @@ export function BottomSheet({
   }, [settled]);
 
   const canMove = onStateChange !== undefined;
-  const shown = canMove && stops.includes(state) ? state : 'collapsed';
-  const index = Math.max(stops.indexOf(shown), 0);
+  // Without a handle, a sheet left folded or expanded could not be brought back: it shows collapsed. `index` and
+  // `shown` come from the same stop, so they cannot disagree.
+  const asked = stops.indexOf(state);
+  const index = canMove && asked >= 0 ? asked : Math.max(stops.indexOf('collapsed'), 0);
+  const shown = stops[index] ?? 'collapsed';
   const top = stops.length - 1;
   const folded = shown === 'folded';
 
@@ -155,7 +158,8 @@ export function BottomSheet({
           onLostPointerCapture={() => drag.current && letGo()}
           // A swipe ends with a click too: only a tap or a key toggles the sheet.
           onClick={() => {
-            if (!swiped.current) onStateChange(stops[index === top ? index - 1 : index + 1]!);
+            const next = stops[index === top ? index - 1 : index + 1];
+            if (!swiped.current && next) onStateChange(next);
             swiped.current = false;
           }}
         />

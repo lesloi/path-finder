@@ -88,6 +88,30 @@ describe('BottomSheet', () => {
     expect(screen.getByTestId('sheet')).not.toHaveClass('h-[60dvh]');
   });
 
+  it('reports nothing on a tap when it has a single stop', () => {
+    const onStateChange = vi.fn();
+    render(<BottomSheet testId="sheet" label="Route" stops={['collapsed']} onStateChange={onStateChange} />);
+
+    fireEvent.click(screen.getByTestId('sheet-handle'));
+
+    expect(onStateChange).not.toHaveBeenCalled();
+  });
+
+  it('takes the lowest stop as its shown one when it has no collapsed stop', () => {
+    render(
+      <BottomSheet
+        testId="sheet"
+        label="Route"
+        state="collapsed"
+        stops={['folded', 'expanded']}
+        onStateChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('sheet-handle')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('sheet').firstElementChild!.nextElementSibling).toHaveAttribute('inert');
+  });
+
   describe('a drag of its handle', () => {
     const SHEET_PX = 300;
     const heightOf = (sheet: HTMLElement) => sheet.style.height;
