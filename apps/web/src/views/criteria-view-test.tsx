@@ -1597,6 +1597,40 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
     });
 
+    it('refuses the same point of interest read a few metres off, as the map does at another zoom', async () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      await act(async () => {});
+      act(() => map().fire('style.load'));
+      const tap = (coordinates: [number, number]) => {
+        map().rendered = [{ properties: { category: 'water', seasonal: false }, geometry: { coordinates } }];
+        act(() => map().fire('click', { lngLat: { lng: 6.21, lat: 45.81 }, point: { x: 1, y: 1 } }));
+      };
+
+      tap([6.21, 45.81]);
+      tap([6.21, 45.81003]);
+
+      expect(waypointMarkers()).toHaveLength(1);
+      expect(screen.getByTestId('criteria-waypoint-refused')).toHaveTextContent(en.waypointDuplicate);
+    });
+
+    it('refuses a point of interest that already is a waypoint, and says so', async () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      await act(async () => {});
+      act(() => map().fire('style.load'));
+      map().rendered = [
+        { properties: { category: 'water', seasonal: false }, geometry: { coordinates: [6.21, 45.81] } },
+      ];
+
+      act(() => map().fire('click', { lngLat: { lng: 6.2101, lat: 45.8101 }, point: { x: 1, y: 1 } }));
+      expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
+      act(() => map().fire('click', { lngLat: { lng: 6.2099, lat: 45.8099 }, point: { x: 1, y: 1 } }));
+
+      expect(waypointMarkers().map((marker) => marker.position)).toEqual([[6.21, 45.81]]);
+      expect(screen.getByTestId('criteria-waypoint-refused')).toHaveTextContent(en.waypointDuplicate);
+    });
+
     it('does not say a tap was refused once placing starts again', async () => {
       vi.stubGlobal('fetch', (url: string) =>
         url === '/api/v1/coverage'

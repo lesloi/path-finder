@@ -144,8 +144,8 @@ _Avoid_: Profile, account
 
 **Point of interest** (POI):
 A useful place shown on the map wherever the user looks, whether or not a route passes
-by it. Display only: POIs never change which routes are generated. Each belongs to one POI
-category, which the user can show or hide.
+by it. A POI changes no search by itself: it matters only once the user makes it a waypoint
+(the server never knows it is one). Each belongs to one POI category, which the user can show or hide.
 _Avoid_: Marker, place, amenity
 
 **Water point**:

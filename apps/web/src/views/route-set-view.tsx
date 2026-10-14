@@ -31,6 +31,7 @@ import {
   exportRoute,
   missText,
   type Position,
+  type WaypointPois,
   type MapSnapshot,
   type Route,
   type PaceUnit,
@@ -74,6 +75,7 @@ export function RouteSetView({
   onClear,
   onHover,
   waypoints,
+  waypointPois,
 }: {
   language: Language;
   paceUnit: PaceUnit;
@@ -96,6 +98,7 @@ export function RouteSetView({
   onHover: (position: Position | undefined) => void;
   /** The points the routes were asked to go through, shown on the profile of a route and kept in its GPX file. */
   waypoints?: Position[] | undefined;
+  waypointPois?: WaypointPois | undefined;
 }) {
   const desktop = useDesktop();
 
@@ -112,6 +115,7 @@ export function RouteSetView({
         onBack={() => onDetailChange(false)}
         onHover={onHover}
         waypoints={waypoints}
+        waypointPois={waypointPois}
       />
     );
   }
@@ -302,6 +306,7 @@ function RouteDetail({
   onBack,
   onHover,
   waypoints,
+  waypointPois,
 }: {
   language: Language;
   paceUnit: PaceUnit;
@@ -314,6 +319,7 @@ function RouteDetail({
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
   waypoints?: Position[] | undefined;
+  waypointPois?: WaypointPois | undefined;
 }) {
   const t = words(language);
   const route = routes[selected];
@@ -380,6 +386,7 @@ function RouteDetail({
         language={language}
         onHover={onHover}
         waypoints={waypoints}
+        waypointPois={waypointPois}
       />
       <SurfaceShare route={route} language={language} />
       <button
@@ -387,7 +394,7 @@ function RouteDetail({
         data-testid="route-export"
         className={PRIMARY_BUTTON}
         // Nothing awaited before the share sheet: it needs the tap that opened it.
-        onClick={() => void exportRoute(route, { language, paceUnit, waypoints }, pace)}
+        onClick={() => void exportRoute(route, { language, paceUnit, waypoints, waypointPois }, pace)}
       >
         <Download size={18} aria-hidden />
         {t.exportGpx}

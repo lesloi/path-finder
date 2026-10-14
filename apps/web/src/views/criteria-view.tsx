@@ -28,6 +28,11 @@ import {
   routesAtPace,
   type Position,
   type RouteSetRequest,
+  kmBetween,
+  waypointPoiAt,
+  waypointPoiKey,
+  type WaypointPoi,
+  type WaypointPois,
   shownPoiCategories,
 } from '../core/index.ts';
 import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
@@ -90,6 +95,9 @@ const NO_START: Position = [0, 0];
  * The first view: where the user sets the criteria of a route set, over a full-screen map. Asking
  * for routes replaces the criteria with the route set, its routes drawn on the map.
  */
+// Two readings of a point of interest this close are the same point.
+const SAME_POI_KM = 0.005;
+
 export function CriteriaView({ language, pageOpen = false }: { language: Language; pageOpen?: boolean }) {
   const t = { ...commonText[language], ...criteriaText[language], ...routesText[language] };
   const desktop = useDesktop();
@@ -109,7 +117,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
   // A tap on the veiled part of the map was refused: the banner says why for a while.
-  const [refused, setRefused] = useState(false);
+  const [refused, setRefused] = useState<'uncovered' | 'duplicate'>();
+  // The points of interest some waypoints were made from, by position; kept for the routes found, as for the criteria.
+  const [waypointPois, setWaypointPois] = useState<WaypointPois>({});
   // On phones, the criteria are a layer over the map; the height of the sheet is what the routes are framed clear of.
   const [layerOpen, setLayerOpen] = useState(false);
   // The sheet says it, and describes its button by it, only while the form does not show its own message.
@@ -178,7 +188,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   }, [pageOpen]);
 
   useToastTimeout(toast, () => setToast(undefined));
-  useToastTimeout(refused || undefined, () => setRefused(false));
+  useToastTimeout(refused, () => setRefused(undefined));
 
   // Escape steps back on a desktop: first out of placing waypoints, then out of picking the start point on the map, then out of the route selected.
   const deselect = () => {
@@ -201,13 +211,22 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   function togglePlacing() {
     if (placing) return setMode(undefined);
     browser.drop();
-    setRefused(false);
+    setRefused(undefined);
     setMode('place');
   }
 
-  function addWaypoint(position: Position) {
+  function addWaypoint(position: Position, poi?: WaypointPoi) {
     if (waypoints.length >= MAX_WAYPOINTS) return;
-    setRefused(false);
+    // The map reads a point's position to within metres, as the zoom changes: a point of interest tapped twice is
+    // the same one when the two readings are this close.
+    if (
+      poi &&
+      waypoints.some((waypoint) => waypointPoiAt(waypointPois, waypoint) && kmBetween(waypoint, position) < SAME_POI_KM)
+    ) {
+      return setRefused('duplicate');
+    }
+    setRefused(undefined);
+    if (poi) setWaypointPois({ ...waypointPois, [waypointPoiKey(position)]: poi });
     setWaypoints([...waypoints, position]);
     // The last one ends placing on its own.
     if (waypoints.length + 1 >= MAX_WAYPOINTS) setMode(undefined);
@@ -215,6 +234,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   function removeWaypoint(index: number) {
     browser.drop();
+    // Its point of interest stays in `waypointPois`: the routes found keep drawing and naming it, and a lookup is by exact position.
     setWaypoints(waypoints.filter((_, i) => i !== index));
   }
 
@@ -270,6 +290,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         }}
         onHover={browser.setHover}
         waypoints={routeSet.request.waypoints}
+        waypointPois={waypointPois}
       />
     ) : undefined;
   const panel = routeSetView ?? (loading && <SearchingPanel language={language} />);
@@ -348,7 +369,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         waypoints={waypoints}
         placing={placing}
         onWaypointAdd={addWaypoint}
-        onWaypointRefused={() => setRefused(true)}
+        onWaypointRefused={() => setRefused('uncovered')}
         onWaypointRemove={removeWaypoint}
         onBasemapFail={(previous) => update({ basemap: previous })}
       />
@@ -520,6 +541,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           onClose={deselect}
           onHover={browser.setHover}
           waypoints={routeSet?.request.waypoints}
+          waypointPois={waypointPois}
         />
       )}
       {picking && (
@@ -559,7 +581,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           data-testid="criteria-waypoint-refused"
           className="m-0 rounded-md bg-surface px-4 py-2 text-ink shadow-float empty:hidden"
         >
-          {placing && refused ? t.waypointUncovered : ''}
+          {placing && refused ? (refused === 'duplicate' ? t.waypointDuplicate : t.waypointUncovered) : ''}
         </p>
       </div>
       {browser.refusal && (

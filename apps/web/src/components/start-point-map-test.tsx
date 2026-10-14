@@ -1271,6 +1271,81 @@ describe('StartPointMap waypoints', () => {
     expect(onStartChange).not.toHaveBeenCalled();
   });
 
+  describe('placing on a point of interest', () => {
+    const fountain = {
+      properties: { category: 'water', seasonal: false, name: 'Fontaine' },
+      geometry: { coordinates: [6.05, 45.05] },
+    };
+    const clickNear = () =>
+      act(() => map().fire('click', { lngLat: { lng: 6.0501, lat: 45.0499 }, point: { x: 1, y: 1 } }));
+
+    it('makes the point a waypoint, at the point and not at the tap', () => {
+      const onWaypointAdd = vi.fn();
+      render(<StartPointMap placing onWaypointAdd={onWaypointAdd} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
+      map().rendered = [fountain];
+
+      clickNear();
+
+      expect(onWaypointAdd).toHaveBeenCalledExactlyOnceWith([6.05, 45.05], {
+        category: 'water',
+        seasonal: false,
+        name: 'Fontaine',
+      });
+    });
+
+    it('does not name a point that has no name', () => {
+      const onWaypointAdd = vi.fn();
+      render(<StartPointMap placing onWaypointAdd={onWaypointAdd} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
+      map().rendered = [{ ...fountain, properties: { category: 'viewpoint', seasonal: false } }];
+
+      clickNear();
+
+      expect(onWaypointAdd).toHaveBeenCalledExactlyOnceWith([6.05, 45.05], { category: 'viewpoint', seasonal: false });
+    });
+
+    it('refuses a point on the veiled part of the map', () => {
+      const [onWaypointAdd, onWaypointRefused] = [vi.fn(), vi.fn()];
+      render(
+        <StartPointMap
+          placing
+          coverage={[[7, 46, 7.1, 46.1]]}
+          onWaypointAdd={onWaypointAdd}
+          onWaypointRefused={onWaypointRefused}
+          onStartChange={vi.fn()}
+        />,
+      );
+      act(() => map().fire('style.load'));
+      map().rendered = [fountain];
+
+      clickNear();
+
+      expect(onWaypointAdd).not.toHaveBeenCalled();
+      expect(onWaypointRefused).toHaveBeenCalledOnce();
+    });
+
+    it('shows no label over the new waypoint', () => {
+      render(<StartPointMap placing onWaypointAdd={vi.fn()} onStartChange={vi.fn()} />);
+      const shown = popups.length;
+
+      act(() => map().fire('click', { features: [fountain] }, 'pois-water'));
+
+      expect(popups.length).toBe(shown);
+    });
+
+    it('is only a label when not placing', () => {
+      const onWaypointAdd = vi.fn();
+      render(<StartPointMap onWaypointAdd={onWaypointAdd} onStartChange={vi.fn()} />);
+      act(() => map().fire('style.load'));
+      map().rendered = [fountain];
+
+      clickNear();
+
+      expect(onWaypointAdd).not.toHaveBeenCalled();
+    });
+  });
+
   it('shows a crosshair while placing, and the usual cursor after', () => {
     const view = render(<StartPointMap placing onStartChange={vi.fn()} />);
     expect(map().getCanvas().style.cursor).toBe('crosshair');
