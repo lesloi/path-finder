@@ -44,6 +44,9 @@ import { RoutePace } from './route-pace.tsx';
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
 
+/** The box of a route's row; the placeholder of the results draws the same. */
+export const ROUTE_ROW_BOX = 'flex min-h-13 w-full flex-col gap-2 rounded-md border border-l-4 border-border p-2';
+
 const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp } satisfies Record<
   Miss['criterion'],
   LucideIcon
@@ -226,10 +229,7 @@ function RouteRow({
       data-testid={`routes-row-${index}`}
       data-selected={selected ? '' : undefined}
       aria-current={selected ? 'true' : undefined}
-      className={
-        `flex min-h-13 w-full flex-col gap-2 rounded-md border border-l-4 border-border p-2 text-left ` +
-        `${routeBorder(index)} hover:bg-surface-2 data-selected:bg-surface-2`
-      }
+      className={`${ROUTE_ROW_BOX} text-left ${routeBorder(index)} hover:bg-surface-2 data-selected:bg-surface-2`}
       aria-label={name}
       onPointerDown={() => (pressed.current = true)}
       onPointerCancel={() => (pressed.current = false)}
