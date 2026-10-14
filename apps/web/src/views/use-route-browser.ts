@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 
 import { useToastTimeout } from '../components/index.ts';
 import type { MapSnapshot, Position, RouteSetRequest } from '../core/index.ts';
-import { useRouteSet, type InvalidCriteria, type RouteSetError } from '../state/index.ts';
+import { useRouteSet, type Refusal } from '../state/index.ts';
 
 /**
  * What the user does with a route set: asking for it, the route selected (none until they pick one), the route
@@ -10,11 +10,8 @@ import { useRouteSet, type InvalidCriteria, type RouteSetError } from '../state/
  * at on its elevation profile. The route set is gone once cleared.
  */
 export function useRouteBrowser() {
-  const [refusal, setRefusal] = useState<{ error: RouteSetError | 'no-routes'; invalid?: InvalidCriteria }>();
-  const error = refusal?.error;
-  const { routeSet, loading, find, clear } = useRouteSet((next, invalid) =>
-    setRefusal({ error: next, ...(invalid && { invalid }) }),
-  );
+  const [refusal, setRefusal] = useState<Refusal>();
+  const { routeSet, loading, find, clear } = useRouteSet(setRefusal);
   const [selected, setSelected] = useState<number>();
   // The route a pointer or the focus is on in the list: the map highlights it without selecting it.
   const [preview, setPreview] = useState<number>();
@@ -28,7 +25,7 @@ export function useRouteBrowser() {
   );
 
   // The notice of a newer version stays: the user has to reload, and a click drops it.
-  useToastTimeout(error === 'stale-build' ? undefined : error, () => setRefusal(undefined));
+  useToastTimeout(refusal?.error === 'stale-build' ? undefined : refusal, () => setRefusal(undefined));
 
   // A snapshot of another route set would draw the wrong places.
   const snapshot = mapSnapshot?.of === geometries ? mapSnapshot : undefined;
@@ -38,8 +35,7 @@ export function useRouteBrowser() {
     snapshot,
     setSnapshot,
     loading,
-    error,
-    invalid: refusal?.invalid,
+    refusal,
     selected,
     preview,
     detail,

@@ -101,10 +101,10 @@ describe('useRouteBrowser', () => {
     const { result } = renderHook(() => useRouteBrowser());
 
     act(() => result.current.ask(request));
-    await waitFor(() => expect(result.current.error).toBe('no-routes'));
+    await waitFor(() => expect(result.current.refusal).toEqual({ error: 'no-routes' }));
     act(() => void vi.advanceTimersByTime(TOAST_MS));
 
-    expect(result.current.error).toBeUndefined();
+    expect(result.current.refusal).toBeUndefined();
   });
 
   it('keeps the notice of a newer version until it is dropped, as the user has to reload', async () => {
@@ -113,32 +113,32 @@ describe('useRouteBrowser', () => {
     const { result } = renderHook(() => useRouteBrowser());
 
     act(() => result.current.ask(request));
-    await waitFor(() => expect(result.current.error).toBe('stale-build'));
+    await waitFor(() => expect(result.current.refusal).toEqual({ error: 'stale-build' }));
     act(() => void vi.advanceTimersByTime(TOAST_MS * 10));
 
-    expect(result.current.error).toBe('stale-build');
+    expect(result.current.refusal).toEqual({ error: 'stale-build' });
   });
 
   it('drops the notice of a newer version on request', async () => {
     answer(Response.json({ error: 'stale-build' }, { status: 426 }));
     const { result } = renderHook(() => useRouteBrowser());
     act(() => result.current.ask(request));
-    await waitFor(() => expect(result.current.error).toBe('stale-build'));
+    await waitFor(() => expect(result.current.refusal).toEqual({ error: 'stale-build' }));
 
     act(() => result.current.dismissError());
 
-    expect(result.current.error).toBeUndefined();
+    expect(result.current.refusal).toBeUndefined();
   });
 
   it('drops an error on request', async () => {
     answer(new Response('', { status: 500 }));
     const { result } = renderHook(() => useRouteBrowser());
     act(() => result.current.ask(request));
-    await waitFor(() => expect(result.current.error).toBe('failed'));
+    await waitFor(() => expect(result.current.refusal).toEqual({ error: 'failed' }));
 
     act(() => result.current.dismissError());
 
-    expect(result.current.error).toBeUndefined();
+    expect(result.current.refusal).toBeUndefined();
   });
 
   it('keeps the map snapshot of the current routes only', async () => {

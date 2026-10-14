@@ -558,13 +558,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           )}
         </div>
       )}
-      {browser.error && (
-        <RouteErrorToast
-          language={language}
-          error={browser.error}
-          {...(browser.invalid && { invalid: browser.invalid })}
-          onDismiss={browser.dismissError}
-        />
+      {browser.refusal && (
+        <RouteErrorToast language={language} refusal={browser.refusal} onDismiss={browser.dismissError} />
       )}
       {toast && toast.start === start && (
         <Toast testId="criteria-toast" onDismiss={() => setToast(undefined)}>
