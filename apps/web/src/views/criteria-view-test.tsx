@@ -1597,6 +1597,23 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
     });
 
+    it('refuses the same point of interest read a few metres off, as the map does at another zoom', async () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      await act(async () => {});
+      act(() => map().fire('style.load'));
+      const tap = (coordinates: [number, number]) => {
+        map().rendered = [{ properties: { category: 'water', seasonal: false }, geometry: { coordinates } }];
+        act(() => map().fire('click', { lngLat: { lng: 6.21, lat: 45.81 }, point: { x: 1, y: 1 } }));
+      };
+
+      tap([6.21, 45.81]);
+      tap([6.21, 45.81003]);
+
+      expect(waypointMarkers()).toHaveLength(1);
+      expect(screen.getByTestId('criteria-waypoint-refused')).toHaveTextContent(en.waypointDuplicate);
+    });
+
     it('refuses a point of interest that already is a waypoint, and says so', async () => {
       render(<CriteriaView language="en" />);
       startPlacing();

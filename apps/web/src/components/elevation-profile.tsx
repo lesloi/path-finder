@@ -184,6 +184,7 @@ export function ElevationProfile({
                   number={number}
                   variant="profile"
                   poi={poi}
+                  tipSide={total && distance / total > 0.5 ? 'top-end' : 'top-start'}
                   {...(poi && { poiLabel: poiLabel(poi, language) })}
                 />
               </span>

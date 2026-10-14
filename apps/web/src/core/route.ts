@@ -103,7 +103,7 @@ export function parseRoutes(body: unknown): Route[] | undefined {
 }
 
 // Kilometres between two positions, on a local equirectangular projection: close enough along a route.
-function kmBetween([lonA, latA]: number[], [lonB, latB]: number[]): number {
+export function kmBetween([lonA, latA]: number[], [lonB, latB]: number[]): number {
   const cos = Math.cos((((latA + latB) / 2) * Math.PI) / 180);
   return Math.hypot((lonB - lonA) * cos, latB - latA) * 111.195;
 }

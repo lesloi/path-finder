@@ -28,6 +28,8 @@ import {
   routesAtPace,
   type Position,
   type RouteSetRequest,
+  kmBetween,
+  waypointPoiAt,
   waypointPoiKey,
   type WaypointPoi,
   type WaypointPois,
@@ -93,6 +95,9 @@ const NO_START: Position = [0, 0];
  * The first view: where the user sets the criteria of a route set, over a full-screen map. Asking
  * for routes replaces the criteria with the route set, its routes drawn on the map.
  */
+// Two readings of a point of interest this close are the same point.
+const SAME_POI_KM = 0.005;
+
 export function CriteriaView({ language, pageOpen = false }: { language: Language; pageOpen?: boolean }) {
   const t = { ...commonText[language], ...criteriaText[language], ...routesText[language] };
   const desktop = useDesktop();
@@ -212,8 +217,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   function addWaypoint(position: Position, poi?: WaypointPoi) {
     if (waypoints.length >= MAX_WAYPOINTS) return;
-    // A point of interest sits at one exact position: the same one twice is the same point.
-    if (poi && waypoints.some((waypoint) => waypointPoiKey(waypoint) === waypointPoiKey(position))) {
+    // The map reads a point's position to within metres, as the zoom changes: a point of interest tapped twice is
+    // the same one when the two readings are this close.
+    if (
+      poi &&
+      waypoints.some((waypoint) => waypointPoiAt(waypointPois, waypoint) && kmBetween(waypoint, position) < SAME_POI_KM)
+    ) {
       return setRefused('duplicate');
     }
     setRefused(undefined);

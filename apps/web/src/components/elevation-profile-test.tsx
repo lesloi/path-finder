@@ -61,6 +61,21 @@ describe('ElevationProfile', () => {
       expect(screen.getByTestId('profile-waypoint-2').querySelector('[data-tip]')).toBeNull();
     });
 
+    it('opens the tooltip of a point of interest toward the middle, so that the screen does not cut it', () => {
+      const poi = { category: 'water', seasonal: false } as const;
+
+      show([at(1), at(3)], { [waypointPoiKey(at(1))]: poi, [waypointPoiKey(at(3))]: poi });
+
+      expect(screen.getByTestId('profile-waypoint-1').querySelector('[data-tip]')).toHaveAttribute(
+        'data-tip-side',
+        'top-start',
+      );
+      expect(screen.getByTestId('profile-waypoint-2').querySelector('[data-tip]')).toHaveAttribute(
+        'data-tip-side',
+        'top-end',
+      );
+    });
+
     it('names a point of interest without a name by what it is', () => {
       show([at(1)], { [waypointPoiKey(at(1))]: { category: 'water', seasonal: false } });
 

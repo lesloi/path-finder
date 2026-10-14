@@ -22,6 +22,7 @@ export function WaypointPin({
   variant,
   poi,
   poiLabel,
+  tipSide = 'top-start',
 }: {
   number: number;
   variant: keyof typeof VARIANTS;
@@ -29,13 +30,15 @@ export function WaypointPin({
   poi?: WaypointPoi | undefined;
   /** What the point of interest is called: the tooltip over its icon. */
   poiLabel?: string;
+  /** Where the tooltip opens: toward the middle of the profile, which the screen does not cut. */
+  tipSide?: Parameters<typeof hint>[1];
 }) {
   const classes = VARIANTS[variant];
   if (poi) {
     return (
       <span
         className="pointer-events-auto absolute top-0 left-0 h-[22px] w-[18px]"
-        {...(poiLabel && hint(poiLabel, 'top-start'))}
+        {...(poiLabel && hint(poiLabel, tipSide))}
       >
         <PoiBadge category={poi.category} seasonal={poi.seasonal} className="absolute top-0 left-0 size-[18px]" />
         <span
