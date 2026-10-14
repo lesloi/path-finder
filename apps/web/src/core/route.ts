@@ -181,6 +181,44 @@ export function positionAt(geometry: Route['geometry'], distance: number): Posit
   return positionAlong(geometry, distancesAlong(geometry), distance);
 }
 
+/** A waypoint as the route passes it, numbered as on the map. */
+export type WaypointOnRoute = {
+  /** From 1, in the order placed. */
+  number: number;
+  /** Kilometres from the start. */
+  distance: number;
+  /** Where the route passes it, which may be a little off the point placed: the API moved it to a way. */
+  position: Position;
+  /** Metres, when the route has heights. */
+  height?: number;
+};
+
+/**
+ * Where a route passes each waypoint: the point of the route nearest to it, looked for after the one found for
+ * the previous waypoint, so that waypoints keep their order on a route that goes by the same place twice.
+ */
+export function waypointsOnRoute(geometry: Route['geometry'], waypoints: Position[]): WaypointOnRoute[] {
+  if (geometry.length === 0) return [];
+  const distances = distancesAlong(geometry);
+  let from = 0;
+  return waypoints.map((waypoint, k) => {
+    let nearest = Math.min(from, geometry.length - 1);
+    let best = kmBetween(geometry[nearest], waypoint);
+    for (let j = nearest + 1; j < geometry.length; j++) {
+      const km = kmBetween(geometry[j], waypoint);
+      if (km < best) [nearest, best] = [j, km];
+    }
+    from = nearest + 1;
+    const [lon, lat, height] = geometry[nearest] as [number, number, number?];
+    return {
+      number: k + 1,
+      distance: distances[nearest],
+      position: [lon, lat],
+      ...(height !== undefined && { height }),
+    };
+  });
+}
+
 /** The position halfway along the route: the far side of a loop. */
 export function midpoint(geometry: Route['geometry']): Position {
   const distances = distancesAlong(geometry);

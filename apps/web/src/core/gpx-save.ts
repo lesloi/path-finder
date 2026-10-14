@@ -1,3 +1,5 @@
+import { gpxExport, type GpxRoute } from './gpx.ts';
+
 /**
  * Sends a GPX file to the device share sheet when the browser can share files, otherwise
  * downloads it. Call it from the tap that asks for it, with nothing awaited before: a share sheet
@@ -18,4 +20,9 @@ export async function saveGpx({ fileName, content }: { fileName: string; content
   const link = Object.assign(document.createElement('a'), { href: url, download: fileName });
   link.click();
   URL.revokeObjectURL(url);
+}
+
+/** Exports a route as a GPX file, as of now, in the language and pace unit the user reads. */
+export function exportRoute(route: GpxRoute, options: Parameters<typeof gpxExport>[2], pace: number): Promise<void> {
+  return saveGpx(gpxExport(route, new Date(), options, pace));
 }

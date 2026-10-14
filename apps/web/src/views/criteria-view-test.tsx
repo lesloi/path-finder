@@ -5,7 +5,7 @@ import { LazyStartPointMap } from '../components/index.ts';
 import { CriteriaView } from './criteria-view.tsx';
 import { expectNamedControls } from '../accessible-names.ts';
 import { criteriaText, errorText, routesText } from '../i18n/index.ts';
-import { maps, markers } from '../maplibre-mock.ts';
+import { maps, markers, popups } from '../maplibre-mock.ts';
 import { useSettings } from '../state/index.ts';
 
 vi.mock('maplibre-gl', () => import('../maplibre-mock.ts'));
@@ -40,6 +40,7 @@ beforeAll(async () => {
 beforeEach(() => {
   maps.length = 0;
   markers.length = 0;
+  popups.length = 0;
 });
 
 afterEach(() => {
@@ -1465,6 +1466,306 @@ describe('CriteriaView', () => {
       fireEvent.click(screen.getByTestId('criteria-sheet-handle'));
 
       expectNamedControls(container);
+    });
+  });
+
+  describe('waypoints', () => {
+    const waypointButton = () => screen.getByTestId('criteria-waypoint');
+    const banner = () => screen.getByTestId('criteria-waypoint-bar');
+    const waypointMarkers = () => markers.filter((marker) => marker.shown && marker.options?.element?.dataset.waypoint);
+    const place = (lng: number, lat: number) => act(() => map().fire('click', { lngLat: { lng, lat } }));
+    const setStart = () => {
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+    };
+    const route = {
+      geometry: [
+        [6.2, 45.8, 450],
+        [6.21, 45.81, 480],
+      ],
+      distance: 10,
+      elevationGain: 30,
+      estimatedDuration: 70,
+      kind: 'match',
+      misses: [],
+      unpavedShare: 0.3,
+      surfaces: [{ surface: 'paved', from: 0, to: 10 }],
+      technical: false,
+    };
+    const startPlacing = () => {
+      setStart();
+      fireEvent.click(waypointButton());
+    };
+    const lastRequest = (fetchMock: ReturnType<typeof vi.fn>) =>
+      JSON.parse(fetchMock.mock.calls.at(-1)![1].body as string) as Record<string, unknown>;
+
+    beforeEach(() => onDesktop());
+
+    it('shows the button once a start point is set', () => {
+      render(<CriteriaView language="en" />);
+      expect(screen.queryByTestId('criteria-waypoint')).not.toBeInTheDocument();
+
+      setStart();
+
+      expect(waypointButton()).toHaveAccessibleName(en.addWaypoint);
+    });
+
+    it('is named in French', () => {
+      render(<CriteriaView language="fr" />);
+      setStart();
+
+      expect(waypointButton()).toHaveAccessibleName(fr.addWaypoint);
+    });
+
+    it('asks for the next waypoint in a banner, and places one on each tap', () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      expect(banner()).toHaveTextContent(en.placeWaypoint);
+      expect(waypointButton()).toHaveAttribute('aria-pressed', 'true');
+
+      place(6.21, 45.81);
+      place(6.22, 45.82);
+
+      expect(banner()).toHaveTextContent(en.placeWaypoint);
+      expect(waypointMarkers().map((marker) => [marker.options?.element?.textContent, marker.position])).toEqual([
+        ['1', [6.21, 45.81]],
+        ['2', [6.22, 45.82]],
+      ]);
+    });
+
+    it('ends with Done, with the button again, or with Escape', () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+
+      fireEvent.click(screen.getByTestId('criteria-waypoint-done'));
+      expect(screen.queryByTestId('criteria-waypoint-bar')).not.toBeInTheDocument();
+
+      fireEvent.click(waypointButton());
+      fireEvent.click(waypointButton());
+      expect(screen.queryByTestId('criteria-waypoint-bar')).not.toBeInTheDocument();
+
+      fireEvent.click(waypointButton());
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByTestId('criteria-waypoint-bar')).not.toBeInTheDocument();
+    });
+
+    it('stops placing at the fifth waypoint, and disables the button then', () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+
+      for (let k = 1; k <= 6; k++) place(6.2 + k / 100, 45.8);
+
+      expect(screen.queryByTestId('criteria-waypoint-bar')).not.toBeInTheDocument();
+      expect(waypointMarkers()).toHaveLength(5);
+      expect(waypointButton()).toBeDisabled();
+    });
+
+    it('places no waypoint on the veiled part of the map, where the server cannot route', async () => {
+      vi.stubGlobal('fetch', (url: string) =>
+        url === '/api/v1/coverage'
+          ? Promise.resolve(Response.json({ cells: [[6, 45.7, 6.3, 45.9]] }))
+          : new Promise(() => {}),
+      );
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      await act(async () => {});
+
+      place(2.3, 48.8);
+      place(6.21, 45.81);
+
+      expect(waypointMarkers().map((marker) => marker.position)).toEqual([[6.21, 45.81]]);
+    });
+
+    it('says so under the banner when a tap falls on the veiled part of the map', async () => {
+      vi.stubGlobal('fetch', (url: string) =>
+        url === '/api/v1/coverage'
+          ? Promise.resolve(Response.json({ cells: [[6, 45.7, 6.3, 45.9]] }))
+          : new Promise(() => {}),
+      );
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      await act(async () => {});
+
+      // A region that is there from the start, so that what it says is announced.
+      expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
+
+      place(2.3, 48.8);
+      expect(screen.getByTestId('criteria-waypoint-refused')).toHaveTextContent(en.waypointUncovered);
+      expect(banner()).toHaveTextContent(en.placeWaypoint);
+
+      place(6.21, 45.81);
+      expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
+    });
+
+    it('does not say a tap was refused once placing starts again', async () => {
+      vi.stubGlobal('fetch', (url: string) =>
+        url === '/api/v1/coverage'
+          ? Promise.resolve(Response.json({ cells: [[6, 45.7, 6.3, 45.9]] }))
+          : new Promise(() => {}),
+      );
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      await act(async () => {});
+      place(2.3, 48.8);
+
+      fireEvent.click(screen.getByTestId('criteria-waypoint-done'));
+      fireEvent.click(waypointButton());
+
+      expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
+    });
+
+    it('stops placing once the search starts', () => {
+      stubFetch(() => new Promise(() => {}));
+      render(<CriteriaView language="en" />);
+      startPlacing();
+
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      expect(screen.queryByTestId('criteria-waypoint-bar')).not.toBeInTheDocument();
+    });
+
+    it('keeps placing when the start point is typed meanwhile', () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+
+      fireEvent.change(field(), { target: { value: '45.9, 6.3' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(banner()).toBeInTheDocument();
+    });
+
+    it('does not move the start point while placing', () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+
+      place(6.5, 45.5);
+
+      expect(field()).toHaveValue('45.8000° N · 6.2000° E');
+    });
+
+    it('stops picking the start point on the map when placing starts, and the other way round', () => {
+      render(<CriteriaView language="en" />);
+      setStart();
+      fireEvent.click(screen.getByTestId('criteria-start-pick'));
+
+      fireEvent.click(waypointButton());
+      expect(screen.getByTestId('criteria-start-pick')).toHaveAttribute('aria-pressed', 'false');
+
+      fireEvent.click(screen.getByTestId('criteria-start-pick'));
+      expect(screen.queryByTestId('criteria-waypoint-bar')).not.toBeInTheDocument();
+    });
+
+    it('removes a waypoint from the bubble of its marker, and numbers the others again', () => {
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      place(6.21, 45.81);
+      place(6.22, 45.82);
+      place(6.23, 45.83);
+      fireEvent.click(screen.getByTestId('criteria-waypoint-done'));
+
+      act(() => waypointMarkers()[1]!.options!.element!.click());
+      act(() => popups.at(-1)!.content!.click());
+
+      expect(waypointMarkers().map((marker) => [marker.options?.element?.textContent, marker.position])).toEqual([
+        ['1', [6.21, 45.81]],
+        ['2', [6.23, 45.83]],
+      ]);
+    });
+
+    it('sends the waypoints with the criteria, in the order they were placed', async () => {
+      const fetchMock = vi.fn(() => Promise.resolve(Response.json({ routes: [route] })));
+      stubFetch(fetchMock);
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      place(6.23, 45.83);
+      place(6.21, 45.81);
+
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      await screen.findByTestId('routes-count');
+      expect(lastRequest(fetchMock).waypoints).toEqual([
+        [6.23, 45.83],
+        [6.21, 45.81],
+      ]);
+    });
+
+    it('sends no waypoints when none is placed', async () => {
+      const fetchMock = vi.fn(() => Promise.resolve(Response.json({ routes: [route] })));
+      stubFetch(fetchMock);
+      render(<CriteriaView language="en" />);
+      setStart();
+
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      await screen.findByTestId('routes-count');
+      expect(lastRequest(fetchMock)).not.toHaveProperty('waypoints');
+    });
+
+    it('counts the waypoints in the summary above the routes, and hides the button while they are shown', async () => {
+      stubFetch(() => Promise.resolve(Response.json({ routes: [route] })));
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      place(6.21, 45.81);
+      place(6.22, 45.82);
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      await screen.findByTestId('routes-count');
+
+      expect(screen.getByTestId('routes-summary')).toHaveTextContent(en.waypointCount(2));
+      expect(screen.queryByTestId('criteria-waypoint')).not.toBeInTheDocument();
+    });
+
+    it('numbers the waypoints on the elevation profile of the route selected', async () => {
+      stubFetch(() => Promise.resolve(Response.json({ routes: [route] })));
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      place(6.21, 45.81);
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+      await screen.findByTestId('routes-count');
+
+      fireEvent.click(await screen.findByTestId('routes-row-0'));
+
+      expect(await screen.findByTestId('route-profile-waypoint-1')).toBeInTheDocument();
+    });
+
+    it('drops the routes once a waypoint is removed, since the criteria changed', async () => {
+      stubFetch(() => Promise.resolve(Response.json({ routes: [route] })));
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      place(6.21, 45.81);
+      fireEvent.click(screen.getByTestId('criteria-waypoint-done'));
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+      await screen.findByTestId('routes-count');
+
+      act(() => waypointMarkers()[0]!.options!.element!.click());
+      act(() => popups.at(-1)!.content!.click());
+
+      expect(screen.queryByTestId('routes-count')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-submit')).toBeInTheDocument();
+    });
+
+    describe.each(['en', 'fr'] as const)('the refusals of the API, in %s', (language) => {
+      const t = routesText[language];
+      const refuse = async (body: object) => {
+        stubFetch(() => Promise.resolve(Response.json({ error: 'invalid-criteria', ...body }, { status: 400 })));
+        render(<CriteriaView language={language} />);
+        startPlacing();
+        place(6.21, 45.81);
+        fireEvent.click(screen.getByTestId('criteria-submit'));
+        return screen.findByTestId('routes-toast');
+      };
+
+      it('names the waypoint that is too far from a way', async () => {
+        expect(await refuse({ field: 'waypoints', waypoint: 2 })).toHaveTextContent(t.waypointTooFar(2));
+      });
+
+      it('says the start point is too far from a way', async () => {
+        expect(await refuse({ field: 'start' })).toHaveTextContent(t.startTooFar);
+      });
+
+      it('says the waypoints make too long a route, or that no way joins them', async () => {
+        expect(await refuse({ field: 'waypoints' })).toHaveTextContent(t.waypointsUnreachable);
+      });
     });
   });
 });

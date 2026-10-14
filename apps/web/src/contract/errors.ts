@@ -6,10 +6,12 @@ export type ErrorCode =
 
 /**
  * The body of every refusal: the code, and for `invalid-criteria` the field of the criteria that
- * failed. Never a value, as the server keeps no location. A wait comes in the `Retry-After` header.
+ * failed, with the waypoint at fault (counted from 1) when it is one. Never a value, as the server keeps no
+ * location. A wait comes in the `Retry-After` header.
  */
 export type ApiError =
-  { error: Exclude<ErrorCode, 'invalid-criteria'> } | { error: 'invalid-criteria'; field: CriteriaField };
+  | { error: Exclude<ErrorCode, 'invalid-criteria'> }
+  | { error: 'invalid-criteria'; field: CriteriaField; waypoint?: number };
 
 /** A part of a route on one surface, `from` and `to` in kilometres along the route, in order and without gaps. */
 export type SurfaceStretch = { surface: 'paved' | 'unpaved'; from: number; to: number };

@@ -82,6 +82,18 @@ describe('RouteDock', () => {
     expect(files![0].name).toMatch(/^Running-12km_340m-\d{14}\.gpx$/);
   });
 
+  it('numbers the waypoints on the profile, and exports them in the GPX file', async () => {
+    const share = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('navigator', { ...navigator, canShare: () => true, share });
+    dock('en', { waypoints: [[route.geometry[2][0], route.geometry[2][1]]] });
+
+    expect(screen.getByTestId('route-profile-waypoint-1')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('route-export'));
+
+    const [{ files }] = share.mock.calls[0] as unknown as [ShareData];
+    expect(await files![0].text()).toContain('<name>Waypoint 1</name>');
+  });
+
   it.each(['en', 'fr'] as const)('names every control in %s', (language) => {
     const { container } = dock(language);
 

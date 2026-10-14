@@ -1,4 +1,4 @@
-import { useState, type PointerEvent } from 'react';
+import { useMemo, useState, type PointerEvent } from 'react';
 
 import {
   elevationProfile,
@@ -7,12 +7,17 @@ import {
   gradeAt,
   positionAt,
   surfaceAt,
+  waypointsOnRoute,
   type Position,
   type Route,
 } from '../core/index.ts';
-import { routesText, type Language } from '../i18n/index.ts';
+import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 import { profileScale } from './profile-scale.ts';
 import { SURFACE_CLASSES } from './surface-colors.ts';
+import { WaypointPin } from './waypoint-pin.tsx';
+
+// A default that keeps its identity, so that the waypoints on the route are not worked out again on every hover.
+const NO_WAYPOINTS: Position[] = [];
 
 const WIDTH = 300;
 const HEIGHT = 60;
@@ -28,15 +33,19 @@ export function ElevationProfile({
   route,
   language,
   onHover,
+  waypoints = NO_WAYPOINTS,
   testId,
 }: {
   route: Route;
   language: Language;
   onHover: (position: Position | undefined) => void;
+  /** The points the route was asked to go through: numbered where it passes them. */
+  waypoints?: Position[] | undefined;
   testId?: string;
 }) {
   const t = routesText[language];
   const [at, setAt] = useState<number>();
+  const onRoute = useMemo(() => waypointsOnRoute(route.geometry, waypoints), [route.geometry, waypoints]);
   const profile = elevationProfile(route.geometry);
   if (!profile) return null;
 
@@ -149,6 +158,20 @@ export function ElevationProfile({
               );
             })}
           </svg>
+          {onRoute.map(({ number, distance }) => (
+            // The pin in the row of the title, above the plot so that it hides none of the profile, and a line down from its tip.
+            <span
+              key={number}
+              data-testid={testId && `${testId}-waypoint-${number}`}
+              role="img"
+              aria-label={`${criteriaText[language].waypointName(number)}, ${formatDistance(distance, language)}`}
+              className="pointer-events-none absolute -top-6 bottom-0 w-[18px] -translate-x-1/2"
+              style={{ left: `${total ? (distance / total) * 100 : 0}%` }}
+            >
+              <span className="absolute top-[22px] bottom-0 left-1/2 w-px -translate-x-1/2 bg-ink-2" />
+              <WaypointPin number={number} variant="profile" />
+            </span>
+          ))}
           {/* The keyboard's way along the profile: a native slider, hidden, whose ring shows on the plot. */}
           <input
             type="range"

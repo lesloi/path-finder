@@ -8,7 +8,7 @@ import { commonText } from './i18n/index.ts';
 // jsdom has no WebGL.
 vi.mock('maplibre-gl');
 ScaleControl.prototype.setUnit = vi.fn();
-Map.prototype.getCanvas = vi.fn(() => ({ setAttribute: vi.fn() }) as never);
+Map.prototype.getCanvas = vi.fn(() => ({ setAttribute: vi.fn(), style: {} }) as never);
 Map.prototype.getContainer = vi.fn(() => document.createElement('div'));
 // The credits page cannot be loaded, as after a deploy that removed its file.
 vi.mock('./views/legal/credits-page.tsx', () => {

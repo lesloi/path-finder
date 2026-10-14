@@ -1,6 +1,14 @@
 // What the web app shares with the server: the criteria vocabulary and its bounds, the error codes it
 // words, and the parts of a route it reads. The bounds come from `apps/server/contract/contract.json`.
-export { CriteriaError, parseCriteria, type Criteria, type CriteriaField, type Position } from './criteria.ts';
+export {
+  CRITERIA_FIELDS,
+  CriteriaError,
+  isCriteriaField,
+  parseCriteria,
+  type Criteria,
+  type CriteriaField,
+  type Position,
+} from './criteria.ts';
 export type { ApiError, ErrorCode, Miss, SurfaceStretch } from './errors.ts';
 export {
   CLIMB_PER_EFFORT_KM,

@@ -26,7 +26,11 @@ export type Criteria = {
 };
 
 /** The criteria fields `parseCriteria` checks, so a form can say which one is wrong. */
-export type CriteriaField = 'start' | 'target' | 'elevationGain' | 'surface' | 'pace' | 'waypoints';
+export const CRITERIA_FIELDS = ['start', 'target', 'elevationGain', 'surface', 'pace', 'waypoints'] as const;
+export type CriteriaField = (typeof CRITERIA_FIELDS)[number];
+
+export const isCriteriaField = (value: unknown): value is CriteriaField =>
+  CRITERIA_FIELDS.includes(value as CriteriaField);
 
 /** Criteria that are not valid, with the field that failed. */
 export class CriteriaError extends RangeError {

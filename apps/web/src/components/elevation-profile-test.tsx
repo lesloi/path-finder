@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import type { Route } from '../core/index.ts';
-import { routesText } from '../i18n/index.ts';
+import { criteriaText, routesText } from '../i18n/index.ts';
 import { ElevationProfile } from './elevation-profile.tsx';
 
 // 1.1 km north, 450 m then up to 500 m (flat first, then steep).
@@ -28,6 +28,44 @@ function plot(onHover = vi.fn(), props: Partial<Route> = {}, language: 'en' | 'f
 }
 
 describe('ElevationProfile', () => {
+  describe('waypoints', () => {
+    const at = (k: number): [number, number] => [route.geometry[k][0], route.geometry[k][1]];
+    const show = (waypoints?: [number, number][]) =>
+      render(
+        <ElevationProfile
+          testId="profile"
+          route={route}
+          language="en"
+          onHover={vi.fn()}
+          {...(waypoints && { waypoints })}
+        />,
+      );
+
+    it('numbers each waypoint where the route passes it', () => {
+      show([at(1), at(3)]);
+
+      expect(screen.getByTestId('profile-waypoint-1')).toHaveTextContent('1');
+      expect(screen.getByTestId('profile-waypoint-2')).toHaveTextContent('2');
+      expect(parseFloat(screen.getByTestId('profile-waypoint-1').style.left)).toBeCloseTo(33.3, 0);
+      expect(parseFloat(screen.getByTestId('profile-waypoint-2').style.left)).toBeCloseTo(100, 0);
+    });
+
+    it('is named for assistive technology by the waypoint and its distance', () => {
+      show([at(1)]);
+
+      expect(screen.getByTestId('profile-waypoint-1')).toHaveAttribute(
+        'aria-label',
+        expect.stringContaining(criteriaText.en.waypointName(1)),
+      );
+    });
+
+    it('shows none without waypoints', () => {
+      show();
+
+      expect(screen.queryByTestId('profile-waypoint-1')).not.toBeInTheDocument();
+    });
+  });
+
   it('goes along the profile with the keyboard, as a pointer does', () => {
     const { onHover } = plot();
     const slider = screen.getByTestId('profile-cursor');

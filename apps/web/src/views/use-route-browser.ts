@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 
 import { useToastTimeout } from '../components/index.ts';
 import type { MapSnapshot, Position, RouteSetRequest } from '../core/index.ts';
-import { useRouteSet, type RouteSetError } from '../state/index.ts';
+import { useRouteSet, type Refusal } from '../state/index.ts';
 
 /**
  * What the user does with a route set: asking for it, the route selected (none until they pick one), the route
@@ -10,8 +10,8 @@ import { useRouteSet, type RouteSetError } from '../state/index.ts';
  * at on its elevation profile. The route set is gone once cleared.
  */
 export function useRouteBrowser() {
-  const [error, setError] = useState<RouteSetError | 'no-routes'>();
-  const { routeSet, loading, find, clear } = useRouteSet(setError);
+  const [refusal, setRefusal] = useState<Refusal>();
+  const { routeSet, loading, find, clear } = useRouteSet(setRefusal);
   const [selected, setSelected] = useState<number>();
   // The route a pointer or the focus is on in the list: the map highlights it without selecting it.
   const [preview, setPreview] = useState<number>();
@@ -25,7 +25,7 @@ export function useRouteBrowser() {
   );
 
   // The notice of a newer version stays: the user has to reload, and a click drops it.
-  useToastTimeout(error === 'stale-build' ? undefined : error, () => setError(undefined));
+  useToastTimeout(refusal?.error === 'stale-build' ? undefined : refusal, () => setRefusal(undefined));
 
   // A snapshot of another route set would draw the wrong places.
   const snapshot = mapSnapshot?.of === geometries ? mapSnapshot : undefined;
@@ -35,7 +35,7 @@ export function useRouteBrowser() {
     snapshot,
     setSnapshot,
     loading,
-    error,
+    refusal,
     selected,
     preview,
     detail,
@@ -44,9 +44,9 @@ export function useRouteBrowser() {
     select: setSelected,
     setPreview,
     setHover,
-    dismissError: () => setError(undefined),
+    dismissError: () => setRefusal(undefined),
     ask(request: RouteSetRequest) {
-      setError(undefined);
+      setRefusal(undefined);
       setSelected(undefined);
       setPreview(undefined);
       setDetail(false);

@@ -3,7 +3,7 @@ import { createRef } from 'react';
 
 import type { CoverageCell, Position } from '../core/index.ts';
 import { requestPoiTile } from '../state/index.ts';
-import { commonText } from '../i18n/index.ts';
+import { commonText, criteriaText } from '../i18n/index.ts';
 import { maps, markers, popups, ScaleControl, type GeoJSONSource } from '../maplibre-mock.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { StartPointMap, type MapHandle } from './start-point-map.tsx';
@@ -1233,5 +1233,170 @@ describe('StartPointMap points of interest', () => {
 
       expect(onBackgroundClick).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('StartPointMap waypoints', () => {
+  const waypoints: Position[] = [
+    [6.1, 45.9],
+    [6.2, 45.8],
+  ];
+  const shown = () => markers.filter((marker) => marker.shown && marker.options?.element?.dataset.waypoint);
+  const pressed = (marker: (typeof markers)[number]) => marker.options!.element!;
+
+  it('draws a numbered marker at each waypoint, in the order placed', () => {
+    render(<StartPointMap waypoints={waypoints} onStartChange={vi.fn()} />);
+
+    expect(shown().map((marker) => [pressed(marker).textContent, marker.position])).toEqual([
+      ['1', [6.1, 45.9]],
+      ['2', [6.2, 45.8]],
+    ]);
+  });
+
+  it('takes a waypoint off the map once it is removed', () => {
+    const view = render(<StartPointMap waypoints={waypoints} onStartChange={vi.fn()} />);
+
+    view.rerender(<StartPointMap waypoints={[waypoints[1]!]} onStartChange={vi.fn()} />);
+
+    expect(shown().map((marker) => [pressed(marker).textContent, marker.position])).toEqual([['1', [6.2, 45.8]]]);
+  });
+
+  it('adds a waypoint on a click while placing, and leaves the start point alone', () => {
+    const [onWaypointAdd, onStartChange] = [vi.fn(), vi.fn()];
+    render(<StartPointMap placing onWaypointAdd={onWaypointAdd} onStartChange={onStartChange} />);
+
+    act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
+
+    expect(onWaypointAdd).toHaveBeenCalledExactlyOnceWith([6.2, 45.8]);
+    expect(onStartChange).not.toHaveBeenCalled();
+  });
+
+  it('shows a crosshair while placing, and the usual cursor after', () => {
+    const view = render(<StartPointMap placing onStartChange={vi.fn()} />);
+    expect(map().getCanvas().style.cursor).toBe('crosshair');
+
+    view.rerender(<StartPointMap onStartChange={vi.fn()} />);
+
+    expect(map().getCanvas().style.cursor).toBe('');
+  });
+
+  it('shows a forbidden cursor over the veiled part of the map while placing', () => {
+    render(<StartPointMap placing coverage={[[6, 45.8, 6.1, 45.9]]} onStartChange={vi.fn()} />);
+
+    act(() => map().fire('mousemove', { lngLat: { lng: 2.3, lat: 48.8 } }));
+    expect(map().getCanvas().style.cursor).toBe('not-allowed');
+
+    act(() => map().fire('mousemove', { lngLat: { lng: 6.05, lat: 45.85 } }));
+    expect(map().getCanvas().style.cursor).toBe('crosshair');
+  });
+
+  it('refuses a click on the veiled part of the map while placing, and says so', () => {
+    const [onWaypointAdd, onWaypointRefused] = [vi.fn(), vi.fn()];
+    render(
+      <StartPointMap
+        placing
+        coverage={[[6, 45.8, 6.1, 45.9]]}
+        onWaypointAdd={onWaypointAdd}
+        onWaypointRefused={onWaypointRefused}
+        onStartChange={vi.fn()}
+      />,
+    );
+
+    act(() => map().fire('click', { lngLat: { lng: 2.3, lat: 48.8 } }));
+    expect(onWaypointAdd).not.toHaveBeenCalled();
+    expect(onWaypointRefused).toHaveBeenCalledOnce();
+
+    act(() => map().fire('click', { lngLat: { lng: 6.05, lat: 45.85 } }));
+    expect(onWaypointAdd).toHaveBeenCalledExactlyOnceWith([6.05, 45.85]);
+  });
+
+  it('keeps the crosshair when the pointer leaves a point of interest or a route while placing', () => {
+    render(<StartPointMap placing onStartChange={vi.fn()} />);
+
+    act(() => map().fire('mouseenter', {}, 'pois-water'));
+    act(() => map().fire('mouseleave', {}, 'pois-water'));
+
+    expect(map().getCanvas().style.cursor).toBe('crosshair');
+  });
+
+  it('keeps the markers it has, and an open bubble, when a waypoint is added after them', () => {
+    const view = render(<StartPointMap waypoints={[waypoints[0]!]} onStartChange={vi.fn()} />);
+    act(() => pressed(shown()[0]!).click());
+    const [first] = shown();
+
+    view.rerender(<StartPointMap waypoints={waypoints} onStartChange={vi.fn()} />);
+
+    expect(shown()).toHaveLength(2);
+    expect(shown()[0]).toBe(first);
+    expect(popups.at(-1)!.shown).toBe(true);
+  });
+
+  it('draws again the markers from the first waypoint removed, and closes its bubble', () => {
+    const view = render(<StartPointMap waypoints={waypoints} onStartChange={vi.fn()} />);
+    act(() => pressed(shown()[1]!).click());
+
+    view.rerender(<StartPointMap waypoints={[waypoints[0]!]} onStartChange={vi.fn()} />);
+
+    expect(shown().map((marker) => marker.position)).toEqual([waypoints[0]]);
+    expect(popups.at(-1)!.shown).toBe(false);
+  });
+
+  it('adds nothing on a click when not placing', () => {
+    const onWaypointAdd = vi.fn();
+    render(<StartPointMap onWaypointAdd={onWaypointAdd} onStartChange={vi.fn()} />);
+
+    act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
+
+    expect(onWaypointAdd).not.toHaveBeenCalled();
+  });
+
+  it('does not take a long press for a start point while placing', () => {
+    const [onWaypointAdd, onStartChange] = [vi.fn(), vi.fn()];
+    render(<StartPointMap placing onWaypointAdd={onWaypointAdd} onStartChange={onStartChange} />);
+
+    act(() => {
+      map().fire('touchstart', { lngLat: { lng: 6.2, lat: 45.8 }, originalEvent: touch });
+      vi.advanceTimersByTime(600);
+    });
+
+    expect(onStartChange).not.toHaveBeenCalled();
+  });
+
+  // MapLibre hears what bubbles up to its container as the map's own: a click adds a waypoint, picks the start point,
+  // selects a route or closes the bubble, and a press starts a long press.
+  it.each(['click', 'mousedown', 'touchstart'])('keeps a %s on a marker from reaching the map', (type) => {
+    render(<StartPointMap placing waypoints={waypoints} onStartChange={vi.fn()} />);
+    // The map's container, which the event would bubble up to.
+    const container = document.createElement('div');
+    const heard = vi.fn();
+    container.addEventListener(type, heard);
+    const marker = pressed(shown()[0]!);
+    container.append(marker);
+
+    act(() => void marker.dispatchEvent(new Event(type, { bubbles: true })));
+
+    expect(heard).not.toHaveBeenCalled();
+  });
+
+  it('offers to remove a waypoint on a tap on its marker', () => {
+    const onWaypointRemove = vi.fn();
+    render(<StartPointMap waypoints={waypoints} onWaypointRemove={onWaypointRemove} onStartChange={vi.fn()} />);
+
+    act(() => pressed(shown()[1]!).click());
+    const popup = popups.at(-1)!;
+    expect(popup.shown).toBe(true);
+    expect(popup.position).toEqual([6.2, 45.8]);
+    act(() => popup.content!.click());
+
+    expect(onWaypointRemove).toHaveBeenCalledExactlyOnceWith(1);
+    expect(popup.shown).toBe(false);
+  });
+
+  it('names the marker and its button in French', () => {
+    render(<StartPointMap language="fr" waypoints={waypoints} onStartChange={vi.fn()} />);
+
+    expect(pressed(shown()[0]!)).toHaveAttribute('aria-label', criteriaText.fr.waypointName(1));
+    act(() => pressed(shown()[0]!).click());
+    expect(popups.at(-1)!.content).toHaveTextContent(criteriaText.fr.removeWaypoint);
   });
 });

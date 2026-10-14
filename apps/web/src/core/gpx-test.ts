@@ -24,6 +24,38 @@ function parse(content: string) {
 }
 
 describe('gpxExport', () => {
+  describe('waypoints', () => {
+    const waypoints: [number, number][] = [
+      [route.geometry[1][0], route.geometry[1][1]],
+      [route.geometry[3][0], route.geometry[3][1]],
+    ];
+
+    it('adds each as a named point where the route passes it, before the track as the schema orders', () => {
+      const { content } = gpxExport(route, DAY, { ...french, waypoints }, PACE);
+
+      const document = parse(content);
+      const points = [...document.querySelectorAll('gpx > wpt')];
+      expect(points.map((point) => point.querySelector('name')?.textContent)).toEqual([
+        'Point de passage 1',
+        'Point de passage 2',
+      ]);
+      expect(points[0]!.getAttribute('lat')).toBe(route.geometry[1][1].toFixed(6));
+      expect(points[0]!.querySelector('ele')?.textContent).toBe('451.0');
+      expect(document.documentElement.children[1]!.tagName).toBe('wpt');
+      expect(document.documentElement.lastElementChild!.tagName).toBe('trk');
+    });
+
+    it('names them in the language of the export', () => {
+      const { content } = gpxExport(route, DAY, { paceUnit: 'min/km', language: 'en', waypoints }, PACE);
+
+      expect(parse(content).querySelector('wpt > name')?.textContent).toBe('Waypoint 1');
+    });
+
+    it('adds none when the route has none', () => {
+      expect(parse(gpxExport(route, DAY, french, PACE).content).querySelector('wpt')).toBeNull();
+    });
+  });
+
   it('names the track after the route', () => {
     const { content } = gpxExport(route, DAY, french, PACE);
 

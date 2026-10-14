@@ -67,19 +67,49 @@ describe('requestRouteSet', () => {
   it('returns how long the API asks to wait', async () => {
     answer(Response.json({ error: 'overloaded' }, { status: 429, headers: { 'Retry-After': '2' } }));
 
-    expect(await requestRouteSet(request)).toEqual({ error: 'overloaded', retryAfter: 2 });
+    expect(await requestRouteSet(request)).toEqual({ refusal: { error: 'overloaded' }, retryAfter: 2 });
   });
 
   it('ignores a wait that is not a number of seconds', async () => {
     answer(Response.json({ error: 'overloaded' }, { status: 429, headers: { 'Retry-After': 'soon' } }));
 
-    expect(await requestRouteSet(request)).toEqual({ error: 'overloaded' });
+    expect(await requestRouteSet(request)).toEqual({ refusal: { error: 'overloaded' } });
   });
 
   it('returns the error code the API answers with', async () => {
     answer(Response.json({ error: 'rate-limited' }, { status: 429 }));
 
-    expect(await requestRouteSet(request)).toEqual({ error: 'rate-limited' });
+    expect(await requestRouteSet(request)).toEqual({ refusal: { error: 'rate-limited' } });
+  });
+
+  it('returns the field and the waypoint an invalid criteria refusal names', async () => {
+    answer(Response.json({ error: 'invalid-criteria', field: 'waypoints', waypoint: 2 }, { status: 400 }));
+
+    expect(await requestRouteSet(request)).toEqual({
+      refusal: { error: 'invalid-criteria', field: 'waypoints', waypoint: 2 },
+    });
+  });
+
+  it('returns the field alone when the refusal names no waypoint', async () => {
+    answer(Response.json({ error: 'invalid-criteria', field: 'start' }, { status: 400 }));
+
+    expect(await requestRouteSet(request)).toEqual({ refusal: { error: 'invalid-criteria', field: 'start' } });
+  });
+
+  it.each([
+    ['an unknown field', { field: 'colour' }],
+    ['a waypoint that is not a position in the list', { field: 'waypoints', waypoint: 0 }],
+    ['a waypoint that is not a whole number', { field: 'waypoints', waypoint: 1.5 }],
+  ])('keeps only what it knows of %s', async (_name, detail) => {
+    answer(Response.json({ error: 'invalid-criteria', ...detail }, { status: 400 }));
+
+    const result = await requestRouteSet(request);
+
+    expect(result).toEqual(
+      detail.field === 'waypoints'
+        ? { refusal: { error: 'invalid-criteria', field: 'waypoints' } }
+        : { refusal: { error: 'invalid-criteria' } },
+    );
   });
 
   it('leaves the page alone when the app is older than the API', async () => {
@@ -87,7 +117,7 @@ describe('requestRouteSet', () => {
     vi.stubGlobal('location', { reload });
     answer(Response.json({ error: 'stale-build' }, { status: 426 }));
 
-    expect(await requestRouteSet(request)).toEqual({ error: 'stale-build' });
+    expect(await requestRouteSet(request)).toEqual({ refusal: { error: 'stale-build' } });
     expect(reload).not.toHaveBeenCalled();
   });
 
@@ -97,7 +127,7 @@ describe('requestRouteSet', () => {
   ])('says the API is unreachable when it %s', async (_, response) => {
     vi.stubGlobal('fetch', vi.fn(response));
 
-    expect(await requestRouteSet(request)).toEqual({ error: 'unreachable' });
+    expect(await requestRouteSet(request)).toEqual({ refusal: { error: 'unreachable' } });
   });
 
   it.each([
@@ -107,7 +137,7 @@ describe('requestRouteSet', () => {
   ])('says the API failed when it %s', async (_, response) => {
     vi.stubGlobal('fetch', vi.fn(response));
 
-    expect(await requestRouteSet(request)).toEqual({ error: 'failed' });
+    expect(await requestRouteSet(request)).toEqual({ refusal: { error: 'failed' } });
   });
 
   it('rejects once the request is cancelled', async () => {
@@ -147,8 +177,20 @@ describe('useRouteSet', () => {
 
     act(() => result.current.find(request));
 
-    await waitFor(() => expect(onError).toHaveBeenCalledWith('rate-limited'));
+    await waitFor(() => expect(onError).toHaveBeenCalledWith({ error: 'rate-limited' }));
     expect(result.current).toMatchObject({ loading: false, routeSet: undefined });
+  });
+
+  it('reports which field was invalid along with the error', async () => {
+    answer(Response.json({ error: 'invalid-criteria', field: 'waypoints', waypoint: 3 }, { status: 400 }));
+    const onError = vi.fn();
+    const { result } = renderHook(() => useRouteSet(onError));
+
+    act(() => result.current.find(request));
+
+    await waitFor(() =>
+      expect(onError).toHaveBeenCalledWith({ error: 'invalid-criteria', field: 'waypoints', waypoint: 3 }),
+    );
   });
 
   it('reports an empty route set as no routes', async () => {
@@ -158,7 +200,7 @@ describe('useRouteSet', () => {
 
     act(() => result.current.find(request));
 
-    await waitFor(() => expect(onError).toHaveBeenCalledWith('no-routes'));
+    await waitFor(() => expect(onError).toHaveBeenCalledWith({ error: 'no-routes' }));
     expect(result.current.routeSet).toBeUndefined();
   });
 
@@ -244,7 +286,7 @@ describe('retrying while the server is busy', () => {
     await wait(5000);
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(onError).toHaveBeenCalledExactlyOnceWith('overloaded');
+    expect(onError).toHaveBeenCalledExactlyOnceWith({ error: 'overloaded' });
     expect(result.current.loading).toBe(false);
   });
 
@@ -264,7 +306,7 @@ describe('retrying while the server is busy', () => {
     await wait(10_000);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith(code);
+    expect(onError).toHaveBeenCalledWith({ error: code, ...(code === 'invalid-criteria' && { field: 'pace' }) });
   });
 
   it('stops waiting when cleared, or when a newer request replaces it', async () => {
@@ -297,7 +339,7 @@ describe('retrying while the server is busy', () => {
     await wait(0);
 
     expect(result.current.routeSet).toBe(shown);
-    expect(onError).toHaveBeenCalledWith('rate-limited');
+    expect(onError).toHaveBeenCalledWith({ error: 'rate-limited' });
   });
 
   it('does not give back old routes when the new request found none at all', async () => {

@@ -60,6 +60,7 @@ function View({
   onClear = () => {},
   pace = 6,
   open = false,
+  waypoints,
 }: {
   language?: 'en' | 'fr';
   paceUnit?: 'min/km' | 'km/h';
@@ -71,6 +72,7 @@ function View({
   onClear?: () => void;
   pace?: number;
   open?: boolean;
+  waypoints?: [number, number][];
 }) {
   const [selected, setSelected] = useState(0);
   const [detail, setDetail] = useState(open);
@@ -91,6 +93,7 @@ function View({
       onPaceChange={onPaceChange}
       onClear={onClear}
       onHover={onHover}
+      {...(waypoints && { waypoints })}
     />
   );
 }
@@ -519,6 +522,19 @@ describe('RouteSetView', () => {
     });
 
     describe('the GPX export', () => {
+      it('keeps the waypoints, which the profile numbers too', async () => {
+        const share = vi.fn(() => Promise.resolve());
+        vi.stubGlobal('navigator', { ...navigator, canShare: () => true, share });
+        const [lon, lat] = routes[0]!.geometry[1]!;
+        render(<View open waypoints={[[lon!, lat!]]} />);
+
+        expect(screen.getByTestId('route-profile-waypoint-1')).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('route-export'));
+
+        const [{ files }] = share.mock.calls[0] as unknown as [ShareData];
+        expect(await files![0].text()).toContain('<name>Waypoint 1</name>');
+      });
+
       it('shares the route as a GPX file named after it', async () => {
         const share = vi.fn(() => Promise.resolve());
         vi.stubGlobal('navigator', { ...navigator, canShare: () => true, share });

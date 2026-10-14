@@ -15,6 +15,7 @@ import {
   projectRoute,
   gradeAt,
   surfaceAt,
+  waypointsOnRoute,
   type MapSnapshot,
   type ProfilePoint,
   type Route,
@@ -408,5 +409,41 @@ describe('toMercator', () => {
 
     expect(x).toBeCloseTo(111_319.5, 0);
     expect(y).toBeCloseTo(5_621_521.5, 0);
+  });
+});
+
+describe('waypointsOnRoute', () => {
+  // Five points 100 m apart, due north: 0, 0.1, 0.2, 0.3 and 0.4 km.
+  const geometry = northward([450, 460, 470, 480, 490]);
+  const near = (k: number): Position => [geometry[k][0] + 0.00001, geometry[k][1] + 0.00001];
+
+  it('puts each waypoint where the route passes it: the distance, the place and the height', () => {
+    const [first, second] = waypointsOnRoute(geometry, [near(1), near(3)]);
+
+    expect(first).toMatchObject({ number: 1, position: [geometry[1][0], geometry[1][1]], height: 460 });
+    expect(first!.distance).toBeCloseTo(0.1, 2);
+    expect(second).toMatchObject({ number: 2, height: 480 });
+    expect(second!.distance).toBeCloseTo(0.3, 2);
+  });
+
+  it('searches on from the previous waypoint, so a route that passes a place twice keeps the order', () => {
+    // Out and back along the same ways: the second waypoint is the same place as the first, on the way back.
+    const there = northward([450, 460, 470]);
+    const back = [...there, there[1], there[0]];
+
+    const [first, second] = waypointsOnRoute(back, [
+      [there[1][0], there[1][1]],
+      [there[1][0], there[1][1]],
+    ]);
+
+    expect(first!.distance).toBeCloseTo(0.1, 2);
+    expect(second!.distance).toBeGreaterThan(first!.distance);
+  });
+
+  it('leaves the height out of a route without heights, and finds nothing for no waypoints', () => {
+    const flat = geometry.map(([lon, lat]): [number, number] => [lon, lat]);
+
+    expect(waypointsOnRoute(flat, [near(2)])[0]).not.toHaveProperty('height');
+    expect(waypointsOnRoute(geometry, [])).toEqual([]);
   });
 });

@@ -28,9 +28,8 @@ import {
   formatDistance,
   formatDuration,
   formatHeight,
-  gpxExport,
+  exportRoute,
   missText,
-  saveGpx,
   type Position,
   type MapSnapshot,
   type Route,
@@ -74,6 +73,7 @@ export function RouteSetView({
   onPaceChange,
   onClear,
   onHover,
+  waypoints,
 }: {
   language: Language;
   paceUnit: PaceUnit;
@@ -94,6 +94,8 @@ export function RouteSetView({
   onPaceChange?: (pace: number) => void;
   onClear: () => void;
   onHover: (position: Position | undefined) => void;
+  /** The points the routes were asked to go through, shown on the profile of a route and kept in its GPX file. */
+  waypoints?: Position[] | undefined;
 }) {
   const desktop = useDesktop();
 
@@ -109,6 +111,7 @@ export function RouteSetView({
         onSelect={onSelect}
         onBack={() => onDetailChange(false)}
         onHover={onHover}
+        waypoints={waypoints}
       />
     );
   }
@@ -298,6 +301,7 @@ function RouteDetail({
   onSelect,
   onBack,
   onHover,
+  waypoints,
 }: {
   language: Language;
   paceUnit: PaceUnit;
@@ -309,6 +313,7 @@ function RouteDetail({
   onSelect: (index: number) => void;
   onBack: () => void;
   onHover: (position: Position | undefined) => void;
+  waypoints?: Position[] | undefined;
 }) {
   const t = words(language);
   const route = routes[selected];
@@ -369,14 +374,20 @@ function RouteDetail({
           ))}
         </div>
       )}
-      <ElevationProfile testId="route-profile" route={route} language={language} onHover={onHover} />
+      <ElevationProfile
+        testId="route-profile"
+        route={route}
+        language={language}
+        onHover={onHover}
+        waypoints={waypoints}
+      />
       <SurfaceShare route={route} language={language} />
       <button
         type="button"
         data-testid="route-export"
         className={PRIMARY_BUTTON}
         // Nothing awaited before the share sheet: it needs the tap that opened it.
-        onClick={() => void saveGpx(gpxExport(route, new Date(), { language, paceUnit }, pace))}
+        onClick={() => void exportRoute(route, { language, paceUnit, waypoints }, pace)}
       >
         <Download size={18} aria-hidden />
         {t.exportGpx}
