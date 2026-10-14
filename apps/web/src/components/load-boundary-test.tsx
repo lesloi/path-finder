@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 
 import { errorText } from '../i18n/index.ts';
-import { reloadForNewBuild } from '../state/index.ts';
 import { ChunkLoadError, loadChunk, LoadBoundary } from './load-boundary.tsx';
 
 function Broken(): never {
@@ -17,30 +16,10 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
-afterEach(() => {
-  sessionStorage.clear();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-});
+afterEach(() => vi.restoreAllMocks());
 
 describe('LoadBoundary', () => {
-  it('reloads the page itself, once, when what it holds fails', () => {
-    const reload = vi.fn();
-    vi.stubGlobal('location', { reload });
-
-    render(
-      <LoadBoundary language="fr">
-        <Broken />
-      </LoadBoundary>,
-    );
-
-    expect(reload).toHaveBeenCalledOnce();
-    expect(screen.queryByTestId('load-failure')).not.toBeInTheDocument();
-  });
-
-  it('asks for a reload, in the language, when a reload did not mend it', () => {
-    vi.stubGlobal('location', { reload: vi.fn() });
-    reloadForNewBuild();
+  it('asks for a reload, in the language, when what it holds fails', () => {
     render(
       <LoadBoundary language="fr">
         <Broken />

@@ -2,7 +2,6 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 
 import type { Route, RouteSetRequest } from '../core/index.ts';
 import { requestRouteSet, retryDelay, useRouteSet } from './route-set.ts';
-import { pendingSearch, reloadForNewBuild } from './stale-build.ts';
 
 const request: RouteSetRequest = {
   start: [6.1294, 45.8992],
@@ -129,11 +128,6 @@ describe('requestRouteSet', () => {
 });
 
 describe('useRouteSet', () => {
-  afterEach(() => {
-    sessionStorage.clear();
-    vi.unstubAllGlobals();
-  });
-
   it('is loading while the API works, then holds the routes and their criteria', async () => {
     let resolve!: (response: Response) => void;
     answer(new Promise<Response>((done) => (resolve = done)));
@@ -144,55 +138,6 @@ describe('useRouteSet', () => {
     expect(result.current.loading).toBe(true);
     await act(async () => resolve(Response.json({ routes: [route] })));
     expect(result.current).toMatchObject({ loading: false, routeSet: { request, routes: [route] } });
-  });
-
-  it('reloads the page, still loading, when the app is older than the API', async () => {
-    const reload = vi.fn();
-    vi.stubGlobal('location', { reload });
-    answer(Response.json({ error: 'stale-build' }, { status: 426 }));
-    const onError = vi.fn();
-    const { result } = renderHook(() => useRouteSet(onError));
-
-    act(() => result.current.find(request));
-
-    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
-    expect(result.current.loading).toBe(true);
-    expect(onError).not.toHaveBeenCalled();
-    expect(pendingSearch()).toEqual(request);
-  });
-
-  it('reports the stale build when a reload did not mend it', async () => {
-    const reload = vi.fn();
-    vi.stubGlobal('location', { reload });
-    reloadForNewBuild();
-    reload.mockClear();
-    answer(Response.json({ error: 'stale-build' }, { status: 426 }));
-    const onError = vi.fn();
-    const { result } = renderHook(() => useRouteSet(onError));
-
-    act(() => result.current.find(request));
-
-    await waitFor(() => expect(onError).toHaveBeenCalledWith('stale-build'));
-    expect(reload).not.toHaveBeenCalled();
-    expect(result.current.loading).toBe(false);
-  });
-
-  it('reloads once when a rollout keeps answering 426, then tells the user', async () => {
-    const reload = vi.fn();
-    vi.stubGlobal('location', { reload });
-    vi.stubGlobal('fetch', () => Promise.resolve(Response.json({ error: 'stale-build' }, { status: 426 })));
-    const first = renderHook(() => useRouteSet(vi.fn()));
-    act(() => first.result.current.find(request));
-    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
-    first.unmount();
-    // The page that comes back is of the same build, and meets an old server again.
-    const onError = vi.fn();
-    const second = renderHook(() => useRouteSet(onError));
-
-    act(() => second.result.current.find(pendingSearch()!));
-
-    await waitFor(() => expect(onError).toHaveBeenCalledWith('stale-build'));
-    expect(reload).toHaveBeenCalledOnce();
   });
 
   it('reports an error and keeps no route set', async () => {

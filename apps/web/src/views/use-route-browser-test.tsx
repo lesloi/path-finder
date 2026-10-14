@@ -40,7 +40,6 @@ async function browse() {
 }
 
 afterEach(() => {
-  sessionStorage.clear();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
@@ -108,9 +107,8 @@ describe('useRouteBrowser', () => {
     expect(result.current.error).toBeUndefined();
   });
 
-  it('keeps the notice of a newer version until it is dropped, when a reload did not bring it', async () => {
+  it('keeps the notice of a newer version until it is dropped, as the user has to reload', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    sessionStorage.setItem('path-finder.reloaded-from', '');
     answer(Response.json({ error: 'stale-build' }, { status: 426 }));
     const { result } = renderHook(() => useRouteBrowser());
 
@@ -122,7 +120,6 @@ describe('useRouteBrowser', () => {
   });
 
   it('drops the notice of a newer version on request', async () => {
-    sessionStorage.setItem('path-finder.reloaded-from', '');
     answer(Response.json({ error: 'stale-build' }, { status: 426 }));
     const { result } = renderHook(() => useRouteBrowser());
     act(() => result.current.ask(request));

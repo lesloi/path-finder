@@ -1,7 +1,7 @@
 import { Crosshair, LocateFixed, Navigation2, Scan, Settings } from 'lucide-react';
 import { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import { forgetPendingSearch, pendingSearch, useCoverage, useSettings } from '../state/index.ts';
+import { useCoverage, useSettings } from '../state/index.ts';
 import { CriteriaBar } from './criteria-bar.tsx';
 import { CriteriaForm, criteriaChanged, criteriaRequest, useCriteriaDraft } from './criteria-form.tsx';
 import { RouteDock } from './route-dock.tsx';
@@ -81,15 +81,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const desktop = useDesktop();
   // Kept here: the form is mounted in the column or in the sheet, whichever the screen shows.
   const draft = useCriteriaDraft();
-  // The search a reload for a new build interrupted: its start point is set before anything else can drop the routes.
-  const [resumed] = useState(pendingSearch);
-  const [start, setStart] = useState<Position | undefined>(resumed?.start);
+  const [start, setStart] = useState<Position>();
   // Where the server can route; unknown until it says, or if it cannot: then the server's own refusal stands.
   const coverage = useCoverage();
   const uncoveredId = useId();
   const startUncovered = useMemo(() => Boolean(start && coverage && !isCovered(coverage, start)), [start, coverage]);
   // Where the map moves to: the device location, or typed coordinates.
-  const [focus, setFocus] = useState<Position | undefined>(resumed?.start);
+  const [focus, setFocus] = useState<Position>();
   const [picking, setPicking] = useState(false);
   // On phones, the criteria are a layer over the map; the height of the sheet is what the routes are framed clear of.
   const [layerOpen, setLayerOpen] = useState(false);
@@ -125,15 +123,6 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     draft[2]();
     browser.ask(request);
   };
-  const resumedSearch = useRef(false);
-  const resume = useEffectEvent(() => {
-    // Once, even if the effect runs again.
-    if (!resumed || resumedSearch.current) return;
-    resumedSearch.current = true;
-    forgetPendingSearch();
-    search(resumed);
-  });
-  useEffect(() => resume(), []);
   const stale = Boolean(routeSet && current && criteriaChanged(current, routeSet.request));
   useRootProperty('--list-inset', 'var(--list-reserved)', listShown);
   useRootProperty('--dock-inset', 'var(--dock-reserved)', dockShown);

@@ -1,7 +1,6 @@
 import { Component, lazy, Suspense, type ComponentType, type ReactNode } from 'react';
 
 import { errorText, type Language } from '../i18n/index.ts';
-import { reloadForNewBuild } from '../state/index.ts';
 
 /** The code of a page or of the map could not be fetched: after a deploy its file is gone, offline it is out of reach. */
 export class ChunkLoadError extends Error {
@@ -24,31 +23,21 @@ export function lazyChunk<P extends object>(load: () => Promise<{ default: Compo
   return lazy(() => loadChunk(load));
 }
 
-// Whether the page reloads itself for the failed load: not known until the boundary has caught the error.
-type BoundaryState = { error?: unknown; reload: 'undecided' | 'reloading' | 'refused' };
-
 /**
- * When a load fails the whole app would go with it: the page reloads itself once, as for a `426`, and the user is
- * asked to reload if that did not help. Any other error is not mended by a reload, so it goes on to the app.
+ * When a load fails the whole app would go with it: the user reloads instead, as for a `426`. Any other error is not
+ * mended by a reload, so it goes on to the app.
  */
-export class LoadErrorBoundary extends Component<{ language: Language; children: ReactNode }, BoundaryState> {
-  state: BoundaryState = { reload: 'undecided' };
+export class LoadErrorBoundary extends Component<{ language: Language; children: ReactNode }, { error?: unknown }> {
+  state: { error?: unknown } = {};
 
   static getDerivedStateFromError(error: unknown) {
     return { error };
   }
 
-  // Not in `getDerivedStateFromError`: React may call it twice, and the reload happens once.
-  componentDidCatch(error: unknown) {
-    if (error instanceof ChunkLoadError) this.setState({ reload: reloadForNewBuild() ? 'reloading' : 'refused' });
-  }
-
   render() {
-    const { error, reload } = this.state;
+    const { error } = this.state;
     if (error === undefined) return this.props.children;
     if (!(error instanceof ChunkLoadError)) throw error;
-    // Nothing shows while the page is about to reload.
-    if (reload !== 'refused') return null;
     return (
       <p role="alert" data-testid="load-failure" className="fixed inset-x-0 top-1/3 z-10 px-6 text-center text-ink">
         {errorText[this.props.language]['stale-build']}

@@ -680,43 +680,6 @@ describe('CriteriaView', () => {
     };
     const routesSource = () => (map().sources.routes as unknown as { data: { features: unknown[] } }).data.features;
 
-    describe('after a reload for a new build', () => {
-      const pending = { start: [6.2, 45.8], target: { distance: 10 }, surface: 'any', pace: 6 };
-      afterEach(() => sessionStorage.clear());
-
-      it('searches again, once, from the start point it had', async () => {
-        onDesktop();
-        sessionStorage.setItem('path-finder.pending-search', JSON.stringify(pending));
-        const routeSets = ask(answer(route(0)));
-
-        render(<CriteriaView language="en" />);
-
-        await screen.findByTestId('routes-count');
-        expect(routeSets).toHaveBeenCalledOnce();
-        expect(screen.queryByTestId('routes-toast')).not.toBeInTheDocument();
-        expect(field()).toHaveValue('45.8000° N · 6.2000° E');
-      });
-
-      it('forgets the search once it is resumed', async () => {
-        onDesktop();
-        sessionStorage.setItem('path-finder.pending-search', JSON.stringify(pending));
-        ask(answer(route(0)));
-
-        render(<CriteriaView language="en" />);
-
-        await screen.findByTestId('routes-count');
-        expect(sessionStorage.getItem('path-finder.pending-search')).toBeNull();
-      });
-
-      it('does not search without a search to resume', () => {
-        const routeSets = ask(answer(route(0)));
-
-        render(<CriteriaView language="en" />);
-
-        expect(routeSets).not.toHaveBeenCalled();
-      });
-    });
-
     it('renames the search button once routes were found', async () => {
       onDesktop();
       ask(answer(route(0)));
