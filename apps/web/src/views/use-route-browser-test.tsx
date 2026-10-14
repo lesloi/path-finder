@@ -95,6 +95,20 @@ describe('useRouteBrowser', () => {
     expect(result.current.hover).toBeUndefined();
   });
 
+  it.each([
+    ['a new request', (r: ReturnType<typeof useRouteBrowser>) => r.ask(request)],
+    ['the routes being dropped', (r: ReturnType<typeof useRouteBrowser>) => r.drop()],
+    ['the detail opening', (r: ReturnType<typeof useRouteBrowser>) => r.openDetail(true)],
+  ])('unfolds the sheet with %s', async (_, change) => {
+    const { result } = await browse();
+    act(() => result.current.setFolded(true));
+    expect(result.current.folded).toBe(true);
+
+    act(() => change(result.current));
+
+    expect(result.current.folded).toBe(false);
+  });
+
   it('reports why a request gave no routes, and drops it after a while', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     answer(Response.json({ routes: [] }));

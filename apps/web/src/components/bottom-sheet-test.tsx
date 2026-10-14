@@ -20,6 +20,30 @@ function Sheet({ children, onHeightChange }: { children?: ReactNode; onHeightCha
   );
 }
 
+// The sheet of a route set, which can also be folded down to its handle.
+function FoldableSheet({ initial = 'normal' }: { initial?: 'normal' | 'expanded' | 'folded' }) {
+  const [expanded, setExpanded] = useState(initial === 'expanded');
+  const [folded, setFolded] = useState(initial === 'folded');
+  return (
+    <BottomSheet
+      testId="sheet"
+      label="Route"
+      expanded={expanded}
+      onExpandedChange={setExpanded}
+      folded={folded}
+      onFoldedChange={setFolded}
+    >
+      <p data-testid="content" />
+    </BottomSheet>
+  );
+}
+
+const swipe = (handle: HTMLElement, from: number, to: number) => {
+  fireEvent.pointerDown(handle, { clientY: from });
+  fireEvent.pointerUp(handle, { clientY: to });
+  fireEvent.click(handle);
+};
+
 describe('BottomSheet', () => {
   it('shows its content', () => {
     render(
@@ -224,6 +248,70 @@ describe('BottomSheet', () => {
       resize(240);
 
       expect(onHeightChange).toHaveBeenLastCalledWith(240);
+    });
+  });
+
+  describe('when it can be folded', () => {
+    it('folds on a swipe down, keeping its content out of reach', () => {
+      render(<FoldableSheet />);
+
+      swipe(screen.getByTestId('sheet-handle'), 200, 300);
+
+      expect(screen.getByTestId('content').parentElement).not.toBeVisible();
+      expect(screen.getByTestId('sheet')).toHaveClass('max-h-[40dvh]');
+    });
+
+    it('goes from expanded to its usual height on a swipe down, not to folded', () => {
+      render(<FoldableSheet initial="expanded" />);
+
+      swipe(screen.getByTestId('sheet-handle'), 200, 300);
+
+      expect(screen.getByTestId('sheet-handle')).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('content')).toBeVisible();
+    });
+
+    it('unfolds on a swipe up, to its usual height', () => {
+      render(<FoldableSheet initial="folded" />);
+
+      swipe(screen.getByTestId('sheet-handle'), 300, 200);
+
+      expect(screen.getByTestId('content')).toBeVisible();
+      expect(screen.getByTestId('sheet-handle')).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('unfolds on a tap of its handle', () => {
+      render(<FoldableSheet initial="folded" />);
+
+      fireEvent.click(screen.getByTestId('sheet-handle'));
+
+      expect(screen.getByTestId('content')).toBeVisible();
+    });
+
+    it('can be dragged below its usual lowest height', () => {
+      render(<FoldableSheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 200 });
+      fireEvent.pointerMove(handle, { clientY: 300 });
+
+      expect(screen.getByTestId('sheet').style.minHeight).toBe('0px');
+    });
+
+    it('ignores being folded once it cannot be anymore', () => {
+      const props = { testId: 'sheet', label: 'Route', onExpandedChange: vi.fn(), folded: true };
+      const { rerender } = render(
+        <BottomSheet {...props} onFoldedChange={vi.fn()}>
+          <p data-testid="content" />
+        </BottomSheet>,
+      );
+
+      rerender(
+        <BottomSheet {...props}>
+          <p data-testid="content" />
+        </BottomSheet>,
+      );
+
+      expect(screen.getByTestId('content')).toBeVisible();
     });
   });
 });
