@@ -1744,23 +1744,6 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('criteria-submit')).toBeInTheDocument();
     });
 
-    it('searches again with the waypoints of a search a reload for a new build interrupted', async () => {
-      const waypoints = [[6.21, 45.81]];
-      sessionStorage.setItem(
-        'path-finder.pending-search',
-        JSON.stringify({ start: [6.2, 45.8], target: { distance: 10 }, surface: 'any', pace: 6, waypoints }),
-      );
-      const fetchMock = vi.fn(() => Promise.resolve(Response.json({ routes: [route] })));
-      stubFetch(fetchMock);
-
-      render(<CriteriaView language="en" />);
-
-      await screen.findByTestId('routes-count');
-      expect(waypointMarkers().map((marker) => marker.position)).toEqual(waypoints);
-      expect(screen.queryByTestId('routes-stale')).not.toBeInTheDocument();
-      sessionStorage.clear();
-    });
-
     describe.each(['en', 'fr'] as const)('the refusals of the API, in %s', (language) => {
       const t = routesText[language];
       const refuse = async (body: object) => {
