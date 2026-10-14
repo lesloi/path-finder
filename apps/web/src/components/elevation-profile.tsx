@@ -40,7 +40,7 @@ export function ElevationProfile({
   language: Language;
   onHover: (position: Position | undefined) => void;
   /** The points the route was asked to go through: numbered where it passes them. */
-  waypoints?: Position[];
+  waypoints?: Position[] | undefined;
   testId?: string;
 }) {
   const t = routesText[language];

@@ -143,6 +143,9 @@ const PIN_BUBBLE_OFFSET = {
   right: [-8, -15],
 } satisfies Record<string, [number, number]>;
 
+// A default that keeps its identity, so that the markers are not drawn again on every render.
+const NO_WAYPOINTS: Position[] = [];
+
 const poiLayerId = (category: PoiCategory) => `pois-${category}`;
 const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
 const emptyRoutes = { type: 'FeatureCollection', features: [] } as const;
@@ -194,7 +197,7 @@ export function StartPointMap({
   start,
   focus,
   pickOnClick = false,
-  waypoints = [],
+  waypoints = NO_WAYPOINTS,
   placing = false,
   routes,
   summaries,

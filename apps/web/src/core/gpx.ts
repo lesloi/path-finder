@@ -31,7 +31,11 @@ export function gpxExport(
   route: GpxRoute,
   exportedAt: Date,
   /** The language the export is written in, how its pace is, and the waypoints the route was asked to go through. */
-  { language, paceUnit, waypoints = [] }: { language: Language; paceUnit: PaceUnit; waypoints?: Position[] },
+  {
+    language,
+    paceUnit,
+    waypoints = [],
+  }: { language: Language; paceUnit: PaceUnit; waypoints?: Position[] | undefined },
   /** Minutes per km, the one the estimated duration was computed at. */
   pace: number,
 ): { fileName: string; content: string } {

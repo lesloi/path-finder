@@ -268,7 +268,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           settingsLink.current?.focus();
         }}
         onHover={browser.setHover}
-        {...(routeSet.request.waypoints && { waypoints: routeSet.request.waypoints })}
+        waypoints={routeSet.request.waypoints}
       />
     ) : undefined;
   const panel = routeSetView ?? (loading && <SearchingPanel language={language} />);
@@ -514,7 +514,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           count={atPace.routes.length}
           onClose={deselect}
           onHover={browser.setHover}
-          {...(routeSet?.request.waypoints && { waypoints: routeSet.request.waypoints })}
+          waypoints={routeSet?.request.waypoints}
         />
       )}
       {picking && (

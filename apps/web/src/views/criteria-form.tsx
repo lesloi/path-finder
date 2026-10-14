@@ -67,7 +67,7 @@ export function useCriteriaDraft(): [Draft, (draft: Draft) => void, () => void] 
  */
 export function criteriaRequest(
   draft: Draft,
-  { pace, start, waypoints }: { pace: number; start?: Position; waypoints?: Position[] },
+  { pace, start, waypoints }: { pace: number; start?: Position | undefined; waypoints?: Position[] | undefined },
 ): RouteSetRequest | undefined {
   const distance = clamp(draft.distance, BOUNDS.distance.min, BOUNDS.distance.max);
   const gain = clamp(draft.gain, 0, BOUNDS.gain.max);
@@ -130,7 +130,7 @@ export function CriteriaForm({
   language: Language;
   start?: Position;
   /** The points the routes go through, in order: they are placed on the map, not in the form. */
-  waypoints?: Position[];
+  waypoints?: Position[] | undefined;
   /** The start point is where the server has no routes: asking would only fail. */
   startUncovered?: boolean;
   /** From `useCriteriaDraft`, for a view that mounts the form in more than one place and keeps what was set. */
@@ -149,7 +149,7 @@ export function CriteriaForm({
   const level = draft.level;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
-  const request = criteriaRequest(draft, { pace: settings.pace, start, ...(waypoints && { waypoints }) });
+  const request = criteriaRequest(draft, { pace: settings.pace, start, waypoints });
   const field = request && invalidField(request);
 
   const sections: Record<Criterion, { title: string; content: ReactNode }> = {
