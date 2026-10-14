@@ -16,14 +16,11 @@ vi.mock('./views/legal/credits-page.tsx', () => {
 });
 
 beforeEach(() => {
-  // A reload did not mend it: otherwise the page would reload itself.
-  sessionStorage.setItem('path-finder.reloaded-from', '');
   // React logs the error it hands to the boundary.
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 afterEach(() => {
-  sessionStorage.clear();
   window.location.hash = '';
   vi.restoreAllMocks();
 });

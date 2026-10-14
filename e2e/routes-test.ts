@@ -60,38 +60,6 @@ test.describe('the route set', () => {
     expect(requests).toBe(2);
   });
 
-  test('reloads by itself when the app is older than the server, and shows the routes', async ({ page }) => {
-    let requests = 0;
-    await page.route('**/api/v1/route-sets', (route) => {
-      requests++;
-      return requests === 1 ? route.fulfill({ status: 426, json: { error: 'stale-build' } }) : route.continue();
-    });
-
-    await findRoutes(page);
-
-    await expect(page.getByTestId('routes-row-0')).toBeVisible();
-    await expect(page.getByTestId('routes-toast')).toHaveCount(0);
-    expect(requests).toBe(2);
-  });
-
-  test('asks the user to reload when a reload did not bring the new build', async ({ page }) => {
-    let requests = 0;
-    await page.route('**/api/v1/route-sets', (route) => {
-      requests++;
-      return route.fulfill({ status: 426, json: { error: 'stale-build' } });
-    });
-    await page.goto('/');
-    await openCriteria(page);
-    await page.getByTestId('criteria-start').fill(START);
-    await page.getByTestId('criteria-start').press('Enter');
-
-    await page.getByTestId('criteria-submit').click();
-
-    await expect(page.getByTestId('routes-toast')).toBeVisible();
-    // One request before the reload, one after it, and no more.
-    expect(requests).toBe(2);
-  });
-
   test('shows the elevation gain of each route', async ({ page }) => {
     await findRoutes(page);
 

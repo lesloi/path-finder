@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import type { ErrorCode } from '../contract/index.ts';
 import { parseRoutes, type Route, type RouteSetRequest } from '../core/index.ts';
 import { buildIdHeader } from './api.ts';
-import { reloadForNewBuild } from './stale-build.ts';
 
 /**
  * Why there is no route set: an error code of the API, the API cannot be reached, or it answered
@@ -106,8 +105,7 @@ async function requestWithRetries(request: RouteSetRequest, signal: AbortSignal)
 
 /**
  * The route set of the last criteria the user asked for, kept in memory only: it is gone when
- * cleared or when the app closes. The one exception is the request of a search that met a newer API: it waits in the
- * session storage for the reload that follows (see `reloadForNewBuild`). `onError` hears why a request gave no routes, `no-routes` when
+ * cleared or when the app closes. `onError` hears why a request gave no routes, `no-routes` when
  * the API found none; after an error the routes shown before the request come back.
  */
 export function useRouteSet(onError: (error: RouteSetError | 'no-routes') => void) {
@@ -133,7 +131,6 @@ export function useRouteSet(onError: (error: RouteSetError | 'no-routes') => voi
     requestWithRetries(request, controller.signal)
       .then((result) => {
         if (controller.signal.aborted) return;
-        if ('error' in result && result.error === 'stale-build' && reloadForNewBuild(request)) return;
         setLoading(false);
         if ('error' in result) {
           setRouteSet(previous.current);

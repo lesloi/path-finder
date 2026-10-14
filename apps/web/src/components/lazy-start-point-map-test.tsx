@@ -13,7 +13,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  sessionStorage.clear();
   vi.doUnmock('./start-point-map.tsx');
   vi.restoreAllMocks();
 });
@@ -36,8 +35,7 @@ describe('LazyStartPointMap', () => {
     await vi.waitFor(() => expect(handle.current).not.toBeNull());
   });
 
-  it('asks for a reload when the code of the map cannot be loaded, once a reload did not mend it', async () => {
-    sessionStorage.setItem('path-finder.reloaded-from', '');
+  it('asks for a reload when the code of the map cannot be loaded', async () => {
     vi.resetModules();
     vi.doMock('./start-point-map.tsx', () => {
       throw new Error('Failed to fetch dynamically imported module');
