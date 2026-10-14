@@ -27,6 +27,7 @@ import { CriteriaBar } from './criteria-bar.tsx';
 import { CriteriaForm, criteriaChanged, criteriaRequest, useCriteriaDraft } from './criteria-form.tsx';
 import { RouteDock } from './route-dock.tsx';
 import { RouteErrorToast } from './route-error-toast.tsx';
+import { WaypointList } from './waypoint-list.tsx';
 import { SearchingPanel } from './searching-panel.tsx';
 import { useRouteBrowser } from './use-route-browser.ts';
 import { RouteSetView } from './route-set-view.tsx';
@@ -250,12 +251,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // On phones, in the place of the location button, which the routes hide.
   const reframeShown = routesShown && mapView.movedAway && !detailOpen;
 
-  // Waypoints are for criteria not yet searched: the button goes away with the route set, and with the search.
-  const waypointShown = Boolean(start) && !routesShown && !loading;
+  // The button of a phone goes away with the route set, and with the search; a desktop has the list of the criteria.
+  const waypointButtonShown = Boolean(start) && !routesShown && !loading && !desktop;
 
   // The place of each button in the stack: the location (or reframe) button keeps the corner, within reach of the
   // thumb, then the waypoint one, then the layers, then the north.
-  const stack = [locateShown || reframeShown, waypointShown, true, mapView.rotated];
+  const stack = [locateShown || reframeShown, waypointButtonShown, true, mapView.rotated];
   const slotOf = (button: number) => stack.slice(0, button).filter(Boolean).length;
 
   // A button that puts the map back goes away once it has: the focus goes on from the settings.
@@ -290,10 +291,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     return () => document.removeEventListener('keydown', onKey);
   }, [desktop, pageOpen]);
 
-  // The criteria change with their waypoints: the routes found no longer answer them.
+  // The routes found are not dropped when the waypoints change: they are told stale, as for any other criterion, but
+  // the route selected goes, as its dock numbers the waypoints it was found with.
   function togglePlacing() {
     if (placing) return setMode(undefined);
-    browser.drop();
+    deselect();
     setRefused(undefined);
     setMode('place');
   }
@@ -316,9 +318,18 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   }
 
   function removeWaypoint(index: number) {
-    browser.drop();
+    deselect();
+    // The row under the pointer is gone, and with it the event that would clear the pin set apart.
+    map.current?.highlightWaypoint(undefined);
     // Its point of interest stays in `waypointPois`: the routes found keep drawing and naming it, and a lookup is by exact position.
     setWaypoints(waypoints.filter((_, i) => i !== index));
+  }
+
+  function moveWaypoint(from: number, to: number) {
+    deselect();
+    const moved = [...waypoints];
+    moved.splice(to, 0, moved.splice(from, 1)[0]!);
+    setWaypoints(moved);
   }
 
   function changeStart(position: Position) {
@@ -401,6 +412,22 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       waypoints={waypoints}
       draft={draft}
       searched={routesShown}
+      waypointList={
+        desktop && start ? (
+          <WaypointList
+            language={language}
+            waypoints={waypoints}
+            waypointPois={waypointPois}
+            placing={placing}
+            full={waypoints.length >= MAX_WAYPOINTS}
+            onTogglePlacing={togglePlacing}
+            onMove={moveWaypoint}
+            onRemove={removeWaypoint}
+            onCenter={(index) => map.current?.centerOn(waypoints[index]!)}
+            onPoint={(index) => map.current?.highlightWaypoint(index)}
+          />
+        ) : undefined
+      }
       onStartChange={moveStart}
       onUnreadable={() => warn('unreadable')}
       onPick={() => {
@@ -478,7 +505,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             className={`fixed z-5 ${STACKED}`}
             style={slotStyle(slotOf(2))}
           />
-          {waypointShown && (
+          {waypointButtonShown && (
             <button
               type="button"
               data-testid="criteria-waypoint"
@@ -707,6 +734,7 @@ function CriteriaFields({
   waypoints,
   draft,
   searched,
+  waypointList,
   onStartChange,
   onUnreadable,
   onPick,
@@ -720,6 +748,7 @@ function CriteriaFields({
   waypoints: Position[];
   draft: ReturnType<typeof useCriteriaDraft>;
   searched: boolean;
+  waypointList: ReactNode;
   onStartChange: (start: Position) => void;
   onUnreadable: () => void;
   onPick: () => void;
@@ -763,6 +792,7 @@ function CriteriaFields({
         waypoints={waypoints}
         draft={draft}
         searched={searched}
+        waypointList={waypointList}
         onSubmit={onSubmit}
       />
     </>

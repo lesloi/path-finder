@@ -1697,6 +1697,175 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('criteria-waypoint-refused')).toHaveTextContent(en.waypointDuplicate);
     });
 
+    describe('listed under the criteria', () => {
+      const items = () => screen.queryAllByTestId(/^criteria-waypoint-item-\d+$/);
+      const names = () => items().map((item) => item.querySelector('[data-name]')!.textContent);
+      const placeThree = () => {
+        startPlacing();
+        place(6.21, 45.81);
+        place(6.22, 45.82);
+        place(6.23, 45.83);
+      };
+
+      it('has the button to add a waypoint in its header, and none over the map', () => {
+        render(<CriteriaView language="en" />);
+
+        setStart();
+
+        expect(
+          within(screen.getByTestId('criteria-waypoint-list')).getByTestId('criteria-waypoint'),
+        ).toHaveAccessibleName(en.addWaypoint);
+        expect(items()).toHaveLength(0);
+        expect(document.querySelectorAll('[data-testid="criteria-waypoint"]')).toHaveLength(1);
+      });
+
+      it('names the waypoints in the order they were placed', () => {
+        render(<CriteriaView language="en" />);
+
+        placeThree();
+
+        expect(names()).toEqual([en.waypointName(1), en.waypointName(2), en.waypointName(3)]);
+      });
+
+      it('names a waypoint made from a point of interest after it', async () => {
+        render(<CriteriaView language="fr" />);
+        startPlacing();
+        await act(async () => {});
+        act(() => map().fire('style.load'));
+        map().rendered = [
+          {
+            properties: { category: 'water', seasonal: false, name: 'Fontaine du Roi' },
+            geometry: { coordinates: [6.21, 45.81] },
+          },
+        ];
+
+        act(() => map().fire('click', { lngLat: { lng: 6.21, lat: 45.81 }, point: { x: 1, y: 1 } }));
+        map().rendered = [];
+        place(6.22, 45.82);
+
+        expect(names()).toEqual(['Fontaine du Roi', fr.waypointName(2)]);
+      });
+
+      it('removes a waypoint from the list and the map', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+
+        const remove = screen.getByTestId('criteria-waypoint-item-2-remove');
+        expect(remove).toHaveAccessibleName(en.removeWaypointNamed(en.waypointName(2)));
+
+        fireEvent.click(remove);
+
+        expect(waypointMarkers().map((marker) => marker.position)).toEqual([
+          [6.21, 45.81],
+          [6.23, 45.83],
+        ]);
+        expect(items()).toHaveLength(2);
+      });
+
+      it('centers the map on a waypoint when its row is clicked', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+
+        fireEvent.click(screen.getByTestId('criteria-waypoint-item-2-name'));
+
+        expect(map().easedTo).toMatchObject({ center: [6.22, 45.82] });
+      });
+
+      const button = (number: number, which: 'up' | 'down') =>
+        screen.getByTestId(`criteria-waypoint-item-${number}-${which}`);
+      const positions = () => waypointMarkers().map((marker) => marker.position);
+
+      it('keeps two waypoints at the same position apart', () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        render(<CriteriaView language="en" />);
+        startPlacing();
+        place(6.21, 45.81);
+        place(6.21, 45.81);
+        place(6.22, 45.82);
+
+        fireEvent.click(button(3, 'up'));
+
+        expect(items()).toHaveLength(3);
+        expect(positions()).toEqual([
+          [6.21, 45.81],
+          [6.22, 45.82],
+          [6.21, 45.81],
+        ]);
+        expect(error).not.toHaveBeenCalled();
+      });
+
+      it('moves the focus to the other arrow of a waypoint that reaches an end', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+
+        button(2, 'down').focus();
+        fireEvent.click(button(2, 'down'));
+
+        expect(button(3, 'up')).toHaveFocus();
+      });
+
+      it('moves a waypoint down, and up, with its buttons', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+
+        fireEvent.click(button(1, 'down'));
+
+        expect(positions()).toEqual([
+          [6.22, 45.82],
+          [6.21, 45.81],
+          [6.23, 45.83],
+        ]);
+
+        fireEvent.click(button(3, 'up'));
+
+        expect(positions()).toEqual([
+          [6.22, 45.82],
+          [6.23, 45.83],
+          [6.21, 45.81],
+        ]);
+      });
+
+      it('has no button to move the first waypoint up or the last one down', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+
+        expect(button(1, 'up')).toBeDisabled();
+        expect(button(3, 'down')).toBeDisabled();
+      });
+
+      it('names the buttons after their waypoint', () => {
+        render(<CriteriaView language="fr" />);
+        placeThree();
+
+        expect(button(2, 'up')).toHaveAccessibleName(fr.moveWaypointUp(fr.waypointName(2)));
+        expect(button(2, 'down')).toHaveAccessibleName(fr.moveWaypointDown(fr.waypointName(2)));
+      });
+
+      it('has no handle to drag', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+
+        expect(screen.queryByTestId('criteria-waypoint-item-1-handle')).not.toBeInTheDocument();
+      });
+
+      it('asks for the routes through the waypoints in their new order', () => {
+        const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => new Promise(() => {}));
+        stubFetch(fetchMock);
+        render(<CriteriaView language="en" />);
+        placeThree();
+        fireEvent.click(screen.getByTestId('criteria-waypoint-done'));
+
+        fireEvent.click(button(1, 'down'));
+        fireEvent.click(screen.getByTestId('criteria-submit'));
+
+        expect(lastRequest(fetchMock).waypoints).toEqual([
+          [6.22, 45.82],
+          [6.21, 45.81],
+          [6.23, 45.83],
+        ]);
+      });
+    });
+
     it('does not say a tap was refused once placing starts again', async () => {
       vi.stubGlobal('fetch', (url: string) =>
         url === '/api/v1/coverage'
@@ -1801,7 +1970,7 @@ describe('CriteriaView', () => {
       expect(lastRequest(fetchMock)).not.toHaveProperty('waypoints');
     });
 
-    it('counts the waypoints in the summary above the routes, and hides the button while they are shown', async () => {
+    it('counts the waypoints in the summary above the routes, and keeps the list', async () => {
       stubFetch(() => Promise.resolve(Response.json({ routes: [route] })));
       render(<CriteriaView language="en" />);
       startPlacing();
@@ -1812,7 +1981,7 @@ describe('CriteriaView', () => {
       await screen.findByTestId('routes-count');
 
       expect(screen.getByTestId('routes-summary')).toHaveTextContent(en.waypointCount(2));
-      expect(screen.queryByTestId('criteria-waypoint')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-waypoint-list')).toBeInTheDocument();
     });
 
     it('numbers the waypoints on the elevation profile of the route selected', async () => {
@@ -1828,20 +1997,64 @@ describe('CriteriaView', () => {
       expect(await screen.findByTestId('route-profile-waypoint-1')).toBeInTheDocument();
     });
 
-    it('drops the routes once a waypoint is removed, since the criteria changed', async () => {
-      stubFetch(() => Promise.resolve(Response.json({ routes: [route] })));
-      render(<CriteriaView language="en" />);
-      startPlacing();
-      place(6.21, 45.81);
-      fireEvent.click(screen.getByTestId('criteria-waypoint-done'));
-      fireEvent.click(screen.getByTestId('criteria-submit'));
-      await screen.findByTestId('routes-count');
+    describe('with routes found', () => {
+      const found = async () => {
+        stubFetch(() => Promise.resolve(Response.json({ routes: [route] })));
+        render(<CriteriaView language="en" />);
+        startPlacing();
+        place(6.21, 45.81);
+        place(6.22, 45.82);
+        fireEvent.click(screen.getByTestId('criteria-waypoint-done'));
+        fireEvent.click(screen.getByTestId('criteria-submit'));
+        await screen.findByTestId('routes-count');
+      };
 
-      act(() => waypointMarkers()[0]!.options!.element!.click());
-      act(() => popups.at(-1)!.content!.click());
+      it('keeps the waypoints listed, to be changed', async () => {
+        await found();
 
-      expect(screen.queryByTestId('routes-count')).not.toBeInTheDocument();
-      expect(screen.getByTestId('criteria-submit')).toBeInTheDocument();
+        expect(screen.getAllByTestId(/^criteria-waypoint-item-\d+$/)).toHaveLength(2);
+        expect(screen.getByTestId('criteria-waypoint')).toBeEnabled();
+      });
+
+      it('keeps the routes, and says they are stale, once a waypoint is removed', async () => {
+        await found();
+
+        fireEvent.click(screen.getByTestId('criteria-waypoint-item-2-remove'));
+
+        expect(screen.getByTestId('routes-count')).toBeInTheDocument();
+        expect(screen.getByTestId('routes-stale')).toBeInTheDocument();
+      });
+
+      it('keeps the routes, and says they are stale, once a waypoint is moved', async () => {
+        await found();
+
+        fireEvent.click(screen.getByTestId('criteria-waypoint-item-1-down'));
+
+        expect(screen.getByTestId('routes-count')).toBeInTheDocument();
+        expect(screen.getByTestId('routes-stale')).toBeInTheDocument();
+      });
+
+      it('closes the dock of the route selected once a waypoint is changed, and keeps the routes', async () => {
+        await found();
+        fireEvent.click(await screen.findByTestId('routes-row-0'));
+        expect(await screen.findByTestId('route-dock')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId('criteria-waypoint-item-1-down'));
+
+        expect(screen.queryByTestId('route-dock')).not.toBeInTheDocument();
+        expect(screen.getByTestId('routes-count')).toBeInTheDocument();
+      });
+
+      it('keeps the routes while a waypoint is added, and searches again with it', async () => {
+        await found();
+
+        fireEvent.click(screen.getByTestId('criteria-waypoint'));
+        place(6.23, 45.83);
+
+        expect(screen.getByTestId('routes-count')).toBeInTheDocument();
+        expect(screen.getAllByTestId(/^criteria-waypoint-item-\d+$/)).toHaveLength(3);
+        expect(screen.getByTestId('criteria-submit')).toHaveTextContent(en.searchAgain);
+      });
     });
 
     describe.each(['en', 'fr'] as const)('the refusals of the API, in %s', (language) => {

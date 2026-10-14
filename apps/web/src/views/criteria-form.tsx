@@ -122,6 +122,7 @@ export function CriteriaForm({
   startUncovered = false,
   draft: kept,
   searched = false,
+  waypointList,
   onSubmit,
 }: {
   language: Language;
@@ -134,6 +135,8 @@ export function CriteriaForm({
   draft?: ReturnType<typeof useCriteriaDraft>;
   /** Routes were already found: the button then runs the search again. */
   searched?: boolean;
+  /** The waypoints as a list, between the criteria and the button. */
+  waypointList?: ReactNode;
   onSubmit: (request: RouteSetRequest) => void;
 }) {
   const t = { ...commonText[language], ...criteriaText[language] };
@@ -284,6 +287,7 @@ export function CriteriaForm({
           {sections[criterion].content}
         </section>
       ))}
+      {waypointList}
       {error}
       {findRoutes}
     </>
