@@ -18,7 +18,7 @@ export const POI_LAYER_KEYS: (keyof PoiLayers)[] = ['water', 'seasonal', 'viewpo
 export const DEFAULT_POI_LAYERS: PoiLayers = { water: true, viewpoint: false, seasonal: true };
 
 /** From this zoom, the map shows points of interest and asks for their tiles; a lower view would span too many. */
-export const POI_MIN_ZOOM = 12;
+export const POI_MIN_ZOOM = 11;
 
 /** A point of interest as the map draws it; `name` is the OSM name, when it has one. */
 export type Poi = { category: PoiCategory; position: Position; seasonal: boolean; name?: string };
