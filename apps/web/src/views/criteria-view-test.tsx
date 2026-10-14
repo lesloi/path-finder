@@ -192,7 +192,7 @@ describe('CriteriaView', () => {
       expect(screen.queryByTestId('criteria-distance')).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId('criteria-open'));
-      expect(screen.getByTestId('sub-page-title')).toHaveTextContent(en.criteria);
+      expect(screen.getByTestId('sub-page-title')).toHaveTextContent(en.search);
       expect(screen.getByTestId('criteria-distance')).toHaveAccessibleName(en.distance);
 
       fireEvent.click(screen.getByTestId('sub-page-back'));
@@ -711,6 +711,82 @@ describe('CriteriaView', () => {
       expect(screen.queryByTestId('routes-loading')).not.toBeInTheDocument();
       expect(screen.queryByTestId('routes-cancel')).not.toBeInTheDocument();
       expect(document.documentElement.style.getPropertyValue('--list-inset')).toBe('');
+    });
+
+    describe('folding the panels on a desktop', () => {
+      async function findRoutes() {
+        onDesktop();
+        ask(answer(route(0), route(1)));
+        render(<CriteriaView language="en" />);
+        act(() => map().fire('style.load'));
+        await submit();
+        await screen.findByTestId('routes-count');
+      }
+      const rootProperty = (name: string) => document.documentElement.style.getPropertyValue(name);
+
+      it('folds the form to its button and unfolds it, keeping what was typed', () => {
+        onDesktop();
+        render(<CriteriaView language="en" />);
+        fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+        const toggle = screen.getByTestId('criteria-fold');
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+        fireEvent.click(toggle);
+
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.getByTestId('criteria-title').closest('aside')).toHaveAttribute('inert');
+        expect(rootProperty('--column-inset')).not.toBe('');
+
+        fireEvent.click(toggle);
+
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByTestId('criteria-title').closest('aside')).not.toHaveAttribute('inert');
+        expect(field()).toHaveValue('45.8, 6.2');
+        expect(rootProperty('--column-inset')).toBe('');
+      });
+
+      it('closes the tooltip of the tab once it is clicked', () => {
+        onDesktop();
+        render(<CriteriaView language="en" />);
+        const toggle = screen.getByTestId('criteria-fold');
+
+        fireEvent.click(toggle);
+
+        expect(toggle).toHaveAttribute('data-tip-dismissed');
+      });
+
+      it('moves the focus to the button when the form folds around it', () => {
+        onDesktop();
+        render(<CriteriaView language="en" />);
+        field().focus();
+
+        fireEvent.click(screen.getByTestId('criteria-fold'));
+
+        expect(screen.getByTestId('criteria-fold')).toHaveFocus();
+      });
+
+      it('folds the routes to their button and unfolds them', async () => {
+        await findRoutes();
+        const toggle = screen.getByTestId('routes-fold');
+
+        fireEvent.click(toggle);
+
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.getByTestId('routes-list').closest('aside')).toHaveAttribute('inert');
+
+        fireEvent.click(toggle);
+
+        expect(screen.getByTestId('routes-list').closest('aside')).not.toHaveAttribute('inert');
+      });
+
+      it('unfolds the routes when a new search starts', async () => {
+        await findRoutes();
+        fireEvent.click(screen.getByTestId('routes-fold'));
+
+        await submit();
+
+        expect(screen.getByTestId('routes-fold')).toHaveAttribute('aria-expanded', 'true');
+      });
     });
 
     describe('clearing the routes', () => {

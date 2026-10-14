@@ -3,9 +3,11 @@ import type { Language } from './language.ts';
 /** The criteria view (map, start point, toasts) and the criteria form. */
 export const criteriaText = {
   en: {
-    criteria: 'Criteria',
+    search: 'Search',
     setCriteria: 'Create a route',
     editCriteria: 'Edit the criteria',
+    hideSearch: 'Hide the search',
+    showSearch: 'Show the search',
     myLocation: 'My location',
     resetNorth: 'Point north',
     reframe: 'Reframe the map',
@@ -62,9 +64,11 @@ export const criteriaText = {
     waypointCount: (count: number) => (count === 1 ? '1 waypoint' : `${count} waypoints`),
   },
   fr: {
-    criteria: 'Critères',
+    search: 'Recherche',
     setCriteria: 'Créer un parcours',
     editCriteria: 'Modifier les critères',
+    hideSearch: 'Masquer la recherche',
+    showSearch: 'Afficher la recherche',
     myLocation: 'Ma position',
     resetNorth: 'Remettre le nord en haut',
     reframe: 'Recadrer la carte',

@@ -85,7 +85,9 @@
   /* The gap between the map's controls and the screen edges. */
   --map-margin: calc(var(--spacing) * 3);
   /* What the desktop left column and its margin cover from the left of the map. */
-  --column-inset: calc(var(--spacing-column) + var(--spacing) * 3);
+  --column-reserved: calc(var(--spacing-column) + var(--spacing) * 3);
+  /* What it covers now: the view sets it to nothing while the column is folded. */
+  --column-inset: var(--column-reserved);
   /* What the route list and the dock cover from the right and the bottom of the map: the framing keeps them clear. */
   --list-reserved: calc(var(--spacing-list) + var(--spacing) * 3);
   --dock-reserved: calc(var(--spacing-dock) + var(--spacing) * 3);

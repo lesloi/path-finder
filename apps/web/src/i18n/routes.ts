@@ -9,6 +9,8 @@ export const routesText = {
   en: {
     routes: 'Routes',
     routesFolded: 'Routes, folded',
+    hideRoutes: 'Hide the routes',
+    showRoutes: 'Show the routes',
     routeCount: (count: number) => (count === 1 ? '1 route' : `${count} routes`),
     route: (index: number, count: number) => `Route ${index} of ${count}`,
     closeRoute: 'Close the route',
@@ -46,6 +48,8 @@ export const routesText = {
   fr: {
     routes: 'Parcours',
     routesFolded: 'Parcours, repliés',
+    hideRoutes: 'Masquer les parcours',
+    showRoutes: 'Afficher les parcours',
     routeCount: (count: number) => `${count} parcours`,
     route: (index: number, count: number) => `Parcours ${index} sur ${count}`,
     closeRoute: 'Fermer le parcours',
