@@ -1,5 +1,15 @@
 import { Crosshair, LocateFixed, MapPinCheck, MapPinPlus, Navigation2, Scan, Settings } from 'lucide-react';
-import { useEffect, useEffectEvent, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 
 import { MAX_WAYPOINTS } from '../contract/index.ts';
 import { useCoverage, useSettings } from '../state/index.ts';
@@ -39,20 +49,14 @@ import {
   useDesktop,
 } from '../components/index.ts';
 
-// The bottom-right buttons: the layers, the waypoint one, the location or reframe one, the north. On phones they stack up from the
-// bottom, over the sheet; on desktops they line up from the right, above the dock when it is shown (`--edge-bottom`).
-// Each class is written whole for Tailwind; `below` counts the buttons the one stands on or beside.
-const STACKED_ABOVE = [
-  'bottom-[calc(var(--sheet-height,0px)+--spacing(3))]',
-  'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--spacing-touch)+--spacing(2))] ' +
-    'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2))]',
-  'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+2*(var(--spacing-touch)+--spacing(2)))] ' +
-    'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+2*(var(--spacing-touch)+--spacing(2)))]',
-  'bottom-[calc(var(--sheet-height,0px)+--spacing(3)+3*(var(--spacing-touch)+--spacing(2)))] ' +
-    'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+3*(var(--spacing-touch)+--spacing(2)))]',
-];
-const stackedAbove = (below: 0 | 1 | 2 | 3) =>
-  `right-safe-3 transition-[bottom] duration-250 ease-[ease] motion-reduce:transition-none desktop:bottom-(--edge-bottom) ${STACKED_ABOVE[below]}`;
+// The bottom-right buttons: the location or reframe one, the waypoint one, the layers, the north. On phones they stack up
+// from the bottom, over the sheet; on desktops they line up from the right, above the dock when it is shown
+// (`--edge-bottom`). `--slot` counts the buttons the one stands on or beside.
+const STACKED =
+  'right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--slot)*(var(--spacing-touch)+--spacing(2)))] ' +
+  'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--slot)*(var(--spacing-touch)+--spacing(2)))] ' +
+  'desktop:bottom-(--edge-bottom) transition-[bottom] duration-250 ease-[ease] motion-reduce:transition-none';
+const slotStyle = (slot: number) => ({ '--slot': slot }) as CSSProperties;
 
 // Sets a custom property of the page while `shown`.
 function useRootProperty(name: string, value: string, shown: boolean) {
@@ -158,10 +162,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   // The place of each button in the stack: the location (or reframe) button keeps the corner, within reach of the
   // thumb, then the waypoint one, then the layers, then the north.
-  const locateOrReframe = locateShown || reframeShown;
-  const waypointSlot = locateOrReframe ? 1 : 0;
-  const layersSlot = (waypointSlot + (waypointShown ? 1 : 0)) as 0 | 1 | 2;
-  const northSlot = (layersSlot + 1) as 1 | 2 | 3;
+  const stack = [locateShown || reframeShown, waypointShown, true, mapView.rotated];
+  const slotOf = (button: number) => stack.slice(0, button).filter(Boolean).length;
 
   // A button that puts the map back goes away once it has: the focus goes on from the settings.
   function putBack(action: 'resetNorth' | 'reframe') {
@@ -369,13 +371,15 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             language={language}
             layers={poiLayers}
             onChange={(layers) => update({ poiLayers: layers })}
-            className={`fixed z-5 ${stackedAbove(layersSlot)}`}
+            className={`fixed z-5 ${STACKED}`}
+            style={slotStyle(slotOf(2))}
           />
           {waypointShown && (
             <button
               type="button"
               data-testid="criteria-waypoint"
-              className={`${FLOATING_BUTTON} fixed z-5 aria-pressed:bg-accent! aria-pressed:text-on-accent! disabled:text-ink-2 ${stackedAbove(waypointSlot)}`}
+              className={`${FLOATING_BUTTON} fixed z-5 aria-pressed:bg-accent! aria-pressed:text-on-accent! disabled:text-ink-2 ${STACKED}`}
+              style={slotStyle(slotOf(1))}
               {...tip(t.addWaypoint, 'stack')}
               aria-pressed={placing}
               disabled={!placing && waypoints.length >= MAX_WAYPOINTS}
@@ -388,7 +392,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             <button
               type="button"
               data-testid="criteria-north"
-              className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(northSlot)}`}
+              className={`${FLOATING_BUTTON} fixed z-5 ${STACKED}`}
+              style={slotStyle(slotOf(3))}
               {...tip(t.resetNorth, 'stack')}
               onClick={() => putBack('resetNorth')}
             >
@@ -403,7 +408,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <button
           type="button"
           data-testid="criteria-locate"
-          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(0)}`}
+          className={`${FLOATING_BUTTON} fixed z-5 ${STACKED}`}
+          style={slotStyle(0)}
           {...tip(t.myLocation, 'stack')}
           onClick={locate}
         >
@@ -414,7 +420,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         <button
           type="button"
           data-testid="criteria-reframe"
-          className={`${FLOATING_BUTTON} fixed z-5 ${stackedAbove(0)}`}
+          className={`${FLOATING_BUTTON} fixed z-5 ${STACKED}`}
+          style={slotStyle(0)}
           {...tip(t.reframe, 'stack')}
           onClick={() => putBack('reframe')}
         >

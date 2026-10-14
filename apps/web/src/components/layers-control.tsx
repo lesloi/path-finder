@@ -1,5 +1,5 @@
 import { Layers } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 
 import { POI_LAYER_KEYS, type PoiLayers } from '../core/index.ts';
 import { criteriaText, type Language } from '../i18n/index.ts';
@@ -17,12 +17,14 @@ export function LayersControl({
   layers,
   onChange,
   className,
+  style,
 }: {
   language: Language;
   layers: PoiLayers;
   onChange: (layers: PoiLayers) => void;
   /** Where the control sits on the map. */
   className: string;
+  style?: CSSProperties;
 }) {
   const t = criteriaText[language];
   const id = useId();
@@ -43,6 +45,7 @@ export function LayersControl({
     <div
       ref={root}
       className={className}
+      {...(style && { style })}
       onKeyDown={(event) => {
         if (event.key !== 'Escape' || !open) return;
         event.stopPropagation();
