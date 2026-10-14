@@ -14,7 +14,7 @@ import {
 import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 import { profileScale } from './profile-scale.ts';
 import { SURFACE_CLASSES } from './surface-colors.ts';
-import { WAYPOINT_PIN } from './waypoint-pin.ts';
+import { WaypointPin } from './waypoint-pin.tsx';
 
 // A default that keeps its identity, so that the waypoints on the route are not worked out again on every hover.
 const NO_WAYPOINTS: Position[] = [];
@@ -169,21 +169,7 @@ export function ElevationProfile({
               style={{ left: `${total ? (distance / total) * 100 : 0}%` }}
             >
               <span className="absolute top-[22px] bottom-0 left-1/2 w-px -translate-x-1/2 bg-ink-2" />
-              <svg
-                viewBox={WAYPOINT_PIN.viewBox}
-                className="absolute top-0 left-0 h-[22px] w-[18px] fill-white"
-                stroke={WAYPOINT_PIN.ink}
-                strokeWidth="2"
-                aria-hidden
-              >
-                <path d={WAYPOINT_PIN.path} />
-              </svg>
-              <span
-                className="absolute inset-x-0 top-[3px] text-center text-[11px] leading-none font-bold"
-                style={{ color: WAYPOINT_PIN.ink }}
-              >
-                {number}
-              </span>
+              <WaypointPin number={number} variant="profile" />
             </span>
           ))}
           {/* The keyboard's way along the profile: a native slider, hidden, whose ring shows on the plot. */}

@@ -1311,32 +1311,20 @@ describe('StartPointMap waypoints', () => {
     expect(onStartChange).not.toHaveBeenCalled();
   });
 
-  it('takes a tap on a marker for neither a waypoint, a start point, a route nor the background', () => {
-    const [onWaypointAdd, onStartChange, onRouteSelect, onBackgroundClick] = [vi.fn(), vi.fn(), vi.fn(), vi.fn()];
-    render(
-      <StartPointMap
-        placing
-        waypoints={waypoints}
-        routes={[[[6, 45]]]}
-        onWaypointAdd={onWaypointAdd}
-        onStartChange={onStartChange}
-        onRouteSelect={onRouteSelect}
-        onBackgroundClick={onBackgroundClick}
-      />,
-    );
-    const originalEvent = { target: pressed(shown()[0]!) };
+  // MapLibre hears what bubbles up to its container as the map's own: a click adds a waypoint, picks the start point,
+  // selects a route or closes the bubble, and a press starts a long press.
+  it.each(['click', 'mousedown', 'touchstart'])('keeps a %s on a marker from reaching the map', (type) => {
+    render(<StartPointMap placing waypoints={waypoints} onStartChange={vi.fn()} />);
+    // The map's container, which the event would bubble up to.
+    const container = document.createElement('div');
+    const heard = vi.fn();
+    container.addEventListener(type, heard);
+    const marker = pressed(shown()[0]!);
+    container.append(marker);
 
-    act(() => {
-      map().fire('click', { lngLat: { lng: 6.1, lat: 45.9 }, originalEvent });
-      map().fire('click', { features: [{ properties: { index: 0 } }], originalEvent }, 'routes-hit');
-      map().fire('mousedown', { lngLat: { lng: 6.1, lat: 45.9 }, originalEvent: { ...originalEvent, button: 0 } });
-      vi.advanceTimersByTime(600);
-    });
+    act(() => void marker.dispatchEvent(new Event(type, { bubbles: true })));
 
-    expect(onWaypointAdd).not.toHaveBeenCalled();
-    expect(onStartChange).not.toHaveBeenCalled();
-    expect(onRouteSelect).not.toHaveBeenCalled();
-    expect(onBackgroundClick).not.toHaveBeenCalled();
+    expect(heard).not.toHaveBeenCalled();
   });
 
   it('offers to remove a waypoint on a tap on its marker', () => {

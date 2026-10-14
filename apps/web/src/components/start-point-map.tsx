@@ -11,6 +11,7 @@ import {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { createPortal } from 'react-dom';
 
 import {
   DEFAULT_BASEMAP,
@@ -47,7 +48,7 @@ import {
   routeTagImage,
 } from './route-tag-image.ts';
 import { useDesktop } from './use-desktop.ts';
-import { WAYPOINT_PIN } from './waypoint-pin.ts';
+import { WaypointPin } from './waypoint-pin.tsx';
 import { NORTH_EPSILON, useRouteSnapshot } from './use-route-snapshot.ts';
 
 const LONG_PRESS_MS = 500;
@@ -122,10 +123,6 @@ const CONTROLS_BOTTOM = 40;
 const TAG_HALF: [number, number] = [56, 28];
 // Half the size of a distance marker.
 const MARKER_HALF = 16;
-
-// Whether a DOM event of the map happened on a waypoint marker, which the map's own handlers must leave alone.
-const onMarker = (event?: Event) =>
-  event?.target instanceof Element && event.target.closest('[data-waypoint]') !== null;
 
 // Where the bubble of a waypoint sits around its pin, which rises 29 px above the point: clear of the pin, above it or
 // beside it, and just under the point when there is no room above.
@@ -520,9 +517,7 @@ export function StartPointMap({
       basemapFailed(previous);
     });
     // Once, not per style: the listeners belong to the map and look the layer up when they fire.
-    map.on('click', 'routes-hit', ({ features, originalEvent }) => {
-      if (!onMarker(originalEvent)) selectRoute(features![0].properties.index as number);
-    });
+    map.on('click', 'routes-hit', ({ features }) => selectRoute(features![0].properties.index as number));
     map.on('mouseenter', 'routes-hit', () => (map.getCanvas().style.cursor = 'pointer'));
     map.on('mouseleave', 'routes-hit', () => (map.getCanvas().style.cursor = ''));
 
@@ -554,9 +549,7 @@ export function StartPointMap({
       map.on('click', layer, (event) => showLabel(event as never));
     }
 
-    map.on('click', ({ lngLat, point, originalEvent }) => {
-      // A marker sits on the map, and its tap is its own: the bubble that offers to remove it.
-      if (onMarker(originalEvent)) return;
+    map.on('click', ({ lngLat, point }) => {
       pick('click', lngLat);
       // A route has its own click, on its wide hit line, and a point of interest its label: anywhere else is the
       // background.
@@ -566,9 +559,8 @@ export function StartPointMap({
     });
 
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const press = ({ lngLat, originalEvent }: MapMouseEvent | MapTouchEvent) => {
+    const press = ({ lngLat }: MapMouseEvent | MapTouchEvent) => {
       clearTimeout(timer);
-      if (onMarker(originalEvent)) return;
       timer = setTimeout(() => pick('long-press', lngLat), LONG_PRESS_MS);
     };
     const cancel = () => clearTimeout(timer);
@@ -624,33 +616,23 @@ export function StartPointMap({
     return () => void map.off('mousemove', follow);
   }, [placing]);
 
-  // A pin with its number, in the order the waypoints were placed. Tapping one opens a
-  // bubble with a button to remove it; the guard in the map's handlers keeps that tap from doing anything else.
+  // The waypoints' markers: a button each, which the pins (`WaypointPin`) are drawn into. Tapping one opens a bubble with a
+  // button to remove it. The marker's own events stop here, as MapLibre would hear them as the map's: a click that
+  // closes the bubble, or adds a waypoint, and a press that starts a long press.
+  const [pinHosts, setPinHosts] = useState<HTMLElement[]>([]);
   useEffect(() => {
     const map = mapRef.current!;
+    const hosts: HTMLElement[] = [];
     const markers = waypoints.map((waypoint, index) => {
       // A button, which brings the focus and the keyboard with it.
-      const element = document.createElement('button');
-      element.type = 'button';
-      element.dataset.waypoint = String(index + 1);
-      element.setAttribute('aria-label', criteriaText[language].waypointName(index + 1));
-      element.className = 'relative block h-[29px] w-6 cursor-pointer p-0 drop-shadow-md';
-      // The pin of the waypoint button, white with a dark outline, its tip on the place; the number sits in its head.
-      const pin = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      pin.setAttribute('viewBox', WAYPOINT_PIN.viewBox);
-      pin.setAttribute('class', 'size-full fill-white');
-      pin.setAttribute('stroke', WAYPOINT_PIN.ink);
-      pin.setAttribute('stroke-width', '2');
-      pin.setAttribute('aria-hidden', 'true');
-      const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      outline.setAttribute('d', WAYPOINT_PIN.path);
-      pin.append(outline);
-      const number = document.createElement('span');
-      number.textContent = String(index + 1);
-      number.className = 'absolute inset-x-0 top-[6px] text-center text-xs leading-none font-bold';
-      number.style.color = WAYPOINT_PIN.ink;
-      element.append(pin, number);
-      const open = () => {
+      const host = document.createElement('button');
+      host.type = 'button';
+      host.className = 'block cursor-pointer p-0';
+      host.setAttribute('aria-label', criteriaText[language].waypointName(index + 1));
+      host.dataset.waypoint = String(index + 1);
+      for (const type of ['mousedown', 'touchstart']) host.addEventListener(type, (event) => event.stopPropagation());
+      host.addEventListener('click', (event) => {
+        event.stopPropagation();
         closeBubble();
         const remove = document.createElement('button');
         remove.type = 'button';
@@ -664,14 +646,11 @@ export function StartPointMap({
           .setLngLat(waypoint)
           .setDOMContent(remove)
           .addTo(map);
-      };
-      element.addEventListener('click', (event) => {
-        // MapLibre hears clicks on its markers as clicks on the map, which would close the bubble this opens.
-        event.stopPropagation();
-        open();
       });
-      return new Marker({ element, anchor: 'bottom' }).setLngLat(waypoint).addTo(map);
+      hosts.push(host);
+      return new Marker({ element: host, anchor: 'bottom' }).setLngLat(waypoint).addTo(map);
     });
+    setPinHosts(hosts);
     return () => {
       closeBubble();
       for (const marker of markers) marker.remove();
@@ -914,6 +893,7 @@ export function StartPointMap({
   return (
     <div className={`fixed inset-0 bg-white ${pickOnClick ? 'map-picking' : ''}`}>
       <div ref={container} className="size-full" />
+      {pinHosts.map((host, index) => createPortal(<WaypointPin number={index + 1} variant="map" />, host, index))}
     </div>
   );
 }
