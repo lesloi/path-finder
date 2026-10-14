@@ -24,6 +24,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: apps/server/go.mod
+          cache-dependency-path: apps/server/go.sum
       - run: CGO_ENABLED=0 go build -trimpath -o /dev/null .
         working-directory: apps/server
       - run: scripts/coverage-server.sh
