@@ -1,6 +1,7 @@
 import type { WaypointPoi } from '../core/index.ts';
 import { PoiBadge } from './poi-badge.tsx';
 import { MAP_INK } from './route-colors.ts';
+import { hint } from './styles.ts';
 
 // The pin of the waypoint button's icon, cropped to the pin so that its tip is at the bottom of the box.
 const PIN_VIEW_BOX = '3 1 18 22';
@@ -20,16 +21,22 @@ export function WaypointPin({
   number,
   variant,
   poi,
+  poiLabel,
 }: {
   number: number;
   variant: keyof typeof VARIANTS;
   /** The point of interest the waypoint was made from: its icon takes the place of the pin, the number in a corner. */
   poi?: WaypointPoi | undefined;
+  /** What the point of interest is called: the tooltip over its icon. */
+  poiLabel?: string;
 }) {
   const classes = VARIANTS[variant];
   if (poi) {
     return (
-      <span className="absolute top-0 left-0 h-[22px] w-[18px]">
+      <span
+        className="pointer-events-auto absolute top-0 left-0 h-[22px] w-[18px]"
+        {...(poiLabel && hint(poiLabel, 'bottom-start'))}
+      >
         <PoiBadge category={poi.category} seasonal={poi.seasonal} className="absolute top-0 left-0 size-[18px]" />
         <span
           className="absolute right-[-4px] bottom-0 min-w-[11px] rounded-full bg-white text-center text-[9px] leading-[11px] font-bold"

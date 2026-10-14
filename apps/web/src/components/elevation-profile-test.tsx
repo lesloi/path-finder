@@ -53,7 +53,12 @@ describe('ElevationProfile', () => {
         'aria-label',
         expect.stringContaining('Fontaine'),
       );
+      expect(screen.getByTestId('profile-waypoint-1').querySelector('[data-tip]')).toHaveAttribute(
+        'data-tip',
+        'Fontaine',
+      );
       expect(screen.getByTestId('profile-waypoint-2').querySelector('circle')).toBeNull();
+      expect(screen.getByTestId('profile-waypoint-2').querySelector('[data-tip]')).toBeNull();
     });
 
     it('names a point of interest without a name by what it is', () => {

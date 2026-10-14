@@ -179,7 +179,12 @@ export function ElevationProfile({
                 style={{ left: `${total ? (distance / total) * 100 : 0}%` }}
               >
                 <span className="absolute top-[22px] bottom-0 left-1/2 w-px -translate-x-1/2 bg-ink-2" />
-                <WaypointPin number={number} variant="profile" poi={poi} />
+                <WaypointPin
+                  number={number}
+                  variant="profile"
+                  poi={poi}
+                  {...(poi && { poiLabel: poiLabel(poi, language) })}
+                />
               </span>
             );
           })}
