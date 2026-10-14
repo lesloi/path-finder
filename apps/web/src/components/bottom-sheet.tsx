@@ -77,13 +77,9 @@ export function BottomSheet({
     style.maxHeight = DRAG_MAX;
     // A sheet already collapsed does not shrink further (unless it folds), nor does an expanded one grow, nor a folded one
     // shrink: the finger may go on, not the sheet.
-    const allowed = drag.current.expanded
-      ? Math.max(moved, 0)
-      : shut
-        ? Math.min(moved, 0)
-        : canFold
-          ? moved
-          : Math.min(moved, 0);
+    const { expanded: wasExpanded } = drag.current;
+    const mayShrink = wasExpanded || (canFold && !shut);
+    const allowed = (moved > 0 ? mayShrink : !wasExpanded) ? moved : 0;
     style.height = `${drag.current.height - allowed}px`;
     // A folded sheet shows what it opens onto as it grows, fading in rather than showing an empty panel.
     if (shut) {
@@ -145,17 +141,13 @@ export function BottomSheet({
             // A drag that went far is no tap, even back where it began; only where it ended says which way to settle.
             swiped.current = reach > SWIPE_PX;
             if (Math.abs(distance) <= SWIPE_PX) return;
-            const up = distance < 0;
-            // A swipe across much of the screen skips the step between.
-            const long = Math.abs(distance) > window.innerHeight * LONG_SWIPE;
-            if (shut) {
-              if (!up) return;
-              onFoldedChange!(false);
-              if (long) onExpandedChange(true);
-            } else if (up || expanded) {
-              onExpandedChange(up);
-              if (!up && long && canFold) onFoldedChange!(true);
-            } else if (canFold) onFoldedChange!(true);
+            // Folded, collapsed, expanded; a swipe across much of the screen skips the step between.
+            const level = shut ? 0 : expanded ? 2 : 1;
+            const steps = Math.abs(distance) > window.innerHeight * LONG_SWIPE ? 2 : 1;
+            const next = Math.min(Math.max(level + (distance < 0 ? steps : -steps), canFold ? 0 : 1), 2);
+            if (next === level) return;
+            if (shut || next === 0) onFoldedChange!(next === 0);
+            if (level === 2 || next === 2) onExpandedChange(next === 2);
           }}
           // A gesture the system takes over leaves the state as it was.
           onPointerCancel={(event) => drag.current?.pointerId === event.pointerId && letGo()}
