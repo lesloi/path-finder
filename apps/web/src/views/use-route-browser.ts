@@ -16,6 +16,8 @@ export function useRouteBrowser() {
   // The route a pointer or the focus is on in the list: the map highlights it without selecting it.
   const [preview, setPreview] = useState<number>();
   const [detail, setDetail] = useState(false);
+  // Whether the phone's sheet is folded down to its handle, to see more of the map.
+  const [folded, setFolded] = useState(false);
   const [hover, setHover] = useState<Position>();
   const [mapSnapshot, setSnapshot] = useState<MapSnapshot>();
   // Kept while the route set does, so the map's effects only run for a new one.
@@ -39,6 +41,8 @@ export function useRouteBrowser() {
     selected,
     preview,
     detail,
+    folded,
+    setFolded,
     hover,
     geometries,
     select: setSelected,
@@ -50,6 +54,7 @@ export function useRouteBrowser() {
       setSelected(undefined);
       setPreview(undefined);
       setDetail(false);
+      setFolded(false);
       find(request);
     },
     /** Forgets the route set, and any search under way, such as when a new start point makes it stale. */
@@ -58,10 +63,13 @@ export function useRouteBrowser() {
       setSelected(undefined);
       setPreview(undefined);
       setDetail(false);
+      setFolded(false);
       setHover(undefined);
     },
     openDetail(open: boolean) {
       setDetail(open);
+      // A detail is read, not folded away.
+      if (open) setFolded(false);
       setHover(undefined);
     },
   };

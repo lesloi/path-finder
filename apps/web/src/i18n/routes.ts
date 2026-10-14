@@ -8,6 +8,7 @@ import type { Language } from './language.ts';
 export const routesText = {
   en: {
     routes: 'Routes',
+    routesFolded: 'Routes, folded',
     routeCount: (count: number) => (count === 1 ? '1 route' : `${count} routes`),
     route: (index: number, count: number) => `Route ${index} of ${count}`,
     closeRoute: 'Close the route',
@@ -44,6 +45,7 @@ export const routesText = {
   },
   fr: {
     routes: 'Parcours',
+    routesFolded: 'Parcours, repliés',
     routeCount: (count: number) => `${count} parcours`,
     route: (index: number, count: number) => `Parcours ${index} sur ${count}`,
     closeRoute: 'Fermer le parcours',
