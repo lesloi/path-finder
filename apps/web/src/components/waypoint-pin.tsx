@@ -23,6 +23,7 @@ export function WaypointPin({
   poi,
   poiLabel,
   tipSide = 'top-start',
+  highlighted = false,
 }: {
   number: number;
   variant: keyof typeof VARIANTS;
@@ -32,6 +33,8 @@ export function WaypointPin({
   poiLabel?: string;
   /** Where the tooltip opens: toward the middle of the profile, which the screen does not cut. */
   tipSide?: Parameters<typeof hint>[1];
+  /** The pin is set apart, larger and in the accent colour, as the user points at its row in the list. */
+  highlighted?: boolean;
 }) {
   const classes = VARIANTS[variant];
   if (poi) {
@@ -51,13 +54,22 @@ export function WaypointPin({
     );
   }
   return (
-    <span className={classes.box}>
-      <svg viewBox={PIN_VIEW_BOX} className="size-full fill-white" stroke={MAP_INK} strokeWidth="2" aria-hidden>
+    <span
+      className={`${classes.box} origin-bottom transition-transform ${highlighted ? 'scale-125' : ''}`}
+      {...(highlighted && { 'data-highlighted': '' })}
+    >
+      <svg
+        viewBox={PIN_VIEW_BOX}
+        className={`size-full ${highlighted ? 'fill-accent' : 'fill-white'}`}
+        stroke={MAP_INK}
+        strokeWidth="2"
+        aria-hidden
+      >
         <path d={PIN_PATH} />
       </svg>
       <span
         className={`absolute inset-x-0 text-center leading-none font-bold ${classes.number}`}
-        style={{ color: MAP_INK }}
+        style={{ color: highlighted ? 'var(--color-on-accent)' : MAP_INK }}
       >
         {number}
       </span>

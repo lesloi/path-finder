@@ -169,6 +169,10 @@ export type MapHandle = {
   resetNorth: () => void;
   /** Frames the routes again, or the selected one. */
   reframe: () => void;
+  /** Moves the map to a position, at the zoom it has. */
+  centerOn: (position: Position) => void;
+  /** Sets the pin of a waypoint apart, larger and in the accent colour: the one the user points at in a list. */
+  highlightWaypoint: (index: number | undefined) => void;
 };
 
 /** What the map writes on a route: its distance and, when known, its elevation gain. */
@@ -663,6 +667,8 @@ export function StartPointMap({
   const placed = useRef<{ marker: Marker; host: HTMLElement; waypoint: Position }[]>([]);
   const placedIn = useRef(language);
   const bubbleOn = useRef(-1);
+  // Kept here, not in the app: pointing at a row must not draw the whole view again.
+  const [highlightedWaypoint, setHighlightedWaypoint] = useState<number>();
   useEffect(() => {
     const map = mapRef.current!;
     let keep = 0;
@@ -711,6 +717,12 @@ export function StartPointMap({
     }
     setPinHosts(placed.current.map(({ host }) => host));
   }, [waypoints, language]);
+  // The pin set apart goes over the ones around it.
+  useEffect(() => {
+    for (const [index, { host }] of placed.current.entries()) {
+      host.style.zIndex = index === highlightedWaypoint ? '1' : '';
+    }
+  }, [highlightedWaypoint, pinHosts]);
   // Gone with the map.
   useEffect(
     () => () => {
@@ -922,6 +934,8 @@ export function StartPointMap({
     resetNorth: () => mapRef.current?.resetNorth(),
     // The framing below runs again.
     reframe: () => setReframes((count) => count + 1),
+    centerOn: (center) => mapRef.current?.easeTo({ center }),
+    highlightWaypoint: setHighlightedWaypoint,
   }));
   const refit = useEffectEvent(() => {
     const map = mapRef.current!;
@@ -956,7 +970,13 @@ export function StartPointMap({
   return (
     <div className={`fixed inset-0 bg-white ${pickOnClick ? 'map-picking' : ''}`}>
       <div ref={container} className="size-full" />
-      {pinHosts.map((host, index) => createPortal(<WaypointPin number={index + 1} variant="map" />, host, index))}
+      {pinHosts.map((host, index) =>
+        createPortal(
+          <WaypointPin number={index + 1} variant="map" highlighted={index === highlightedWaypoint} />,
+          host,
+          index,
+        ),
+      )}
     </div>
   );
 }

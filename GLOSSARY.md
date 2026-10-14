@@ -19,8 +19,8 @@ and up to five optional waypoints.
 _Avoid_: Filters, query, search parameters
 
 **Waypoint**:
-A point a route must pass through between its start and its end, in the order the user
-placed it. Up to five per set of criteria. Waypoints never replace the target distance or
+A point a route must pass through between its start and its end, in the order of the list,
+which the user can change. Up to five per set of criteria. Waypoints never replace the target distance or
 target duration: criteria whose waypoints alone exceed the target are refused. A waypoint
 off the ways a route can use is moved to the nearest one, unless it is too far from any.
 _Avoid_: Stage, via, étape
