@@ -15,4 +15,12 @@ describe('SearchingPanel', () => {
 
     expect(screen.getByRole('status')).toBe(screen.getByTestId('routes-loading'));
   });
+
+  it('hides the placeholder of the results from assistive technology', () => {
+    render(<SearchingPanel language="en" />);
+
+    const placeholder = screen.getByTestId('routes-placeholder');
+    expect(placeholder).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByTestId('routes-loading')).not.toContainElement(placeholder);
+  });
 });
