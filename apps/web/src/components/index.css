@@ -313,7 +313,7 @@
 /*
  * A tooltip for an icon: `data-tip` is its text, `data-tip-side` the side it opens on, chosen so that it stays on the
  * screen and out of a scrolling panel, which would cut it. `stack` is for the buttons that stack up on phones and line
- * up on desktops: to the left of a stack, above a line. Escape dismisses it (`useTipDismiss`).
+ * up on desktops: to the left of a stack, above a line. Escape or a press dismisses it (`useTipDismiss`).
  */
 [data-tip]:where(:not(.fixed, .absolute)) {
   position: relative;

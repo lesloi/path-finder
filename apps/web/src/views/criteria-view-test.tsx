@@ -745,16 +745,6 @@ describe('CriteriaView', () => {
         expect(rootProperty('--column-inset')).toBe('');
       });
 
-      it('closes the tooltip of the tab once it is clicked', () => {
-        onDesktop();
-        render(<CriteriaView language="en" />);
-        const toggle = screen.getByTestId('criteria-fold');
-
-        fireEvent.click(toggle);
-
-        expect(toggle).toHaveAttribute('data-tip-dismissed');
-      });
-
       it('moves the focus to the button when the form folds around it', () => {
         onDesktop();
         render(<CriteriaView language="en" />);

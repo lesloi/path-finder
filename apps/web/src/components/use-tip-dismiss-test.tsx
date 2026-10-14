@@ -51,6 +51,15 @@ describe('useTipDismiss', () => {
     expect(onKey).toHaveBeenCalledTimes(1);
   });
 
+  it('dismisses the tooltip a control holds open when it is pressed on its icon', () => {
+    render(<Tips onKey={vi.fn()} />);
+    screen.getByTestId('tip').focus();
+
+    fireEvent.click(screen.getByTestId('icon'));
+
+    expect(screen.getByTestId('tip')).toHaveAttribute('data-tip-dismissed');
+  });
+
   it('shows the tooltip again once the focus leaves the element', () => {
     render(<Tips onKey={vi.fn()} />);
     screen.getByTestId('tip').focus();
