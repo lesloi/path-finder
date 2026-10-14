@@ -2,17 +2,17 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import { useState, type ReactNode } from 'react';
 
-import { BottomSheet } from './bottom-sheet.tsx';
+import { BottomSheet, type SheetState } from './bottom-sheet.tsx';
 
-// The sheet as a view holds it, keeping whether it is expanded.
+// The sheet as a view holds it, keeping its state.
 function Sheet({ children, onHeightChange }: { children?: ReactNode; onHeightChange?: (height: number) => void }) {
-  const [expanded, setExpanded] = useState(false);
+  const [state, setState] = useState<SheetState>('collapsed');
   return (
     <BottomSheet
       testId="sheet"
       label="Route"
-      expanded={expanded}
-      onExpandedChange={setExpanded}
+      state={state}
+      onStateChange={setState}
       {...(onHeightChange && { onHeightChange })}
     >
       {children}
@@ -20,19 +20,13 @@ function Sheet({ children, onHeightChange }: { children?: ReactNode; onHeightCha
   );
 }
 
+const FOLDABLE = ['folded', 'collapsed', 'expanded'] as const;
+
 // The sheet of a route set, which can also be folded down to its handle.
-function FoldableSheet({ initial = 'normal' }: { initial?: 'normal' | 'expanded' | 'folded' }) {
-  const [expanded, setExpanded] = useState(initial === 'expanded');
-  const [folded, setFolded] = useState(initial === 'folded');
+function FoldableSheet({ initial = 'collapsed' }: { initial?: SheetState }) {
+  const [state, setState] = useState<SheetState>(initial);
   return (
-    <BottomSheet
-      testId="sheet"
-      label="Route"
-      expanded={expanded}
-      onExpandedChange={setExpanded}
-      folded={folded}
-      onFoldedChange={setFolded}
-    >
+    <BottomSheet testId="sheet" label="Route" state={state} onStateChange={setState} stops={FOLDABLE}>
       <p data-testid="content" />
     </BottomSheet>
   );
@@ -89,9 +83,33 @@ describe('BottomSheet', () => {
   });
 
   it('stays collapsed when it cannot expand, since nothing could collapse it', () => {
-    render(<BottomSheet testId="sheet" label="Route" expanded />);
+    render(<BottomSheet testId="sheet" label="Route" state="expanded" />);
 
     expect(screen.getByTestId('sheet')).not.toHaveClass('h-[60dvh]');
+  });
+
+  it('reports nothing on a tap when it has a single stop', () => {
+    const onStateChange = vi.fn();
+    render(<BottomSheet testId="sheet" label="Route" stops={['collapsed']} onStateChange={onStateChange} />);
+
+    fireEvent.click(screen.getByTestId('sheet-handle'));
+
+    expect(onStateChange).not.toHaveBeenCalled();
+  });
+
+  it('takes the lowest stop as its shown one when it has no collapsed stop', () => {
+    render(
+      <BottomSheet
+        testId="sheet"
+        label="Route"
+        state="collapsed"
+        stops={['folded', 'expanded']}
+        onStateChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('sheet-handle')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('sheet').firstElementChild!.nextElementSibling).toHaveAttribute('inert');
   });
 
   describe('a drag of its handle', () => {
@@ -113,10 +131,10 @@ describe('BottomSheet', () => {
     });
 
     it.each([
-      ['collapsed', false, 400, 450],
-      ['expanded', true, 400, 350],
-    ])('does not move a %s sheet further than it is', (_, expanded, from, to) => {
-      render(<BottomSheet testId="sheet" label="Route" expanded={expanded} onExpandedChange={vi.fn()} />);
+      ['collapsed', 400, 450],
+      ['expanded', 400, 350],
+    ] as const)('does not move a %s sheet further than it is', (state, from, to) => {
+      render(<BottomSheet testId="sheet" label="Route" state={state} onStateChange={vi.fn()} />);
       const handle = screen.getByTestId('sheet-handle');
 
       fireEvent.pointerDown(handle, { clientY: from });
@@ -192,7 +210,7 @@ describe('BottomSheet', () => {
     it('lets go of the sheet when its handle goes away during a drag', () => {
       const onHeightChange = vi.fn();
       const props = { testId: 'sheet', label: 'Route', onHeightChange };
-      const { rerender } = render(<BottomSheet {...props} onExpandedChange={vi.fn()} />);
+      const { rerender } = render(<BottomSheet {...props} onStateChange={vi.fn()} />);
       const handle = screen.getByTestId('sheet-handle');
       fireEvent.pointerDown(handle, { clientY: 400 });
       fireEvent.pointerMove(handle, { clientY: 300 });
@@ -314,9 +332,9 @@ describe('BottomSheet', () => {
           testId="sheet"
           label="Route"
           foldedLabel="Route, folded"
-          onExpandedChange={vi.fn()}
-          onFoldedChange={vi.fn()}
-          folded
+          onStateChange={vi.fn()}
+          stops={FOLDABLE}
+          state="folded"
         />,
       );
       expect(screen.getByTestId('sheet-handle')).toHaveAccessibleName('Route, folded');
@@ -326,8 +344,9 @@ describe('BottomSheet', () => {
           testId="sheet"
           label="Route"
           foldedLabel="Route, folded"
-          onExpandedChange={vi.fn()}
-          onFoldedChange={vi.fn()}
+          onStateChange={vi.fn()}
+          stops={FOLDABLE}
+          state="collapsed"
         />,
       );
 
@@ -342,6 +361,27 @@ describe('BottomSheet', () => {
       expect(screen.getByTestId('content')).toBeVisible();
     });
 
+    it('keeps the content of a collapsed sheet shown while it is dragged, folding or not', () => {
+      render(<Sheet />);
+      const handle = screen.getByTestId('sheet-handle');
+
+      fireEvent.pointerDown(handle, { clientY: 400 });
+      fireEvent.pointerMove(handle, { clientY: 300 });
+
+      expect(screen.getByTestId('sheet').querySelector('div')!.style.opacity).toBe('');
+    });
+
+    it('reports one state at a time', () => {
+      const onStateChange = vi.fn();
+      render(
+        <BottomSheet testId="sheet" label="Route" state="folded" stops={FOLDABLE} onStateChange={onStateChange} />,
+      );
+
+      swipe(screen.getByTestId('sheet-handle'), 700, 100);
+
+      expect(onStateChange).toHaveBeenCalledExactlyOnceWith('expanded');
+    });
+
     it('can be dragged below its usual lowest height', () => {
       render(<FoldableSheet />);
       const handle = screen.getByTestId('sheet-handle');
@@ -353,9 +393,9 @@ describe('BottomSheet', () => {
     });
 
     it('ignores being folded once it cannot be anymore', () => {
-      const props = { testId: 'sheet', label: 'Route', onExpandedChange: vi.fn(), folded: true };
+      const props = { testId: 'sheet', label: 'Route', onStateChange: vi.fn(), state: 'folded' } as const;
       const { rerender } = render(
-        <BottomSheet {...props} onFoldedChange={vi.fn()}>
+        <BottomSheet {...props} stops={FOLDABLE}>
           <p data-testid="content" />
         </BottomSheet>,
       );

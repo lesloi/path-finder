@@ -98,15 +98,34 @@ describe('useRouteBrowser', () => {
   it.each([
     ['a new request', (r: ReturnType<typeof useRouteBrowser>) => r.ask(request)],
     ['the routes being dropped', (r: ReturnType<typeof useRouteBrowser>) => r.drop()],
-    ['the detail opening', (r: ReturnType<typeof useRouteBrowser>) => r.openDetail(true)],
-  ])('unfolds the sheet with %s', async (_, change) => {
+  ])('puts the sheet back to collapsed with %s', async (_, change) => {
     const { result } = await browse();
-    act(() => result.current.setFolded(true));
-    expect(result.current.folded).toBe(true);
+    act(() => result.current.changeSheet('folded'));
+    expect(result.current.sheet).toBe('folded');
 
     act(() => change(result.current));
 
-    expect(result.current.folded).toBe(false);
+    expect(result.current.sheet).toBe('collapsed');
+    expect(result.current.detail).toBe(false);
+  });
+
+  it('opens the detail by expanding the sheet, and closes it by collapsing', async () => {
+    const { result } = await browse();
+
+    act(() => result.current.openDetail(true));
+    expect(result.current).toMatchObject({ sheet: 'expanded', detail: true });
+
+    act(() => result.current.openDetail(false));
+    expect(result.current).toMatchObject({ sheet: 'collapsed', detail: false });
+  });
+
+  it('forgets the place pointed at when the sheet changes state', async () => {
+    const { result } = await browse();
+    act(() => result.current.setHover([6, 45]));
+
+    act(() => result.current.changeSheet('folded'));
+
+    expect(result.current.hover).toBeUndefined();
   });
 
   it('reports why a request gave no routes, and drops it after a while', async () => {
