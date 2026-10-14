@@ -201,13 +201,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   function togglePlacing() {
     if (placing) return setMode(undefined);
     browser.drop();
+    setRefused(false);
     setMode('place');
   }
 
   function addWaypoint(position: Position) {
     if (waypoints.length >= MAX_WAYPOINTS) return;
-    // The veiled part of the map is where the server cannot route: a waypoint there would only be refused.
-    if (coverage && !isCovered(coverage, position)) return setRefused(true);
     setRefused(false);
     setWaypoints([...waypoints, position]);
     // The last one ends placing on its own.
@@ -349,6 +348,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         waypoints={waypoints}
         placing={placing}
         onWaypointAdd={addWaypoint}
+        onWaypointRefused={() => setRefused(true)}
         onWaypointRemove={removeWaypoint}
         onBasemapFail={(previous) => update({ basemap: previous })}
       />
@@ -535,8 +535,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           </button>
         </div>
       )}
-      {placing && (
-        <div className={TOP_NOTICES}>
+      {/* Always there, so that what a refused tap says is announced: a region that comes with its text is not. */}
+      <div className={TOP_NOTICES}>
+        {placing && (
           <div
             data-testid="criteria-waypoint-bar"
             className="flex items-center gap-3 rounded-md bg-surface py-1 pr-1 pl-4 text-ink-2 shadow-float"
@@ -551,18 +552,16 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               {t.waypointsDone}
             </button>
           </div>
-          {/* Under the banner, which keeps asking for a point. */}
-          {refused && (
-            <p
-              role="status"
-              data-testid="criteria-waypoint-refused"
-              className="m-0 rounded-md bg-surface px-4 py-2 text-ink shadow-float"
-            >
-              {t.waypointUncovered}
-            </p>
-          )}
-        </div>
-      )}
+        )}
+        {/* Under the banner, which keeps asking for a point. */}
+        <p
+          role="status"
+          data-testid="criteria-waypoint-refused"
+          className="m-0 rounded-md bg-surface px-4 py-2 text-ink shadow-float empty:hidden"
+        >
+          {placing && refused ? t.waypointUncovered : ''}
+        </p>
+      </div>
       {browser.refusal && (
         <RouteErrorToast language={language} refusal={browser.refusal} onDismiss={browser.dismissError} />
       )}

@@ -1290,6 +1290,57 @@ describe('StartPointMap waypoints', () => {
     expect(map().getCanvas().style.cursor).toBe('crosshair');
   });
 
+  it('refuses a click on the veiled part of the map while placing, and says so', () => {
+    const [onWaypointAdd, onWaypointRefused] = [vi.fn(), vi.fn()];
+    render(
+      <StartPointMap
+        placing
+        coverage={[[6, 45.8, 6.1, 45.9]]}
+        onWaypointAdd={onWaypointAdd}
+        onWaypointRefused={onWaypointRefused}
+        onStartChange={vi.fn()}
+      />,
+    );
+
+    act(() => map().fire('click', { lngLat: { lng: 2.3, lat: 48.8 } }));
+    expect(onWaypointAdd).not.toHaveBeenCalled();
+    expect(onWaypointRefused).toHaveBeenCalledOnce();
+
+    act(() => map().fire('click', { lngLat: { lng: 6.05, lat: 45.85 } }));
+    expect(onWaypointAdd).toHaveBeenCalledExactlyOnceWith([6.05, 45.85]);
+  });
+
+  it('keeps the crosshair when the pointer leaves a point of interest or a route while placing', () => {
+    render(<StartPointMap placing onStartChange={vi.fn()} />);
+
+    act(() => map().fire('mouseenter', {}, 'pois-water'));
+    act(() => map().fire('mouseleave', {}, 'pois-water'));
+
+    expect(map().getCanvas().style.cursor).toBe('crosshair');
+  });
+
+  it('keeps the markers it has, and an open bubble, when a waypoint is added after them', () => {
+    const view = render(<StartPointMap waypoints={[waypoints[0]!]} onStartChange={vi.fn()} />);
+    act(() => pressed(shown()[0]!).click());
+    const [first] = shown();
+
+    view.rerender(<StartPointMap waypoints={waypoints} onStartChange={vi.fn()} />);
+
+    expect(shown()).toHaveLength(2);
+    expect(shown()[0]).toBe(first);
+    expect(popups.at(-1)!.shown).toBe(true);
+  });
+
+  it('draws again the markers from the first waypoint removed, and closes its bubble', () => {
+    const view = render(<StartPointMap waypoints={waypoints} onStartChange={vi.fn()} />);
+    act(() => pressed(shown()[1]!).click());
+
+    view.rerender(<StartPointMap waypoints={[waypoints[0]!]} onStartChange={vi.fn()} />);
+
+    expect(shown().map((marker) => marker.position)).toEqual([waypoints[0]]);
+    expect(popups.at(-1)!.shown).toBe(false);
+  });
+
   it('adds nothing on a click when not placing', () => {
     const onWaypointAdd = vi.fn();
     render(<StartPointMap onWaypointAdd={onWaypointAdd} onStartChange={vi.fn()} />);

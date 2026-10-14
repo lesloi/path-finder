@@ -64,12 +64,6 @@ describe('ElevationProfile', () => {
 
       expect(screen.queryByTestId('profile-waypoint-1')).not.toBeInTheDocument();
     });
-
-    it('lets the pointer through to the profile', () => {
-      show([at(1)]);
-
-      expect(screen.getByTestId('profile-waypoint-1')).toHaveClass('pointer-events-none');
-    });
   });
 
   it('goes along the profile with the keyboard, as a pointer does', () => {

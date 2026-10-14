@@ -10,7 +10,7 @@ import {
   type CriteriaField,
 } from '../contract/index.ts';
 import { PaceSlider, PRIMARY_BUTTON, SegmentedControl, Slider } from '../components/index.ts';
-import { formatDuration, type Position, type RouteSetRequest } from '../core/index.ts';
+import { formatDuration, samePositions, type Position, type RouteSetRequest } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { useSettings, type LastCriteria } from '../state/index.ts';
 
@@ -84,9 +84,6 @@ export function criteriaRequest(
     }
   );
 }
-
-const samePositions = (a: Position[], b: Position[]) =>
-  a.length === b.length && a.every(([lon, lat], i) => lon === b[i]![0] && lat === b[i]![1]);
 
 /**
  * Whether `request` asks for something other than `found`, the request of the routes shown. A distance or an

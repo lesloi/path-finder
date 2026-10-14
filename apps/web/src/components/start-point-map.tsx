@@ -19,6 +19,7 @@ import {
   formatDistance,
   formatHeight,
   isCovered,
+  samePositions,
   isWithin,
   POI_MIN_ZOOM,
   poiTilesCovering,
@@ -213,6 +214,7 @@ export function StartPointMap({
   onSnapshot,
   onStartChange,
   onWaypointAdd,
+  onWaypointRefused,
   onWaypointRemove,
   onBasemapFail,
   onViewChange,
@@ -269,6 +271,8 @@ export function StartPointMap({
   /** A click or a tap places a waypoint, and a long press no longer sets the start point. */
   placing?: boolean;
   onWaypointAdd?: (waypoint: Position) => void;
+  /** A tap fell on the veiled part of the map, where the server cannot route: no waypoint was placed. */
+  onWaypointRefused?: () => void;
   /** The user asked to remove the waypoint at this index, from its bubble. */
   onWaypointRemove?: (index: number) => void;
   /** The style of a new basemap could not be loaded: the map went back to this one, which the app should show. */
@@ -304,9 +308,16 @@ export function StartPointMap({
     view.current = next;
     onViewChange?.(next);
   });
+  // The veiled part of the map is where the server cannot route: a waypoint there would only be refused.
+  const canPlace = useEffectEvent(([lng, lat]: Position) => !coverage || isCovered(coverage, [lng, lat]));
+  // What the pointer looks like where nothing else sets it: a crosshair while placing, which says a tap places a waypoint.
+  const idleCursor = useEffectEvent(() => (placing ? 'crosshair' : ''));
   const pick = useEffectEvent((how: 'long-press' | 'click', { lng, lat }: { lng: number; lat: number }) => {
     if (placing) {
-      if (how === 'click') onWaypointAdd?.([lng, lat]);
+      if (how === 'click') {
+        if (canPlace([lng, lat])) onWaypointAdd?.([lng, lat]);
+        else onWaypointRefused?.();
+      }
       return;
     }
     // A tap on a route selects it: it must not move the start point too.
@@ -519,7 +530,7 @@ export function StartPointMap({
     // Once, not per style: the listeners belong to the map and look the layer up when they fire.
     map.on('click', 'routes-hit', ({ features }) => selectRoute(features![0].properties.index as number));
     map.on('mouseenter', 'routes-hit', () => (map.getCanvas().style.cursor = 'pointer'));
-    map.on('mouseleave', 'routes-hit', () => (map.getCanvas().style.cursor = ''));
+    map.on('mouseleave', 'routes-hit', () => (map.getCanvas().style.cursor = idleCursor()));
 
     // The label of a point of interest: its name, else what it is. By hover where there is a pointer, and on a tap
     // where there is not. OSM names come from anyone, so they are text, never markup.
@@ -543,7 +554,7 @@ export function StartPointMap({
         showLabel(event as never);
       });
       map.on('mouseleave', layer, () => {
-        map.getCanvas().style.cursor = '';
+        map.getCanvas().style.cursor = idleCursor();
         label.current?.remove();
       });
       map.on('click', layer, (event) => showLabel(event as never));
@@ -601,15 +612,13 @@ export function StartPointMap({
     };
   }, [start]);
 
-  // A crosshair tells the user a tap now places a waypoint, and a forbidden sign that this part is veiled.
-  const coverageNow = useEffectEvent(() => coverage);
+  // A forbidden sign over the veiled part of the map, while placing.
   useEffect(() => {
     const map = mapRef.current!;
-    map.getCanvas().style.cursor = placing ? 'crosshair' : '';
+    map.getCanvas().style.cursor = idleCursor();
     if (!placing) return;
     const follow = ({ lngLat }: MapMouseEvent) => {
-      const cells = coverageNow();
-      const cursor = cells && !isCovered(cells, [lngLat.lng, lngLat.lat]) ? 'not-allowed' : 'crosshair';
+      const cursor = canPlace([lngLat.lng, lngLat.lat]) ? 'crosshair' : 'not-allowed';
       if (map.getCanvas().style.cursor !== cursor) map.getCanvas().style.cursor = cursor;
     };
     map.on('mousemove', follow);
@@ -619,17 +628,33 @@ export function StartPointMap({
   // The waypoints' markers: a button each, which the pins (`WaypointPin`) are drawn into. Tapping one opens a bubble with a
   // button to remove it. The marker's own events stop here, as MapLibre would hear them as the map's: a click that
   // closes the bubble, or adds a waypoint, and a press that starts a long press.
+  // A change keeps the markers before the first one that moved, and an open bubble with them.
   const [pinHosts, setPinHosts] = useState<HTMLElement[]>([]);
+  const placed = useRef<{ marker: Marker; host: HTMLElement; waypoint: Position }[]>([]);
+  const placedIn = useRef(language);
+  const bubbleOn = useRef(-1);
   useEffect(() => {
     const map = mapRef.current!;
-    const hosts: HTMLElement[] = [];
-    const markers = waypoints.map((waypoint, index) => {
+    let keep = 0;
+    if (placedIn.current === language) {
+      while (
+        keep < placed.current.length &&
+        samePositions([placed.current[keep]!.waypoint], waypoints.slice(keep, keep + 1))
+      ) {
+        keep++;
+      }
+    }
+    placedIn.current = language;
+    for (const { marker } of placed.current.splice(keep)) marker.remove();
+    if (bubbleOn.current >= keep) closeBubble();
+    for (const [index, waypoint] of waypoints.slice(keep).entries()) {
+      const number = keep + index + 1;
       // A button, which brings the focus and the keyboard with it.
       const host = document.createElement('button');
       host.type = 'button';
       host.className = 'block cursor-pointer p-0';
-      host.setAttribute('aria-label', criteriaText[language].waypointName(index + 1));
-      host.dataset.waypoint = String(index + 1);
+      host.setAttribute('aria-label', criteriaText[language].waypointName(number));
+      host.dataset.waypoint = String(number);
       for (const type of ['mousedown', 'touchstart']) host.addEventListener(type, (event) => event.stopPropagation());
       host.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -640,22 +665,30 @@ export function StartPointMap({
         remove.className = 'rounded-md px-2 py-1.5 font-semibold text-accent';
         remove.addEventListener('click', () => {
           closeBubble();
-          removeWaypoint(index);
+          removeWaypoint(number - 1);
         });
         bubbleRef.current = new Popup({ closeButton: false, offset: PIN_BUBBLE_OFFSET, className: 'waypoint-bubble' })
           .setLngLat(waypoint)
           .setDOMContent(remove)
           .addTo(map);
+        bubbleOn.current = number - 1;
       });
-      hosts.push(host);
-      return new Marker({ element: host, anchor: 'bottom' }).setLngLat(waypoint).addTo(map);
-    });
-    setPinHosts(hosts);
-    return () => {
-      closeBubble();
-      for (const marker of markers) marker.remove();
-    };
+      placed.current.push({
+        marker: new Marker({ element: host, anchor: 'bottom' }).setLngLat(waypoint).addTo(map),
+        host,
+        waypoint,
+      });
+    }
+    setPinHosts(placed.current.map(({ host }) => host));
   }, [waypoints, language]);
+  // Gone with the map.
+  useEffect(
+    () => () => {
+      closeBubble();
+      for (const { marker } of placed.current.splice(0)) marker.remove();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (focus) mapRef.current!.easeTo({ center: focus, zoom: 14 });

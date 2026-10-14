@@ -36,3 +36,7 @@ export function parsePosition(text: string): Position | undefined {
   if (Math.abs(latitude.value) > 90 || Math.abs(longitude.value) > 180) return undefined;
   return [longitude.value, latitude.value];
 }
+
+/** Whether two lists hold the same positions, in the same order. */
+export const samePositions = (a: Position[], b: Position[]) =>
+  a.length === b.length && a.every(([lon, lat], i) => lon === b[i]![0] && lat === b[i]![1]);

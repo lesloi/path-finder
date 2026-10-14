@@ -1586,12 +1586,32 @@ describe('CriteriaView', () => {
       startPlacing();
       await act(async () => {});
 
+      // A region that is there from the start, so that what it says is announced.
+      expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
+
       place(2.3, 48.8);
       expect(screen.getByTestId('criteria-waypoint-refused')).toHaveTextContent(en.waypointUncovered);
       expect(banner()).toHaveTextContent(en.placeWaypoint);
 
       place(6.21, 45.81);
-      expect(screen.queryByTestId('criteria-waypoint-refused')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
+    });
+
+    it('does not say a tap was refused once placing starts again', async () => {
+      vi.stubGlobal('fetch', (url: string) =>
+        url === '/api/v1/coverage'
+          ? Promise.resolve(Response.json({ cells: [[6, 45.7, 6.3, 45.9]] }))
+          : new Promise(() => {}),
+      );
+      render(<CriteriaView language="en" />);
+      startPlacing();
+      await act(async () => {});
+      place(2.3, 48.8);
+
+      fireEvent.click(screen.getByTestId('criteria-waypoint-done'));
+      fireEvent.click(waypointButton());
+
+      expect(screen.getByTestId('criteria-waypoint-refused')).toBeEmptyDOMElement();
     });
 
     it('stops placing once the search starts', () => {
