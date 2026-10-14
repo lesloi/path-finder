@@ -1,4 +1,14 @@
-import { Crosshair, LocateFixed, MapPinCheck, MapPinPlus, Navigation2, Scan, Settings } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Crosshair,
+  LocateFixed,
+  MapPinCheck,
+  MapPinPlus,
+  Navigation2,
+  Scan,
+  Settings,
+} from 'lucide-react';
 import {
   useEffect,
   useEffectEvent,
@@ -44,9 +54,13 @@ import {
   FLOATING_BUTTON,
   ICON_BUTTON,
   LayersControl,
-  LIST_COLUMN,
+  LIST_FRAME,
+  LIST_FRAME_FOLDED,
+  PANEL,
+  PANEL_FOLDED,
   PRIMARY_BUTTON,
-  SIDE_COLUMN,
+  SIDE_FRAME,
+  SIDE_FRAME_FOLDED,
   SubPage,
   tip,
   Toast,
@@ -65,6 +79,68 @@ const STACKED =
   'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--slot)*(var(--spacing-touch)+--spacing(2)))] ' +
   'desktop:bottom-(--edge-bottom) transition-[bottom] duration-250 ease-[ease] motion-reduce:transition-none';
 const slotStyle = (slot: number) => ({ '--slot': slot }) as CSSProperties;
+
+// A folded desktop panel is gone from the map but for its tab, against the edge of the screen; an unfolded one carries
+// the tab on its outer edge, in the middle. The panel is hidden, not unmounted: what is typed in the form stays.
+const FOLD_TAB =
+  'pointer-events-auto absolute top-1/2 grid h-12 w-6 -translate-y-1/2 place-items-center bg-surface text-ink shadow-float hover:bg-surface-2';
+
+function FoldablePanel({
+  testId,
+  side,
+  folded,
+  label,
+  ariaLabel,
+  onToggle,
+  children,
+}: {
+  testId: string;
+  side: 'left' | 'right';
+  folded: boolean;
+  label: string;
+  ariaLabel?: string;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const id = useId();
+  const panel = useRef<HTMLElement>(null);
+  const tab = useRef<HTMLButtonElement>(null);
+  const left = side === 'left';
+  const frame = left ? (folded ? SIDE_FRAME_FOLDED : SIDE_FRAME) : folded ? LIST_FRAME_FOLDED : LIST_FRAME;
+  // The chevron points where the panel goes, or where it comes from.
+  const Icon = left === folded ? ChevronRight : ChevronLeft;
+  return (
+    <div className={frame}>
+      <aside
+        id={id}
+        ref={panel}
+        className={folded ? `${PANEL} ${PANEL_FOLDED}` : PANEL}
+        aria-label={ariaLabel}
+        inert={folded}
+      >
+        {children}
+      </aside>
+      <button
+        ref={tab}
+        type="button"
+        data-testid={testId}
+        className={`${FOLD_TAB} ${left ? 'left-full rounded-r-md' : 'right-full rounded-l-md'}`}
+        aria-expanded={!folded}
+        aria-controls={id}
+        {...tip(label, left ? 'bottom-start' : 'bottom-end')}
+        onClick={(event) => {
+          // The tab slides under the pointer: its tooltip would stay open, until the pointer leaves it.
+          event.currentTarget.setAttribute('data-tip-dismissed', '');
+          // The panel is about to be hidden: the focus would be lost with it.
+          if (panel.current?.contains(document.activeElement)) tab.current?.focus();
+          onToggle();
+        }}
+      >
+        <Icon size={16} aria-hidden />
+      </button>
+    </div>
+  );
+}
 
 // Sets a custom property of the page while `shown`.
 function useRootProperty(name: string, value: string, shown: boolean) {
@@ -128,6 +204,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // The sheet says it, and describes its button by it, only while the form does not show its own message.
   const sheetUncovered = startUncovered && !layerOpen;
   const [sheetHeight, setSheetHeight] = useState(0);
+  // On desktops, each panel folds down to its button, to free the map.
+  const [formFolded, setFormFolded] = useState(false);
+  const [listFolded, setListFolded] = useState(false);
   // What went wrong, and the start point then: setting a new one drops the toast.
   const [toast, setToast] = useState<{ problem: 'unavailable' | 'unreadable'; start?: Position }>();
   const settingsLink = useRef<HTMLAnchorElement>(null);
@@ -154,12 +233,15 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Every search keeps the criteria it was made with, whichever button asked for it.
   const search = (request: RouteSetRequest) => {
     setCleared(false);
+    // The routes would be found out of sight.
+    setListFolded(false);
     setMode((current) => (current === 'place' ? undefined : current));
     draft[2]();
     browser.ask(request);
   };
   const stale = Boolean(routeSet && current && criteriaChanged(current, routeSet.request));
-  useRootProperty('--list-inset', 'var(--list-reserved)', listShown);
+  useRootProperty('--column-inset', '0px', desktop && formFolded);
+  useRootProperty('--list-inset', listFolded ? '0px' : 'var(--list-reserved)', listShown);
   useRootProperty('--dock-inset', 'var(--dock-reserved)', dockShown);
   // The floating buttons and the map attribution sit above the sheet, whatever its height.
   useRootProperty('--sheet-height', `${sheetHeight}px`, !desktop && sheetHeight > 0);
@@ -454,15 +536,28 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       )}
       {desktop ? (
         <>
-          <aside className={SIDE_COLUMN}>
+          <FoldablePanel
+            testId="criteria-fold"
+            side="left"
+            folded={formFolded}
+            label={formFolded ? t.showSearch : t.hideSearch}
+            onToggle={() => setFormFolded(!formFolded)}
+          >
             <div data-testid="criteria-title" className="flex items-center gap-2 px-4 pt-4 text-lg font-bold">
               <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
               Path finder
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">{criteriaFields}</div>
-          </aside>
+          </FoldablePanel>
           {listShown && (
-            <aside className={LIST_COLUMN} aria-label={t.routes}>
+            <FoldablePanel
+              testId="routes-fold"
+              side="right"
+              folded={listFolded}
+              label={listFolded ? t.showRoutes : t.hideRoutes}
+              ariaLabel={t.routes}
+              onToggle={() => setListFolded(!listFolded)}
+            >
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
                 {routeSet && !loading && (
                   <p data-testid="routes-summary" className="text-sm text-ink-2">
@@ -473,7 +568,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
                 {panel}
                 {cancelButton}
               </div>
-            </aside>
+            </FoldablePanel>
           )}
         </>
       ) : (
@@ -531,7 +626,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             {cancelButton}
           </BottomSheet>
           {layerOpen && (
-            <SubPage title={t.criteria} back="#/" language={language} navigate={() => setLayerOpen(false)}>
+            <SubPage title={t.search} back="#/" language={language} navigate={() => setLayerOpen(false)}>
               <div className="flex flex-col gap-3">{criteriaFields}</div>
             </SubPage>
           )}

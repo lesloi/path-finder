@@ -9,22 +9,33 @@ export const FLOATING_BUTTON =
 /** A round button with an icon alone, on a surface. */
 export const ICON_BUTTON = 'grid size-touch flex-none place-items-center rounded-full text-ink hover:bg-surface-2';
 
-// A desktop panel floating over the map, as tall as its content, within the screen. One string for each height:
-// Tailwind finds a class only when it is written whole.
-const PANEL = 'fixed z-4 flex flex-col overflow-hidden rounded-md bg-surface shadow-float ';
+// A desktop panel floats over the map inside a frame that only places it: the frame is as tall as the panel, within the
+// screen, and carries the tab that folds it, in the middle of its outer edge. Folded, the frame slides out of the screen
+// up to its tab, which keeps its height. One string for each height: Tailwind finds a class only when it is written
+// whole.
+const FRAME =
+  'pointer-events-none fixed z-4 flex flex-col transition-transform duration-250 ease-[ease] motion-reduce:transition-none ';
 
-/** The desktop panel floating over the left of the map. */
-export const SIDE_COLUMN = `${PANEL}top-safe-3 left-safe-3 w-column max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-(--spacing(6)))]`;
+/** What a panel in its frame is: the frame does not take the clicks, the panel does. */
+export const PANEL = 'pointer-events-auto flex min-h-0 flex-col overflow-hidden rounded-md bg-surface shadow-float';
 
-/** The desktop panel floating over the right of the map, above the dock: the routes found. */
-export const LIST_COLUMN =
+/** The panel, once its frame has slid away: out of the page, after the slide. */
+export const PANEL_FOLDED = 'invisible transition-[visibility] delay-250';
+
+/** The frame of the panel over the left of the map. */
+export const SIDE_FRAME = `${FRAME}top-safe-3 left-safe-3 w-column max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-(--spacing(6)))]`;
+export const SIDE_FRAME_FOLDED = `${SIDE_FRAME} -translate-x-[calc(100%+env(safe-area-inset-left)+--spacing(3))]`;
+
+/** The frame of the panel over the right of the map, above the dock: the routes found. */
+export const LIST_FRAME =
   // Under the settings button, and over the row of buttons at the bottom right.
-  `${PANEL}top-[calc(env(safe-area-inset-top)+--spacing(6)+var(--spacing-touch))] right-safe-3 w-list ` +
+  `${FRAME}top-[calc(env(safe-area-inset-top)+--spacing(6)+var(--spacing-touch))] right-safe-3 w-list ` +
   'max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-var(--dock-inset)-(--spacing(6))-var(--spacing-touch)-(--spacing(3))-(--spacing(6))-var(--spacing-touch)-(--spacing(3)))]';
+export const LIST_FRAME_FOLDED = `${LIST_FRAME} translate-x-[calc(100%+env(safe-area-inset-right)+--spacing(3))]`;
 
 /** The desktop panel along the bottom of the map, from the left column to the edge: the route selected. */
 export const DOCK =
-  'fixed right-safe-3 bottom-safe-3 left-[calc(var(--column-inset)+--spacing(3))] z-4 flex h-dock rounded-md ' +
+  'fixed right-safe-3 bottom-safe-3 left-[calc(var(--column-reserved)+--spacing(3))] z-4 flex h-dock rounded-md ' +
   'bg-surface shadow-float';
 
 /** The title of a group of list rows. */
