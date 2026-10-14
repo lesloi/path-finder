@@ -28,7 +28,6 @@ import {
   routesAtPace,
   type Position,
   type RouteSetRequest,
-  waypointPoiAt,
   waypointPoiKey,
   type WaypointPoi,
   type WaypointPois,
@@ -214,7 +213,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   function addWaypoint(position: Position, poi?: WaypointPoi) {
     if (waypoints.length >= MAX_WAYPOINTS) return;
     // A point of interest sits at one exact position: the same one twice is the same point.
-    if (poi && waypointPoiAt(waypointPois, position)) return setRefused('duplicate');
+    if (poi && waypoints.some((waypoint) => waypointPoiKey(waypoint) === waypointPoiKey(position))) {
+      return setRefused('duplicate');
+    }
     setRefused(undefined);
     if (poi) setWaypointPois({ ...waypointPois, [waypointPoiKey(position)]: poi });
     setWaypoints([...waypoints, position]);
@@ -224,13 +225,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   function removeWaypoint(index: number) {
     browser.drop();
-    const left = waypoints.filter((_, i) => i !== index);
-    setWaypoints(left);
-    setWaypointPois(
-      Object.fromEntries(
-        Object.entries(waypointPois).filter(([key]) => left.some((waypoint) => waypointPoiKey(waypoint) === key)),
-      ),
-    );
+    // Its point of interest stays in `waypointPois`: the routes found keep drawing and naming it, and a lookup is by exact position.
+    setWaypoints(waypoints.filter((_, i) => i !== index));
   }
 
   function changeStart(position: Position) {

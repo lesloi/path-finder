@@ -548,19 +548,26 @@ export function StartPointMap({
     // where there is not. OSM names come from anyone, so they are text, never markup.
     const poiLayers = POI_CATEGORIES.map(poiLayerId);
     const label = labelRef;
+    // A rendered feature as a point of interest, and where it sits.
+    const poiOf = (feature?: {
+      properties?: Record<string, unknown> | null;
+      geometry: unknown;
+    }): { position: Position; poi: WaypointPoi } | undefined => {
+      const { category, seasonal, name } = feature?.properties ?? {};
+      if (category !== 'water' && category !== 'viewpoint') return undefined;
+      const [lon, lat] = (feature!.geometry as { coordinates: number[] }).coordinates;
+      return {
+        position: [lon!, lat!] as Position,
+        poi: { category, seasonal: Boolean(seasonal), ...(typeof name === 'string' && name && { name }) },
+      };
+    };
     const showLabel = ({ features }: { features?: { properties: Record<string, unknown>; geometry: unknown }[] }) => {
-      const feature = features?.[0];
-      if (!feature) return;
-      const { category, seasonal, name } = feature.properties;
-      const poi = {
-        category,
-        seasonal: Boolean(seasonal),
-        ...(typeof name === 'string' && name && { name }),
-      } as WaypointPoi;
+      const found = poiOf(features?.[0]);
+      if (!found) return;
       label.current?.remove();
       label.current = new Popup({ closeButton: false, offset: 14 })
-        .setLngLat((feature.geometry as { coordinates: [number, number] }).coordinates)
-        .setText(poiLabel(poi, languageNow()))
+        .setLngLat(found.position)
+        .setText(poiLabel(found.poi, languageNow()))
         .addTo(map);
     };
     for (const layer of poiLayers) {
@@ -579,18 +586,12 @@ export function StartPointMap({
     // The point of interest under a tap, when the style has its layers yet.
     const poiAt = (point: MapMouseEvent['point']) => {
       const present = poiLayers.filter((id) => map.getLayer(id));
-      const feature = present.length ? map.queryRenderedFeatures(point, { layers: present })[0] : undefined;
-      const { category, seasonal, name } = feature?.properties ?? {};
-      if (category !== 'water' && category !== 'viewpoint') return undefined;
-      const [lon, lat] = (feature!.geometry as unknown as { coordinates: number[] }).coordinates;
-      return {
-        position: [lon!, lat!] as Position,
-        poi: { category, seasonal: Boolean(seasonal), ...(typeof name === 'string' && name && { name }) },
-      };
+      return present.length ? poiOf(map.queryRenderedFeatures(point, { layers: present })[0]) : undefined;
     };
 
     map.on('click', ({ lngLat, point }) => {
-      pick('click', lngLat, poiAt(point));
+      // Only placing makes a point of interest of a tap: otherwise it is a label.
+      pick('click', lngLat, isPlacing() ? poiAt(point) : undefined);
       // A route has its own click, on its wide hit line, and a point of interest its label: anywhere else is the
       // background.
       // A style on its way holds none of these layers yet, and asking for a layer that is not there is an error.
