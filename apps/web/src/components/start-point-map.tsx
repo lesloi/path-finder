@@ -232,7 +232,7 @@ export function StartPointMap({
   coverage?: CoverageCell[] | undefined;
   /** The language of the labels. */
   language?: Language;
-  /** The categories of points of interest to draw, from zoom 12; no tile is asked for while there are none. */
+  /** The categories of points of interest to draw, from zoom 11; no tile is asked for while there are none. */
   poiCategories?: PoiCategory[];
   /** Whether seasonal water points are drawn among them. */
   poiSeasonal?: boolean;
@@ -754,7 +754,7 @@ export function StartPointMap({
     source.setData(coverage?.length ? veilPolygon(coverage) : emptyRoutes);
   }, [loaded, coverage, styleVersion]);
 
-  // The points of interest in view: the tiles of the view are asked for only from zoom 12 and while a category is on,
+  // The points of interest in view: the tiles of the view are asked for only from zoom 11 and while a category is on,
   // since a tile says which ~30 km the user looks at. A view that moved on meanwhile drops the late answer.
   const categoriesKey = poiCategories.join();
   useEffect(() => {

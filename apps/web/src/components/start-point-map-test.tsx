@@ -1082,8 +1082,8 @@ describe('StartPointMap points of interest', () => {
     await act(async () => map().fire('moveend'));
   }
 
-  it('asks for no tile below zoom 12, which would reveal a wide area for nothing', async () => {
-    await openAt(11.9, ['water', 'viewpoint']);
+  it('asks for no tile below zoom 11, which would reveal a wide area for nothing', async () => {
+    await openAt(10.9, ['water', 'viewpoint']);
 
     expect(requestPoiTile).not.toHaveBeenCalled();
   });
@@ -1094,8 +1094,8 @@ describe('StartPointMap points of interest', () => {
     expect(requestPoiTile).not.toHaveBeenCalled();
   });
 
-  it('draws the points of the categories that are on, from zoom 12', async () => {
-    await openAt(12, ['water']);
+  it('draws the points of the categories that are on, from zoom 11', async () => {
+    await openAt(11, ['water']);
 
     expect(requestPoiTile).toHaveBeenCalledWith(expect.any(Number), expect.any(Number));
     expect(shown()).toHaveLength(1);
@@ -1104,7 +1104,7 @@ describe('StartPointMap points of interest', () => {
       (map().layers as { id: string; minzoom?: number }[])
         .filter(({ id }) => id.startsWith('pois'))
         .map(({ minzoom }) => minzoom),
-    ).toEqual([12, 12]);
+    ).toEqual([11, 11]);
   });
 
   it('marks a seasonal point', async () => {

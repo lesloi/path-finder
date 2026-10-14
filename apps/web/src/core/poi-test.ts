@@ -97,8 +97,8 @@ describe('shownPoiCategories', () => {
   });
 });
 
-it('shows points of interest from zoom 12', () => {
-  expect(POI_MIN_ZOOM).toBe(12);
+it('shows points of interest from zoom 11', () => {
+  expect(POI_MIN_ZOOM).toBe(11);
 });
 
 describe('waypointPoiAt', () => {
