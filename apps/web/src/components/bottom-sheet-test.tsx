@@ -290,6 +290,24 @@ describe('BottomSheet', () => {
       expect(screen.getByTestId('sheet-handle')).toHaveAttribute('aria-expanded', 'false');
     });
 
+    it('goes from folded to expanded on a swipe across the screen', () => {
+      render(<FoldableSheet initial="folded" />);
+
+      swipe(screen.getByTestId('sheet-handle'), 700, 100);
+
+      expect(screen.getByTestId('sheet-handle')).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByTestId('content').parentElement).not.toHaveAttribute('inert');
+    });
+
+    it('goes from expanded to folded on a swipe across the screen', () => {
+      render(<FoldableSheet initial="expanded" />);
+
+      swipe(screen.getByTestId('sheet-handle'), 100, 700);
+
+      expect(screen.getByTestId('sheet-handle')).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('content').parentElement).toHaveAttribute('inert');
+    });
+
     it('unfolds on a tap of its handle', () => {
       render(<FoldableSheet initial="folded" />);
 

@@ -5,6 +5,8 @@ const SWIPE_PX = 30;
 // While it follows the finger, the sheet stays between these heights: in screen units, as the classes are.
 const DRAG_MIN = '15dvh';
 const DRAG_MAX = '60dvh';
+// A swipe longer than this share of the screen goes from the handle alone to the expanded sheet, or back.
+const LONG_SWIPE = 0.3;
 // A folded sheet dragged up by this much, in px, shows its content in full.
 const FADE_IN_PX = 120;
 
@@ -13,7 +15,7 @@ const FADE_IN_PX = 120;
  * `expanded` (such as for the detail of a route), it takes 60 % of it. The handle toggles that, from a tap or a
  * swipe; without `onExpandedChange` there is no handle, as a mark that does nothing would mislead. A drag of the
  * handle moves the sheet with the finger, but never past its state (a collapsed sheet does not shrink, an expanded one
- * does not grow), and it settles on the side the finger went. A sheet that can be folded goes one step per swipe,
+ * does not grow), and it settles on the side the finger went. A sheet that can be folded goes one step per swipe (two for a swipe across much of the screen),
  * between folded, collapsed and expanded, and a tap on a folded one brings it back to collapsed. `onHeightChange` hears the height of the sheet in px, so the map is framed clear of it and the
  * buttons over the map stand above it: it waits for the end of a drag, so the map is not framed again at every move.
  */
@@ -144,10 +146,16 @@ export function BottomSheet({
             swiped.current = reach > SWIPE_PX;
             if (Math.abs(distance) <= SWIPE_PX) return;
             const up = distance < 0;
+            // A swipe across much of the screen skips the step between.
+            const long = Math.abs(distance) > window.innerHeight * LONG_SWIPE;
             if (shut) {
-              if (up) onFoldedChange!(false);
-            } else if (up || expanded) onExpandedChange(up);
-            else if (canFold) onFoldedChange!(true);
+              if (!up) return;
+              onFoldedChange!(false);
+              if (long) onExpandedChange(true);
+            } else if (up || expanded) {
+              onExpandedChange(up);
+              if (!up && long && canFold) onFoldedChange!(true);
+            } else if (canFold) onFoldedChange!(true);
           }}
           // A gesture the system takes over leaves the state as it was.
           onPointerCancel={(event) => drag.current?.pointerId === event.pointerId && letGo()}
