@@ -5,6 +5,8 @@ const SWIPE_PX = 30;
 // While it follows the finger, the sheet stays between these heights: in screen units, as the classes are.
 const DRAG_MIN = '15dvh';
 const DRAG_MAX = '60dvh';
+// A folded sheet dragged up by this much, in px, shows its content in full.
+const FADE_IN_PX = 120;
 
 /**
  * The phone panel over the bottom of the map. It is as tall as its content, up to 40 % of the screen; once
@@ -37,6 +39,7 @@ export function BottomSheet({
   children?: ReactNode;
 }) {
   const sheet = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
   // The finger dragging the handle: where it began, how tall the sheet was then, whether it was expanded and how far
   // it went; none without a drag.
   const drag = useRef<{ pointerId: number; y: number; height: number; expanded: boolean; reach: number }>(undefined);
@@ -80,12 +83,20 @@ export function BottomSheet({
           ? moved
           : Math.min(moved, 0);
     style.height = `${drag.current.height - allowed}px`;
+    // A folded sheet shows what it opens onto as it grows, fading in rather than showing an empty panel.
+    if (shut) {
+      Object.assign(content.current!.style, {
+        maxHeight: 'none',
+        opacity: String(Math.min(-allowed / FADE_IN_PX, 1)),
+      });
+    }
   };
 
   // The sheet goes back to the height its state gives it.
   const letGo = () => {
     drag.current = undefined;
     Object.assign(sheet.current!.style, { height: '', minHeight: '', maxHeight: '' });
+    Object.assign(content.current!.style, { maxHeight: '', opacity: '' });
     setSettled((count) => count + 1);
   };
 
@@ -101,7 +112,7 @@ export function BottomSheet({
       ref={sheet}
       data-testid={testId}
       className={
-        'fixed inset-x-0 bottom-0 z-4 flex flex-col rounded-t-lg bg-surface shadow-float ' +
+        'fixed inset-x-0 bottom-0 z-4 flex overflow-hidden flex-col rounded-t-lg bg-surface shadow-float ' +
         'pr-safe-4 pb-safe-4 pl-safe-4 desktop:hidden ' +
         (tall && !shut ? 'h-[60dvh]' : 'max-h-[40dvh]') +
         // Without a handle, the space it took is kept as plain padding.
@@ -151,8 +162,12 @@ export function BottomSheet({
           }}
         />
       )}
-      {/* Hidden rather than unmounted, so that the content is out of reach but keeps its scroll. */}
-      <div hidden={shut} className="flex min-h-0 flex-col gap-3 overflow-y-auto">
+      {/* Squeezed to nothing rather than unmounted, so that it keeps its scroll and a drag up can reveal it; inert, so it is out of reach meanwhile. */}
+      <div
+        ref={content}
+        inert={shut}
+        className={'flex flex-col gap-3 overflow-y-auto ' + (shut ? 'max-h-0 flex-none' : 'min-h-0')}
+      >
         {children}
       </div>
     </div>

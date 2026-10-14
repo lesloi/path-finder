@@ -257,7 +257,7 @@ describe('BottomSheet', () => {
 
       swipe(screen.getByTestId('sheet-handle'), 200, 300);
 
-      expect(screen.getByTestId('content').parentElement).not.toBeVisible();
+      expect(screen.getByTestId('content').parentElement).toHaveAttribute('inert');
       expect(screen.getByTestId('sheet')).toHaveClass('max-h-[40dvh]');
     });
 
@@ -268,6 +268,17 @@ describe('BottomSheet', () => {
 
       expect(screen.getByTestId('sheet-handle')).toHaveAttribute('aria-expanded', 'false');
       expect(screen.getByTestId('content')).toBeVisible();
+    });
+
+    it('reveals its content, fading in, as a folded sheet is dragged up', () => {
+      render(<FoldableSheet initial="folded" />);
+      const handle = screen.getByTestId('sheet-handle');
+      const content = screen.getByTestId('content').parentElement!;
+
+      fireEvent.pointerDown(handle, { clientY: 300 });
+      fireEvent.pointerMove(handle, { clientY: 240 });
+
+      expect(content.style).toMatchObject({ maxHeight: 'none', opacity: '0.5' });
     });
 
     it('unfolds on a swipe up, to its usual height', () => {
@@ -311,7 +322,7 @@ describe('BottomSheet', () => {
         </BottomSheet>,
       );
 
-      expect(screen.getByTestId('content')).toBeVisible();
+      expect(screen.getByTestId('content').parentElement).not.toHaveAttribute('inert');
     });
   });
 });
