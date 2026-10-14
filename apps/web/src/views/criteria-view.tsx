@@ -128,9 +128,7 @@ function FoldablePanel({
         aria-expanded={!folded}
         aria-controls={id}
         {...tip(label, left ? 'bottom-start' : 'bottom-end')}
-        onClick={(event) => {
-          // The tab slides under the pointer: its tooltip would stay open, until the pointer leaves it.
-          event.currentTarget.setAttribute('data-tip-dismissed', '');
+        onClick={() => {
           // The panel is about to be hidden: the focus would be lost with it.
           if (panel.current?.contains(document.activeElement)) tab.current?.focus();
           onToggle();
