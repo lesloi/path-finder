@@ -175,7 +175,8 @@ export function ElevationProfile({
                 data-testid={testId && `${testId}-waypoint-${number}`}
                 role="img"
                 aria-label={`${poi ? poiLabel(poi, language) : criteriaText[language].waypointName(number)}, ${formatDistance(distance, language)}`}
-                className="pointer-events-none absolute -top-6 bottom-0 w-[18px] -translate-x-1/2"
+                // Above what follows it in the dock, such as its close button: a tooltip opened from the pin must not go under it.
+                className="pointer-events-none absolute -top-6 bottom-0 z-10 w-[18px] -translate-x-1/2"
                 style={{ left: `${total ? (distance / total) * 100 : 0}%` }}
               >
                 <span className="absolute top-[22px] bottom-0 left-1/2 w-px -translate-x-1/2 bg-ink-2" />
