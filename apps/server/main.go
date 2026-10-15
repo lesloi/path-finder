@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/lesloi/path-finder/apps/server/elevation"
 	"github.com/lesloi/path-finder/apps/server/engine"
 	"github.com/lesloi/path-finder/apps/server/generator"
 	"github.com/lesloi/path-finder/apps/server/graphbuild"
@@ -41,10 +42,15 @@ func run(command string, args []string) error {
 		fs.Var(&pbfs, "pbf", "OSM PBF file (repeatable)")
 		dem := fs.String("dem", "", "directory holding the BD ALTI .asc tiles, plain or gzipped (.asc.gz)")
 		out := fs.String("out", filepath.Join(dataDir(), engine.GraphFileName), "graph file to write")
+		crs := fs.String("dem-crs", "lambert93", "projection of the BD ALTI tiles: lambert93 (metropolitan France), or utmZZn / utmZZs for an overseas territory, see docs/INSTALL.md")
 		bbox := fs.String("bbox", "", "keep only this zone, as minLon,minLat,maxLon,maxLat: the memory then follows the zone, not the extract (one sorted -pbf)")
 		_ = fs.Parse(args)
+		proj, err := elevation.ParseProjection(*crs)
+		if err != nil {
+			return err
+		}
 		if *bbox == "" {
-			return graphbuild.Build(pbfs, *dem, *out, os.Stderr)
+			return graphbuild.Build(pbfs, *dem, proj, *out, os.Stderr)
 		}
 		box, err := graphbuild.ParseBox(*bbox)
 		if err != nil {
@@ -53,7 +59,7 @@ func run(command string, args []string) error {
 		if len(pbfs) != 1 {
 			return fmt.Errorf("build-graph -bbox reads exactly one -pbf, got %d", len(pbfs))
 		}
-		return graphbuild.BuildClipped(pbfs[0], *dem, *out, box, os.Stderr)
+		return graphbuild.BuildClipped(pbfs[0], *dem, proj, *out, box, os.Stderr)
 	case "plan-zones":
 		fs := flag.NewFlagSet(command, flag.ExitOnError)
 		pbf := fs.String("pbf", "", "sorted OSM PBF file of the country")

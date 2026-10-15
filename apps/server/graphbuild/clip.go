@@ -28,19 +28,19 @@ type Box struct{ MinLon, MinLat, MaxLon, MaxLat float64 }
 //
 // The extract must be sorted, as the ones of Geofabrik are (nodes by id, then ways): it is read once, and a
 // way finds its nodes among those of the box by their id.
-func BuildClipped(pbfPath, demDir, outPath string, box Box, log io.Writer) error {
+func BuildClipped(pbfPath, demDir string, proj elevation.Projection, outPath string, box Box, log io.Writer) error {
 	if !(box.MinLon < box.MaxLon && box.MinLat < box.MaxLat) {
 		return errors.New("graphbuild: the box is empty: its minimums must be below its maximums")
 	}
 	p := progress{log, time.Now()}
 	// Only the tiles of the box are read, and after the extract: the memory of the nodes is freed by then.
 	// Their headers are checked first, so that a job without the tiles of its zone fails at once.
-	tiles, err := elevation.CountWithin(demDir, box.MinLat, box.MinLon, box.MaxLat, box.MaxLon)
+	tiles, err := elevation.CountWithin(demDir, proj, box.MinLat, box.MinLon, box.MaxLat, box.MaxLon)
 	if err != nil {
 		return err
 	}
 	if tiles == 0 {
-		return fmt.Errorf("graphbuild: no BD ALTI tile of %s meets the box", demDir)
+		return fmt.Errorf("graphbuild: no BD ALTI tile of %s meets the box: check -dem-crs names their projection (lambert93 by default)", demDir)
 	}
 	p.step("BD ALTI: %d tiles meet the box", tiles)
 	ways, lat, lon, err := readClipped(pbfPath, box)
@@ -49,7 +49,7 @@ func BuildClipped(pbfPath, demDir, outPath string, box Box, log io.Writer) error
 	}
 	runtime.GC()
 	p.step("read the box: %d walkable ways, %d candidate nodes", len(ways), len(lat))
-	dem, err := elevation.LoadWithin(demDir, box.MinLat, box.MinLon, box.MaxLat, box.MaxLon)
+	dem, err := elevation.LoadWithin(demDir, proj, box.MinLat, box.MinLon, box.MaxLat, box.MaxLon)
 	if err != nil {
 		return err
 	}

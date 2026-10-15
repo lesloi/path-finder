@@ -143,10 +143,10 @@ func (p progress) step(format string, args ...any) {
 }
 
 // Build turns OSM PBF files and the BD ALTI ASC tiles below demDir into a graph file with elevation
-// on every node, and reports its steps to log.
-func Build(pbfPaths []string, demDir, outPath string, log io.Writer) error {
+// on every node, and reports its steps to log. The tiles are written in the projection proj.
+func Build(pbfPaths []string, demDir string, proj elevation.Projection, outPath string, log io.Writer) error {
 	p := progress{log, time.Now()}
-	dem, err := elevation.Load(demDir)
+	dem, err := elevation.Load(demDir, proj)
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func finish(p progress, dem *elevation.DEM, demDir string, ways []rawWay, lat, l
 	nodes, off, edges := assemble(ways, lat, lon, elev)
 	p.step("graph: %d nodes, %d directed edges", len(nodes), len(edges))
 	if len(edges) == 0 {
-		return fmt.Errorf("no walkable way has elevation: check that %s holds the BD ALTI tiles of the area the extracts cover", demDir)
+		return fmt.Errorf("no walkable way has elevation: check that %s holds the BD ALTI tiles of the area the extracts cover, and that -dem-crs names their projection (lambert93 by default)", demDir)
 	}
 
 	if err := engine.WriteGraph(outPath, nodes, off, edges); err != nil {

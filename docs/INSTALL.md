@@ -72,6 +72,25 @@ default): more make long searches faster and the file bigger. A way with no BD A
 it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one surface-preference
 profile and to one graph: build them again after each graph; the server refuses those of another graph.
 
+### Overseas France
+
+`france-latest.osm.pbf` holds metropolitan France only. Each overseas territory has its own Geofabrik extract
+(`guadeloupe`, `guyane`, `martinique`, `mayotte`, `reunion`) and its own BD ALTI archives, which are not in
+Lambert-93: name their projection with `-dem-crs`. Build each territory into its own zone, as above, with the
+extract and the tiles of that territory:
+
+| Territory                | `-dem-crs` |
+| ------------------------ | ---------- |
+| Guadeloupe, Martinique   | `utm20n`   |
+| French Guiana            | `utm22n`   |
+| Réunion                  | `utm40s`   |
+| Mayotte                  | `utm38s`   |
+| Saint-Pierre-et-Miquelon | `utm21n`   |
+
+These names are what the IGN archives are expected to use, not yet checked against them: read the projection
+in each archive's description before the first build. The default is `lambert93`. Tiles read in the wrong
+projection give no elevation, and the build fails.
+
 ### Points of interest
 
 `build-pois` reads the same extracts and writes the tiles of the water points (`amenity=drinking_water`, or
