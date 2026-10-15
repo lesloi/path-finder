@@ -889,11 +889,11 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32
 	if lift < 0 {
 		sign = -1
 	}
-	best := base
+	best, small := base, g.small()
 	for k := 0; k < 8; k++ {
 		a := float64(k) * math.Pi / 4
 		n, d, ok := sp.nearest(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl))
-		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev && !g.small().has(n) {
+		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev && !small.has(n) {
 			best = n
 		}
 	}
