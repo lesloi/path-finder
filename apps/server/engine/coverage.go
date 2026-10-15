@@ -15,7 +15,8 @@ const CoverageCellsPerDegree = 10
 // a search or a request holds nothing to read, and a reload brings its own.
 // Every coarse cell that a fine cell with nodes overlaps counts, and so does one within the snap distance of it
 // (maxSnapMeters): a start that far from a node is served, so the error only goes towards a start the engines
-// refuse (ErrOffGraph), never towards an area they would serve that is left out.
+// refuse (ErrOffGraph, or ErrNoLoop when only small components lie within reach), never towards an area they
+// would serve that is left out.
 func (z *Zones) Coverage() [][4]float64 { return z.cov }
 
 // Coverage is that of the zones now served.
