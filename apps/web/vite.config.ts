@@ -31,8 +31,6 @@ function serviceWorker(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), buildId(), serviceWorker()],
-  // In dev, keep one copy of maplibre-gl-shared for the page and its worker.
-  optimizeDeps: { exclude: ['maplibre-gl'] },
   worker: { format: 'es' },
   // The server (`apps/server`, port 3000, or API_PORT) serves the built app on the same origin in production.
   // PORT is the one a preview tool hands out for the web app.
