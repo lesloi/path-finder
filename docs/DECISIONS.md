@@ -76,7 +76,9 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   by more than a match allows, and a loop stops being resized only when its distance and gain are both in
   range: a circle alone left a high gain to chance, and a set of five matches came up for 29 % of the
   requests at +1000 m. A point may snap as far as 0.3 times the circle's radius (400 m at least), since
-  on a long loop in a valley most of the circle falls where no way is mapped within 400 m.
+  on a long loop in a valley most of the circle falls where no way is mapped within 400 m. A circle with a
+  point beyond that reach is turned by the golden angle, up to eight times, and no point is placed on a
+  component of fewer than 1,000 nodes, which no leg reaches from the rest of the graph.
   With waypoints, the circle's points are only detours: each goes into the leg between two
   fixed points that it is nearest to, and only the detour is resized. The loop straight through
   the waypoints is a candidate too. Criteria whose waypoints alone exceed the target are refused, by

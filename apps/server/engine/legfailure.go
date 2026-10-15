@@ -101,8 +101,8 @@ func searchCause(stop stopReason) LegCause {
 	return CauseDisconnected
 }
 
-// smallComponentNodes is the size under which a set of joined ways is too small to hold a loop. At Chamonix
-// a control point fell on one for 246 of 2,000 candidates, all of which were then lost; no component
+// smallComponentNodes is the size under which a set of joined ways is too small to hold a loop. In the Mont-Blanc
+// valleys a control point fell on one for 246 of 2,000 candidates, all of which were then lost; no component
 // between 1,000 and 50,000 nodes was hit.
 const smallComponentNodes = 1_000
 
