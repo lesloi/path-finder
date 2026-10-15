@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"unsafe"
 )
@@ -559,7 +560,7 @@ func TestAControlPointDoesNotLandOnAnIsland(t *testing.T) {
 		t.Fatalf("ok = %v, turn = %v: the first circle lands on the islands and should have been turned", ok, used)
 	}
 	for _, n := range nodes {
-		if e.g.small.has(n) {
+		if e.g.small().has(n) {
 			t.Errorf("node %d is on an island", n)
 		}
 	}
@@ -572,13 +573,52 @@ func TestALiftedControlPointDoesNotLandOnAnIsland(t *testing.T) {
 	hi := g.addNode(250, 0, 900)
 	g.connect(hi, g.addNode(300, 0, 900), KindPath)
 	e := openTest(t, g, false)
-	if !e.g.small.has(uint32(hi)) {
+	if !e.g.small().has(uint32(hi)) {
 		t.Fatal("the island is not small")
 	}
 	// Act
 	got := liftedNode(e.g, e.sp, uint32(start), 250, 1)
 	// Assert
-	if e.g.small.has(got) {
+	if e.g.small().has(got) {
 		t.Errorf("the control point was lifted onto the island, node %d", got)
+	}
+}
+
+func TestSmallComponentsAreComputedOnFirstUseOnly(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	g.grid(30, 40, flat)
+	island := g.addNode(9_000, 0, 100)
+	g.connect(island, g.addNode(9_100, 0, 100), KindPath)
+	e := openTest(t, g, false)
+	if e.g.smallSet != nil {
+		t.Fatal("the set was computed when the graph was opened")
+	}
+	// Act
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); e.g.small() }()
+	}
+	wg.Wait()
+	// Assert
+	if !e.g.small().has(uint32(island)) {
+		t.Error("the island is not small")
+	}
+}
+
+func TestARouteDoesNotComputeTheSmallComponents(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	at := g.grid(10, 10, flat)
+	e := openTest(t, g, false)
+	// Act
+	_, err := e.Route(context.Background(), pointOf(g, at(0, 0)), pointOf(g, at(5, 5)))
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.g.smallSet != nil {
+		t.Error("a route computed the small components")
 	}
 }
