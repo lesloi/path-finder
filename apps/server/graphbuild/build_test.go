@@ -137,7 +137,13 @@ func writeTaggedPBF(t *testing.T, path string, nodes []pbfNode, nodeTags map[int
 // writeHills writes one ASC tile of 2 km around the centre, rising 0.1 m per metre towards the north.
 func writeHills(t *testing.T, dir string, lat, lon float64) {
 	t.Helper()
-	x, y := elevation.Lambert93(lat, lon)
+	writeHillsIn(t, dir, elevation.Lambert93Grid, lat, lon)
+}
+
+// writeHillsIn is writeHills for a tile written in the projection proj.
+func writeHillsIn(t *testing.T, dir string, proj elevation.Projection, lat, lon float64) {
+	t.Helper()
+	x, y := proj.Forward(lat, lon)
 	const cells, size = 80, 25
 	xll, yll := math.Floor(x/size)*size-cells/2*size, math.Floor(y/size)*size-cells/2*size
 	var b strings.Builder
@@ -176,7 +182,7 @@ func TestBuildMakesAGraphTheEngineRoutesOn(t *testing.T) {
 
 	graph := filepath.Join(dir, "graph.bin")
 	var log bytes.Buffer
-	if err := Build([]string{filepath.Join(dir, "a.pbf"), filepath.Join(dir, "b.pbf")}, dir, graph, &log); err != nil {
+	if err := Build([]string{filepath.Join(dir, "a.pbf"), filepath.Join(dir, "b.pbf")}, dir, elevation.Lambert93Grid, graph, &log); err != nil {
 		t.Fatal(err)
 	}
 	for _, step := range []string{"BD ALTI: 1 tiles", "pass 1: 2 walkable ways", "graph: 5 nodes, 8 directed edges"} {
@@ -205,6 +211,45 @@ func TestBuildMakesAGraphTheEngineRoutesOn(t *testing.T) {
 	}
 }
 
+func TestBuildReadsOverseasTilesInTheirProjection(t *testing.T) {
+	// Saint-Denis, Réunion: its BD ALTI tiles are in UTM 40S, where Lambert-93 would put no elevation.
+	const lat, lon = -20.8789, 55.4481
+	proj, err := elevation.ParseProjection("utm40s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	writeHillsIn(t, dir, proj, lat, lon)
+	step := 0.002
+	var nodes []pbfNode
+	for i := int64(1); i <= 5; i++ {
+		nodes = append(nodes, pbfNode{i, lat + float64(i-3)*step, lon})
+	}
+	writePBF(t, filepath.Join(dir, "a.pbf"), nodes, []pbfWay{
+		{id: 10, refs: []int64{1, 2, 3, 4, 5}, tags: [][2]string{{"highway", "path"}}},
+	})
+
+	graph := filepath.Join(dir, "graph.bin")
+	if err := Build([]string{filepath.Join(dir, "a.pbf")}, dir, proj, graph, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := Build([]string{filepath.Join(dir, "a.pbf")}, dir, elevation.Lambert93Grid, filepath.Join(dir, "lambert.bin"), &bytes.Buffer{}); err == nil {
+		t.Error("the same tiles read as Lambert-93: err = nil, want no elevation")
+	}
+	e, err := engine.Open(graph, "", "any")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := e.Route(context.Background(), engine.Point{Lat: lat - 2*step, Lon: lon}, engine.Point{Lat: lat + 2*step, Lon: lon})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 0.1 m of height per metre northwards, over 890 m: about 89 m.
+	if r.Ascent < 80 || r.Ascent > 95 {
+		t.Errorf("ascent = %.1f m, want about 89", r.Ascent)
+	}
+}
+
 func TestBuildFlagsT3AndLeavesOutT4(t *testing.T) {
 	const lat, lon = 45.9, 6.1
 	dir := t.TempDir()
@@ -220,7 +265,7 @@ func TestBuildFlagsT3AndLeavesOutT4(t *testing.T) {
 
 	graph := filepath.Join(dir, "graph.bin")
 	var log bytes.Buffer
-	if err := Build([]string{filepath.Join(dir, "a.pbf")}, dir, graph, &log); err != nil {
+	if err := Build([]string{filepath.Join(dir, "a.pbf")}, dir, elevation.Lambert93Grid, graph, &log); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(log.String(), "graph: 3 nodes") {
@@ -242,17 +287,17 @@ func TestBuildFlagsT3AndLeavesOutT4(t *testing.T) {
 
 func TestBuildFailsOnMissingInput(t *testing.T) {
 	dir := t.TempDir()
-	if err := Build([]string{"missing.pbf"}, dir, filepath.Join(dir, "g.bin"), os.Stderr); err == nil {
+	if err := Build([]string{"missing.pbf"}, dir, elevation.Lambert93Grid, filepath.Join(dir, "g.bin"), os.Stderr); err == nil {
 		t.Error("no elevation tile: err = nil")
 	}
 	writeHills(t, dir, 45.9, 6.1)
-	if err := Build([]string{filepath.Join(dir, "missing.pbf")}, dir, filepath.Join(dir, "g.bin"), os.Stderr); err == nil {
+	if err := Build([]string{filepath.Join(dir, "missing.pbf")}, dir, elevation.Lambert93Grid, filepath.Join(dir, "g.bin"), os.Stderr); err == nil {
 		t.Error("a PBF that does not exist: err = nil")
 	}
 	if err := os.WriteFile(filepath.Join(dir, "broken.pbf"), []byte("not a pbf"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := Build([]string{filepath.Join(dir, "broken.pbf")}, dir, filepath.Join(dir, "g.bin"), os.Stderr); err == nil {
+	if err := Build([]string{filepath.Join(dir, "broken.pbf")}, dir, elevation.Lambert93Grid, filepath.Join(dir, "g.bin"), os.Stderr); err == nil {
 		t.Error("a file that is no PBF: err = nil")
 	}
 }
@@ -266,7 +311,7 @@ func TestBuildFailsWhenNoWayHasElevation(t *testing.T) {
 		[]pbfWay{{id: 10, refs: []int64{1, 2}, tags: [][2]string{{"highway", "path"}}}})
 
 	out := filepath.Join(dir, "graph.bin")
-	err := Build([]string{filepath.Join(dir, "paris.pbf")}, dir, out, &bytes.Buffer{})
+	err := Build([]string{filepath.Join(dir, "paris.pbf")}, dir, elevation.Lambert93Grid, out, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "BD ALTI") {
 		t.Errorf("err = %v, want it to name the elevation tiles", err)
 	}

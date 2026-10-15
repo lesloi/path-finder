@@ -19,7 +19,7 @@ import (
 
 const rad = math.Pi / 180
 
-// lambert converts WGS84 to Lambert-93 (EPSG:2154), the projection of BD ALTI.
+// lambert converts WGS84 to Lambert-93 (EPSG:2154), the projection of the metropolitan BD ALTI.
 type lambert struct{ n, f, rho0, lon0 float64 }
 
 const (
@@ -46,7 +46,7 @@ var l93 = func() lambert {
 	return lambert{n: n, f: f, rho0: grsA * f * math.Pow(t0, n), lon0: 3 * rad}
 }()
 
-func (l lambert) forward(latDeg, lonDeg float64) (x, y float64) {
+func (l lambert) Forward(latDeg, lonDeg float64) (x, y float64) {
 	rho := grsA * l.f * math.Pow(tfun(latDeg*rad), l.n)
 	theta := l.n * (lonDeg*rad - l.lon0)
 	return 700000 + rho*math.Sin(theta), 6600000 + l.rho0 - rho*math.Cos(theta)
@@ -59,6 +59,7 @@ type demTile struct {
 
 // DEM holds BD ALTI 25 m ASC tiles in memory.
 type DEM struct {
+	proj         Projection
 	tiles        map[[2]int]*demTile
 	x0, y0, cs   float64 // lower-left corner of the lowest tile, and the cell size in metres
 	tileW, tileH float64
@@ -85,7 +86,7 @@ type ascHeader struct {
 	nodata       float64
 }
 
-// extent is the area of the tile in Lambert-93 metres.
+// extent is the area of the tile in the metres of its projection.
 func (h ascHeader) extent() (x0, y0, x1, y1 float64) {
 	return h.xll, h.yll, h.xll + float64(h.ncols)*h.cs, h.yll + float64(h.nrows)*h.cs
 }
@@ -184,18 +185,18 @@ func readASC(path string) (*ascFile, error) {
 	return &ascFile{xll: h.xll, yll: h.yll, cs: h.cs, tile: t}, nil
 }
 
-// Load reads every .asc and .asc.gz file below dir.
-func Load(dir string) (*DEM, error) { return load(dir, nil) }
+// Load reads every .asc and .asc.gz file below dir, written in the projection proj.
+func Load(dir string, proj Projection) (*DEM, error) { return load(dir, proj, nil) }
 
 // within is the test of a tile header that holds when the tile meets the box, given by its latitudes and
 // longitudes in degrees.
-func within(minLat, minLon, maxLat, maxLon float64) func(ascHeader) bool {
-	// A box is not a rectangle in Lambert-93: the rectangle through points all along its edges holds it.
+func within(proj Projection, minLat, minLon, maxLat, maxLon float64) func(ascHeader) bool {
+	// A box is not a rectangle in the grid of the tiles: the rectangle through points all along its edges holds it.
 	x0, y0, x1, y1 := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
 	const steps = 8
 	for i := 0; i <= steps; i++ {
 		for j := 0; j <= steps; j++ {
-			x, y := Lambert93(minLat+(maxLat-minLat)*float64(i)/steps, minLon+(maxLon-minLon)*float64(j)/steps)
+			x, y := proj.Forward(minLat+(maxLat-minLat)*float64(i)/steps, minLon+(maxLon-minLon)*float64(j)/steps)
 			x0, y0, x1, y1 = min(x0, x), min(y0, y), max(x1, x), max(y1, y)
 		}
 	}
@@ -207,8 +208,8 @@ func within(minLat, minLon, maxLat, maxLon float64) func(ascHeader) bool {
 
 // CountWithin is how many tiles below dir meet the box: it reads only their headers, so a job can tell at
 // once that it has not been given the tiles of its zone.
-func CountWithin(dir string, minLat, minLon, maxLat, maxLon float64) (int, error) {
-	keep, n := within(minLat, minLon, maxLat, maxLon), 0
+func CountWithin(dir string, proj Projection, minLat, minLon, maxLat, maxLon float64) (int, error) {
+	keep, n := within(proj, minLat, minLon, maxLat, maxLon), 0
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !isTile(p) {
 			return err
@@ -224,8 +225,8 @@ func CountWithin(dir string, minLat, minLon, maxLat, maxLon float64) (int, error
 
 // LoadWithin reads the tiles below dir that meet the box: the memory of a build is then that of the
 // tiles of its zone, not of the whole country. It reads only the header of the others.
-func LoadWithin(dir string, minLat, minLon, maxLat, maxLon float64) (*DEM, error) {
-	d, err := load(dir, within(minLat, minLon, maxLat, maxLon))
+func LoadWithin(dir string, proj Projection, minLat, minLon, maxLat, maxLon float64) (*DEM, error) {
+	d, err := load(dir, proj, within(proj, minLat, minLon, maxLat, maxLon))
 	if errors.Is(err, errNoTile) {
 		return nil, fmt.Errorf("no tile of %s meets the box %.3f,%.3f,%.3f,%.3f", dir, minLon, minLat, maxLon, maxLat)
 	}
@@ -236,7 +237,7 @@ func LoadWithin(dir string, minLat, minLon, maxLat, maxLon float64) (*DEM, error
 var errNoTile = errors.New("no .asc or .asc.gz file")
 
 // load reads the tiles below dir that keep accepts (all of them when it is nil).
-func load(dir string, keep func(ascHeader) bool) (*DEM, error) {
+func load(dir string, proj Projection, keep func(ascHeader) bool) (*DEM, error) {
 	var paths []string
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() && isTile(p) {
@@ -278,7 +279,7 @@ func load(dir string, keep func(ascHeader) bool) (*DEM, error) {
 	if len(files) == 0 {
 		return nil, fmt.Errorf("%w in %s", errNoTile, dir)
 	}
-	d := &DEM{tiles: map[[2]int]*demTile{}, x0: math.Inf(1), y0: math.Inf(1), cs: files[0].cs}
+	d := &DEM{proj: proj, tiles: map[[2]int]*demTile{}, x0: math.Inf(1), y0: math.Inf(1), cs: files[0].cs}
 	d.ncols, d.nrows = files[0].tile.ncols, files[0].tile.nrows
 	for _, f := range files {
 		d.x0, d.y0 = min(d.x0, f.xll), min(d.y0, f.yll)
@@ -311,8 +312,8 @@ func (d *DEM) cell(gi, gj int) float32 {
 	return t.v[(d.nrows-1-rowFromBottom)*d.ncols+c]
 }
 
-// elevationL93 samples the elevation in metres at a Lambert-93 point, NaN outside the tiles.
-func (d *DEM) elevationL93(x, y float64) float32 {
+// elevationAt samples the elevation in metres at a point of the grid of the tiles, NaN outside the tiles.
+func (d *DEM) elevationAt(x, y float64) float32 {
 	fx, fy := (x-d.x0)/d.cs-0.5, (y-d.y0)/d.cs-0.5
 	i, j := int(math.Floor(fx)), int(math.Floor(fy))
 	tx, ty := float32(fx-float64(i)), float32(fy-float64(j))
@@ -324,15 +325,18 @@ func (d *DEM) elevationL93(x, y float64) float32 {
 
 // At samples the elevation in metres at a WGS84 point, NaN outside the tiles.
 func (d *DEM) At(latDeg, lonDeg float64) float32 {
-	x, y := l93.forward(latDeg, lonDeg)
-	return d.elevationL93(x, y)
+	x, y := d.proj.Forward(latDeg, lonDeg)
+	return d.elevationAt(x, y)
 }
 
 // Tiles is the number of tiles loaded.
 func (d *DEM) Tiles() int { return len(d.tiles) }
 
+// Lambert93Grid is the projection of the metropolitan BD ALTI tiles.
+var Lambert93Grid Projection = l93
+
 // Lambert93 converts a WGS84 point in degrees to Lambert-93 metres, the projection of BD ALTI.
-func Lambert93(latDeg, lonDeg float64) (x, y float64) { return l93.forward(latDeg, lonDeg) }
+func Lambert93(latDeg, lonDeg float64) (x, y float64) { return l93.Forward(latDeg, lonDeg) }
 
 // Unknown marks a node with no elevation: the point is outside the tiles, or its position is unknown.
 const Unknown = math.MinInt32

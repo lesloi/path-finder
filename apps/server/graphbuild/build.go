@@ -143,10 +143,10 @@ func (p progress) step(format string, args ...any) {
 }
 
 // Build turns OSM PBF files and the BD ALTI ASC tiles below demDir into a graph file with elevation
-// on every node, and reports its steps to log.
-func Build(pbfPaths []string, demDir, outPath string, log io.Writer) error {
+// on every node, and reports its steps to log. The tiles are written in the projection proj.
+func Build(pbfPaths []string, demDir string, proj elevation.Projection, outPath string, log io.Writer) error {
 	p := progress{log, time.Now()}
-	dem, err := elevation.Load(demDir)
+	dem, err := elevation.Load(demDir, proj)
 	if err != nil {
 		return err
 	}

@@ -56,7 +56,7 @@ func TestDEMReadsTilesAndInterpolates(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	dem, err := Load(dir)
+	dem, err := Load(dir, Lambert93Grid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,11 +65,11 @@ func TestDEMReadsTilesAndInterpolates(t *testing.T) {
 	}
 	// Cell centres are 12.5 m into each cell, and heights are interpolated between them.
 	for x, want := range map[float64]float64{800_012.5: 100, 800_025: 105, 800_037.5: 110} {
-		if z := dem.elevationL93(x, 6_500_050); math.Abs(float64(z)-want) > 0.01 {
+		if z := dem.elevationAt(x, 6_500_050); math.Abs(float64(z)-want) > 0.01 {
 			t.Errorf("height at x=%v is %v, want %v", x, z, want)
 		}
 	}
-	if z := dem.elevationL93(800_000, 6_700_000); !math.IsNaN(float64(z)) {
+	if z := dem.elevationAt(800_000, 6_700_000); !math.IsNaN(float64(z)) {
 		t.Errorf("height outside the tiles = %v, want NaN", z)
 	}
 	// The hole of b.asc (north-west cell) takes the value of the overlapping tile.
@@ -79,21 +79,21 @@ func TestDEMReadsTilesAndInterpolates(t *testing.T) {
 }
 
 func TestDEMErrors(t *testing.T) {
-	if _, err := Load(t.TempDir()); err == nil {
+	if _, err := Load(t.TempDir(), Lambert93Grid); err == nil {
 		t.Error("an empty directory: err = nil")
 	}
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "bad.asc"), []byte("ncols x\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Load(dir); err == nil {
+	if _, err := Load(dir, Lambert93Grid); err == nil {
 		t.Error("a bad header: err = nil")
 	}
 	short := t.TempDir()
 	if err := os.WriteFile(filepath.Join(short, "short.asc"), []byte("ncols 2\nnrows 2\nxllcorner 0\nyllcorner 0\ncellsize 25\nNODATA_value -1\n1 2 3\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Load(short); err == nil {
+	if _, err := Load(short, Lambert93Grid); err == nil {
 		t.Error("too few values: err = nil")
 	}
 }
@@ -113,7 +113,7 @@ func TestLambertOfKnownPoints(t *testing.T) {
 func TestSampleKeepsHighElevations(t *testing.T) {
 	dir := t.TempDir()
 	writeTile(t, dir, "a.asc", 800_000, 6_500_000, func(c, r int) float64 { return 4000 })
-	dem, err := Load(dir)
+	dem, err := Load(dir, Lambert93Grid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestSampleKeepsHighElevations(t *testing.T) {
 func TestSampleReadsEveryPointOnEveryCPU(t *testing.T) {
 	dir := t.TempDir()
 	writeTile(t, dir, "a.asc", 800_000, 6_500_000, func(c, r int) float64 { return float64(100 + 10*c) })
-	dem, err := Load(dir)
+	dem, err := Load(dir, Lambert93Grid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,27 +175,27 @@ func TestLoadWithinReadsOnlyTheTilesOfTheBox(t *testing.T) {
 	box := func(c [2]float64) [4]float64 { return [4]float64{c[0] - 0.01, c[1] - 0.01, c[0] + 0.01, c[1] + 0.01} } // minLat, minLon, maxLat, maxLon
 
 	b := box(paris)
-	dem, err := LoadWithin(dir, b[0], b[1], b[2], b[3])
+	dem, err := LoadWithin(dir, Lambert93Grid, b[0], b[1], b[2], b[3])
 	if err != nil || dem.Tiles() != 1 {
 		t.Fatalf("a box round Paris: %v tiles, %v", dem, err)
 	}
 	if z := dem.At(paris[0], paris[1]); math.IsNaN(float64(z)) {
 		t.Error("the tile of Paris does not cover Paris")
 	}
-	if n, err := CountWithin(dir, b[0], b[1], b[2], b[3]); err != nil || n != 1 {
+	if n, err := CountWithin(dir, Lambert93Grid, b[0], b[1], b[2], b[3]); err != nil || n != 1 {
 		t.Errorf("CountWithin round Paris = %d, %v; want 1", n, err)
 	}
-	if n, err := CountWithin(dir, 43.0, -1.0, 43.1, -0.9); err != nil || n != 0 {
+	if n, err := CountWithin(dir, Lambert93Grid, 43.0, -1.0, 43.1, -0.9); err != nil || n != 0 {
 		t.Errorf("CountWithin in an empty area = %d, %v; want 0", n, err)
 	}
-	whole, err := LoadWithin(dir, 45, 2, 49, 5)
+	whole, err := LoadWithin(dir, Lambert93Grid, 45, 2, 49, 5)
 	if err != nil || whole.Tiles() != 2 {
 		t.Fatalf("a box round both: %v tiles, %v", whole, err)
 	}
-	if _, err := LoadWithin(dir, 43.0, -1.0, 43.1, -0.9); err == nil || !strings.Contains(err.Error(), "no tile") {
+	if _, err := LoadWithin(dir, Lambert93Grid, 43.0, -1.0, 43.1, -0.9); err == nil || !strings.Contains(err.Error(), "no tile") {
 		t.Errorf("a box with no tile: err = %v", err)
 	}
-	if _, err := LoadWithin(t.TempDir(), 45, 2, 49, 5); err == nil {
+	if _, err := LoadWithin(t.TempDir(), Lambert93Grid, 45, 2, 49, 5); err == nil {
 		t.Error("an empty directory: err = nil")
 	}
 }
@@ -207,10 +207,10 @@ func TestATileHeaderMustSayWhereItIs(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "centre.asc"), []byte(bad), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CountWithin(dir, 45, 2, 49, 5); err == nil || !strings.Contains(err.Error(), "xllcorner") {
+	if _, err := CountWithin(dir, Lambert93Grid, 45, 2, 49, 5); err == nil || !strings.Contains(err.Error(), "xllcorner") {
 		t.Errorf("CountWithin: err = %v, want it to name the missing xllcorner", err)
 	}
-	if _, err := LoadWithin(dir, 45, 2, 49, 5); err == nil {
+	if _, err := LoadWithin(dir, Lambert93Grid, 45, 2, 49, 5); err == nil {
 		t.Error("LoadWithin: err = nil")
 	}
 }
@@ -228,11 +228,11 @@ func TestGzippedTilesReadLikePlainOnes(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	want, err := Load(plain)
+	want, err := Load(plain, Lambert93Grid)
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := Load(gz)
+	got, err := Load(gz, Lambert93Grid)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestGzippedTilesReadLikePlainOnes(t *testing.T) {
 		t.Fatalf("%d tiles, want %d", got.Tiles(), want.Tiles())
 	}
 	for _, x := range []float64{800_012.5, 800_050, 800_137.5} {
-		if a, b := got.elevationL93(x, 6_500_050), want.elevationL93(x, 6_500_050); a != b {
+		if a, b := got.elevationAt(x, 6_500_050), want.elevationAt(x, 6_500_050); a != b {
 			t.Errorf("height at x=%v is %v from gzip, %v from plain", x, a, b)
 		}
 	}
@@ -264,7 +264,7 @@ func TestADamagedGzippedTileNamesItsFile(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(dir, name), bad, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := Load(dir); err == nil || !strings.Contains(err.Error(), name) {
+		if _, err := Load(dir, Lambert93Grid); err == nil || !strings.Contains(err.Error(), name) {
 			t.Errorf("%s: Load err = %v, want it to name the file", name, err)
 		}
 	}
@@ -273,7 +273,39 @@ func TestADamagedGzippedTileNamesItsFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "header.asc.gz"), []byte("this is not gzip"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CountWithin(dir, 45, 2, 49, 5); err == nil || !strings.Contains(err.Error(), "header.asc.gz") {
+	if _, err := CountWithin(dir, Lambert93Grid, 45, 2, 49, 5); err == nil || !strings.Contains(err.Error(), "header.asc.gz") {
 		t.Errorf("CountWithin err = %v, want it to name the file", err)
+	}
+}
+
+func TestDEMReadsTilesInTheProjectionItIsGiven(t *testing.T) {
+	// Saint-Denis (Réunion) and Pointe-à-Pitre (Guadeloupe) in their own UTM zone: each tile only holds its point
+	// when the DEM projects with the right zone.
+	cases := []struct {
+		name     string
+		lat, lon float64
+	}{
+		{"utm40s", -20.8789, 55.4481},
+		{"utm20n", 16.2411, -61.5331},
+	}
+	for _, c := range cases {
+		proj, err := ParseProjection(c.name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dir := t.TempDir()
+		x, y := proj.Forward(c.lat, c.lon)
+		writeTile(t, dir, "a.asc", math.Floor(x/100)*100-50, math.Floor(y/100)*100-50, func(c, r int) float64 { return 250 })
+
+		dem, err := LoadWithin(dir, proj, c.lat-0.01, c.lon-0.01, c.lat+0.01, c.lon+0.01)
+		if err != nil || dem.Tiles() != 1 {
+			t.Fatalf("%s: a box round the point: %v tiles, %v", c.name, dem, err)
+		}
+		if z := dem.At(c.lat, c.lon); math.Abs(float64(z)-250) > 0.01 {
+			t.Errorf("%s: At = %v, want 250", c.name, z)
+		}
+		if z := dem.At(c.lat+1, c.lon); !math.IsNaN(float64(z)) {
+			t.Errorf("%s: a point 110 km north = %v, want NaN", c.name, z)
+		}
 	}
 }
