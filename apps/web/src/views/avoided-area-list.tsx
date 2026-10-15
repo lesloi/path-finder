@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { CircleCheck, CirclePlus, X } from 'lucide-react';
 
 import { AVOIDED_AREA_RADIUS, type AvoidedArea } from '../contract/index.ts';
@@ -16,6 +17,8 @@ export function AvoidedAreaList({
   onToggle,
   onResize,
   onRemove,
+  onCenter,
+  onPoint,
 }: {
   language: Language;
   areas: AvoidedArea[];
@@ -26,8 +29,14 @@ export function AvoidedAreaList({
   onToggle: () => void;
   onResize: (index: number, radius: number) => void;
   onRemove: (index: number) => void;
+  /** The user asked to see an area. */
+  onCenter: (index: number) => void;
+  /** The user points at an area's row, or leaves it. */
+  onPoint: (index: number | undefined) => void;
 }) {
   const t = criteriaText[language];
+  // The list can go away under the pointer, which then never leaves it.
+  useEffect(() => () => onPoint(undefined), []); // eslint-disable-line react-hooks/exhaustive-deps -- only on unmount
   return (
     <section className="flex flex-col gap-2" data-testid="criteria-avoided-list">
       <div className="flex items-center justify-between">
@@ -52,9 +61,22 @@ export function AvoidedAreaList({
             <li
               key={index}
               data-testid={id}
+              // The circle goes with the row for whoever points at it, with the mouse or with the keyboard.
+              onMouseEnter={() => onPoint(index)}
+              onMouseLeave={() => onPoint(undefined)}
+              onFocus={() => onPoint(index)}
+              onBlur={() => onPoint(undefined)}
               className="flex items-center gap-2 rounded-lg bg-surface-2/50 py-1 pr-1 pl-3"
             >
-              <AvoidedAreaBadge number={index + 1} />
+              <button
+                type="button"
+                data-testid={`${id}-name`}
+                className="grid flex-none place-items-center rounded-full"
+                aria-label={name}
+                onClick={() => onCenter(index)}
+              >
+                <AvoidedAreaBadge number={index + 1} />
+              </button>
               <input
                 type="range"
                 data-testid={`${id}-radius`}
@@ -74,7 +96,10 @@ export function AvoidedAreaList({
                 className="grid size-8 flex-none place-items-center rounded-full text-ink hover:bg-surface-2"
                 aria-label={t.removeAvoidedAreaNamed(name)}
                 {...hint(t.removeAvoidedArea, 'left')}
-                onClick={() => onRemove(index)}
+                onClick={() => {
+                  onPoint(undefined);
+                  onRemove(index);
+                }}
               >
                 <X size={16} aria-hidden />
               </button>

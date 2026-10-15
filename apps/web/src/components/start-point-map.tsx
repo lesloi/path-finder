@@ -178,6 +178,8 @@ export type MapHandle = {
   centerOn: (position: Position) => void;
   /** Sets the pin of a waypoint apart, larger and in the accent colour: the one the user points at in a list. */
   highlightWaypoint: (index: number | undefined) => void;
+  /** Sets the circle and the number of an avoided area apart, the one the user points at in the list. */
+  highlightArea: (index: number | undefined) => void;
 };
 
 /** What the map writes on a route: its distance and, when known, its elevation gain. */
@@ -432,13 +434,17 @@ export function StartPointMap({
         id: 'avoided-areas-fill',
         type: 'fill',
         source: 'avoided-areas',
-        paint: { 'fill-color': MAP_COLORS.avoided, 'fill-opacity': 0.22 },
+        paint: { 'fill-color': MAP_COLORS.avoided, 'fill-opacity': ['case', ['get', 'highlighted'], 0.4, 0.22] },
       });
       map.addLayer({
         id: 'avoided-areas-line',
         type: 'line',
         source: 'avoided-areas',
-        paint: { 'line-color': MAP_COLORS.avoided, 'line-width': 2, 'line-dasharray': [2, 2] },
+        paint: {
+          'line-color': MAP_COLORS.avoided,
+          'line-width': ['case', ['get', 'highlighted'], 4, 2],
+          'line-dasharray': [2, 2],
+        },
       });
       // Above the veil and under the routes. A seasonal point has the reverse badge: it may be dry.
       for (const category of POI_CATEGORIES) {
@@ -700,6 +706,7 @@ export function StartPointMap({
   const bubbleOn = useRef(-1);
   // Kept here, not in the app: pointing at a row must not draw the whole view again.
   const [highlightedWaypoint, setHighlightedWaypoint] = useState<number>();
+  const [highlightedArea, setHighlightedArea] = useState<number>();
   useEffect(() => {
     const map = mapRef.current!;
     let keep = 0;
@@ -817,13 +824,13 @@ export function StartPointMap({
     if (!loaded || !source) return;
     source.setData({
       type: 'FeatureCollection',
-      features: avoidedAreas.map((area) => ({
+      features: avoidedAreas.map((area, index) => ({
         type: 'Feature' as const,
-        properties: {},
+        properties: { highlighted: index === highlightedArea },
         geometry: { type: 'Polygon' as const, coordinates: [circlePolygon(area)] },
       })),
     });
-  }, [loaded, avoidedAreas, styleVersion]);
+  }, [loaded, avoidedAreas, highlightedArea, styleVersion]);
 
   // The points of interest in view: the tiles of the view are asked for only from zoom 11 and while a category is on,
   // since a tile says which ~30 km the user looks at. A view that moved on meanwhile drops the late answer.
@@ -995,6 +1002,7 @@ export function StartPointMap({
     reframe: () => setReframes((count) => count + 1),
     centerOn: (center) => mapRef.current?.easeTo({ center }),
     highlightWaypoint: setHighlightedWaypoint,
+    highlightArea: setHighlightedArea,
   }));
   const refit = useEffectEvent(() => {
     const map = mapRef.current!;
@@ -1029,7 +1037,13 @@ export function StartPointMap({
   return (
     <div className={`fixed inset-0 bg-white ${pickOnClick ? 'map-picking' : ''}`}>
       <div ref={container} className="size-full" />
-      {areaHosts.map((host, index) => createPortal(<AvoidedAreaBadge number={index + 1} />, host, `area-${index}`))}
+      {areaHosts.map((host, index) =>
+        createPortal(
+          <AvoidedAreaBadge number={index + 1} highlighted={index === highlightedArea} />,
+          host,
+          `area-${index}`,
+        ),
+      )}
       {pinHosts.map((host, index) =>
         createPortal(
           <WaypointPin number={index + 1} variant="map" highlighted={index === highlightedWaypoint} />,

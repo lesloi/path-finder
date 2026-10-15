@@ -492,6 +492,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             onToggle={toggleAvoiding}
             onResize={resizeAvoidedArea}
             onRemove={removeAvoidedArea}
+            onCenter={(index) => map.current?.centerOn(avoidedAreas[index]!.center)}
+            onPoint={(index) => map.current?.highlightArea(index)}
           />
         ) : undefined
       }
