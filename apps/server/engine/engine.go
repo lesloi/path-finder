@@ -325,6 +325,9 @@ func computeSpatial(nodes []node) *spatial {
 	return s
 }
 
+// ringM is how far a ring of cells reaches farther than the one inside it (a cell is 0.002° of latitude).
+const ringM = 200
+
 // nearest is the node closest to a point.
 func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bool) {
 	return s.nearestOutside(g, latDeg, lonDeg, nil, 0)
@@ -335,7 +338,7 @@ func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bo
 func (s *spatial) nearestOutside(g *graph, latDeg, lonDeg float64, skip nodeSet, reachM float64) (uint32, float64, bool) {
 	rings := 200
 	if reachM > 0 {
-		rings = min(rings, int(reachM/200)+2)
+		rings = min(rings, int(reachM/ringM)+2)
 	}
 	lat, lon := int32(latDeg*1e7), int32(lonDeg*1e7)
 	cy, cx := int(lat-s.minLat)/cellLat, int(lon-s.minLon)/cellLon
@@ -370,7 +373,7 @@ func (s *spatial) nearestOutside(g *graph, latDeg, lonDeg float64, skip nodeSet,
 			visit(cx-r, y)
 			visit(cx+r, y)
 		}
-		if found && math.Sqrt(best) <= float64(r)*200 {
+		if found && math.Sqrt(best) <= float64(r)*ringM {
 			break
 		}
 	}

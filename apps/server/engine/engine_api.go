@@ -247,7 +247,7 @@ func (e *Engine) snapWaypoints(waypoints []Point, leaveSmall bool) ([]uint32, er
 			return nil, &WaypointError{Index: i + 1}
 		}
 		if leaveSmall && e.g.small.has(n) {
-			if n, d, ok = e.sp.nearestOutside(e.g, w.Lat, w.Lon, e.g.small, maxWaypointSnapMeters); !ok || d > maxWaypointSnapMeters {
+			if n, ok = e.nearestLarge(w, maxWaypointSnapMeters); !ok {
 				return nil, ErrNoRoute
 			}
 		}
@@ -273,11 +273,16 @@ func (e *Engine) snapLoopStart(p Point) (uint32, error) {
 	if err != nil || !e.g.small.has(n) {
 		return n, err
 	}
-	n, d, ok := e.sp.nearestOutside(e.g, p.Lat, p.Lon, e.g.small, maxSnapMeters)
-	if !ok || d > maxSnapMeters {
-		return 0, ErrNoLoop
+	if n, ok := e.nearestLarge(p, maxSnapMeters); ok {
+		return n, nil
 	}
-	return n, nil
+	return 0, ErrNoLoop
+}
+
+// nearestLarge is the node nearest to p within reachM that is outside the small components.
+func (e *Engine) nearestLarge(p Point, reachM float64) (uint32, bool) {
+	n, d, ok := e.sp.nearestOutside(e.g, p.Lat, p.Lon, e.g.small, reachM)
+	return n, ok && d <= reachM
 }
 
 // routeAnchors routes the cheapest loop from the start node through the waypoints in order and back.
