@@ -288,8 +288,10 @@ func (e *Engine) nearestLarge(p Point, reachM float64) (uint32, bool) {
 // routeAnchors routes the cheapest loop from the start node through the waypoints in order and back.
 // The anchors are the nodes it goes through, the start node first and last, without a node twice in a row:
 // fewer than two means every waypoint is the start node, and the loop goes nowhere.
-func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Point) (anchors, nodes, edges []uint32, err error) {
-	snapped, err := e.snapWaypoints(waypoints, !e.g.small.has(start))
+// With leaveSmall the waypoints move off the small components (see snapWaypoints): loops want it, a direct loop
+// goes where it is told.
+func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Point, leaveSmall bool) (anchors, nodes, edges []uint32, err error) {
+	snapped, err := e.snapWaypoints(waypoints, leaveSmall)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -315,7 +317,7 @@ func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point
 	if len(waypoints) == 0 {
 		return nil, 0, nil
 	}
-	anchors, nodes, edges, err := e.routeAnchors(ctx, start, waypoints)
+	anchors, nodes, edges, err := e.routeAnchors(ctx, start, waypoints, true)
 	if err != nil || len(anchors) < 2 {
 		return nil, 0, err
 	}
@@ -331,7 +333,7 @@ func (e *Engine) DirectLoop(ctx context.Context, start Point, waypoints []Point)
 	if err != nil {
 		return nil, err
 	}
-	_, nodes, edges, err := e.routeAnchors(ctx, src, waypoints)
+	_, nodes, edges, err := e.routeAnchors(ctx, src, waypoints, false)
 	if err != nil {
 		return nil, err
 	}

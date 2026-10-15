@@ -45,18 +45,14 @@ func TestAnIslandAloneAnswersNoLoopWithoutSearching(t *testing.T) {
 	if !e.g.small.has(uint32(island)) {
 		t.Fatal("the island is not small")
 	}
-	req := islandLoops(g, island)
-	req.Stats = &LoopStats{}
+	// A search that ran would end on the cancelled context.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
 	// Act
-	loops, err := e.Loops(context.Background(), req)
+	loops, err := e.Loops(ctx, islandLoops(g, island))
 	// Assert
 	if !errors.Is(err, ErrNoLoop) || loops != nil {
 		t.Fatalf("loops = %d, err = %v, want ErrNoLoop", len(loops), err)
-	}
-	for c := range req.Stats.Lost {
-		if req.Stats.Lost[c].Load()+req.Stats.Cut[c].Load() != 0 {
-			t.Errorf("cause %d: the search ran", c)
-		}
 	}
 }
 
@@ -105,5 +101,39 @@ func TestAWaypointWithOnlyAnIslandInReachFindsNoRoute(t *testing.T) {
 	// Assert
 	if !errors.Is(err, ErrNoRoute) || !errors.Is(direct, ErrNoRoute) {
 		t.Errorf("loops: %v, direct loop: %v, want ErrNoRoute", err, direct)
+	}
+}
+
+func TestADirectLoopKeepsAWaypointOnAnIslandWhereItIs(t *testing.T) {
+	// Arrange: the lattice is within a waypoint's reach, which only loops use to move off islands
+	g, island := islandBeside(-200)
+	e := openTest(t, g, false)
+	// Act
+	_, err := e.DirectLoop(context.Background(), pointOf(g, 15*30+15), []Point{pointOf(g, island)})
+	// Assert
+	if !errors.Is(err, ErrNoRoute) {
+		t.Errorf("err = %v, want ErrNoRoute", err)
+	}
+}
+
+func TestNearestOutsideStopsAtItsReach(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	here := g.addNode(0, 0, 100)
+	g.addNode(0, 390, 100)
+	g.addNode(390, 0, 100)
+	e := openTest(t, g, false)
+	skip := make(nodeSet, 1)
+	skip[0] = 1 << uint(here)
+	p := pointOf(g, here)
+	// Act
+	_, dFar, okFar := e.sp.nearestOutside(e.g, p.Lat, p.Lon, skip, 400)
+	_, dNear, okNear := e.sp.nearestOutside(e.g, p.Lat, p.Lon, skip, 150)
+	// Assert
+	if !okFar || dFar > 400 {
+		t.Errorf("reach 400: ok = %v, d = %v, want a node 390 m away", okFar, dFar)
+	}
+	if okNear && dNear <= 150 {
+		t.Errorf("reach 150: found a node at %v m", dNear)
 	}
 }
