@@ -816,6 +816,53 @@ func collapse(points []uint32) []uint32 {
 	return out
 }
 
+// A loop whose elevation gain is within ascentBand of the target, or within ascentBandFloorM for a small
+// target, is left alone. It is the band of a match of the route set (a fifth, 50 m), which the engine
+// cannot import from the generator.
+const (
+	ascentBand       = 0.2
+	ascentBandFloorM = 50.0
+	// liftReach is how far, as a share of the circle's radius, a control point may move to a higher or
+	// lower node when the loop is as far from its elevation gain as can be.
+	liftReach = 0.4
+)
+
+// climbLift tells how the next resizing should move the control points to fix the elevation gain: a share
+// of 1 at most towards higher nodes (positive) when the loop climbs too little, towards lower ones
+// (negative) when it climbs too much, and 0 with no target or inside the band.
+func climbLift(ascent, target float64) float64 {
+	if target <= 0 || math.Abs(ascent-target) <= math.Max(ascentBand*target, ascentBandFloorM) {
+		return 0
+	}
+	return math.Max(-1, math.Min(1, (target-ascent)/target))
+}
+
+// liftedNode is the highest node (lift > 0) or lowest (lift < 0) among base and those nearest to eight
+// points reachM around it, or base for no lift. Fixed directions keep a seed's loops the same.
+func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32 {
+	if lift == 0 {
+		return base
+	}
+	b := g.nodes[base]
+	lat, lon := float64(b.Lat)*1e-7, float64(b.Lon)*1e-7
+	cosl := math.Cos(lat * rad)
+	best := base
+	better := func(n uint32) bool {
+		if lift > 0 {
+			return g.nodes[n].Elev > g.nodes[best].Elev
+		}
+		return g.nodes[n].Elev < g.nodes[best].Elev
+	}
+	for k := 0; k < 8; k++ {
+		a := float64(k) * math.Pi / 4
+		n, d, ok := sp.nearest(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl))
+		if ok && d <= 400 && better(n) {
+			best = n
+		}
+	}
+	return best
+}
+
 func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *loopParams, start uint32, index int) *loopResult {
 	g := cx.g
 	rng := newSplitmix(lp.seed, uint64(index))
@@ -840,6 +887,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 		jitter[j] = 0.85 + 0.3*rng.f64()
 	}
 	var best *loopResult
+	lift := 0.0
 	for iter := 0; iter < 4; iter++ {
 		if ctx.Err() != nil {
 			return best
@@ -853,7 +901,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 			if !ok || d > 400 {
 				return best
 			}
-			points = append(points, n)
+			points = append(points, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))
 		}
 		points = append(points, start)
 		if lp.anchors != nil {
@@ -870,7 +918,8 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 		if best == nil || sc < best.score {
 			best = &loopResult{nodes, edges, dist, asc, trail, overlap, sc}
 		}
-		if math.Abs(dist-lp.distM) < 0.03*lp.distM {
+		lift = climbLift(asc, lp.ascentM)
+		if math.Abs(dist-lp.distM) < 0.03*lp.distM && lift == 0 {
 			break
 		}
 		if lp.anchors != nil {

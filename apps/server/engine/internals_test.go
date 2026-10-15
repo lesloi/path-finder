@@ -379,3 +379,63 @@ func TestHeadersRoundTripAndRefuseAnotherVersion(t *testing.T) {
 		t.Error("a header of another version was read")
 	}
 }
+
+func TestClimbLiftIsZeroWithoutATargetOrWithinTheBand(t *testing.T) {
+	cases := []struct {
+		name           string
+		ascent, target float64
+	}{
+		{"no target", 0, 0},
+		{"no target but a climb", 800, 0},
+		{"on target", 1000, 1000},
+		{"just inside the band", 810, 1000},
+		{"within the floor of a small target", 80, 100},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := climbLift(tc.ascent, tc.target); got != 0 {
+				t.Errorf("climbLift(%v, %v) = %v, want 0", tc.ascent, tc.target, got)
+			}
+		})
+	}
+}
+
+func TestClimbLiftPushesUpWhenTheLoopClimbsTooLittleAndDownWhenTooMuch(t *testing.T) {
+	// Arrange
+	target := 1000.0
+	// Act
+	slightly, far, over, wayOver := climbLift(700, target), climbLift(200, target), climbLift(1400, target), climbLift(5000, target)
+	// Assert
+	if !(slightly > 0 && far > slightly && far <= 1) {
+		t.Errorf("lifts %v (a bit short) and %v (far short) should be positive, growing and capped at 1", slightly, far)
+	}
+	if !(over < 0 && wayOver <= over && wayOver >= -1) {
+		t.Errorf("lifts %v (a bit over) and %v (far over) should be negative, growing and capped at -1", over, wayOver)
+	}
+}
+
+func TestLiftedNodePicksTheHighestOrLowestNodeWithinReach(t *testing.T) {
+	// Arrange: a lattice that rises towards the east
+	g := &testGraph{}
+	at := g.grid(21, 21, func(x, y int) float64 { return float64(x) * 10 })
+	e := openTest(t, g, false)
+	base := uint32(at(10, 10))
+	// Act
+	up := liftedNode(e.g, e.sp, base, 300, 1)
+	down := liftedNode(e.g, e.sp, base, 300, -1)
+	still := liftedNode(e.g, e.sp, base, 300, 0)
+	tooShort := liftedNode(e.g, e.sp, base, 20, 1)
+	// Assert
+	if up != uint32(at(13, 10)) && up != uint32(at(13, 9)) && up != uint32(at(13, 11)) {
+		t.Errorf("up = %d, want a node 300 m east", up)
+	}
+	if e.g.nodes[down].Elev >= e.g.nodes[base].Elev {
+		t.Errorf("down is not lower than the base node")
+	}
+	if still != base {
+		t.Errorf("no lift moved the node from %d to %d", base, still)
+	}
+	if tooShort != base {
+		t.Errorf("a reach under the lattice step moved the node to %d", tooShort)
+	}
+}

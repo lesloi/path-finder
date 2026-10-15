@@ -171,10 +171,16 @@ func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStar
 			t.Fatalf("%s at %s: %v", c.label(), st.Name, err)
 		}
 		// Time ran out with no route at all: it counts as an empty set.
+		if os.Getenv("HARNESS_VERBOSE") != "" {
+			fmt.Printf("  %s, %s, seed %d: error %v after %s\n", c.label(), st.Name, seed, err, s.elapsed.Round(time.Millisecond))
+		}
 		return s
 	}
 	routes := out.([]contract.Route)
 	s.routes = len(routes)
+	if len(routes) < minRoutes && os.Getenv("HARNESS_VERBOSE") != "" {
+		fmt.Printf("  %s, %s, seed %d: %d route(s) after %s, %d loops found\n", c.label(), st.Name, seed, len(routes), s.elapsed.Round(time.Millisecond), s.candidates)
+	}
 	for _, r := range routes {
 		if r.Kind == "match" {
 			s.matches++
