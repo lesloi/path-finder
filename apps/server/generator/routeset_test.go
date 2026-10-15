@@ -105,8 +105,8 @@ func TestDistanceTolerances(t *testing.T) {
 	if len(r) != 1 || r[0].Kind != "suggestion" || r[0].Misses[0].Criterion != "distance" || math.Abs(r[0].Misses[0].Gap+2.4) > 1e-9 {
 		t.Errorf("7.6 km: %+v", r)
 	}
-	if r := build(c, compose(withDistance(12.6))); len(r) != 0 {
-		t.Errorf("12.6 km kept: %+v", r)
+	if r := build(c, compose(withDistance(13.6))); len(r) != 0 {
+		t.Errorf("13.6 km kept: %+v", r)
 	}
 }
 
@@ -116,8 +116,8 @@ func TestElevationGainTolerances(t *testing.T) {
 	if len(r) != 1 || r[0].Kind != "suggestion" || r[0].Misses[0].Criterion != "elevationGain" || r[0].Misses[0].Gap != 120 {
 		t.Errorf("420 m: %+v", r)
 	}
-	if r := build(c, compose(withGain(ptr(460)))); len(r) != 0 {
-		t.Errorf("460 m kept: %+v", r)
+	if r := build(c, compose(withGain(ptr(530)))); len(r) != 0 {
+		t.Errorf("530 m kept: %+v", r)
 	}
 }
 
@@ -126,7 +126,7 @@ func TestElevationGainFloors(t *testing.T) {
 	r := build(flatTarget,
 		compose(withGain(ptr(50)), withHeading(0)),
 		compose(withGain(ptr(100)), withHeading(120)),
-		compose(withGain(ptr(101)), withHeading(240)),
+		compose(withGain(ptr(151)), withHeading(240)),
 	)
 	equal(t, kinds(r), []string{"match", "suggestion"}, "kinds")
 	if *r[1].ElevationGain != 100 || r[1].Misses[0].Gap != 100 {
@@ -198,8 +198,8 @@ func TestTargetDuration(t *testing.T) {
 	if len(r) != 1 || r[0].Kind != "suggestion" || r[0].Misses[0].Criterion != "duration" || r[0].Misses[0].Gap != 11 {
 		t.Errorf("78 min: %+v", r)
 	}
-	if r := build(byDuration, compose(withDistance(12))); len(r) != 0 {
-		t.Errorf("90 min kept: %+v", r)
+	if r := build(byDuration, compose(withDistance(12.2))); len(r) != 0 {
+		t.Errorf("91 min kept: %+v", r)
 	}
 }
 
@@ -321,4 +321,91 @@ func TestDiversity(t *testing.T) {
 			t.Errorf("%d routes, want 1", len(r))
 		}
 	})
+}
+
+func TestWideSuggestionsFillASetShortOfThreeRoutes(t *testing.T) {
+	wide := func(h float64) *candidate { return compose(withHeading(h), withDistance(13)) }
+	suggestion := func(h float64) *candidate { return compose(withHeading(h), withDistance(8)) }
+	match := func(h float64) *candidate { return compose(withHeading(h)) }
+	c := criteria(nil)
+	cases := map[string]struct {
+		candidates []*candidate
+		want       []string
+	}{
+		"fills when nothing else fits": {
+			[]*candidate{wide(0), wide(60), wide(120), wide(180)},
+			[]string{"suggestion", "suggestion", "suggestion"},
+		},
+		"completes the suggestions up to three": {
+			[]*candidate{match(0), wide(60), wide(120), wide(180)},
+			[]string{"match", "suggestion", "suggestion"},
+		},
+		"unused once three routes fit": {
+			[]*candidate{match(0), suggestion(60), suggestion(120), wide(180)},
+			[]string{"match", "suggestion", "suggestion"},
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) { equal(t, kinds(build(c, tc.candidates...)), tc.want, "kinds") })
+	}
+}
+
+func TestWideSuggestionComesAfterANormalOne(t *testing.T) {
+	c := criteria(nil)
+
+	r := build(c,
+		compose(withHeading(0), withDistance(13)), // a better score than the suggestion, but wide
+		compose(withHeading(120), withDistance(12.4), withGain(ptr(450))),
+	)
+
+	equal(t, distances(r), []float64{12.4, 13}, "distances")
+}
+
+func TestWideSuggestionReportsItsMisses(t *testing.T) {
+	c := criteria(nil)
+
+	r := build(c, compose(withDistance(13), withGain(ptr(500))))
+
+	if len(r) != 1 || r[0].Kind != "suggestion" || len(r[0].Misses) != 2 {
+		t.Fatalf("routes = %+v", r)
+	}
+	if r[0].Misses[0].Gap != 3 || r[0].Misses[1].Gap != 200 {
+		t.Errorf("misses = %+v", r[0].Misses)
+	}
+}
+
+func TestBeyondTheWideTolerancesARouteIsDropped(t *testing.T) {
+	c := criteria(nil)
+	for name, cand := range map[string]*candidate{
+		"distance":       compose(withDistance(13.6)),
+		"elevationGain":  compose(withGain(ptr(530))),
+		"elevationBelow": compose(withGain(ptr(30))),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if r := build(c, cand); len(r) != 0 {
+				t.Errorf("routes = %+v", r)
+			}
+		})
+	}
+}
+
+func TestWideElevationGainFloor(t *testing.T) {
+	c := criteria(func(c *contract.Criteria) { c.ElevationGain = &contract.ElevationGain{Metres: 100} })
+
+	inside := build(c, compose(withGain(ptr(245))))
+	outside := build(c, compose(withGain(ptr(255))))
+
+	if len(inside) != 1 || len(outside) != 0 {
+		t.Errorf("inside = %+v, outside = %+v", inside, outside)
+	}
+}
+
+func TestWideDurationTarget(t *testing.T) {
+	c := criteria(func(c *contract.Criteria) { c.Target = contract.Target{Duration: 74} })
+
+	r := build(c, compose(withDistance(13)))
+
+	if len(r) != 1 || r[0].Kind != "suggestion" || r[0].Misses[0].Criterion != "duration" {
+		t.Errorf("routes = %+v", r)
+	}
 }
