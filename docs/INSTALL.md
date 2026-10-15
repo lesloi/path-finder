@@ -77,30 +77,31 @@ profile and to one graph: build them again after each graph; the server refuses 
 `france-latest.osm.pbf` holds metropolitan France only. Each overseas territory has its own BD ALTI archive,
 in UTM: name its projection with `-dem-crs`.
 
-| Territory                | BD ALTI | `-dem-crs` | OSM extract                                                               |
-| ------------------------ | ------- | ---------- | ------------------------------------------------------------------------- |
-| Guadeloupe               | `D971`  | `utm20n`   | Geofabrik `guadeloupe`                                                    |
-| Martinique               | `D972`  | `utm20n`   | Geofabrik `martinique`                                                    |
-| French Guiana            | `D973`  | `utm22n`   | Geofabrik `guyane`                                                        |
-| Réunion                  | `D974`  | `utm40s`   | Geofabrik `reunion`                                                       |
-| Saint-Pierre-et-Miquelon | `D975`  | `utm21n`   | [OSM France](https://download.openstreetmap.fr/extracts/north-america/)   |
-| Mayotte                  | `D976`  | `utm38s`   | Geofabrik `mayotte`                                                       |
-| Saint-Barthélemy         | `D977`  | `utm20n`   | [OSM France](https://download.openstreetmap.fr/extracts/central-america/) |
-| Saint-Martin             | `D978`  | `utm20n`   | [OSM France](https://download.openstreetmap.fr/extracts/central-america/) |
+| Territory                | BD ALTI | `-dem-crs` | OSM extract                                                                                        |
+| ------------------------ | ------- | ---------- | -------------------------------------------------------------------------------------------------- |
+| Guadeloupe               | `D971`  | `utm20n`   | Geofabrik `guadeloupe`                                                                             |
+| Martinique               | `D972`  | `utm20n`   | Geofabrik `martinique`                                                                             |
+| French Guiana            | `D973`  | `utm22n`   | Geofabrik `guyane`                                                                                 |
+| Réunion                  | `D974`  | `utm40s`   | Geofabrik `reunion`                                                                                |
+| Saint-Pierre-et-Miquelon | `D975`  | `utm21n`   | [OSM France](https://download.openstreetmap.fr/extracts/north-america/) `saint_pierre_et_miquelon` |
+| Mayotte                  | `D976`  | `utm38s`   | Geofabrik `mayotte`                                                                                |
+| Saint-Barthélemy         | `D977`  | `utm20n`   | [OSM France](https://download.openstreetmap.fr/extracts/central-america/) `saint_barthelemy`       |
+| Saint-Martin             | `D978`  | `utm20n`   | [OSM France](https://download.openstreetmap.fr/extracts/central-america/) `saint_martin`           |
 
 A territory is one zone: skip `plan-zones`, and build it without `-bbox` into its own subdirectory of
-`DATA_DIR` (the server refuses a `graph.bin` with zones beside it). Without `-bbox` the build reads every tile
-below `-dem`, so keep the archive of each territory in a directory of its own:
+`DATA_DIR`. From two graphs on, every graph lives in a subdirectory (the server refuses a `graph.bin` with zones
+beside it): move one built at the root into one first. Without `-bbox` the build reads every tile below `-dem`,
+so keep the archive of each territory in a directory of its own:
 
 ```sh
 zone=$DATA_DIR/guadeloupe && mkdir -p "$zone"
-./path-finder build-graph -pbf guadeloupe-latest.osm.pbf -dem data/bdalti-d971 -dem-crs utm20n -out "$zone/graph.bin"
+./path-finder build-graph -pbf $DATA_DIR/osm/guadeloupe-latest.osm.pbf -dem $DATA_DIR/bdalti-d971 -dem-crs utm20n -out "$zone/graph.bin"
 for profile in any paved unpaved; do
   ./path-finder build-alt -graph "$zone/graph.bin" -out "$zone/$profile.alt" -profile "$profile"
 done
 ```
 
-The tiles in a wrong projection give no elevation, and the build fails.
+The default `-dem-crs` is `lambert93`. Tiles read in the wrong projection give no elevation, and the build fails.
 
 ### Points of interest
 
