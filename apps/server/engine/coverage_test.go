@@ -50,14 +50,21 @@ func squareAt(lat, lon, side float64) *testGraph {
 func TestCoverageIsTheCellsHoldingANode(t *testing.T) {
 	dir := t.TempDir()
 	// West of Greenwich, over two cells; and a second zone on the same cells, as zones overlap by design.
+	// Then the overseas ones, south of the equator (Réunion, Mayotte) and west of Greenwich (French Guiana).
 	writeZone(t, filepath.Join(dir, "brittany"), squareAt(48.01, -2.51, 0.02))
 	writeZone(t, filepath.Join(dir, "brittany-east"), squareAt(48.02, -2.49, 0.002))
 	writeZone(t, filepath.Join(dir, "annecy"), squareAt(45.905, 6.11, 0.002))
+	writeZone(t, filepath.Join(dir, "reunion"), squareAt(-21.155, 55.455, 0.002))
+	writeZone(t, filepath.Join(dir, "mayotte"), squareAt(-12.855, 45.155, 0.002))
+	writeZone(t, filepath.Join(dir, "guyane"), squareAt(4.945, -52.355, 0.002))
 	z, err := OpenZones(dir, "any", "paved")
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := [][4]float64{
+		{55.4, -21.2, 55.5, -21.1},
+		{45.1, -12.9, 45.2, -12.8},
+		{-52.4, 4.9, -52.3, 5},
 		{6.1, 45.9, 6.2, 46},
 		{-2.6, 48, -2.5, 48.1},
 		{-2.5, 48, -2.4, 48.1},

@@ -74,22 +74,34 @@ profile and to one graph: build them again after each graph; the server refuses 
 
 ### Overseas France
 
-`france-latest.osm.pbf` holds metropolitan France only. Each overseas territory has its own Geofabrik extract
-(`guadeloupe`, `guyane`, `martinique`, `mayotte`, `reunion`) and its own BD ALTI archives, which are not in
-Lambert-93: name their projection with `-dem-crs`. Build each territory into its own zone, as above, with the
-extract and the tiles of that territory:
+`france-latest.osm.pbf` holds metropolitan France only. Each overseas territory has its own BD ALTI archive,
+in UTM: name its projection with `-dem-crs`.
 
-| Territory                | `-dem-crs` |
-| ------------------------ | ---------- |
-| Guadeloupe, Martinique   | `utm20n`   |
-| French Guiana            | `utm22n`   |
-| Réunion                  | `utm40s`   |
-| Mayotte                  | `utm38s`   |
-| Saint-Pierre-et-Miquelon | `utm21n`   |
+| Territory                | BD ALTI | `-dem-crs` | OSM extract                                                                                        |
+| ------------------------ | ------- | ---------- | -------------------------------------------------------------------------------------------------- |
+| Guadeloupe               | `D971`  | `utm20n`   | Geofabrik `guadeloupe`                                                                             |
+| Martinique               | `D972`  | `utm20n`   | Geofabrik `martinique`                                                                             |
+| French Guiana            | `D973`  | `utm22n`   | Geofabrik `guyane`                                                                                 |
+| Réunion                  | `D974`  | `utm40s`   | Geofabrik `reunion`                                                                                |
+| Saint-Pierre-et-Miquelon | `D975`  | `utm21n`   | [OSM France](https://download.openstreetmap.fr/extracts/north-america/) `saint_pierre_et_miquelon` |
+| Mayotte                  | `D976`  | `utm38s`   | Geofabrik `mayotte`                                                                                |
+| Saint-Barthélemy         | `D977`  | `utm20n`   | [OSM France](https://download.openstreetmap.fr/extracts/central-america/) `saint_barthelemy`       |
+| Saint-Martin             | `D978`  | `utm20n`   | [OSM France](https://download.openstreetmap.fr/extracts/central-america/) `saint_martin`           |
 
-These names are what the IGN archives are expected to use, not yet checked against them: read the projection
-in each archive's description before the first build. The default is `lambert93`. Tiles read in the wrong
-projection give no elevation, and the build fails.
+A territory is one zone: skip `plan-zones`, and build it without `-bbox` into its own subdirectory of
+`DATA_DIR`. From two graphs on, every graph lives in a subdirectory (the server refuses a `graph.bin` with zones
+beside it): move one built at the root into one first. Without `-bbox` the build reads every tile below `-dem`,
+so keep the archive of each territory in a directory of its own:
+
+```sh
+zone=$DATA_DIR/guadeloupe && mkdir -p "$zone"
+./path-finder build-graph -pbf $DATA_DIR/osm/guadeloupe-latest.osm.pbf -dem $DATA_DIR/bdalti-d971 -dem-crs utm20n -out "$zone/graph.bin"
+for profile in any paved unpaved; do
+  ./path-finder build-alt -graph "$zone/graph.bin" -out "$zone/$profile.alt" -profile "$profile"
+done
+```
+
+The default `-dem-crs` is `lambert93`. Tiles read in the wrong projection give no elevation, and the build fails.
 
 ### Points of interest
 
