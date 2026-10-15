@@ -467,3 +467,118 @@ func TestClimbLiftIsZeroWithoutABand(t *testing.T) {
 		t.Errorf("climbLift with no band = %v, want 0: a caller that sets none gets no steering", got)
 	}
 }
+
+// A band of ways along the east-west axis through the start, 5 km wide, as a valley floor between walls.
+func valleyBand(g *testGraph) (start int) {
+	for y := -5; y <= 5; y++ {
+		for x := -80; x <= 80; x++ {
+			n := g.addNode(float64(y)*500, float64(x)*stepM, 100)
+			if x > -80 {
+				g.connect(n-1, n, KindPath)
+			}
+			if y > -5 {
+				g.connect(n-161, n, KindPath)
+			}
+			if x == 0 && y == 0 {
+				start = n
+			}
+		}
+	}
+	return start
+}
+
+func TestAControlCircleTurnsToWhereWaysAre(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	start := valleyBand(g)
+	e := openTest(t, g, false)
+	sn := g.nodes[start]
+	slat, slon := float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7
+	const rc, theta = 3000.0, math.Pi / 2 // towards the wall: its points fall 2 km from the band, past the 900 m reach
+	jitter := []float64{1, 1}
+	if _, ok := circlePoints(e.g, e.sp, slat, slon, rc, theta, jitter, 0); ok {
+		t.Fatal("the first circle was meant to fall off the ways")
+	}
+	// Act
+	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, rc, theta, jitter, 0)
+	// Assert
+	if !ok || len(nodes) != len(jitter) {
+		t.Fatalf("ok = %v with %d nodes, want a circle of %d points", ok, len(nodes), len(jitter))
+	}
+	if used == theta {
+		t.Error("the circle did not turn")
+	}
+}
+
+func TestAControlCircleGivesUpWhenNoTurnReachesTheWays(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	start := g.grid(2, 2, flat)(0, 0)
+	e := openTest(t, g, false)
+	sn := g.nodes[start]
+	// Act
+	_, _, ok := rotatedCircle(e.g, e.sp, float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7, 20_000, 0, []float64{1, 1, 1}, 0)
+	// Assert
+	if ok {
+		t.Error("a circle 20 km wide around a 100 m lattice found ways within reach")
+	}
+}
+
+func TestSmallComponentsAreTheOnesTooSmallToHoldARoute(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	at := g.grid(30, 40, flat) // 1,200 nodes
+	island := g.addNode(9_000, 0, 100)
+	g.connect(island, g.addNode(9_100, 0, 100), KindPath)
+	e := openTest(t, g, false)
+	// Act
+	small := smallComponents(e.g, 1_000)
+	// Assert
+	if !small.has(uint32(island)) || !small.has(uint32(island+1)) {
+		t.Error("the two-node island is not small")
+	}
+	if small.has(uint32(at(0, 0))) || small.has(uint32(at(29, 39))) {
+		t.Error("the lattice is small")
+	}
+}
+
+func TestAControlPointDoesNotLandOnAnIsland(t *testing.T) {
+	// Arrange: the nodes nearest to the first circle's points form two islands, in a valley of 1,771 nodes
+	g := &testGraph{}
+	start := valleyBand(g)
+	for _, x := range []float64{-2598, 2598} {
+		g.connect(g.addNode(4_500, x, 100), g.addNode(4_550, x, 100), KindPath)
+	}
+	e := openTest(t, g, false)
+	sn := g.nodes[start]
+	slat, slon := float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7
+	// Act
+	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, 3000, math.Pi/2, []float64{1, 1}, 0)
+	// Assert
+	if !ok || used == math.Pi/2 {
+		t.Fatalf("ok = %v, turn = %v: the first circle lands on the islands and should have been turned", ok, used)
+	}
+	for _, n := range nodes {
+		if e.g.small.has(n) {
+			t.Errorf("node %d is on an island", n)
+		}
+	}
+}
+
+func TestALiftedControlPointDoesNotLandOnAnIsland(t *testing.T) {
+	// Arrange: a high island 250 m north of the start, in the valley's band
+	g := &testGraph{}
+	start := valleyBand(g)
+	hi := g.addNode(250, 0, 900)
+	g.connect(hi, g.addNode(300, 0, 900), KindPath)
+	e := openTest(t, g, false)
+	if !e.g.small.has(uint32(hi)) {
+		t.Fatal("the island is not small")
+	}
+	// Act
+	got := liftedNode(e.g, e.sp, uint32(start), 250, 1)
+	// Assert
+	if e.g.small.has(got) {
+		t.Errorf("the control point was lifted onto the island, node %d", got)
+	}
+}

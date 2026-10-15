@@ -83,6 +83,9 @@ type LoopRequest struct {
 	// and without retaining the slice. Returning true ends the search: the loops still being
 	// searched are dropped, so a caller that has what it needs spares the CPU.
 	Enough func(found []*Route) bool
+	// Stats, when set, counts why candidates give no loop, for a diagnosis. Finding why costs extra
+	// searches, so the product leaves it nil.
+	Stats *LoopStats
 }
 
 // Open maps a graph file, and its landmark file when landmarksPath is not empty, for the named
@@ -215,7 +218,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	}
 	found, failure := generate(ctx, e, e.sp, &loopParams{
 		distM: req.Distance, ascentM: req.Ascent, ascentBand: req.AscentBand, candidates: req.Candidates, seed: req.Seed,
-		anchors: anchors, baseM: baseM,
+		anchors: anchors, baseM: baseM, stats: req.Stats,
 	}, start, enough)
 	if failure != nil {
 		return nil, failure
@@ -269,11 +272,11 @@ func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Poi
 	}
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
-	nodes, edges, ok := chainLegs(ctx, e, s, e.prof.UpPerMeter, anchors)
+	nodes, edges, cause := chainLegs(ctx, e, s, e.prof.UpPerMeter, searchLimits{loopLegMaxSettled}, false, anchors)
 	if err := ctx.Err(); err != nil {
 		return nil, nil, nil, err
 	}
-	if !ok {
+	if cause != CauseNone {
 		return nil, nil, nil, ErrNoRoute
 	}
 	return anchors, nodes, edges, nil

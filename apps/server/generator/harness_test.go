@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"slices"
 	"sync/atomic"
@@ -74,15 +75,18 @@ func (c harnessCase) label() string {
 	return s
 }
 
-// countingLooper records how many loops the search had found when it stopped.
+// countingLooper records how many loops the search had found when it stopped, and why candidates failed.
 type countingLooper struct {
 	Looper
 	found atomic.Int64
+	// stats add up over the requests of a case; the harness reads and clears them between cases.
+	stats engine.LoopStats
 }
 
 func (c *countingLooper) Loops(ctx context.Context, req engine.LoopRequest) ([]*engine.Route, error) {
 	c.found.Store(0)
 	enough := req.Enough
+	req.Stats = &c.stats
 	req.Enough = func(found []*engine.Route) bool {
 		c.found.Store(int64(len(found)))
 		return enough != nil && enough(found)
@@ -97,6 +101,8 @@ type sample struct {
 	elapsed         time.Duration
 	found           int
 	matches, routes int
+	// retraced adds up the share of each match that goes back over a way it already used.
+	retraced float64
 }
 
 func TestHarness(t *testing.T) {
@@ -135,7 +141,7 @@ func TestHarness(t *testing.T) {
 
 	fmt.Printf("%d start(s), %d seed(s), %d candidates, timeout %s, surface %s\n",
 		len(cfg.Starts), len(cfg.Seeds), cmpOr(cfg.Candidates, defaultCandidates), timeout, cfg.Surface)
-	fmt.Printf("%-34s %8s %6s %6s %6s %7s %7s %7s %9s\n", "criteria", "median s", "p90 s", "max s", "loops", "full", ">=3", "empty", "matches")
+	fmt.Printf("%-34s %8s %6s %6s %6s %7s %7s %7s %9s %9s\n", "criteria", "median s", "p90 s", "max s", "loops", "full", ">=3", "empty", "matches", "retraced")
 	for _, c := range cfg.Cases {
 		for _, limit := range cfg.Caps {
 			var samples []sample
@@ -148,6 +154,7 @@ func TestHarness(t *testing.T) {
 				}
 			}
 			report(fmt.Sprintf("%s, cap %d", c.label(), limit), samples, limit)
+			reportCauses(looper)
 		}
 	}
 }
@@ -196,9 +203,24 @@ func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStar
 	for _, r := range routes {
 		if r.Kind == "match" {
 			s.matches++
+			s.retraced += retraceShare(cellsAlong(r.Geometry, criteria.Start, 0))
 		}
 	}
 	return s
+}
+
+// reportCauses prints, for the case just run, how many candidates were lost for each cause, and how many
+// only had their resizing cut short, then clears the counts. Candidates cancelled by the early stop or the
+// timeout are not counted.
+func reportCauses(l *countingLooper) {
+	var lost, cut int64
+	line := ""
+	for c := engine.CauseSameNode; c < engine.NumCauses; c++ {
+		lc, cc := l.stats.Lost[c].Swap(0), l.stats.Cut[c].Swap(0)
+		lost, cut = lost+lc, cut+cc
+		line += fmt.Sprintf(" %s %d/%d", c, lc, cc)
+	}
+	fmt.Printf("  candidates lost / cut, by cause:%s (total %d/%d)\n", line, lost, cut)
 }
 
 func report(label string, samples []sample, limit int) {
@@ -209,10 +231,12 @@ func report(label string, samples []sample, limit int) {
 	var times []float64
 	var founds []int
 	var full, atLeast3, empty, matches int
+	var retraced float64
 	for _, s := range samples {
 		times = append(times, s.elapsed.Seconds())
 		founds = append(founds, s.found)
 		matches += s.matches
+		retraced += s.retraced
 		if s.matches >= limit {
 			full++
 		}
@@ -226,6 +250,6 @@ func report(label string, samples []sample, limit int) {
 	n := float64(len(samples))
 	slices.Sort(times)
 	slices.Sort(founds)
-	fmt.Printf("%-34s %8.2f %6.2f %6.2f %6d %6.0f%% %6.0f%% %6.0f%% %9.2f\n", label, times[len(times)/2], times[len(times)*9/10], times[len(times)-1], founds[len(founds)/2],
-		100*float64(full)/n, 100*float64(atLeast3)/n, 100*float64(empty)/n, float64(matches)/n)
+	fmt.Printf("%-34s %8.2f %6.2f %6.2f %6d %6.0f%% %6.0f%% %6.0f%% %9.2f %8.1f%%\n", label, times[len(times)/2], times[len(times)*9/10], times[len(times)-1], founds[len(founds)/2],
+		100*float64(full)/n, 100*float64(atLeast3)/n, 100*float64(empty)/n, float64(matches)/n, 100*retraced/math.Max(1, float64(matches)))
 }

@@ -50,7 +50,9 @@ type graph struct {
 	off         []uint32
 	edges       []edge
 	sp          *spatial
-	file        mapped
+	// small holds the nodes of components too small to hold a loop: control points keep off them.
+	small nodeSet
+	file  mapped
 }
 
 func align16(n int) int { return (n + 15) &^ 15 }
@@ -174,6 +176,7 @@ func openGraph(path string) (_ *graph, err error) {
 	if g.sp.nodes, err = view[uint32](data, listAt, n); err != nil {
 		return nil, fmt.Errorf("%s: index nodes: %w", path, err)
 	}
+	g.small = smallComponents(g, smallComponentNodes)
 	return g, nil
 }
 
@@ -423,7 +426,19 @@ type searcher struct {
 	used    int
 	heap    []item
 	settled int
+	// stop is why the last route returned nil.
+	stop stopReason
 }
+
+// stopReason tells why a search found no route.
+type stopReason uint8
+
+const (
+	stopExhausted stopReason = iota // every node it could reach was settled
+	stopCutoff                      // the cheapest open node cost more than a route is worth
+	stopCap                         // it settled as many nodes as it was allowed
+	stopCanceled
+)
 
 const (
 	noEdge           = math.MaxUint32
@@ -532,7 +547,9 @@ type searchLimits struct {
 func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *avoidSet, lim searchLimits, src, dst uint32) *route {
 	s.reset()
 	s.settled = 0
+	s.stop = stopExhausted
 	if ctx.Err() != nil { // short searches never reach the periodic check below
+		s.stop = stopCanceled
 		return nil
 	}
 	g := cx.g
@@ -594,13 +611,16 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 			continue
 		}
 		if it.g > maxCost {
+			s.stop = stopCutoff
 			break
 		}
 		s.settled++
 		if lim.maxSettled > 0 && s.settled > lim.maxSettled {
+			s.stop = stopCap
 			return nil
 		}
 		if s.settled&1023 == 0 && ctx.Err() != nil {
+			s.stop = stopCanceled
 			return nil
 		}
 		if u == dst {
@@ -625,6 +645,7 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 				if fresh {
 					if (s.used+1)*2 > len(s.slots) {
 						if ctx.Err() != nil { // growing copies tens of MB and cannot be interrupted
+							s.stop = stopCanceled
 							return nil
 						}
 						s.grow()
@@ -708,6 +729,8 @@ type loopParams struct {
 	// of the cheapest loop through them.
 	anchors []uint32
 	baseM   float64
+	// stats, when set, counts why candidates fail. Nil in the product: finding why costs extra searches.
+	stats *LoopStats
 }
 
 type loopResult struct {
@@ -742,20 +765,24 @@ func measure(g *graph, nodes, edges []uint32) (dist, trail, overlap float64) {
 }
 
 // chainLegs routes each leg between consecutive points, a leg avoiding the ways the earlier ones used.
-// It reports false when a leg has no route, or joins a node to itself.
-func chainLegs(ctx context.Context, cx *Engine, s *searcher, climb float32, points []uint32) (nodes, edges []uint32, ok bool) {
+// It returns CauseNone on success, otherwise why a leg failed. With diagnosing, which costs extra searches,
+// the cause is told apart as diagnose does; without, it is what the search itself saw.
+func chainLegs(ctx context.Context, cx *Engine, s *searcher, climb float32, lim searchLimits, diagnosing bool, points []uint32) (nodes, edges []uint32, cause LegCause) {
 	avoid := newAvoidSet()
 	for j := 1; j < len(points); j++ {
 		if points[j-1] == points[j] {
-			return nil, nil, false
+			return nil, nil, CauseSameNode
 		}
 		var av *avoidSet
 		if avoid.n > 0 {
 			av = avoid
 		}
-		leg := s.route(ctx, cx, climb, av, searchLimits{loopLegMaxSettled}, points[j-1], points[j])
+		leg := s.route(ctx, cx, climb, av, lim, points[j-1], points[j])
 		if leg == nil {
-			return nil, nil, false
+			if diagnosing {
+				return nil, nil, diagnose(ctx, cx, s, climb, av, lim, points[j-1], points[j], s.stop)
+			}
+			return nil, nil, searchCause(s.stop)
 		}
 		if len(nodes) == 0 {
 			nodes = append(nodes, leg.nodes...)
@@ -767,7 +794,7 @@ func chainLegs(ctx context.Context, cx *Engine, s *searcher, climb float32, poin
 			avoid.insert(pairKey(leg.nodes[q-1], leg.nodes[q]))
 		}
 	}
-	return nodes, edges, true
+	return nodes, edges, CauseNone
 }
 
 // withControlPoints inserts the control points into the legs between the anchors, each into the leg it
@@ -841,7 +868,8 @@ func climbLift(ascent, target float64, band AscentBand) float64 {
 }
 
 // liftedNode is the highest node (lift > 0) or lowest (lift < 0) among base and those nearest to eight
-// points reachM around it, or base for no lift. Fixed directions keep a seed's loops the same.
+// points reachM around it, leaving out the nodes of small components, or base for no lift. Fixed directions keep
+// a seed's loops the same.
 func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32 {
 	if lift == 0 {
 		return base
@@ -857,14 +885,60 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32
 	for k := 0; k < 8; k++ {
 		a := float64(k) * math.Pi / 4
 		n, d, ok := sp.nearest(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl))
-		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev {
+		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev && !g.small.has(n) {
 			best = n
 		}
 	}
 	return best
 }
 
+// circleTries is how many turns of the control circle are tried before a candidate is given up.
+const circleTries = 8
+
+// goldenAngle spreads successive turns of the circle as evenly as can be, whatever their number.
+const goldenAngle = 2.399963229728653
+
+// circlePoints is the node of each control point of the circle of radius rc whose centre lies towards theta
+// from the point (slat, slon), or false when one is farther than snapReach from any way.
+func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64) ([]uint32, bool) {
+	cosl := math.Cos(slat * rad)
+	cxm, cym := rc*math.Cos(theta), rc*math.Sin(theta)
+	nodes := make([]uint32, 0, len(jitter))
+	for j := range jitter {
+		phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(len(jitter)+1)
+		x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
+		n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
+		if !ok || d > snapReach(rc) || g.small.has(n) {
+			return nil, false
+		}
+		nodes = append(nodes, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))
+	}
+	return nodes, true
+}
+
+// rotatedCircle is circlePoints for theta, or for the first of the next turns that falls on ways. In a valley
+// most directions lead to a wall: at Chamonix, 30 km, 44 % of the circles had a point beyond reach, and turning
+// it up to circleTries times leaves none. The turn it used comes back, to be kept for the resizings.
+func rotatedCircle(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64) ([]uint32, float64, bool) {
+	for r := 0; r < circleTries; r++ {
+		turned := theta + float64(r)*goldenAngle
+		if nodes, ok := circlePoints(g, sp, slat, slon, rc, turned, jitter, lift); ok {
+			return nodes, turned, true
+		}
+	}
+	return nil, theta, false
+}
+
 func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *loopParams, start uint32, index int) *loopResult {
+	best, cause := candidateLoop(ctx, cx, sp, s, lp, start, index)
+	if lp.stats != nil && ctx.Err() == nil {
+		lp.stats.record(cause, best == nil)
+	}
+	return best
+}
+
+// candidateLoop is candidate, and says why it stopped short of its four resizings, if it did.
+func candidateLoop(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *loopParams, start uint32, index int) (*loopResult, LegCause) {
 	g := cx.g
 	rng := newSplitmix(lp.seed, uint64(index))
 	climb := cx.prof.UpPerMeter * float32(2*rng.f64())
@@ -891,27 +965,21 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 	lift := 0.0
 	for iter := 0; iter < 4; iter++ {
 		if ctx.Err() != nil {
-			return best
+			return best, CauseCanceled
 		}
-		cxm, cym := rc*math.Cos(theta), rc*math.Sin(theta)
-		points := []uint32{start}
-		for j := 0; j < k; j++ {
-			phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(k+1)
-			x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
-			n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
-			if !ok || d > snapReach(rc) {
-				return best
-			}
-			points = append(points, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))
+		circle, turned, ok := rotatedCircle(g, sp, slat, slon, rc, theta, jitter, lift)
+		if !ok {
+			return best, CauseNoSnap
 		}
-		points = append(points, start)
+		theta = turned
+		points := append(append([]uint32{start}, circle...), start)
 		if lp.anchors != nil {
 			// The user's waypoints fix the order; the circle's points only add detours between them.
 			points = collapse(withControlPoints(lp.anchors, points[1:len(points)-1], xy))
 		}
-		nodes, edges, ok := chainLegs(ctx, cx, s, climb, points)
-		if !ok {
-			return best
+		nodes, edges, cause := chainLegs(ctx, cx, s, climb, searchLimits{loopLegMaxSettled}, lp.stats != nil, points)
+		if cause != CauseNone {
+			return best, cause
 		}
 		dist, trail, overlap := measure(g, nodes, edges)
 		asc := ascent(g, nodes)
@@ -934,7 +1002,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 			rc *= lp.distM / dist
 		}
 	}
-	return best
+	return best, CauseNone
 }
 
 // maxSearchWorkers is how many CPUs one loop search uses at most: beyond it, more workers find nothing
