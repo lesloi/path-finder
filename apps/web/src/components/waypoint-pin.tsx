@@ -47,10 +47,7 @@ export function WaypointPin({
   const classes = VARIANTS[variant];
   if (poi) {
     return (
-      <span
-        className={`pointer-events-auto ${classes.poi}`}
-        {...(poiLabel && hint(poiLabel, tipSide))}
-      >
+      <span className={`pointer-events-auto ${classes.poi}`} {...(poiLabel && hint(poiLabel, tipSide))}>
         <PoiBadge category={poi.category} seasonal={poi.seasonal} className={classes.badge} />
         <span
           className="absolute right-[-4px] bottom-0 min-w-[11px] rounded-full bg-white text-center text-[9px] leading-[11px] font-bold"
