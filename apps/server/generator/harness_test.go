@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"slices"
 	"sync/atomic"
@@ -100,6 +101,8 @@ type sample struct {
 	elapsed         time.Duration
 	found           int
 	matches, routes int
+	// retraced adds up the share of each match that goes back over a way it already used.
+	retraced float64
 }
 
 func TestHarness(t *testing.T) {
@@ -138,7 +141,7 @@ func TestHarness(t *testing.T) {
 
 	fmt.Printf("%d start(s), %d seed(s), %d candidates, timeout %s, surface %s\n",
 		len(cfg.Starts), len(cfg.Seeds), cmpOr(cfg.Candidates, defaultCandidates), timeout, cfg.Surface)
-	fmt.Printf("%-34s %8s %6s %6s %6s %7s %7s %7s %9s\n", "criteria", "median s", "p90 s", "max s", "loops", "full", ">=3", "empty", "matches")
+	fmt.Printf("%-34s %8s %6s %6s %6s %7s %7s %7s %9s %9s\n", "criteria", "median s", "p90 s", "max s", "loops", "full", ">=3", "empty", "matches", "retraced")
 	for _, c := range cfg.Cases {
 		for _, limit := range cfg.Caps {
 			var samples []sample
@@ -200,6 +203,7 @@ func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStar
 	for _, r := range routes {
 		if r.Kind == "match" {
 			s.matches++
+			s.retraced += retracedShare(r.Geometry)
 		}
 	}
 	return s
@@ -219,6 +223,29 @@ func reportCauses(l *countingLooper) {
 	fmt.Printf("  candidates lost / cut, by cause:%s (total %d/%d)\n", line, lost, cut)
 }
 
+// retracedShare is the share of a route's segments that run over a segment it already ran, in either direction.
+func retracedShare(geometry [][]float64) float64 {
+	if len(geometry) < 2 {
+		return 0
+	}
+	type key [4]int64
+	seen := map[key]bool{}
+	repeated := 0
+	for i := 1; i < len(geometry); i++ {
+		a := [2]int64{int64(geometry[i-1][0] * 1e5), int64(geometry[i-1][1] * 1e5)}
+		b := [2]int64{int64(geometry[i][0] * 1e5), int64(geometry[i][1] * 1e5)}
+		if a[0] > b[0] || a[0] == b[0] && a[1] > b[1] {
+			a, b = b, a
+		}
+		k := key{a[0], a[1], b[0], b[1]}
+		if seen[k] {
+			repeated++
+		}
+		seen[k] = true
+	}
+	return float64(repeated) / float64(len(geometry)-1)
+}
+
 func report(label string, samples []sample, limit int) {
 	if len(samples) == 0 {
 		fmt.Printf("%-34s no sample\n", label)
@@ -227,10 +254,12 @@ func report(label string, samples []sample, limit int) {
 	var times []float64
 	var founds []int
 	var full, atLeast3, empty, matches int
+	var retraced float64
 	for _, s := range samples {
 		times = append(times, s.elapsed.Seconds())
 		founds = append(founds, s.found)
 		matches += s.matches
+		retraced += s.retraced
 		if s.matches >= limit {
 			full++
 		}
@@ -244,6 +273,6 @@ func report(label string, samples []sample, limit int) {
 	n := float64(len(samples))
 	slices.Sort(times)
 	slices.Sort(founds)
-	fmt.Printf("%-34s %8.2f %6.2f %6.2f %6d %6.0f%% %6.0f%% %6.0f%% %9.2f\n", label, times[len(times)/2], times[len(times)*9/10], times[len(times)-1], founds[len(founds)/2],
-		100*float64(full)/n, 100*float64(atLeast3)/n, 100*float64(empty)/n, float64(matches)/n)
+	fmt.Printf("%-34s %8.2f %6.2f %6.2f %6d %6.0f%% %6.0f%% %6.0f%% %9.2f %8.1f%%\n", label, times[len(times)/2], times[len(times)*9/10], times[len(times)-1], founds[len(founds)/2],
+		100*float64(full)/n, 100*float64(atLeast3)/n, 100*float64(empty)/n, float64(matches)/n, 100*retraced/math.Max(1, float64(matches)))
 }
