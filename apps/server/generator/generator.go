@@ -24,13 +24,23 @@ type Looper interface {
 type Generator struct {
 	// Engines by surface preference ("any", "paved", "unpaved").
 	Engines map[string]Looper
-	// Candidates is how many loops to ask the engine for (default 80).
+	// Candidates is how many loops to ask the engine for (default defaultCandidates).
 	Candidates int
+	// MaxRoutes is how many matches a route set holds at most, and where the search stops (default maxRoutes).
+	MaxRoutes int
+	// StopAfter ends the search once that many loops in a row have added no match to the set, whatever the
+	// budget left (default defaultStopAfter). It lets a hard request search long and an easy one stop early.
+	StopAfter int
 	// Seed gives each request its own seed, so asking again can bring other loops (default random).
 	Seed func() uint64
 }
 
-const defaultCandidates = 80
+// defaultCandidates is large because most requests stop long before it: defaultStopAfter ends the search once
+// more loops no longer add a match. The measures behind both are in docs/DECISIONS.md.
+const (
+	defaultCandidates = 100
+	defaultStopAfter  = 60
+)
 
 // Generate reads the criteria from body and returns the routes of a route set. It reports
 // criteria that are not valid as a *contract.CriteriaError. When ctx ends first, it returns the
@@ -49,6 +59,8 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	if err != nil {
 		return nil, err
 	}
+	limit := cmpOr(g.MaxRoutes, maxRoutes)
+	stopAfter := cmpOr(g.StopAfter, defaultStopAfter)
 	req := engine.LoopRequest{
 		Start:      engine.Point{Lat: criteria.Start[1], Lon: criteria.Start[0]},
 		Distance:   km * 1000,
@@ -60,35 +72,40 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		req.AscentBand = engine.AscentBand{Share: matchTolerance.elevationGain, FloorM: matchTolerance.elevationGainFloor}
 	}
 	// The loop straight through the waypoints is a candidate of its own.
-	var direct *candidate
-	var seen []*candidate
+	set := newRanking(criteria, km)
 	if len(criteria.Waypoints) > 0 {
 		for _, w := range criteria.Waypoints {
 			req.Waypoints = append(req.Waypoints, engine.Point{Lat: w[1], Lon: w[0]})
 		}
-		var err error
-		if direct, err = throughWaypoints(ctx, looper, criteria, req.Waypoints); err != nil {
+		direct, err := throughWaypoints(ctx, looper, criteria, req.Waypoints)
+		if err != nil {
 			return nil, err
 		}
 		if direct != nil {
-			seen = append(seen, direct)
+			set.add(direct)
 		}
 	}
-	// Stops searching once the route set cannot get any bigger: more loops would only cost CPU.
-	var converted int
-	req.Enough = func(found []*engine.Route) bool {
+	// Stops searching once the route set cannot get any bigger, or no longer does: more loops would only cost CPU.
+	var converted, best, lastGain int
+	addLoops := func(found []*engine.Route) {
 		for ; converted < len(found); converted++ {
 			if c := toCandidate(found[converted]); c != nil {
-				seen = append(seen, c)
+				set.add(c)
 			}
 		}
+	}
+	req.Enough = func(found []*engine.Route) bool {
+		addLoops(found)
 		matches := 0
-		for _, r := range buildRouteSet(criteria, km, seen) {
+		for _, r := range set.routes(limit) {
 			if r.Kind == "match" {
 				matches++
 			}
 		}
-		return matches >= maxRoutes
+		if matches > best {
+			best, lastGain = matches, len(found)
+		}
+		return matches >= limit || len(found)-lastGain >= stopAfter
 	}
 
 	loops, err := looper.Loops(ctx, req)
@@ -99,16 +116,8 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	case err != nil && ctx.Err() == nil:
 		return nil, err
 	}
-	candidates := make([]*candidate, 0, len(loops)+1)
-	if direct != nil {
-		candidates = append(candidates, direct)
-	}
-	for _, l := range loops {
-		if c := toCandidate(l); c != nil {
-			candidates = append(candidates, c)
-		}
-	}
-	routes := buildRouteSet(criteria, km, candidates)
+	addLoops(loops)
+	routes := set.routes(limit)
 	if ctx.Err() != nil && len(routes) == 0 {
 		return nil, ctx.Err()
 	}

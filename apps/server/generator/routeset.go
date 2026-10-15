@@ -153,22 +153,35 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	}, score, cells}, true
 }
 
-// buildRouteSet keeps the candidates that fit the criteria, the best first: up to maxRoutes
-// matches, then suggestions only to fill the set up to minRoutes, none sharing most of its
-// geometry with a better one. Fewer is fine, and none is possible.
-func buildRouteSet(c contract.Criteria, targetKm float64, candidates []*candidate) []contract.Route {
-	radius := math.Min(startRadius, startRadiusShare*targetKm*1000)
-	var all []ranked
+// ranking holds the candidates that fit the criteria, the best first. Each is classified once as it is added,
+// since the search asks for the route set after every loop found.
+type ranking struct {
+	criteria contract.Criteria
+	radius   float64
+	all      []ranked
+}
+
+func newRanking(c contract.Criteria, targetKm float64) *ranking {
+	return &ranking{criteria: c, radius: math.Min(startRadius, startRadiusShare*targetKm*1000)}
+}
+
+// add ranks candidates among those already there. The sort is stable, so equal scores keep the order the
+// candidates were added in.
+func (r *ranking) add(candidates ...*candidate) {
 	for _, cand := range candidates {
-		if r, ok := classify(c, cand, radius); ok {
-			all = append(all, r)
+		if entry, ok := classify(r.criteria, cand, r.radius); ok {
+			r.all = append(r.all, entry)
 		}
 	}
-	sort.SliceStable(all, func(i, j int) bool { return all[i].score < all[j].score })
+	sort.SliceStable(r.all, func(i, j int) bool { return r.all[i].score < r.all[j].score })
+}
 
+// routes keeps the best up to limit matches, then suggestions only to fill the set up to minRoutes, none
+// sharing most of its geometry with a better one. Fewer is fine, and none is possible.
+func (r *ranking) routes(limit int) []contract.Route {
 	var picked []ranked
 	pick := func(kind string, size int) {
-		for _, entry := range all {
+		for _, entry := range r.all {
 			if len(picked) >= size {
 				return
 			}
@@ -187,11 +200,19 @@ func buildRouteSet(c contract.Criteria, targetKm float64, candidates []*candidat
 			}
 		}
 	}
-	pick("match", maxRoutes)
+	pick("match", limit)
 	pick("suggestion", minRoutes)
 	routes := make([]contract.Route, len(picked))
 	for i, p := range picked {
 		routes[i] = p.route
 	}
 	return routes
+}
+
+// buildRouteSet keeps the candidates that fit the criteria, the best first: up to limit matches, then
+// suggestions only to fill the set up to minRoutes.
+func buildRouteSet(c contract.Criteria, targetKm float64, candidates []*candidate, limit int) []contract.Route {
+	r := newRanking(c, targetKm)
+	r.add(candidates...)
+	return r.routes(limit)
 }

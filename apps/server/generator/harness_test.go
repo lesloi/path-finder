@@ -34,6 +34,10 @@ type harnessConfig struct {
 	// Surface is the surface preference to search with (default "any").
 	Surface string   `json:"surface"`
 	Seeds   []uint64 `json:"seeds"`
+	// Caps are the sizes of route set to search for, each measured on its own (default: the product's).
+	Caps []int `json:"caps"`
+	// StopAfter is the Generator's stop on loops that add no match (default: the server's).
+	StopAfter int `json:"stopAfter"`
 	// Candidates is the search budget of a request (default: the server's).
 	Candidates int `json:"candidates"`
 	// Timeout is what a request is given, as a Go duration (default: the server's 15 s).
@@ -120,6 +124,9 @@ func TestHarness(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	if len(cfg.Caps) == 0 {
+		cfg.Caps = []int{maxRoutes}
+	}
 	zones, err := engine.NewReloader(cfg.DataDir, cfg.Surface)
 	if err != nil {
 		t.Fatal(err)
@@ -127,23 +134,25 @@ func TestHarness(t *testing.T) {
 	looper := &countingLooper{Looper: zones.Profile(cfg.Surface)}
 
 	fmt.Printf("%d start(s), %d seed(s), %d candidates, timeout %s, surface %s\n",
-		len(cfg.Starts), len(cfg.Seeds), cfg.Candidates, timeout, cfg.Surface)
-	fmt.Printf("%-26s %8s %6s %7s %7s %7s %9s\n", "criteria", "median s", "loops", "5 match", ">=3", "empty", "matches")
+		len(cfg.Starts), len(cfg.Seeds), cmpOr(cfg.Candidates, defaultCandidates), timeout, cfg.Surface)
+	fmt.Printf("%-34s %8s %6s %6s %6s %7s %7s %7s %9s\n", "criteria", "median s", "p90 s", "max s", "loops", "full", ">=3", "empty", "matches")
 	for _, c := range cfg.Cases {
-		var samples []sample
-		for _, st := range cfg.Starts {
-			if c.Waypoints && len(st.Waypoints) == 0 {
-				continue
+		for _, limit := range cfg.Caps {
+			var samples []sample
+			for _, st := range cfg.Starts {
+				if c.Waypoints && len(st.Waypoints) == 0 {
+					continue
+				}
+				for _, seed := range cfg.Seeds {
+					samples = append(samples, run(t, cfg, looper, st, c, seed, timeout, limit))
+				}
 			}
-			for _, seed := range cfg.Seeds {
-				samples = append(samples, run(t, cfg, looper, st, c, seed, timeout))
-			}
+			report(fmt.Sprintf("%s, cap %d", c.label(), limit), samples, limit)
 		}
-		report(c.label(), samples)
 	}
 }
 
-func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStart, c harnessCase, seed uint64, timeout time.Duration) sample {
+func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStart, c harnessCase, seed uint64, timeout time.Duration, limit int) sample {
 	t.Helper()
 	criteria := contract.Criteria{
 		Start: [2]float64{st.Lon, st.Lat}, Target: contract.Target{Distance: c.DistanceKm},
@@ -160,7 +169,7 @@ func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStar
 		t.Fatal(err)
 	}
 	g := &Generator{
-		Engines: map[string]Looper{cfg.Surface: looper}, Candidates: cfg.Candidates,
+		Engines: map[string]Looper{cfg.Surface: looper}, Candidates: cfg.Candidates, MaxRoutes: limit, StopAfter: cfg.StopAfter,
 		Seed: func() uint64 { return seed },
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -192,9 +201,9 @@ func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStar
 	return s
 }
 
-func report(label string, samples []sample) {
+func report(label string, samples []sample, limit int) {
 	if len(samples) == 0 {
-		fmt.Printf("%-26s no sample\n", label)
+		fmt.Printf("%-34s no sample\n", label)
 		return
 	}
 	var times []float64
@@ -204,7 +213,7 @@ func report(label string, samples []sample) {
 		times = append(times, s.elapsed.Seconds())
 		founds = append(founds, s.found)
 		matches += s.matches
-		if s.matches >= maxRoutes {
+		if s.matches >= limit {
 			full++
 		}
 		if s.routes >= minRoutes {
@@ -217,6 +226,6 @@ func report(label string, samples []sample) {
 	n := float64(len(samples))
 	slices.Sort(times)
 	slices.Sort(founds)
-	fmt.Printf("%-26s %8.2f %6d %6.0f%% %6.0f%% %6.0f%% %9.2f\n", label, times[len(times)/2], founds[len(founds)/2],
+	fmt.Printf("%-34s %8.2f %6.2f %6.2f %6d %6.0f%% %6.0f%% %6.0f%% %9.2f\n", label, times[len(times)/2], times[len(times)*9/10], times[len(times)-1], founds[len(founds)/2],
 		100*float64(full)/n, 100*float64(atLeast3)/n, 100*float64(empty)/n, float64(matches)/n)
 }
