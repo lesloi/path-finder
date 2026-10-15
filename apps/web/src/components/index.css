@@ -356,6 +356,11 @@
     translate: none;
   }
 }
+[data-tip-side='left']::after {
+  top: 50%;
+  right: calc(100% + var(--spacing) * 2);
+  translate: 0 -50%;
+}
 [data-tip-side^='bottom']::after {
   top: calc(100% + var(--spacing) * 2);
 }

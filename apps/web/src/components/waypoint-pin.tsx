@@ -8,9 +8,17 @@ const PIN_VIEW_BOX = '3 1 18 22';
 const PIN_PATH = 'M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0';
 
 // Each class is written whole for Tailwind. The map's pin carries its own shadow; the profile's sits where its parent puts it.
+const PLACED_POI = { poi: 'absolute top-0 left-0 h-[22px] w-[18px]', badge: 'absolute top-0 left-0 size-[18px]' };
 const VARIANTS = {
-  map: { box: 'relative block h-[29px] w-6 drop-shadow-md', number: 'top-[6px] text-xs' },
-  profile: { box: 'absolute top-0 left-0 h-[22px] w-[18px]', number: 'top-[3px] text-[11px]' },
+  map: { box: 'relative block h-[29px] w-6 drop-shadow-md', number: 'top-[6px] text-xs', ...PLACED_POI },
+  profile: { box: 'absolute top-0 left-0 h-[22px] w-[18px]', number: 'top-[3px] text-[11px]', ...PLACED_POI },
+  // In a row of the list, which centres it: in the flow, not placed.
+  list: {
+    box: 'relative block h-6 w-5',
+    number: 'top-[5px] text-[11px]',
+    poi: 'relative block size-6',
+    badge: 'absolute top-0 left-0 size-6',
+  },
 };
 
 /**
@@ -40,10 +48,10 @@ export function WaypointPin({
   if (poi) {
     return (
       <span
-        className="pointer-events-auto absolute top-0 left-0 h-[22px] w-[18px]"
+        className={`pointer-events-auto ${classes.poi}`}
         {...(poiLabel && hint(poiLabel, tipSide))}
       >
-        <PoiBadge category={poi.category} seasonal={poi.seasonal} className="absolute top-0 left-0 size-[18px]" />
+        <PoiBadge category={poi.category} seasonal={poi.seasonal} className={classes.badge} />
         <span
           className="absolute right-[-4px] bottom-0 min-w-[11px] rounded-full bg-white text-center text-[9px] leading-[11px] font-bold"
           style={{ color: MAP_INK }}

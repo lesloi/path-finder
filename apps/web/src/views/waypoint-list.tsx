@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, MapPinCheck, MapPinPlus, X } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { WaypointPin } from '../components/waypoint-pin.tsx';
 import { hint, tip } from '../components/index.ts';
@@ -7,6 +7,9 @@ import { poiLabel, waypointPoiAt, type Position, type WaypointPois } from '../co
 import { criteriaText, type Language } from '../i18n/index.ts';
 
 const ROW_BUTTON = 'grid size-8 flex-none place-items-center rounded-full text-ink hover:bg-surface-2';
+
+// How long a row moved stays set apart.
+const MOVED_MS = 1200;
 
 const NAME = 'flex min-w-0 flex-1 items-center gap-2 py-1 text-left text-sm text-ink';
 
@@ -49,6 +52,22 @@ export function WaypointList({
 }) {
   const t = criteriaText[language];
   const list = useRef<HTMLOListElement>(null);
+  // The names of the rows read alike, so a move leaves the list looking the same: the row just moved is set apart for a
+  // moment, and said aloud.
+  // The row is told by its key, not its index: a waypoint removed or another one added meanwhile must not move the
+  // highlight onto a stranger. `count` makes each move a new announcement, even to the position just announced.
+  const [moved, setMoved] = useState<{ key: string; position: number; count: number }>();
+  useEffect(() => {
+    if (!moved) return;
+    const timer = setTimeout(() => setMoved((current) => (current === moved ? undefined : current)), MOVED_MS);
+    return () => clearTimeout(timer);
+  }, [moved]);
+  // Two waypoints can be at the very same position: the key counts the ones before.
+  const keyOf = (index: number) => {
+    const [lon, lat] = waypoints[index]!;
+    return `${lon},${lat}#${waypoints.slice(0, index).filter((w) => w[0] === lon && w[1] === lat).length}`;
+  };
+  const movedStands = moved !== undefined && waypoints[moved.position - 1] && keyOf(moved.position - 1) === moved.key;
   // A row that reaches an end can no longer be moved that way: the focus goes on to the arrow that still works, so
   // that someone at the keyboard is not left on a disabled button.
   const refocus = useRef<{ index: number; direction: 'up' | 'down' }>(undefined);
@@ -84,18 +103,24 @@ export function WaypointList({
           </button>
         )}
       </div>
+      <p className="sr-only" role="status" data-testid="criteria-waypoint-announcement">
+        {movedStands && <span key={moved.count}>{t.waypointMoved(moved.position)}</span>}
+      </p>
       <ol ref={list} className="-m-1 flex max-h-36 flex-col gap-1 overflow-y-auto p-1">
         {waypoints.map((waypoint, index) => {
           const number = index + 1;
           const poi = waypointPoiAt(waypointPois, waypoint);
-          const name = poi ? poiLabel(poi, language) : t.waypointName(number);
+          // The number in the pin says the order; the name has none, as it would only change under the user's eyes.
+          // The buttons are named by number, so that those of the rows do not read alike.
+          const poiName = poi && poiLabel(poi, language);
+          const name = poiName || t.waypointLabel;
+          const buttonName = poiName || t.waypointName(number);
           const id = `criteria-waypoint-item-${number}`;
-          // Two waypoints can be at the very same position: the key counts the ones before.
-          const key = `${waypoint.join(',')}#${waypoints.slice(0, index).filter((w) => w[0] === waypoint[0] && w[1] === waypoint[1]).length}`;
+          const key = keyOf(index);
           const pinAndName = (
             <>
-              <span className="relative block h-[29px] w-6 flex-none" aria-hidden>
-                <WaypointPin number={number} variant="map" poi={poi} />
+              <span className="grid size-7 flex-none place-items-center" aria-hidden>
+                <WaypointPin number={number} variant="list" poi={poi} />
               </span>
               <span data-name className="truncate">
                 {name}
@@ -107,7 +132,7 @@ export function WaypointList({
               // Its position names the point as it moves.
               key={key}
               data-testid={id}
-              className="flex items-center gap-1 rounded-lg bg-surface-2/50 pr-1 pl-3"
+              className={`flex items-center gap-1 rounded-lg pr-1 pl-3 transition-colors duration-500 ${movedStands && moved.key === key ? 'bg-accent/25' : 'bg-surface-2/50'}`}
               // The pin goes with the row for whoever points at it, with the mouse or with the keyboard.
               onMouseEnter={() => onPoint?.(index)}
               onMouseLeave={() => onPoint?.(undefined)}
@@ -138,13 +163,14 @@ export function WaypointList({
                     type="button"
                     data-testid={`${id}-${direction}`}
                     className={`${ROW_BUTTON} disabled:opacity-40`}
-                    aria-label={t[label](name)}
+                    aria-label={t[label](buttonName)}
                     // A tooltip on a button that cannot be pressed would say what it cannot do.
-                    {...(possible && hint(t[hintOf], 'top-end'))}
+                    {...(possible && hint(t[hintOf], 'left'))}
                     disabled={!possible}
                     onClick={() => {
                       refocus.current = { index: target, direction };
                       onMove(index, target);
+                      setMoved({ key: keyOf(index), position: target + 1, count: (moved?.count ?? 0) + 1 });
                     }}
                   >
                     <Icon size={16} aria-hidden />
@@ -155,8 +181,8 @@ export function WaypointList({
                 type="button"
                 data-testid={`${id}-remove`}
                 className={ROW_BUTTON}
-                aria-label={t.removeWaypointNamed(name)}
-                {...hint(t.removeWaypoint, 'top-end')}
+                aria-label={t.removeWaypointNamed(buttonName)}
+                {...hint(t.removeWaypoint, 'left')}
                 onClick={() => onRemove(index)}
               >
                 <X size={16} aria-hidden />
