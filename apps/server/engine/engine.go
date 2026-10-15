@@ -830,12 +830,11 @@ const (
 // A control point is moved to the nearest node within snapReach of it. On a long loop, in a valley with
 // steep sides, most points of the circle fall where no way is mapped within 400 m, and 87 of 100 candidates
 // were lost at Chamonix; the reach follows the circle, and the resizing then corrects the distance.
-const (
-	minSnapReachM  = 400.0
-	snapReachShare = 0.3
-)
+const snapReachShare = 0.3
 
-func snapReach(radiusM float64) float64 { return math.Max(minSnapReachM, snapReachShare*radiusM) }
+func snapReach(radiusM float64) float64 {
+	return math.Max(float64(maxSnapMeters), snapReachShare*radiusM)
+}
 
 // climbLift tells how the next resizing should move the control points to fix the elevation gain: a share
 // of 1 at most towards higher nodes (positive) when the loop climbs too little, towards lower ones
@@ -856,17 +855,15 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32
 	b := g.nodes[base]
 	lat, lon := float64(b.Lat)*1e-7, float64(b.Lon)*1e-7
 	cosl := math.Cos(lat * rad)
-	best := base
-	better := func(n uint32) bool {
-		if lift > 0 {
-			return g.nodes[n].Elev > g.nodes[best].Elev
-		}
-		return g.nodes[n].Elev < g.nodes[best].Elev
+	sign := int32(1)
+	if lift < 0 {
+		sign = -1
 	}
+	best := base
 	for k := 0; k < 8; k++ {
 		a := float64(k) * math.Pi / 4
 		n, d, ok := sp.nearest(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl))
-		if ok && d <= 400 && better(n) {
+		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev {
 			best = n
 		}
 	}

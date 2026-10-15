@@ -86,9 +86,12 @@ func (c *countingLooper) Loops(ctx context.Context, req engine.LoopRequest) ([]*
 	return c.Looper.Loops(ctx, req)
 }
 
+// verbose lists the sets of fewer than three routes, to see where a measure falls short.
+var verbose = os.Getenv("HARNESS_VERBOSE") != ""
+
 type sample struct {
 	elapsed         time.Duration
-	candidates      int
+	found           int
 	matches, routes int
 }
 
@@ -125,7 +128,7 @@ func TestHarness(t *testing.T) {
 
 	fmt.Printf("%d start(s), %d seed(s), %d candidates, timeout %s, surface %s\n",
 		len(cfg.Starts), len(cfg.Seeds), cfg.Candidates, timeout, cfg.Surface)
-	fmt.Printf("%-26s %8s %6s %7s %7s %7s %9s\n", "criteria", "median s", "cands", "5 match", ">=3", "empty", "matches")
+	fmt.Printf("%-26s %8s %6s %7s %7s %7s %9s\n", "criteria", "median s", "loops", "5 match", ">=3", "empty", "matches")
 	for _, c := range cfg.Cases {
 		var samples []sample
 		for _, st := range cfg.Starts {
@@ -164,22 +167,22 @@ func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStar
 	defer cancel()
 	began := time.Now()
 	out, err := g.Generate(ctx, body)
-	s := sample{elapsed: time.Since(began), candidates: int(looper.found.Load())}
+	s := sample{elapsed: time.Since(began), found: int(looper.found.Load())}
 	if err != nil {
 		var invalid *contract.CriteriaError
 		if errors.As(err, &invalid) {
 			t.Fatalf("%s at %s: %v", c.label(), st.Name, err)
 		}
 		// Time ran out with no route at all: it counts as an empty set.
-		if os.Getenv("HARNESS_VERBOSE") != "" {
+		if verbose {
 			fmt.Printf("  %s, %s, seed %d: error %v after %s\n", c.label(), st.Name, seed, err, s.elapsed.Round(time.Millisecond))
 		}
 		return s
 	}
 	routes := out.([]contract.Route)
 	s.routes = len(routes)
-	if len(routes) < minRoutes && os.Getenv("HARNESS_VERBOSE") != "" {
-		fmt.Printf("  %s, %s, seed %d: %d route(s) after %s, %d loops found\n", c.label(), st.Name, seed, len(routes), s.elapsed.Round(time.Millisecond), s.candidates)
+	if len(routes) < minRoutes && verbose {
+		fmt.Printf("  %s, %s, seed %d: %d route(s) after %s, %d loops found\n", c.label(), st.Name, seed, len(routes), s.elapsed.Round(time.Millisecond), s.found)
 	}
 	for _, r := range routes {
 		if r.Kind == "match" {
@@ -195,11 +198,11 @@ func report(label string, samples []sample) {
 		return
 	}
 	var times []float64
-	var cands []int
+	var founds []int
 	var full, atLeast3, empty, matches int
 	for _, s := range samples {
 		times = append(times, s.elapsed.Seconds())
-		cands = append(cands, s.candidates)
+		founds = append(founds, s.found)
 		matches += s.matches
 		if s.matches >= maxRoutes {
 			full++
@@ -213,7 +216,7 @@ func report(label string, samples []sample) {
 	}
 	n := float64(len(samples))
 	slices.Sort(times)
-	slices.Sort(cands)
-	fmt.Printf("%-26s %8.2f %6d %6.0f%% %6.0f%% %6.0f%% %9.2f\n", label, times[len(times)/2], cands[len(cands)/2],
+	slices.Sort(founds)
+	fmt.Printf("%-26s %8.2f %6d %6.0f%% %6.0f%% %6.0f%% %9.2f\n", label, times[len(times)/2], founds[len(founds)/2],
 		100*float64(full)/n, 100*float64(atLeast3)/n, 100*float64(empty)/n, float64(matches)/n)
 }
