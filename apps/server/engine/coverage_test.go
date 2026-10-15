@@ -122,3 +122,28 @@ func TestCoverageLeavesOutWhatIsPastTheSnapDistance(t *testing.T) {
 		t.Errorf("coverage = %v", got)
 	}
 }
+
+// The overseas territories lie south of the equator (Réunion, Mayotte) or west of Greenwich (the Antilles, French
+// Guiana): a coordinate rounded towards zero would put a cell one off there.
+func TestCoverageOfOverseasCells(t *testing.T) {
+	dir := t.TempDir()
+	writeZone(t, filepath.Join(dir, "reunion"), squareAt(-21.155, 55.455, 0.002))
+	writeZone(t, filepath.Join(dir, "mayotte"), squareAt(-12.855, 45.155, 0.002))
+	writeZone(t, filepath.Join(dir, "guyane"), squareAt(4.945, -52.355, 0.002))
+	z, err := OpenZones(dir, "any", "paved")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := z.Coverage()
+
+	// From south to north.
+	want := [][4]float64{
+		{55.4, -21.2, 55.5, -21.1},
+		{45.1, -12.9, 45.2, -12.8},
+		{-52.4, 4.9, -52.3, 5},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("coverage = %v, want %v", got, want)
+	}
+}
