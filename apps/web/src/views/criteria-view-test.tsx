@@ -1717,14 +1717,6 @@ describe('CriteriaView', () => {
         expect(document.querySelectorAll('[data-testid="criteria-waypoint"]')).toHaveLength(1);
       });
 
-      it('names the waypoints in the order they were placed', () => {
-        render(<CriteriaView language="en" />);
-
-        placeThree();
-
-        expect(names()).toEqual([en.waypointName(1), en.waypointName(2), en.waypointName(3)]);
-      });
-
       it('names a waypoint made from a point of interest after it', async () => {
         render(<CriteriaView language="fr" />);
         startPlacing();
@@ -1741,7 +1733,7 @@ describe('CriteriaView', () => {
         map().rendered = [];
         place(6.22, 45.82);
 
-        expect(names()).toEqual(['Fontaine du Roi', fr.waypointName(2)]);
+        expect(names()).toEqual(['Fontaine du Roi', fr.waypointLabel]);
       });
 
       it('removes a waypoint from the list and the map', () => {
@@ -1821,6 +1813,38 @@ describe('CriteriaView', () => {
           [6.23, 45.83],
           [6.21, 45.81],
         ]);
+      });
+
+      it('says where a moved waypoint now stands', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+
+        fireEvent.click(button(1, 'down'));
+
+        expect(screen.getByTestId('criteria-waypoint-announcement')).toHaveTextContent(en.waypointMoved(2));
+      });
+
+      it('stops saying a waypoint moved once it is removed', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+        fireEvent.click(button(1, 'down'));
+
+        fireEvent.click(screen.getByTestId('criteria-waypoint-item-2-remove'));
+
+        expect(screen.getByTestId('criteria-waypoint-announcement')).toBeEmptyDOMElement();
+      });
+
+      it('says it again when a waypoint moves to the position the last one reached', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+        fireEvent.click(button(1, 'down'));
+        const announcement = screen.getByTestId('criteria-waypoint-announcement');
+        const first = announcement.firstElementChild;
+
+        fireEvent.click(button(3, 'up'));
+
+        expect(announcement).toHaveTextContent(en.waypointMoved(2));
+        expect(announcement.firstElementChild).not.toBe(first);
       });
 
       it('has no button to move the first waypoint up or the last one down', () => {
@@ -2103,7 +2127,7 @@ describe('CriteriaView', () => {
       placeThenOpenCriteria(2);
 
       const list = screen.getByTestId('criteria-waypoint-list');
-      expect(names()).toEqual([en.waypointName(1), en.waypointName(2)]);
+      expect(names()).toEqual([en.waypointLabel, en.waypointLabel]);
       expect(list.nextElementSibling).toBe(screen.getByTestId('criteria-submit'));
     });
 
