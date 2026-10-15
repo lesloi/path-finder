@@ -38,7 +38,7 @@ type Generator struct {
 // defaultCandidates is large because most requests stop long before it: defaultStopAfter ends the search once
 // more loops no longer add a match. The measures behind both are in docs/DECISIONS.md.
 const (
-	defaultCandidates = 400
+	defaultCandidates = 100
 	defaultStopAfter  = 60
 )
 
