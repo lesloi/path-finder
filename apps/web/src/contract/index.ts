@@ -2,6 +2,7 @@
 // words, and the parts of a route it reads. The bounds come from `apps/server/contract/contract.json`.
 export {
   areaContains,
+  METRES_PER_DEGREE,
   CRITERIA_FIELDS,
   CriteriaError,
   isCriteriaField,

@@ -305,19 +305,14 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   // The routes found are not dropped when the waypoints change: they are told stale, as for any other criterion, but
   // the route selected goes, as its dock numbers the waypoints it was found with.
-  function togglePlacing() {
-    if (placing) return setMode(undefined);
+  function toggleMode(next: 'place' | 'avoid') {
+    if (mode === next) return setMode(undefined);
     deselect();
     setRefused(undefined);
-    setMode('place');
+    setMode(next);
   }
-
-  function toggleAvoiding() {
-    if (avoiding) return setMode(undefined);
-    deselect();
-    setRefused(undefined);
-    setMode('avoid');
-  }
+  const togglePlacing = () => toggleMode('place');
+  const toggleAvoiding = () => toggleMode('avoid');
 
   // The points no area may hold or touch.
   const points = [...(start ? [start] : []), ...waypoints];
@@ -410,6 +405,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       { timeout: 10_000 },
     );
   }
+
+  const refusals = {
+    uncovered: t.waypointUncovered,
+    duplicate: t.waypointDuplicate,
+    inside: t.avoidedAreaOnPoint,
+    inArea: t.waypointInAvoidedArea,
+  };
 
   const routeSetView =
     atPace && routeSet && routesShown ? (
@@ -792,15 +794,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           data-testid="criteria-waypoint-refused"
           className="m-0 rounded-md bg-surface px-4 py-2 text-ink shadow-float empty:hidden"
         >
-          {(placing || avoiding) && refused
-            ? refused === 'inside'
-              ? t.avoidedAreaOnPoint
-              : refused === 'inArea'
-                ? t.waypointInAvoidedArea
-                : refused === 'duplicate'
-                  ? t.waypointDuplicate
-                  : t.waypointUncovered
-            : ''}
+          {mode && refused ? refusals[refused] : ''}
         </p>
       </div>
       {browser.refusal && (

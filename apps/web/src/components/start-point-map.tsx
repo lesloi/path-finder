@@ -324,7 +324,7 @@ export function StartPointMap({
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
-  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick && !placing && !avoiding;
+  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick && !(placing || avoiding);
   const view = useRef<MapView>({ bearing: 0, rotated: false, movedAway: false });
   // Tells the app what changed in the view, and only when something did: the map moves many times a second.
   const changeView = useEffectEvent((change: Partial<MapView>) => {
@@ -336,8 +336,9 @@ export function StartPointMap({
   // The veiled part of the map is where the server cannot route: a waypoint there would only be refused.
   const canPlace = useEffectEvent(([lng, lat]: Position) => !coverage || isCovered(coverage, [lng, lat]));
   // What the pointer looks like where nothing else sets it: a crosshair while placing, which says a tap places a waypoint.
-  const isPlacing = useEffectEvent(() => Boolean(placing || avoiding));
-  const idleCursor = useEffectEvent(() => (placing || avoiding ? 'crosshair' : ''));
+  const marking = placing || avoiding;
+  const isPlacing = useEffectEvent(() => marking);
+  const idleCursor = useEffectEvent(() => (marking ? 'crosshair' : ''));
   const pick = useEffectEvent(
     (
       how: 'long-press' | 'click',
@@ -363,7 +364,7 @@ export function StartPointMap({
     },
   );
   const clickedBackground = useEffectEvent(() => {
-    if (!pickOnClick && !placing && !avoiding) onBackgroundClick?.();
+    if (!pickOnClick && !(placing || avoiding)) onBackgroundClick?.();
   });
   const basemapFailed = useEffectEvent((previous: Basemap) => onBasemapFail?.(previous));
   const selectRoute = useEffectEvent((index: number) => {

@@ -32,7 +32,7 @@ export type Criteria = {
 /** A circle routes keep out of: its centre, and its radius in metres. */
 export type AvoidedArea = { center: Position; radius: number };
 
-const METRES_PER_DEGREE = 111_194.9;
+export const METRES_PER_DEGREE = 111_194.9;
 
 /** Whether a position is inside an area, as the server tells it. */
 export function areaContains({ center, radius }: AvoidedArea, [lon, lat]: Position): boolean {

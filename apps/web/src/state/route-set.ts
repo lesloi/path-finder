@@ -38,10 +38,9 @@ const isErrorCode = (value: unknown): value is ErrorCode =>
 function invalidCriteria(body: object): Refusal {
   const { field, waypoint, area } = body as { field?: unknown; waypoint?: unknown; area?: unknown };
   if (!isCriteriaField(field)) return { error: 'invalid-criteria' };
-  const number = (value: unknown) => typeof value === 'number' && Number.isInteger(value) && value > 0;
-  if (field === 'waypoints' && number(waypoint))
-    return { error: 'invalid-criteria', field, waypoint: waypoint as number };
-  if (field === 'avoidedAreas' && number(area)) return { error: 'invalid-criteria', field, area: area as number };
+  const number = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0;
+  if (field === 'waypoints' && number(waypoint)) return { error: 'invalid-criteria', field, waypoint };
+  if (field === 'avoidedAreas' && number(area)) return { error: 'invalid-criteria', field, area };
   return { error: 'invalid-criteria', field };
 }
 

@@ -88,12 +88,6 @@ func segmentWithin(center Point, cosl float64, a, b node, radiusM float64) bool 
 	return math.Hypot(ax+t*dx, ay+t*dy) <= radiusM
 }
 
-// within tells whether node n is within reachM of p.
-func (s *spatial) within(g *graph, p Point, n uint32, reachM float64) bool {
-	nd := g.nodes[n]
-	return distanceM(float64(nd.Lat)*1e-7, float64(nd.Lon)*1e-7, p) <= reachM
-}
-
 // eachNodeWithin calls visit for the nodes within reachM of p.
 func (s *spatial) eachNodeWithin(g *graph, p Point, reachM float64, visit func(uint32)) {
 	dLat := int32(reachM / metersPerDegree * 1e7)
@@ -110,7 +104,7 @@ func (s *spatial) eachNodeWithin(g *graph, p Point, reachM float64, visit func(u
 		for x := x0; x <= x1; x++ {
 			c := y*s.nx + x
 			for _, n := range s.nodes[s.start[c]:s.start[c+1]] {
-				if s.within(g, p, n, reachM) {
+				if nd := g.nodes[n]; distanceM(float64(nd.Lat)*1e-7, float64(nd.Lon)*1e-7, p) <= reachM {
 					visit(n)
 				}
 			}

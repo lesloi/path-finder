@@ -7,10 +7,10 @@ import {
   MIN_TARGET_DISTANCE,
   parseCriteria,
   TARGET_DURATION,
+  type AvoidedArea,
   type CriteriaField,
 } from '../contract/index.ts';
 import { PaceSlider, PRIMARY_BUTTON, SegmentedControl, Slider } from '../components/index.ts';
-import type { AvoidedArea } from '../contract/index.ts';
 import { formatDuration, kmBetween, samePositions, type Position, type RouteSetRequest } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { useSettings, type LastCriteria } from '../state/index.ts';
@@ -104,7 +104,10 @@ export function criteriaRequest(
 
 const sameAreas = (a: AvoidedArea[], b: AvoidedArea[]) =>
   a.length === b.length &&
-  a.every((area, i) => area.radius === b[i]!.radius && samePositions([area.center], [b[i]!.center]));
+  a.every(
+    ({ center, radius }, i) =>
+      radius === b[i]!.radius && center[0] === b[i]!.center[0] && center[1] === b[i]!.center[1],
+  );
 
 /**
  * Whether `request` asks for something other than `found`, the request of the routes shown. A distance or an

@@ -59,8 +59,10 @@ type AvoidedArea struct {
 }
 
 // contains tells whether a position, as longitude and latitude, is inside the area.
+// metresPerDegree is the engine's: both sides judge a point inside an area with the same distance.
+const metresPerDegree = 111194.9
+
 func (a AvoidedArea) contains(p [2]float64) bool {
-	const metresPerDegree = 111194.9
 	dy := (p[1] - a.Center[1]) * metresPerDegree
 	dx := (p[0] - a.Center[0]) * metresPerDegree * math.Cos(a.Center[1]*math.Pi/180)
 	return math.Hypot(dx, dy) <= a.Radius
