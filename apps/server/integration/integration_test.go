@@ -382,7 +382,7 @@ func TestAvoidedAreaRefusalsNameAFieldAndANumberNeverAPosition(t *testing.T) {
 	h := newServer(t)
 	cases := map[string]struct{ criteria, want string }{
 		"a start inside an area": {criteria(`{"distance":10}`, `,"avoidedAreas":[{"center":[6.1380,45.9030],"radius":300},{"center":[6.1294,45.8992],"radius":300}]`), `{"error":"invalid-criteria","field":"avoidedAreas","area":2}`},
-		"too many areas":         {criteria(`{"distance":10}`, `,"avoidedAreas":[`+strings.Repeat(`{"center":[6.2,45.9],"radius":100},`, 5)+`{"center":[6.2,45.9],"radius":100}]`), `{"error":"invalid-criteria","field":"avoidedAreas"}`},
+		"too many areas":         {criteria(`{"distance":10}`, `,"avoidedAreas":[`+strings.Repeat(`{"center":[6.2,45.9],"radius":100},`, 3)+`{"center":[6.2,45.9],"radius":100}]`), `{"error":"invalid-criteria","field":"avoidedAreas"}`},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

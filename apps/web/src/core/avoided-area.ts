@@ -1,10 +1,21 @@
 import { AVOIDED_AREA_RADIUS, type AvoidedArea } from '../contract/index.ts';
 import type { Position } from './coordinates.ts';
+import { kmBetween } from './route.ts';
 
 const METRES_PER_DEGREE = 111_194.9;
 
 /** The radius of a new area, in metres. */
 export const DEFAULT_AVOIDED_RADIUS = Math.min(AVOIDED_AREA_RADIUS.max, Math.max(AVOIDED_AREA_RADIUS.min, 400));
+
+/**
+ * The largest radius, in metres, a circle around `center` can have without holding or touching any of the points: the
+ * server refuses an area that holds the start point or a waypoint, so the limit keeps a margin from the nearest one.
+ */
+export function maxRadiusAround(center: Position, points: Position[]): number {
+  const MARGIN_M = 5;
+  const nearest = Math.min(...points.map((point) => kmBetween(center, point) * 1000));
+  return Math.floor(nearest) - MARGIN_M;
+}
 
 /** The ring of a polygon that draws the area, closed on its first point. */
 export function circlePolygon({ center, radius }: AvoidedArea, steps = 64): Position[] {

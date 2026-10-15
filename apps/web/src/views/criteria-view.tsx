@@ -21,7 +21,13 @@ import {
   type ReactNode,
 } from 'react';
 
-import { areaContains, MAX_AVOIDED_AREAS, MAX_WAYPOINTS, type AvoidedArea } from '../contract/index.ts';
+import {
+  areaContains,
+  AVOIDED_AREA_RADIUS,
+  MAX_AVOIDED_AREAS,
+  MAX_WAYPOINTS,
+  type AvoidedArea,
+} from '../contract/index.ts';
 import { useCoverage, useSettings } from '../state/index.ts';
 import { CriteriaBar } from './criteria-bar.tsx';
 import { CriteriaForm, criteriaChanged, criteriaRequest, useCriteriaDraft } from './criteria-form.tsx';
@@ -35,6 +41,7 @@ import { RouteSetView } from './route-set-view.tsx';
 import {
   criteriaSummary,
   DEFAULT_AVOIDED_RADIUS,
+  maxRadiusAround,
   formatPosition,
   isCovered,
   parsePosition,
@@ -200,7 +207,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // The circles routes keep out of: kept here too, for this visit only, as the waypoints are.
   const [avoidedAreas, setAvoidedAreas] = useState<AvoidedArea[]>([]);
   // A tap on the veiled part of the map was refused: the banner says why for a while.
-  const [refused, setRefused] = useState<'uncovered' | 'duplicate' | 'inside'>();
+  const [refused, setRefused] = useState<'uncovered' | 'duplicate' | 'inside' | 'inArea'>();
   // The points of interest some waypoints were made from, by position; kept for the routes found, as for the criteria.
   const [waypointPois, setWaypointPois] = useState<WaypointPois>({});
   // On phones, the criteria are a layer over the map; the height of the sheet is what the routes are framed clear of.
@@ -312,20 +319,29 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     setMode('avoid');
   }
 
+  // The points no area may hold or touch.
+  const points = [...(start ? [start] : []), ...waypoints];
+
   function addAvoidedArea(center: Position) {
     if (avoidedAreas.length >= MAX_AVOIDED_AREAS) return;
-    const area = { center, radius: DEFAULT_AVOIDED_RADIUS };
-    // The server refuses an area that holds the start point or a waypoint: the user is told here, on the spot.
-    if ([start, ...waypoints].some((point) => point && areaContains(area, point))) return setRefused('inside');
+    // A new area shrinks to stay clear of the start point and the waypoints, which the server refuses to find inside
+    // one; it is refused only when there is no room left for the smallest.
+    const radius = Math.min(DEFAULT_AVOIDED_RADIUS, maxRadiusAround(center, points));
+    if (radius < AVOIDED_AREA_RADIUS.min) return setRefused('inside');
     setRefused(undefined);
     deselect();
-    setAvoidedAreas([...avoidedAreas, area]);
+    setAvoidedAreas([...avoidedAreas, { center, radius }]);
     if (avoidedAreas.length + 1 >= MAX_AVOIDED_AREAS) setMode(undefined);
   }
 
   function resizeAvoidedArea(index: number, radius: number) {
     deselect();
-    setAvoidedAreas(avoidedAreas.map((area, i) => (i === index ? { ...area, radius } : area)));
+    // An area grows up to the nearest point, not over it.
+    setAvoidedAreas(
+      avoidedAreas.map((area, i) =>
+        i === index ? { ...area, radius: Math.min(radius, maxRadiusAround(area.center, points)) } : area,
+      ),
+    );
   }
 
   function removeAvoidedArea(index: number) {
@@ -335,6 +351,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   function addWaypoint(position: Position, poi?: WaypointPoi) {
     if (waypoints.length >= MAX_WAYPOINTS) return;
+    if (avoidedAreas.some((area) => areaContains(area, position))) return setRefused('inArea');
     // The map reads a point's position to within metres, as the zoom changes: a point of interest tapped twice is
     // the same one when the two readings are this close.
     if (
@@ -775,9 +792,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           {(placing || avoiding) && refused
             ? refused === 'inside'
               ? t.avoidedAreaOnPoint
-              : refused === 'duplicate'
-                ? t.waypointDuplicate
-                : t.waypointUncovered
+              : refused === 'inArea'
+                ? t.waypointInAvoidedArea
+                : refused === 'duplicate'
+                  ? t.waypointDuplicate
+                  : t.waypointUncovered
             : ''}
         </p>
       </div>

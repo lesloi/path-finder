@@ -54,6 +54,7 @@ import {
   routeTagImage,
 } from './route-tag-image.ts';
 import { useDesktop } from './use-desktop.ts';
+import { AvoidedAreaBadge } from './avoided-area-badge.tsx';
 import { WaypointPin } from './waypoint-pin.tsx';
 import { NORTH_EPSILON, useRouteSnapshot } from './use-route-snapshot.ts';
 
@@ -747,6 +748,20 @@ export function StartPointMap({
     }
     setPinHosts(placed.current.map(({ host }) => host));
   }, [waypoints, language]);
+  // The number of each avoided area, at the centre of its circle. A marker moves with its circle, which a resize leaves
+  // where it is: the markers are made again only when a centre changes.
+  const [areaHosts, setAreaHosts] = useState<HTMLElement[]>([]);
+  const centres = avoidedAreas.map(({ center }) => center.join(','));
+  useEffect(() => {
+    const map = mapRef.current!;
+    const markers = avoidedAreas.map(({ center }) => {
+      const host = document.createElement('div');
+      host.className = 'pointer-events-none';
+      return { host, marker: new Marker({ element: host }).setLngLat(center).addTo(map) };
+    });
+    setAreaHosts(markers.map(({ host }) => host));
+    return () => markers.forEach(({ marker }) => marker.remove());
+  }, [centres.join(';')]); // eslint-disable-line react-hooks/exhaustive-deps -- `avoidedAreas` changes with every resize
   // The pin set apart goes over the ones around it.
   useEffect(() => {
     for (const [index, { host }] of placed.current.entries()) {
@@ -1014,6 +1029,7 @@ export function StartPointMap({
   return (
     <div className={`fixed inset-0 bg-white ${pickOnClick ? 'map-picking' : ''}`}>
       <div ref={container} className="size-full" />
+      {areaHosts.map((host, index) => createPortal(<AvoidedAreaBadge number={index + 1} />, host, `area-${index}`))}
       {pinHosts.map((host, index) =>
         createPortal(
           <WaypointPin number={index + 1} variant="map" highlighted={index === highlightedWaypoint} />,

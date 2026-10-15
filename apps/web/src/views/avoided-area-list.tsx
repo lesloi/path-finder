@@ -1,7 +1,8 @@
 import { CircleCheck, CirclePlus, X } from 'lucide-react';
 
 import { AVOIDED_AREA_RADIUS, type AvoidedArea } from '../contract/index.ts';
-import { hint, Slider, tip } from '../components/index.ts';
+import { AvoidedAreaBadge } from '../components/avoided-area-badge.tsx';
+import { hint, tip } from '../components/index.ts';
 import { criteriaText, type Language } from '../i18n/index.ts';
 
 const RADIUS_STEP = 50;
@@ -51,21 +52,22 @@ export function AvoidedAreaList({
             <li
               key={index}
               data-testid={id}
-              className="flex items-center gap-1 rounded-lg bg-surface-2/50 py-1 pr-1 pl-3"
+              className="flex items-center gap-2 rounded-lg bg-surface-2/50 py-1 pr-1 pl-3"
             >
-              <div className="min-w-0 flex-1">
-                <Slider
-                  testId={`${id}-radius`}
-                  label={t.avoidedAreaRadiusOf(name)}
-                  value={area.radius}
-                  shown={t.avoidedAreaRadius(area.radius)}
-                  leading={<span className="text-sm text-ink">{name}</span>}
-                  min={AVOIDED_AREA_RADIUS.min}
-                  max={AVOIDED_AREA_RADIUS.max}
-                  step={RADIUS_STEP}
-                  onChange={(radius) => onResize(index, radius)}
-                />
-              </div>
+              <AvoidedAreaBadge number={index + 1} />
+              <input
+                type="range"
+                data-testid={`${id}-radius`}
+                className="min-w-0 flex-1 accent-accent"
+                aria-label={t.avoidedAreaRadiusOf(name)}
+                aria-valuetext={t.avoidedAreaRadius(area.radius)}
+                min={AVOIDED_AREA_RADIUS.min}
+                max={AVOIDED_AREA_RADIUS.max}
+                step={RADIUS_STEP}
+                value={area.radius}
+                onChange={(event) => onResize(index, Number(event.target.value))}
+              />
+              <span className="w-14 flex-none text-right text-xs text-ink-2 tabular-nums">{area.radius} m</span>
               <button
                 type="button"
                 data-testid={`${id}-remove`}

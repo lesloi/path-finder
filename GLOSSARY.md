@@ -15,7 +15,7 @@ _Avoid_: Origin, departure
 **Criteria**:
 Everything the user sets to ask for routes: start point, a target distance or a
 target duration, an optional target elevation gain, a surface preference,
-up to five optional waypoints and up to five optional avoided areas.
+up to five optional waypoints and up to three optional avoided areas.
 _Avoid_: Filters, query, search parameters
 
 **Waypoint**:
@@ -27,7 +27,7 @@ _Avoid_: Stage, via, étape
 
 **Avoided area**:
 A circle (a centre and a radius) that no route goes through: the ways that touch it are left out of the
-searches, not made costly. Up to five per set of criteria, kept for the visit and sent only when a route of
+searches, not made costly. Up to three per set of criteria, kept for the visit and sent only when a route of
 this length can reach them. Criteria whose start point or waypoint is inside one are refused, and the
 control points and waypoints near one move to the nearest way outside it.
 _Avoid_: Exclusion zone, forbidden zone, blocklist
