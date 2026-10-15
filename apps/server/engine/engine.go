@@ -327,6 +327,16 @@ func computeSpatial(nodes []node) *spatial {
 
 // nearest is the node closest to a point.
 func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bool) {
+	return s.nearestOutside(g, latDeg, lonDeg, nil, 0)
+}
+
+// nearestOutside is the node closest to a point that is not in skip. With a positive reachM it looks no farther
+// than that, so a point with only skipped nodes around it is refused at once and not after the whole index.
+func (s *spatial) nearestOutside(g *graph, latDeg, lonDeg float64, skip nodeSet, reachM float64) (uint32, float64, bool) {
+	rings := 200
+	if reachM > 0 {
+		rings = min(rings, int(reachM/200)+2)
+	}
 	lat, lon := int32(latDeg*1e7), int32(lonDeg*1e7)
 	cy, cx := int(lat-s.minLat)/cellLat, int(lon-s.minLon)/cellLon
 	cosl := math.Cos(latDeg * rad)
@@ -337,6 +347,9 @@ func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bo
 		}
 		c := y*s.nx + x
 		for _, n := range s.nodes[s.start[c]:s.start[c+1]] {
+			if skip != nil && skip.has(n) {
+				continue
+			}
 			dy := float64(g.nodes[n].Lat-lat) * 1e-7 * metersPerDegree
 			dx := float64(g.nodes[n].Lon-lon) * 1e-7 * metersPerDegree * cosl
 			if d := dx*dx + dy*dy; d < best {
@@ -346,7 +359,7 @@ func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bo
 	}
 	// Rings of cells around the point, 200 at most. A ring adds about 200 m (a cell is 0.002° of latitude), so once a
 	// node is found no farther ring can hold a nearer one.
-	for r := 0; r < 200; r++ {
+	for r := 0; r < rings; r++ {
 		for x := cx - r; x <= cx+r; x++ {
 			visit(x, cy-r)
 			if r > 0 {
