@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { CircleCheck, CirclePlus, X } from 'lucide-react';
+import { CircleCheck, CircleDashed, X } from 'lucide-react';
 
 import { AVOIDED_AREA_RADIUS, type AvoidedArea } from '../contract/index.ts';
 import { AvoidedAreaBadge } from '../components/avoided-area-badge.tsx';
@@ -50,7 +50,7 @@ export function AvoidedAreaList({
           disabled={!placing && full}
           onClick={onToggle}
         >
-          {placing ? <CircleCheck size={18} aria-hidden /> : <CirclePlus size={18} aria-hidden />}
+          {placing ? <CircleCheck size={18} aria-hidden /> : <CircleDashed size={18} aria-hidden />}
         </button>
       </div>
       <ol className="-m-1 flex max-h-48 flex-col gap-1 overflow-y-auto p-1">
