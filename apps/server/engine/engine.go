@@ -912,11 +912,12 @@ func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter [
 	cosl := math.Cos(slat * rad)
 	cxm, cym := rc*math.Cos(theta), rc*math.Sin(theta)
 	nodes := make([]uint32, 0, len(jitter))
+	small := g.small()
 	for j := range jitter {
 		phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(len(jitter)+1)
 		x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
 		n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
-		if !ok || d > snapReach(rc) || g.small().has(n) {
+		if !ok || d > snapReach(rc) || small.has(n) {
 			return nil, false
 		}
 		nodes = append(nodes, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))

@@ -606,3 +606,19 @@ func TestSmallComponentsAreComputedOnFirstUseOnly(t *testing.T) {
 		t.Error("the island is not small")
 	}
 }
+
+func TestARouteDoesNotComputeTheSmallComponents(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	at := g.grid(10, 10, flat)
+	e := openTest(t, g, false)
+	// Act
+	_, err := e.Route(context.Background(), pointOf(g, at(0, 0)), pointOf(g, at(5, 5)))
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.g.smallSet != nil {
+		t.Error("a route computed the small components")
+	}
+}
