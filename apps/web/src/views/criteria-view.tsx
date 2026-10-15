@@ -553,6 +553,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         onWaypointAdd={addWaypoint}
         onWaypointRefused={() => setRefused('uncovered')}
         onWaypointRemove={removeWaypoint}
+        onAvoidedAreaRemove={removeAvoidedArea}
         onBasemapFail={(previous) => update({ basemap: previous })}
       />
       <a

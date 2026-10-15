@@ -232,6 +232,7 @@ export function StartPointMap({
   onAvoidedAreaAdd,
   onWaypointRefused,
   onWaypointRemove,
+  onAvoidedAreaRemove,
   onBasemapFail,
   onViewChange,
   ref,
@@ -297,6 +298,8 @@ export function StartPointMap({
   onWaypointRefused?: () => void;
   /** The user asked to remove the waypoint at this index, from its bubble. */
   onWaypointRemove?: (index: number) => void;
+  /** The user asked to remove the avoided area at this index, from its bubble. */
+  onAvoidedAreaRemove?: (index: number) => void;
   /** The style of a new basemap could not be loaded: the map went back to this one, which the app should show. */
   onBasemapFail?: (basemap: Basemap) => void;
   /** The user turned or moved the map, or it was put back. */
@@ -367,6 +370,7 @@ export function StartPointMap({
     if (interactive) onRouteSelect?.(index);
   });
   const removeWaypoint = useEffectEvent((index: number) => onWaypointRemove?.(index));
+  const removeArea = useEffectEvent((index: number) => onAvoidedAreaRemove?.(index));
   // The bubble that offers to remove a waypoint.
   const bubbleRef = useRef<Popup>(undefined);
   const closeBubble = () => bubbleRef.current?.remove();
@@ -761,14 +765,39 @@ export function StartPointMap({
   const centres = avoidedAreas.map(({ center }) => center.join(','));
   useEffect(() => {
     const map = mapRef.current!;
-    const markers = avoidedAreas.map(({ center }) => {
-      const host = document.createElement('div');
-      host.className = 'pointer-events-none';
+    // A button, as the waypoints' pins are: tapping it opens a bubble with a button to remove the area. Its own events
+    // stop here, as the map would hear them as its own: a click that adds a point, a press that starts a long press.
+    const markers = avoidedAreas.map(({ center }, index) => {
+      const host = document.createElement('button');
+      host.type = 'button';
+      host.className = 'block cursor-pointer p-0';
+      host.setAttribute('aria-label', criteriaText[language].avoidedAreaName(index + 1));
+      for (const type of ['mousedown', 'touchstart']) host.addEventListener(type, (event) => event.stopPropagation());
+      host.addEventListener('click', (event) => {
+        event.stopPropagation();
+        closeBubble();
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = criteriaText[language].removeAvoidedArea;
+        remove.className = 'rounded-md px-2 py-1.5 font-semibold text-accent';
+        remove.addEventListener('click', () => {
+          closeBubble();
+          removeArea(index);
+        });
+        bubbleRef.current = new Popup({ closeButton: false, offset: 16, className: 'waypoint-bubble' })
+          .setLngLat(center)
+          .setDOMContent(remove)
+          .addTo(map);
+        bubbleOn.current = -1;
+      });
       return { host, marker: new Marker({ element: host }).setLngLat(center).addTo(map) };
     });
     setAreaHosts(markers.map(({ host }) => host));
-    return () => markers.forEach(({ marker }) => marker.remove());
-  }, [centres.join(';')]); // eslint-disable-line react-hooks/exhaustive-deps -- `avoidedAreas` changes with every resize
+    return () => {
+      closeBubble();
+      markers.forEach(({ marker }) => marker.remove());
+    };
+  }, [centres.join(';'), language]); // eslint-disable-line react-hooks/exhaustive-deps -- `avoidedAreas` changes with every resize
   // The pin set apart goes over the ones around it.
   useEffect(() => {
     for (const [index, { host }] of placed.current.entries()) {
