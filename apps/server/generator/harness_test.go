@@ -135,7 +135,7 @@ func TestHarness(t *testing.T) {
 
 	fmt.Printf("%d start(s), %d seed(s), %d candidates, timeout %s, surface %s\n",
 		len(cfg.Starts), len(cfg.Seeds), cmpOr(cfg.Candidates, defaultCandidates), timeout, cfg.Surface)
-	fmt.Printf("%-34s %8s %6s %6s %7s %7s %7s %9s\n", "criteria", "median s", "p90 s", "loops", "full", ">=3", "empty", "matches")
+	fmt.Printf("%-34s %8s %6s %6s %6s %7s %7s %7s %9s\n", "criteria", "median s", "p90 s", "max s", "loops", "full", ">=3", "empty", "matches")
 	for _, c := range cfg.Cases {
 		for _, limit := range cfg.Caps {
 			var samples []sample
@@ -226,6 +226,6 @@ func report(label string, samples []sample, limit int) {
 	n := float64(len(samples))
 	slices.Sort(times)
 	slices.Sort(founds)
-	fmt.Printf("%-34s %8.2f %6.2f %6d %6.0f%% %6.0f%% %6.0f%% %9.2f\n", label, times[len(times)/2], times[len(times)*9/10], founds[len(founds)/2],
+	fmt.Printf("%-34s %8.2f %6.2f %6.2f %6d %6.0f%% %6.0f%% %6.0f%% %9.2f\n", label, times[len(times)/2], times[len(times)*9/10], times[len(times)-1], founds[len(founds)/2],
 		100*float64(full)/n, 100*float64(atLeast3)/n, 100*float64(empty)/n, float64(matches)/n)
 }
