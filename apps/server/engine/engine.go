@@ -827,6 +827,16 @@ const (
 	liftReach = 0.4
 )
 
+// A control point is moved to the nearest node within snapReach of it. On a long loop, in a valley with
+// steep sides, most points of the circle fall where no way is mapped within 400 m, and 87 of 100 candidates
+// were lost at Chamonix; the reach follows the circle, and the resizing then corrects the distance.
+const (
+	minSnapReachM  = 400.0
+	snapReachShare = 0.3
+)
+
+func snapReach(radiusM float64) float64 { return math.Max(minSnapReachM, snapReachShare*radiusM) }
+
 // climbLift tells how the next resizing should move the control points to fix the elevation gain: a share
 // of 1 at most towards higher nodes (positive) when the loop climbs too little, towards lower ones
 // (negative) when it climbs too much, and 0 with no target or inside the band.
@@ -898,7 +908,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 			phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(k+1)
 			x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
 			n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
-			if !ok || d > 400 {
+			if !ok || d > snapReach(rc) {
 				return best
 			}
 			points = append(points, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))

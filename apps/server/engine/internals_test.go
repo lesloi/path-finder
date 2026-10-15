@@ -439,3 +439,22 @@ func TestLiftedNodePicksTheHighestOrLowestNodeWithinReach(t *testing.T) {
 		t.Errorf("a reach under the lattice step moved the node to %d", tooShort)
 	}
 }
+
+func TestControlPointSnapReachGrowsWithTheCircle(t *testing.T) {
+	cases := []struct {
+		name      string
+		radiusM   float64
+		wantReach float64
+	}{
+		{"a small circle keeps the floor", 1_000, 400},
+		{"a circle of 30 km loops", 3_700, 0.3 * 3_700},
+		{"a large circle", 10_000, 3_000},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := snapReach(tc.radiusM); math.Abs(got-tc.wantReach) > 1e-9 {
+				t.Errorf("snapReach(%v) = %v, want %v", tc.radiusM, got, tc.wantReach)
+			}
+		})
+	}
+}
