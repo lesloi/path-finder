@@ -125,7 +125,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 }
 
 // throughWaypoints routes the direct loop through the waypoints and refuses criteria whose waypoints
-// make a loop too long for the target to be met even by a suggestion, or that the engine cannot match
+// make a loop too long for the target to be met even by a wide suggestion, or that the engine cannot match
 // to a way. It returns the direct loop as a candidate, or nil when it goes nowhere.
 func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, points []engine.Point) (*candidate, error) {
 	tooLong := &contract.CriteriaError{Field: "waypoints", Message: "waypoints make too long a route for the target"}
@@ -136,7 +136,7 @@ func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, p
 	if c.Target.Distance == 0 {
 		km, limit = km*c.Pace, c.Target.Duration
 	}
-	if km > limit*(1+suggestionTolerance.distance) {
+	if km > limit*(1+wideTolerance.distance) {
 		return nil, tooLong
 	}
 	route, err := looper.DirectLoop(ctx, engine.Point{Lat: c.Start[1], Lon: c.Start[0]}, points)
@@ -157,7 +157,7 @@ func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, p
 	}
 	estimated := effortDistance(cand.distance, cand.elevationGain) * c.Pace
 	// Only a loop that is too long is refused: detours make up for one that is too short.
-	if tooFar := checks(c, cand, estimated)[0]; tooFar.gap > 0 && !tooFar.suggestion {
+	if tooFar := checks(c, cand, estimated)[0]; tooFar.gap > 0 && tooFar.tier == tierOut {
 		return nil, tooLong
 	}
 	return cand, nil

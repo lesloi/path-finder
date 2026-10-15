@@ -322,7 +322,7 @@ func TestGenerateRefusesWaypointsBeyondTheTargetBeforeSearching(t *testing.T) {
 
 func TestGenerateRefusesADirectLoopBeyondTheTarget(t *testing.T) {
 	long := engineLoop(0)
-	long.Distance = 14_000 // 40 % over a target of 10 km: beyond what a suggestion allows
+	long.Distance = 14_000 // 40 % over a target of 10 km: beyond what a wide suggestion allows
 	looper := &fakeLooper{direct: long}
 
 	_, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints))
@@ -333,6 +333,20 @@ func TestGenerateRefusesADirectLoopBeyondTheTarget(t *testing.T) {
 	}
 	if looper.loopCalls != 0 {
 		t.Error("loops were searched for waypoints that cannot meet the target")
+	}
+}
+
+func TestGenerateKeepsAWaypointLoopThatOnlyAWideSuggestionAllows(t *testing.T) {
+	long := engineLoop(0)
+	long.Distance = 12_800 // 28 % over a target of 10 km: refused by suggestions, kept by wide ones
+	looper := &fakeLooper{direct: long, err: engine.ErrNoLoop}
+	// 6.4 km east and back: the straight lines alone are 28 % over the target.
+	east := `[[6.2120,45.8992]]`
+
+	routes, err := generate(t, looper, context.Background(), withWaypoints(east))
+
+	if err != nil || len(routes) != 1 || routes[0].Kind != "suggestion" {
+		t.Errorf("routes = %+v, err = %v, want the direct loop as a suggestion", routes, err)
 	}
 }
 
