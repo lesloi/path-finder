@@ -57,6 +57,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	}
 	if criteria.ElevationGain != nil && criteria.ElevationGain.Shortcut == "" {
 		req.Ascent = criteria.ElevationGain.Metres
+		req.AscentBand = engine.AscentBand{Share: matchTolerance.elevationGain, FloorM: matchTolerance.elevationGainFloor}
 	}
 	// The loop straight through the waypoints is a candidate of its own.
 	var direct *candidate

@@ -700,6 +700,7 @@ func (r *splitmix) below(n uint64) uint64 { return r.next() % n }
 
 type loopParams struct {
 	distM, ascentM float64
+	ascentBand     AscentBand
 	candidates     int
 	seed           uint64
 	// anchors are the nodes every loop goes through in order, from the start node back to it: the start
@@ -816,6 +817,53 @@ func collapse(points []uint32) []uint32 {
 	return out
 }
 
+// liftReach is how far, as a share of the circle's radius, a control point may move to a higher or lower
+// node when the loop is as far from its elevation gain as can be.
+const liftReach = 0.4
+
+// A control point is moved to the nearest node within snapReach of it. On a long loop, in a valley with
+// steep sides, most points of the circle fall where no way is mapped within 400 m, and 87 of 100 candidates
+// were lost at Chamonix; the reach follows the circle, and the resizing then corrects the distance.
+const snapReachShare = 0.3
+
+func snapReach(radiusM float64) float64 {
+	return math.Max(float64(maxSnapMeters), snapReachShare*radiusM)
+}
+
+// climbLift tells how the next resizing should move the control points to fix the elevation gain: a share
+// of 1 at most towards higher nodes (positive) when the loop climbs too little, towards lower ones
+// (negative) when it climbs too much, and 0 with no target, no band or inside the band.
+func climbLift(ascent, target float64, band AscentBand) float64 {
+	if target <= 0 || band == (AscentBand{}) || math.Abs(ascent-target) <= math.Max(band.Share*target, band.FloorM) {
+		return 0
+	}
+	return math.Max(-1, math.Min(1, (target-ascent)/target))
+}
+
+// liftedNode is the highest node (lift > 0) or lowest (lift < 0) among base and those nearest to eight
+// points reachM around it, or base for no lift. Fixed directions keep a seed's loops the same.
+func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32 {
+	if lift == 0 {
+		return base
+	}
+	b := g.nodes[base]
+	lat, lon := float64(b.Lat)*1e-7, float64(b.Lon)*1e-7
+	cosl := math.Cos(lat * rad)
+	sign := int32(1)
+	if lift < 0 {
+		sign = -1
+	}
+	best := base
+	for k := 0; k < 8; k++ {
+		a := float64(k) * math.Pi / 4
+		n, d, ok := sp.nearest(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl))
+		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev {
+			best = n
+		}
+	}
+	return best
+}
+
 func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *loopParams, start uint32, index int) *loopResult {
 	g := cx.g
 	rng := newSplitmix(lp.seed, uint64(index))
@@ -840,6 +888,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 		jitter[j] = 0.85 + 0.3*rng.f64()
 	}
 	var best *loopResult
+	lift := 0.0
 	for iter := 0; iter < 4; iter++ {
 		if ctx.Err() != nil {
 			return best
@@ -850,10 +899,10 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 			phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(k+1)
 			x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
 			n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
-			if !ok || d > 400 {
+			if !ok || d > snapReach(rc) {
 				return best
 			}
-			points = append(points, n)
+			points = append(points, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))
 		}
 		points = append(points, start)
 		if lp.anchors != nil {
@@ -870,7 +919,8 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 		if best == nil || sc < best.score {
 			best = &loopResult{nodes, edges, dist, asc, trail, overlap, sc}
 		}
-		if math.Abs(dist-lp.distM) < 0.03*lp.distM {
+		lift = climbLift(asc, lp.ascentM, lp.ascentBand)
+		if math.Abs(dist-lp.distM) < 0.03*lp.distM && lift == 0 {
 			break
 		}
 		if lp.anchors != nil {

@@ -61,12 +61,19 @@ type Route struct {
 	Technical  bool      // the route holds a technical stretch
 }
 
+// AscentBand is a share of the target elevation gain, and a floor in metres for a small target, within which
+// a loop is on target. The caller owns what counts as a match, so the engine is told it.
+type AscentBand struct{ Share, FloorM float64 }
+
 // LoopRequest asks for loops from Start. Distance is the target length in metres and Ascent the
 // target elevation gain in metres (0 for none). The same Seed always yields the same loops.
 type LoopRequest struct {
-	Start      Point
-	Distance   float64
-	Ascent     float64
+	Start    Point
+	Distance float64
+	Ascent   float64
+	// AscentBand is how far a loop's elevation gain may be from Ascent to count as on target. A loop
+	// outside it is steered towards the target; the zero value steers nothing.
+	AscentBand AscentBand
 	Candidates int
 	Seed       uint64
 	// Waypoints every loop goes through, in this order, between leaving Start and coming back to it. A
@@ -207,7 +214,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 		}
 	}
 	found, failure := generate(ctx, e, e.sp, &loopParams{
-		distM: req.Distance, ascentM: req.Ascent, candidates: req.Candidates, seed: req.Seed,
+		distM: req.Distance, ascentM: req.Ascent, ascentBand: req.AscentBand, candidates: req.Candidates, seed: req.Seed,
 		anchors: anchors, baseM: baseM,
 	}, start, enough)
 	if failure != nil {

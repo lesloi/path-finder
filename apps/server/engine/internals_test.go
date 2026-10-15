@@ -379,3 +379,91 @@ func TestHeadersRoundTripAndRefuseAnotherVersion(t *testing.T) {
 		t.Error("a header of another version was read")
 	}
 }
+
+var matchBand = AscentBand{Share: 0.2, FloorM: 50}
+
+func TestClimbLiftIsZeroWithoutATargetOrWithinTheBand(t *testing.T) {
+	cases := []struct {
+		name           string
+		ascent, target float64
+	}{
+		{"no target", 0, 0},
+		{"on target", 1000, 1000},
+		{"just inside the band", 810, 1000},
+		{"within the floor of a small target", 80, 100},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := climbLift(tc.ascent, tc.target, matchBand); got != 0 {
+				t.Errorf("climbLift(%v, %v) = %v, want 0", tc.ascent, tc.target, got)
+			}
+		})
+	}
+}
+
+func TestClimbLiftPushesUpWhenTheLoopClimbsTooLittleAndDownWhenTooMuch(t *testing.T) {
+	// Arrange
+	target := 1000.0
+	// Act
+	slightly, far, over, wayOver := climbLift(700, target, matchBand), climbLift(200, target, matchBand), climbLift(1400, target, matchBand), climbLift(5000, target, matchBand)
+	// Assert
+	if !(slightly > 0 && far > slightly && far <= 1) {
+		t.Errorf("lifts %v (a bit short) and %v (far short) should be positive, growing and capped at 1", slightly, far)
+	}
+	if !(over < 0 && wayOver <= over && wayOver >= -1) {
+		t.Errorf("lifts %v (a bit over) and %v (far over) should be negative, growing and capped at -1", over, wayOver)
+	}
+}
+
+func TestLiftedNodePicksTheHighestOrLowestNodeWithinReach(t *testing.T) {
+	// Arrange: a lattice that rises towards the east
+	g := &testGraph{}
+	at := g.grid(21, 21, func(x, y int) float64 { return float64(x) * 10 })
+	e := openTest(t, g, false)
+	base := uint32(at(10, 10))
+	// Act
+	up := liftedNode(e.g, e.sp, base, 300, 1)
+	down := liftedNode(e.g, e.sp, base, 300, -1)
+	still := liftedNode(e.g, e.sp, base, 300, 0)
+	tooShort := liftedNode(e.g, e.sp, base, 20, 1)
+	// Assert
+	if e.g.nodes[up].Elev <= e.g.nodes[base].Elev {
+		t.Errorf("up is not higher than the base node")
+	}
+	if e.g.nodes[down].Elev >= e.g.nodes[base].Elev {
+		t.Errorf("down is not lower than the base node")
+	}
+	if still != base {
+		t.Errorf("no lift moved the node from %d to %d", base, still)
+	}
+	if tooShort != base {
+		t.Errorf("a reach under the lattice step moved the node to %d", tooShort)
+	}
+}
+
+func TestControlPointSnapReachGrowsWithTheCircle(t *testing.T) {
+	cases := []struct {
+		name      string
+		radiusM   float64
+		wantReach float64
+	}{
+		{"a small circle keeps the floor", 1_000, 400},
+		{"a large circle", 10_000, 3_000},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := snapReach(tc.radiusM); got != tc.wantReach {
+				t.Errorf("snapReach(%v) = %v, want %v", tc.radiusM, got, tc.wantReach)
+			}
+		})
+	}
+}
+
+func TestClimbLiftIsZeroWithoutABand(t *testing.T) {
+	// Act
+	got := climbLift(200, 1000, AscentBand{})
+	// Assert
+	if got != 0 {
+		t.Errorf("climbLift with no band = %v, want 0: a caller that sets none gets no steering", got)
+	}
+}

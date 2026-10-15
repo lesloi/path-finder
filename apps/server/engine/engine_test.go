@@ -6,7 +6,9 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -785,4 +787,38 @@ func TestDirectLoopErrors(t *testing.T) {
 	if _, err := e.DirectLoop(context.Background(), start, []Point{island}); !errors.Is(err, ErrNoRoute) {
 		t.Errorf("unreachable waypoint: err = %v, want ErrNoRoute", err)
 	}
+}
+
+func TestLoopsAreSteeredTowardsTheElevationGainWhenGivenABand(t *testing.T) {
+	// Arrange: a lattice that rises towards the east, and a target the first loops miss
+	g := &testGraph{}
+	at := g.grid(21, 21, func(x, y int) float64 { return float64(x) * 20 })
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+	req.Ascent = 300
+	steered := req
+	steered.AscentBand = AscentBand{Share: 0.2, FloorM: 50}
+	// Act
+	plain, err := e.Loops(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	withBand, err := e.Loops(context.Background(), steered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Assert: the same seed gives other loops only because the band steers them
+	if reflect.DeepEqual(shapes(plain), shapes(withBand)) {
+		t.Error("a band changed no loop: the engine does not steer by elevation gain")
+	}
+}
+
+// shapes lists the length and gain of loops in a fixed order: Loops returns them in no particular order.
+func shapes(loops []*Route) [][2]float64 {
+	out := make([][2]float64, len(loops))
+	for i, l := range loops {
+		out[i] = [2]float64{math.Round(l.Distance), math.Round(l.Ascent)}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i][0] < out[j][0] || out[i][0] == out[j][0] && out[i][1] < out[j][1] })
+	return out
 }
