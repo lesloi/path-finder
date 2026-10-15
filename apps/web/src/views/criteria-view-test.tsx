@@ -15,6 +15,10 @@ const fr = criteriaText.fr;
 
 const map = () => maps.at(-1)!;
 const field = () => screen.getByTestId('criteria-start');
+const place = (lng: number, lat: number) => act(() => map().fire('click', { lngLat: { lng, lat } }));
+const items = () => screen.queryAllByTestId(/^criteria-waypoint-item-\d+$/);
+const names = () => items().map((item) => item.querySelector('[data-name]')!.textContent);
+const waypointMarkers = () => markers.filter((marker) => marker.shown && marker.options?.element?.dataset.waypoint);
 const onDesktop = () =>
   vi
     .spyOn(window, 'matchMedia')
@@ -1536,8 +1540,6 @@ describe('CriteriaView', () => {
   describe('waypoints', () => {
     const waypointButton = () => screen.getByTestId('criteria-waypoint');
     const banner = () => screen.getByTestId('criteria-waypoint-bar');
-    const waypointMarkers = () => markers.filter((marker) => marker.shown && marker.options?.element?.dataset.waypoint);
-    const place = (lng: number, lat: number) => act(() => map().fire('click', { lngLat: { lng, lat } }));
     const setStart = () => {
       fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
       fireEvent.keyDown(field(), { key: 'Enter' });
@@ -1696,8 +1698,6 @@ describe('CriteriaView', () => {
     });
 
     describe('listed under the criteria', () => {
-      const items = () => screen.queryAllByTestId(/^criteria-waypoint-item-\d+$/);
-      const names = () => items().map((item) => item.querySelector('[data-name]')!.textContent);
       const placeThree = () => {
         startPlacing();
         place(6.21, 45.81);
@@ -1717,14 +1717,6 @@ describe('CriteriaView', () => {
         expect(document.querySelectorAll('[data-testid="criteria-waypoint"]')).toHaveLength(1);
       });
 
-      it('names the waypoints in the order they were placed', () => {
-        render(<CriteriaView language="en" />);
-
-        placeThree();
-
-        expect(names()).toEqual([en.waypointName(1), en.waypointName(2), en.waypointName(3)]);
-      });
-
       it('names a waypoint made from a point of interest after it', async () => {
         render(<CriteriaView language="fr" />);
         startPlacing();
@@ -1741,7 +1733,7 @@ describe('CriteriaView', () => {
         map().rendered = [];
         place(6.22, 45.82);
 
-        expect(names()).toEqual(['Fontaine du Roi', fr.waypointName(2)]);
+        expect(names()).toEqual(['Fontaine du Roi', fr.waypointLabel]);
       });
 
       it('removes a waypoint from the list and the map', () => {
@@ -1821,6 +1813,38 @@ describe('CriteriaView', () => {
           [6.23, 45.83],
           [6.21, 45.81],
         ]);
+      });
+
+      it('says where a moved waypoint now stands', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+
+        fireEvent.click(button(1, 'down'));
+
+        expect(screen.getByTestId('criteria-waypoint-announcement')).toHaveTextContent(en.waypointMoved(2));
+      });
+
+      it('stops saying a waypoint moved once it is removed', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+        fireEvent.click(button(1, 'down'));
+
+        fireEvent.click(screen.getByTestId('criteria-waypoint-item-2-remove'));
+
+        expect(screen.getByTestId('criteria-waypoint-announcement')).toBeEmptyDOMElement();
+      });
+
+      it('says it again when a waypoint moves to the position the last one reached', () => {
+        render(<CriteriaView language="en" />);
+        placeThree();
+        fireEvent.click(button(1, 'down'));
+        const announcement = screen.getByTestId('criteria-waypoint-announcement');
+        const first = announcement.firstElementChild;
+
+        fireEvent.click(button(3, 'up'));
+
+        expect(announcement).toHaveTextContent(en.waypointMoved(2));
+        expect(announcement.firstElementChild).not.toBe(first);
       });
 
       it('has no button to move the first waypoint up or the last one down', () => {
@@ -2076,6 +2100,75 @@ describe('CriteriaView', () => {
       it('says the waypoints make too long a route, or that no way joins them', async () => {
         expect(await refuse({ field: 'waypoints' })).toHaveTextContent(t.waypointsUnreachable);
       });
+    });
+  });
+
+  describe('waypoints on a phone', () => {
+    const placeThenOpenCriteria = (count: number) => {
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByTestId('sub-page-back'));
+      fireEvent.click(screen.getByTestId('criteria-waypoint'));
+      for (const [lng, lat] of [
+        [6.21, 45.81],
+        [6.22, 45.82],
+        [6.23, 45.83],
+      ].slice(0, count)) {
+        place(lng!, lat!);
+      }
+      fireEvent.click(screen.getByTestId('criteria-waypoint-done'));
+      fireEvent.click(screen.getByTestId('criteria-open'));
+    };
+
+    it('lists them in the criteria, between the last criterion and the search button', () => {
+      render(<CriteriaView language="en" />);
+
+      placeThenOpenCriteria(2);
+
+      const list = screen.getByTestId('criteria-waypoint-list');
+      expect(names()).toEqual([en.waypointLabel, en.waypointLabel]);
+      expect(list.nextElementSibling).toBe(screen.getByTestId('criteria-submit'));
+    });
+
+    it('has no section without waypoints', () => {
+      render(<CriteriaView language="en" />);
+
+      placeThenOpenCriteria(0);
+
+      expect(screen.queryByTestId('criteria-waypoint-list')).not.toBeInTheDocument();
+    });
+
+    it('moves a waypoint down and removes another', () => {
+      render(<CriteriaView language="en" />);
+      placeThenOpenCriteria(3);
+
+      fireEvent.click(screen.getByTestId('criteria-waypoint-item-1-down'));
+      fireEvent.click(screen.getByTestId('criteria-waypoint-item-3-remove'));
+
+      expect(items()).toHaveLength(2);
+      expect(waypointMarkers().map((marker) => marker.position)).toEqual([
+        [6.22, 45.82],
+        [6.21, 45.81],
+      ]);
+    });
+
+    it('keeps the one button to add a waypoint, the one over the map', () => {
+      render(<CriteriaView language="en" />);
+
+      placeThenOpenCriteria(2);
+
+      expect(document.querySelectorAll('[data-testid="criteria-waypoint"]')).toHaveLength(1);
+      expect(screen.getByTestId('criteria-waypoint-list')).not.toContainElement(
+        screen.getByTestId('criteria-waypoint'),
+      );
+    });
+
+    it('does not offer to centre the map on a waypoint', () => {
+      render(<CriteriaView language="en" />);
+      placeThenOpenCriteria(2);
+
+      expect(screen.getByTestId('criteria-waypoint-item-1-name').tagName).not.toBe('BUTTON');
     });
   });
 });

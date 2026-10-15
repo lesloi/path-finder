@@ -403,6 +403,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       {t.cancelSearch}
     </button>
   );
+  // A phone has the button over the map, and no pointer to highlight a pin with.
+  const waypointTools = desktop && {
+    add: { placing, full: waypoints.length >= MAX_WAYPOINTS, onToggle: togglePlacing },
+    onCenter: (index: number) => map.current?.centerOn(waypoints[index]!),
+    onPoint: (index: number | undefined) => map.current?.highlightWaypoint(index),
+  };
   const criteriaFields = (
     <CriteriaFields
       start={start}
@@ -413,18 +419,14 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       draft={draft}
       searched={routesShown}
       waypointList={
-        desktop && start ? (
+        start && (desktop || waypoints.length > 0) ? (
           <WaypointList
             language={language}
             waypoints={waypoints}
             waypointPois={waypointPois}
-            placing={placing}
-            full={waypoints.length >= MAX_WAYPOINTS}
-            onTogglePlacing={togglePlacing}
             onMove={moveWaypoint}
             onRemove={removeWaypoint}
-            onCenter={(index) => map.current?.centerOn(waypoints[index]!)}
-            onPoint={(index) => map.current?.highlightWaypoint(index)}
+            {...waypointTools}
           />
         ) : undefined
       }
