@@ -79,7 +79,7 @@ export function WaypointList({
           {placing ? <MapPinCheck size={18} aria-hidden /> : <MapPinPlus size={18} aria-hidden />}
         </button>
       </div>
-      <ol ref={list} className="flex flex-col gap-1">
+      <ol ref={list} className="-m-1 flex max-h-36 flex-col gap-1 overflow-y-auto p-1">
         {waypoints.map((waypoint, index) => {
           const number = index + 1;
           const poi = waypointPoiAt(waypointPois, waypoint);
