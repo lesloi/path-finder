@@ -104,3 +104,55 @@ func searchCause(stop stopReason) LegCause {
 	}
 	return CauseDisconnected
 }
+
+// smallComponentNodes is the size under which a set of joined ways is too small to hold a loop. At Chamonix
+// a control point fell on one for 246 of 2,000 candidates, all of which were then lost; no component
+// between 1,000 and 50,000 nodes was hit.
+const smallComponentNodes = 1_000
+
+// nodeSet is a set of nodes as a bitmap.
+type nodeSet []uint64
+
+func (s nodeSet) has(n uint32) bool { return s[n>>6]&(1<<(n&63)) != 0 }
+
+// smallComponents is the nodes of the connected components of fewer than limit nodes, in a graph that holds a
+// component of limit nodes or more.
+func smallComponents(g *graph, limit int) nodeSet {
+	parent := make([]uint32, g.n)
+	for i := range parent {
+		parent[i] = uint32(i)
+	}
+	find := func(x uint32) uint32 {
+		for parent[x] != x {
+			parent[x] = parent[parent[x]]
+			x = parent[x]
+		}
+		return x
+	}
+	for u := 0; u < g.n; u++ {
+		for e := g.off[u]; e < g.off[u+1]; e++ {
+			if a, b := find(uint32(u)), find(g.edges[e].To); a != b {
+				parent[a] = b
+			}
+		}
+	}
+	size := make([]uint32, g.n)
+	for i := 0; i < g.n; i++ {
+		size[find(uint32(i))]++
+	}
+	small := make(nodeSet, (g.n+63)/64)
+	// A graph with no component of limit nodes is a small zone, where every component is all there is.
+	hasLarge := false
+	for i := 0; i < g.n && !hasLarge; i++ {
+		hasLarge = int(size[i]) >= limit
+	}
+	if !hasLarge {
+		return small
+	}
+	for i := 0; i < g.n; i++ {
+		if int(size[find(uint32(i))]) < limit {
+			small[i>>6] |= 1 << (uint(i) & 63)
+		}
+	}
+	return small
+}

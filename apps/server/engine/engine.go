@@ -50,7 +50,9 @@ type graph struct {
 	off         []uint32
 	edges       []edge
 	sp          *spatial
-	file        mapped
+	// small holds the nodes of components too small to hold a loop: control points keep off them.
+	small nodeSet
+	file  mapped
 }
 
 func align16(n int) int { return (n + 15) &^ 15 }
@@ -174,6 +176,7 @@ func openGraph(path string) (_ *graph, err error) {
 	if g.sp.nodes, err = view[uint32](data, listAt, n); err != nil {
 		return nil, fmt.Errorf("%s: index nodes: %w", path, err)
 	}
+	g.small = smallComponents(g, smallComponentNodes)
 	return g, nil
 }
 
@@ -904,7 +907,7 @@ func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter [
 		phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(len(jitter)+1)
 		x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
 		n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
-		if !ok || d > snapReach(rc) {
+		if !ok || d > snapReach(rc) || g.small.has(n) {
 			return nil, false
 		}
 		nodes = append(nodes, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))

@@ -523,3 +523,44 @@ func TestAControlCircleGivesUpWhenNoTurnReachesTheWays(t *testing.T) {
 		t.Error("a circle 20 km wide around a 100 m lattice found ways within reach")
 	}
 }
+
+func TestSmallComponentsAreTheOnesTooSmallToHoldARoute(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	at := g.grid(30, 40, flat) // 1,200 nodes
+	island := g.addNode(9_000, 0, 100)
+	g.connect(island, g.addNode(9_100, 0, 100), KindPath)
+	e := openTest(t, g, false)
+	// Act
+	small := smallComponents(e.g, 1_000)
+	// Assert
+	if !small.has(uint32(island)) || !small.has(uint32(island+1)) {
+		t.Error("the two-node island is not small")
+	}
+	if small.has(uint32(at(0, 0))) || small.has(uint32(at(29, 39))) {
+		t.Error("the lattice is small")
+	}
+}
+
+func TestAControlPointDoesNotLandOnAnIsland(t *testing.T) {
+	// Arrange: the nodes nearest to the first circle's points form two islands, in a valley of 1,771 nodes
+	g := &testGraph{}
+	start := valleyBand(g)
+	for _, x := range []float64{-2598, 2598} {
+		g.connect(g.addNode(4_500, x, 100), g.addNode(4_550, x, 100), KindPath)
+	}
+	e := openTest(t, g, false)
+	sn := g.nodes[start]
+	slat, slon := float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7
+	// Act
+	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, 3000, math.Pi/2, []float64{1, 1}, 0)
+	// Assert
+	if !ok || used == math.Pi/2 {
+		t.Fatalf("ok = %v, turn = %v: the first circle lands on the islands and should have been turned", ok, used)
+	}
+	for _, n := range nodes {
+		if e.g.small.has(n) {
+			t.Errorf("node %d is on an island", n)
+		}
+	}
+}
