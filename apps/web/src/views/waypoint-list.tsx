@@ -8,6 +8,8 @@ import { criteriaText, type Language } from '../i18n/index.ts';
 
 const ROW_BUTTON = 'grid size-8 flex-none place-items-center rounded-full text-ink hover:bg-surface-2';
 
+const NAME = 'flex min-w-0 flex-1 items-center gap-2 py-1 text-left text-sm text-ink';
+
 const MOVES = [
   { direction: 'up', Icon: ArrowUp, label: 'moveWaypointUp', hintOf: 'moveUp' },
   { direction: 'down', Icon: ArrowDown, label: 'moveWaypointDown', hintOf: 'moveDown' },
@@ -21,9 +23,7 @@ export function WaypointList({
   language,
   waypoints,
   waypointPois,
-  placing,
-  full,
-  onTogglePlacing,
+  add,
   onMove,
   onRemove,
   onCenter,
@@ -32,17 +32,20 @@ export function WaypointList({
   language: Language;
   waypoints: Position[];
   waypointPois: WaypointPois;
-  /** The user is placing waypoints on the map. */
-  placing: boolean;
-  /** No more waypoints can be added. */
-  full: boolean;
-  onTogglePlacing: () => void;
+  /** The button to add waypoints; left out where another one does that job. */
+  add?: {
+    /** The user is placing waypoints on the map. */
+    placing: boolean;
+    /** No more waypoints can be added. */
+    full: boolean;
+    onToggle: () => void;
+  };
   onMove: (from: number, to: number) => void;
   onRemove: (index: number) => void;
-  /** The user asked to see a waypoint. */
-  onCenter: (index: number) => void;
+  /** The user asked to see a waypoint; without it, a row is no button. */
+  onCenter?: (index: number) => void;
   /** The user points at a waypoint's row, or leaves it. */
-  onPoint: (index: number | undefined) => void;
+  onPoint?: (index: number | undefined) => void;
 }) {
   const t = criteriaText[language];
   const list = useRef<HTMLOListElement>(null);
@@ -61,23 +64,25 @@ export function WaypointList({
     (pressed?.disabled ? other : pressed)?.focus();
   }, [waypoints]);
   // The list can go away under the pointer, which then never leaves it.
-  useEffect(() => () => onPoint(undefined), []); // eslint-disable-line react-hooks/exhaustive-deps -- only on unmount
+  useEffect(() => () => onPoint?.(undefined), []); // eslint-disable-line react-hooks/exhaustive-deps -- only on unmount
   return (
     <section className="flex flex-col gap-2" data-testid="criteria-waypoint-list">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-ink-2">{t.waypoints}</h2>
-        <button
-          type="button"
-          data-testid="criteria-waypoint"
-          // The size of its title: the section is no taller than the others.
-          className="-my-1.5 mr-1 grid size-8 place-items-center rounded-full text-ink hover:bg-surface-2 aria-pressed:bg-accent! aria-pressed:text-on-accent! disabled:text-ink-2"
-          {...tip(t.addWaypoint, 'bottom-end')}
-          aria-pressed={placing}
-          disabled={!placing && full}
-          onClick={onTogglePlacing}
-        >
-          {placing ? <MapPinCheck size={18} aria-hidden /> : <MapPinPlus size={18} aria-hidden />}
-        </button>
+        {add && (
+          <button
+            type="button"
+            data-testid="criteria-waypoint"
+            // The size of its title: the section is no taller than the others.
+            className="-my-1.5 mr-1 grid size-8 place-items-center rounded-full text-ink hover:bg-surface-2 aria-pressed:bg-accent! aria-pressed:text-on-accent! disabled:text-ink-2"
+            {...tip(t.addWaypoint, 'bottom-end')}
+            aria-pressed={add.placing}
+            disabled={!add.placing && add.full}
+            onClick={add.onToggle}
+          >
+            {add.placing ? <MapPinCheck size={18} aria-hidden /> : <MapPinPlus size={18} aria-hidden />}
+          </button>
+        )}
       </div>
       <ol ref={list} className="-m-1 flex max-h-36 flex-col gap-1 overflow-y-auto p-1">
         {waypoints.map((waypoint, index) => {
@@ -87,6 +92,16 @@ export function WaypointList({
           const id = `criteria-waypoint-item-${number}`;
           // Two waypoints can be at the very same position: the key counts the ones before.
           const key = `${waypoint.join(',')}#${waypoints.slice(0, index).filter((w) => w[0] === waypoint[0] && w[1] === waypoint[1]).length}`;
+          const pinAndName = (
+            <>
+              <span className="relative block h-[29px] w-6 flex-none" aria-hidden>
+                <WaypointPin number={number} variant="map" poi={poi} />
+              </span>
+              <span data-name className="truncate">
+                {name}
+              </span>
+            </>
+          );
           return (
             <li
               // Its position names the point as it moves.
@@ -94,24 +109,25 @@ export function WaypointList({
               data-testid={id}
               className="flex items-center gap-1 rounded-lg bg-surface-2/50 pr-1 pl-3"
               // The pin goes with the row for whoever points at it, with the mouse or with the keyboard.
-              onMouseEnter={() => onPoint(index)}
-              onMouseLeave={() => onPoint(undefined)}
-              onFocus={() => onPoint(index)}
-              onBlur={() => onPoint(undefined)}
+              onMouseEnter={() => onPoint?.(index)}
+              onMouseLeave={() => onPoint?.(undefined)}
+              onFocus={() => onPoint?.(index)}
+              onBlur={() => onPoint?.(undefined)}
             >
-              <button
-                type="button"
-                data-testid={`${id}-name`}
-                className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left text-sm text-ink"
-                onClick={() => onCenter(index)}
-              >
-                <span className="relative block h-[29px] w-6 flex-none" aria-hidden>
-                  <WaypointPin number={number} variant="map" poi={poi} />
-                </span>
-                <span data-name className="truncate">
-                  {name}
-                </span>
-              </button>
+              {onCenter ? (
+                <button
+                  type="button"
+                  data-testid={`${id}-name`}
+                  className={`${NAME} rounded-md`}
+                  onClick={() => onCenter(index)}
+                >
+                  {pinAndName}
+                </button>
+              ) : (
+                <div data-testid={`${id}-name`} className={NAME}>
+                  {pinAndName}
+                </div>
+              )}
               {MOVES.map(({ direction, Icon, label, hintOf }) => {
                 const target = index + (direction === 'up' ? -1 : 1);
                 const possible = target >= 0 && target < waypoints.length;
