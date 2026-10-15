@@ -50,9 +50,18 @@ type graph struct {
 	off         []uint32
 	edges       []edge
 	sp          *spatial
-	// small holds the nodes of components too small to hold a loop: control points keep off them.
-	small nodeSet
-	file  mapped
+	// smallOnce guards smallSet: the pass reads the whole graph, which route-only traffic and startup never need.
+	smallOnce sync.Once
+	smallSet  nodeSet
+	file      mapped
+}
+
+// small holds the nodes of components too small to hold a loop: control points keep off them. It is computed
+// on first use and kept for the life of the graph; a caller that leaves does not stop it, since later searches
+// reuse the result.
+func (g *graph) small() nodeSet {
+	g.smallOnce.Do(func() { g.smallSet = smallComponents(g, smallComponentNodes) })
+	return g.smallSet
 }
 
 func align16(n int) int { return (n + 15) &^ 15 }
@@ -176,7 +185,6 @@ func openGraph(path string) (_ *graph, err error) {
 	if g.sp.nodes, err = view[uint32](data, listAt, n); err != nil {
 		return nil, fmt.Errorf("%s: index nodes: %w", path, err)
 	}
-	g.small = smallComponents(g, smallComponentNodes)
 	return g, nil
 }
 
@@ -885,7 +893,7 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32
 	for k := 0; k < 8; k++ {
 		a := float64(k) * math.Pi / 4
 		n, d, ok := sp.nearest(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl))
-		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev && !g.small.has(n) {
+		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev && !g.small().has(n) {
 			best = n
 		}
 	}
@@ -908,7 +916,7 @@ func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter [
 		phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(len(jitter)+1)
 		x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
 		n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
-		if !ok || d > snapReach(rc) || g.small.has(n) {
+		if !ok || d > snapReach(rc) || g.small().has(n) {
 			return nil, false
 		}
 		nodes = append(nodes, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))
