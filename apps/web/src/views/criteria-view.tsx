@@ -584,11 +584,6 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               onToggle={() => setListFolded(!listFolded)}
             >
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-                {routeSet && !loading && (
-                  <p data-testid="routes-summary" className="text-sm text-ink-2">
-                    {criteriaSummary(routeSet.request, language)}
-                  </p>
-                )}
                 {staleNotice}
                 {panel}
                 {cancelButton}
