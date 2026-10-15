@@ -467,3 +467,59 @@ func TestClimbLiftIsZeroWithoutABand(t *testing.T) {
 		t.Errorf("climbLift with no band = %v, want 0: a caller that sets none gets no steering", got)
 	}
 }
+
+// A band of ways along the east-west axis through the start, 5 km wide, as a valley floor between walls.
+func valleyBand(g *testGraph) (start int) {
+	for y := -5; y <= 5; y++ {
+		for x := -80; x <= 80; x++ {
+			n := g.addNode(float64(y)*500, float64(x)*stepM, 100)
+			if x > -80 {
+				g.connect(n-1, n, KindPath)
+			}
+			if y > -5 {
+				g.connect(n-161, n, KindPath)
+			}
+			if x == 0 && y == 0 {
+				start = n
+			}
+		}
+	}
+	return start
+}
+
+func TestAControlCircleTurnsToWhereWaysAre(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	start := valleyBand(g)
+	e := openTest(t, g, false)
+	sn := g.nodes[start]
+	slat, slon := float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7
+	const rc, theta = 3000.0, math.Pi / 2 // towards the wall: its points fall 2 km from the band, past the 900 m reach
+	jitter := []float64{1, 1}
+	if _, ok := circlePoints(e.g, e.sp, slat, slon, rc, theta, jitter, 0); ok {
+		t.Fatal("the first circle was meant to fall off the ways")
+	}
+	// Act
+	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, rc, theta, jitter, 0)
+	// Assert
+	if !ok || len(nodes) != len(jitter) {
+		t.Fatalf("ok = %v with %d nodes, want a circle of %d points", ok, len(nodes), len(jitter))
+	}
+	if used == theta {
+		t.Error("the circle did not turn")
+	}
+}
+
+func TestAControlCircleGivesUpWhenNoTurnReachesTheWays(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	start := g.grid(2, 2, flat)(0, 0)
+	e := openTest(t, g, false)
+	sn := g.nodes[start]
+	// Act
+	_, _, ok := rotatedCircle(e.g, e.sp, float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7, 20_000, 0, []float64{1, 1, 1}, 0)
+	// Assert
+	if ok {
+		t.Error("a circle 20 km wide around a 100 m lattice found ways within reach")
+	}
+}

@@ -888,6 +888,43 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32
 	return best
 }
 
+// circleTries is how many turns of the control circle are tried before a candidate is given up.
+const circleTries = 8
+
+// goldenAngle spreads successive turns of the circle as evenly as can be, whatever their number.
+const goldenAngle = 2.399963229728653
+
+// circlePoints is the node of each control point of the circle of radius rc whose centre lies towards theta
+// from the point (slat, slon), or false when one is farther than snapReach from any way.
+func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64) ([]uint32, bool) {
+	cosl := math.Cos(slat * rad)
+	cxm, cym := rc*math.Cos(theta), rc*math.Sin(theta)
+	nodes := make([]uint32, 0, len(jitter))
+	for j := range jitter {
+		phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(len(jitter)+1)
+		x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
+		n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
+		if !ok || d > snapReach(rc) {
+			return nil, false
+		}
+		nodes = append(nodes, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))
+	}
+	return nodes, true
+}
+
+// rotatedCircle is circlePoints for theta, or for the first of the next turns that falls on ways. In a valley
+// most directions lead to a wall: at Chamonix, 30 km, 44 % of the circles had a point beyond reach, and turning
+// it up to circleTries times leaves none. The turn it used comes back, to be kept for the resizings.
+func rotatedCircle(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64) ([]uint32, float64, bool) {
+	for r := 0; r < circleTries; r++ {
+		turned := theta + float64(r)*goldenAngle
+		if nodes, ok := circlePoints(g, sp, slat, slon, rc, turned, jitter, lift); ok {
+			return nodes, turned, true
+		}
+	}
+	return nil, theta, false
+}
+
 func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *loopParams, start uint32, index int) *loopResult {
 	best, cause := candidateLoop(ctx, cx, sp, s, lp, start, index)
 	if lp.stats != nil && ctx.Err() == nil {
@@ -926,18 +963,12 @@ func candidateLoop(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp
 		if ctx.Err() != nil {
 			return best, CauseCanceled
 		}
-		cxm, cym := rc*math.Cos(theta), rc*math.Sin(theta)
-		points := []uint32{start}
-		for j := 0; j < k; j++ {
-			phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(k+1)
-			x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
-			n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
-			if !ok || d > snapReach(rc) {
-				return best, CauseNoSnap
-			}
-			points = append(points, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))
+		circle, turned, ok := rotatedCircle(g, sp, slat, slon, rc, theta, jitter, lift)
+		if !ok {
+			return best, CauseNoSnap
 		}
-		points = append(points, start)
+		theta = turned
+		points := append(append([]uint32{start}, circle...), start)
 		if lp.anchors != nil {
 			// The user's waypoints fix the order; the circle's points only add detours between them.
 			points = collapse(withControlPoints(lp.anchors, points[1:len(points)-1], xy))
