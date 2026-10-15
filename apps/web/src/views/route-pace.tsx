@@ -34,7 +34,8 @@ export function RoutePace({
       type="button"
       ref={edit}
       data-testid="routes-pace-edit"
-      className="grid size-touch flex-none place-items-center rounded-full text-ink hover:bg-surface-2 aria-pressed:text-accent"
+      // `relative` keeps the button above the slider, which is pulled up over its lower part.
+      className="relative grid size-touch flex-none place-items-center rounded-full text-ink hover:bg-surface-2 aria-pressed:text-accent"
       {...tip(t.editPace, 'bottom-start')}
       aria-pressed={editing}
       onClick={() => setEditing(!editing)}
@@ -45,7 +46,7 @@ export function RoutePace({
   // The pencil stays where it is: before the pace, which the slider then spans the width under.
   if (editing && onChange) {
     return (
-      <div ref={editor} data-testid="routes-pace" className="text-sm text-ink-2">
+      <div ref={editor} data-testid="routes-pace" className="text-sm text-ink-2 [&_output]:text-lg [&_input]:-mt-3">
         <PaceSlider
           label={t.pace}
           pace={pace}
