@@ -44,16 +44,15 @@ func (s *LoopStats) record(c LegCause, lost bool) {
 // diagnoseFloodNodes bounds the search for the extent of a component.
 const diagnoseFloodNodes = 50_000
 
-// reaches tells whether, within diagnoseFloodNodes nodes, a walk from one node meets the other, and whether
-// it ran out of nodes first: a walk that runs out without meeting it has left the whole component behind.
-func reaches(g *graph, from, to uint32) (met, exhausted bool) {
+// isolated tells whether a walk from one node, bounded to diagnoseFloodNodes nodes, runs out of nodes
+// without meeting the other: it has then left a whole component behind.
+func isolated(g *graph, from, to uint32) bool {
 	seen := map[uint32]struct{}{from: {}}
 	queue := []uint32{from}
-	for len(queue) > 0 {
-		u := queue[0]
-		queue = queue[1:]
+	for head := 0; head < len(queue); head++ {
+		u := queue[head]
 		if u == to {
-			return true, false
+			return false
 		}
 		for e := g.off[u]; e < g.off[u+1]; e++ {
 			v := g.edges[e].To
@@ -61,26 +60,23 @@ func reaches(g *graph, from, to uint32) (met, exhausted bool) {
 				continue
 			}
 			if len(seen) >= diagnoseFloodNodes {
-				return false, false
+				return false
 			}
 			seen[v] = struct{}{}
 			queue = append(queue, v)
 		}
 	}
-	return false, true
+	return true
 }
 
 // diagnose names a failed leg more exactly than the search can: a search that settles the large side of a
 // leg stops on its cutoff just as when the target is on an island, and one that was slowed by the avoid set
 // looks like any other.
 func diagnose(ctx context.Context, cx *Engine, s *searcher, climb float32, avoid *avoidSet, lim searchLimits, from, to uint32, stop stopReason) LegCause {
-	if ctx.Err() != nil || stop == stopCanceled {
+	if ctx.Err() != nil {
 		return CauseCanceled
 	}
-	if _, exhausted := reaches(cx.g, from, to); exhausted {
-		return CauseDisconnected
-	}
-	if _, exhausted := reaches(cx.g, to, from); exhausted {
+	if isolated(cx.g, from, to) || isolated(cx.g, to, from) {
 		return CauseDisconnected
 	}
 	if avoid != nil && s.route(ctx, cx, climb, nil, lim, from, to) != nil {
@@ -129,27 +125,28 @@ func smallComponents(g *graph, limit int) nodeSet {
 		}
 		return x
 	}
-	for u := 0; u < g.n; u++ {
+	for u := uint32(0); int(u) < g.n; u++ {
 		for e := g.off[u]; e < g.off[u+1]; e++ {
-			if a, b := find(uint32(u)), find(g.edges[e].To); a != b {
-				parent[a] = b
+			if v := g.edges[e].To; v > u { // every edge is stored both ways
+				if a, b := find(u), find(v); a != b {
+					parent[a] = b
+				}
 			}
 		}
 	}
 	size := make([]uint32, g.n)
-	for i := 0; i < g.n; i++ {
-		size[find(uint32(i))]++
+	large := false
+	for i := range size {
+		r := find(uint32(i))
+		size[r]++
+		large = large || int(size[r]) >= limit
 	}
 	small := make(nodeSet, (g.n+63)/64)
 	// A graph with no component of limit nodes is a small zone, where every component is all there is.
-	hasLarge := false
-	for i := 0; i < g.n && !hasLarge; i++ {
-		hasLarge = int(size[i]) >= limit
-	}
-	if !hasLarge {
+	if !large {
 		return small
 	}
-	for i := 0; i < g.n; i++ {
+	for i := range size {
 		if int(size[find(uint32(i))]) < limit {
 			small[i>>6] |= 1 << (uint(i) & 63)
 		}

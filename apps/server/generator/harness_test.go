@@ -203,7 +203,7 @@ func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStar
 	for _, r := range routes {
 		if r.Kind == "match" {
 			s.matches++
-			s.retraced += retracedShare(r.Geometry)
+			s.retraced += retraceShare(cellsAlong(r.Geometry, criteria.Start, 0))
 		}
 	}
 	return s
@@ -221,29 +221,6 @@ func reportCauses(l *countingLooper) {
 		line += fmt.Sprintf(" %s %d/%d", c, lc, cc)
 	}
 	fmt.Printf("  candidates lost / cut, by cause:%s (total %d/%d)\n", line, lost, cut)
-}
-
-// retracedShare is the share of a route's segments that run over a segment it already ran, in either direction.
-func retracedShare(geometry [][]float64) float64 {
-	if len(geometry) < 2 {
-		return 0
-	}
-	type key [4]int64
-	seen := map[key]bool{}
-	repeated := 0
-	for i := 1; i < len(geometry); i++ {
-		a := [2]int64{int64(geometry[i-1][0] * 1e5), int64(geometry[i-1][1] * 1e5)}
-		b := [2]int64{int64(geometry[i][0] * 1e5), int64(geometry[i][1] * 1e5)}
-		if a[0] > b[0] || a[0] == b[0] && a[1] > b[1] {
-			a, b = b, a
-		}
-		k := key{a[0], a[1], b[0], b[1]}
-		if seen[k] {
-			repeated++
-		}
-		seen[k] = true
-	}
-	return float64(repeated) / float64(len(geometry)-1)
 }
 
 func report(label string, samples []sample, limit int) {
