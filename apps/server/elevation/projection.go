@@ -12,12 +12,13 @@ type Projection interface {
 	Forward(latDeg, lonDeg float64) (x, y float64)
 }
 
-// utm is a Universal Transverse Mercator zone. The overseas BD ALTI tiles use it (RGAF09, RGFG95, RGR92,
-// RGM04 and RGSPM06 differ from WGS84 by under a metre, less than a cell of 25 m).
+// utm is a Universal Transverse Mercator zone, for the overseas BD ALTI tiles. The geodetic datum of those
+// tiles (RGAF09, RGFG95, RGR92, RGM04, RGSPM06) is taken as WGS84, as Lambert-93's is: they should differ by
+// under a metre, less than a cell of 25 m. Not checked against the IGN archives yet.
 type utm struct {
-	lon0, y0, scale float64 // scale is the scale factor times the rectifying radius
+	lon0, y0, scale float64 // scale folds the constant k0 and rectifying radius into one factor
 	alpha           [4]float64
-	twoRootN        float64 // 2·√n/(1+n)
+	twoRootN        float64 // 2·√n/(1+n), constant per zone: Forward runs once per graph node
 }
 
 const utmScale = 0.9996

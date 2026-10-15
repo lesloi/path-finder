@@ -87,7 +87,9 @@ extract and the tiles of that territory:
 | Mayotte                  | `utm38s`   |
 | Saint-Pierre-et-Miquelon | `utm21n`   |
 
-The default is `lambert93`. Tiles read in the wrong projection give no elevation, and the build fails.
+These names are what the IGN archives are expected to use, not yet checked against them: read the projection
+in each archive's description before the first build. The default is `lambert93`. Tiles read in the wrong
+projection give no elevation, and the build fails.
 
 ### Points of interest
 

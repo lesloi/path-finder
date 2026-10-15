@@ -203,7 +203,7 @@ func finish(p progress, dem *elevation.DEM, demDir string, ways []rawWay, lat, l
 	nodes, off, edges := assemble(ways, lat, lon, elev)
 	p.step("graph: %d nodes, %d directed edges", len(nodes), len(edges))
 	if len(edges) == 0 {
-		return fmt.Errorf("no walkable way has elevation: check that %s holds the BD ALTI tiles of the area the extracts cover", demDir)
+		return fmt.Errorf("no walkable way has elevation: check that %s holds the BD ALTI tiles of the area the extracts cover, and that -dem-crs names their projection (lambert93 by default)", demDir)
 	}
 
 	if err := engine.WriteGraph(outPath, nodes, off, edges); err != nil {

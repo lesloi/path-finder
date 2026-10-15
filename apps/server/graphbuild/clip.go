@@ -40,7 +40,7 @@ func BuildClipped(pbfPath, demDir string, proj elevation.Projection, outPath str
 		return err
 	}
 	if tiles == 0 {
-		return fmt.Errorf("graphbuild: no BD ALTI tile of %s meets the box", demDir)
+		return fmt.Errorf("graphbuild: no BD ALTI tile of %s meets the box: check -dem-crs names their projection (lambert93 by default)", demDir)
 	}
 	p.step("BD ALTI: %d tiles meet the box", tiles)
 	ways, lat, lon, err := readClipped(pbfPath, box)
