@@ -21,18 +21,20 @@ import {
   type ReactNode,
 } from 'react';
 
-import { MAX_WAYPOINTS } from '../contract/index.ts';
+import { areaContains, MAX_AVOIDED_AREAS, MAX_WAYPOINTS, type AvoidedArea } from '../contract/index.ts';
 import { useCoverage, useSettings } from '../state/index.ts';
 import { CriteriaBar } from './criteria-bar.tsx';
 import { CriteriaForm, criteriaChanged, criteriaRequest, useCriteriaDraft } from './criteria-form.tsx';
 import { RouteDock } from './route-dock.tsx';
 import { RouteErrorToast } from './route-error-toast.tsx';
+import { AvoidedAreaList } from './avoided-area-list.tsx';
 import { WaypointList } from './waypoint-list.tsx';
 import { SearchingPanel } from './searching-panel.tsx';
 import { useRouteBrowser } from './use-route-browser.ts';
 import { RouteSetView } from './route-set-view.tsx';
 import {
   criteriaSummary,
+  DEFAULT_AVOIDED_RADIUS,
   formatPosition,
   isCovered,
   parsePosition,
@@ -189,13 +191,16 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
   // What a tap on the map is for: the start point (`pick`, from the crosshair) or a waypoint (`place`); one at a time.
-  const [mode, setMode] = useState<'pick' | 'place'>();
+  const [mode, setMode] = useState<'pick' | 'place' | 'avoid'>();
   const picking = mode === 'pick';
   const placing = mode === 'place';
+  const avoiding = mode === 'avoid';
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
+  // The circles routes keep out of: kept here too, for this visit only, as the waypoints are.
+  const [avoidedAreas, setAvoidedAreas] = useState<AvoidedArea[]>([]);
   // A tap on the veiled part of the map was refused: the banner says why for a while.
-  const [refused, setRefused] = useState<'uncovered' | 'duplicate'>();
+  const [refused, setRefused] = useState<'uncovered' | 'duplicate' | 'inside'>();
   // The points of interest some waypoints were made from, by position; kept for the routes found, as for the criteria.
   const [waypointPois, setWaypointPois] = useState<WaypointPois>({});
   // On phones, the criteria are a layer over the map; the height of the sheet is what the routes are framed clear of.
@@ -228,13 +233,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const selected = desktop ? browser.selected : (browser.selected ?? 0);
   const dockRoute = desktop ? atPace?.routes[selected ?? -1] : undefined;
   const dockShown = Boolean(dockRoute);
-  const current = criteriaRequest(draft[0], { pace, start, waypoints });
+  const current = criteriaRequest(draft[0], { pace, start, waypoints, avoidedAreas });
   // Every search keeps the criteria it was made with, whichever button asked for it.
   const search = (request: RouteSetRequest) => {
     setCleared(false);
     // The routes would be found out of sight.
     setListFolded(false);
-    setMode((current) => (current === 'place' ? undefined : current));
+    setMode((current) => (current === 'place' || current === 'avoid' ? undefined : current));
     draft[2]();
     browser.ask(request);
   };
@@ -298,6 +303,34 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     deselect();
     setRefused(undefined);
     setMode('place');
+  }
+
+  function toggleAvoiding() {
+    if (avoiding) return setMode(undefined);
+    deselect();
+    setRefused(undefined);
+    setMode('avoid');
+  }
+
+  function addAvoidedArea(center: Position) {
+    if (avoidedAreas.length >= MAX_AVOIDED_AREAS) return;
+    const area = { center, radius: DEFAULT_AVOIDED_RADIUS };
+    // The server refuses an area that holds the start point or a waypoint: the user is told here, on the spot.
+    if ([start, ...waypoints].some((point) => point && areaContains(area, point))) return setRefused('inside');
+    setRefused(undefined);
+    deselect();
+    setAvoidedAreas([...avoidedAreas, area]);
+    if (avoidedAreas.length + 1 >= MAX_AVOIDED_AREAS) setMode(undefined);
+  }
+
+  function resizeAvoidedArea(index: number, radius: number) {
+    deselect();
+    setAvoidedAreas(avoidedAreas.map((area, i) => (i === index ? { ...area, radius } : area)));
+  }
+
+  function removeAvoidedArea(index: number) {
+    deselect();
+    setAvoidedAreas(avoidedAreas.filter((_, i) => i !== index));
   }
 
   function addWaypoint(position: Position, poi?: WaypointPoi) {
@@ -416,6 +449,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       language={language}
       picking={picking}
       waypoints={waypoints}
+      avoidedAreas={avoidedAreas}
       draft={draft}
       searched={routesShown}
       waypointList={
@@ -427,6 +461,20 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             onMove={moveWaypoint}
             onRemove={removeWaypoint}
             {...waypointTools}
+          />
+        ) : undefined
+      }
+      avoidedList={
+        // Placing areas needs a pointer and room: a phone has neither the button nor the list yet.
+        desktop && start ? (
+          <AvoidedAreaList
+            language={language}
+            areas={avoidedAreas}
+            placing={avoiding}
+            full={avoidedAreas.length >= MAX_AVOIDED_AREAS}
+            onToggle={toggleAvoiding}
+            onResize={resizeAvoidedArea}
+            onRemove={removeAvoidedArea}
           />
         ) : undefined
       }
@@ -479,6 +527,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         onSnapshot={browser.setSnapshot}
         onStartChange={changeStart}
         waypoints={waypoints}
+        avoidedAreas={avoidedAreas}
+        avoiding={avoiding}
+        onAvoidedAreaAdd={addAvoidedArea}
         placing={placing}
         onWaypointAdd={addWaypoint}
         onWaypointRefused={() => setRefused('uncovered')}
@@ -598,7 +649,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           <CriteriaBar
             language={language}
             summary={criteriaSummary(
-              criteriaRequest(draft[0], { pace, start: start ?? NO_START, waypoints })!,
+              criteriaRequest(draft[0], { pace, start: start ?? NO_START, waypoints, avoidedAreas })!,
               language,
             )}
             start={start && formatPosition(start, language)}
@@ -699,13 +750,35 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             </button>
           </div>
         )}
+        {avoiding && (
+          <div
+            data-testid="criteria-avoided-bar"
+            className="flex items-center gap-3 rounded-md bg-surface py-1 pr-1 pl-4 text-ink-2 shadow-float"
+          >
+            {desktop ? t.placeAvoidedArea : t.placeAvoidedAreaTouch}
+            <button
+              type="button"
+              data-testid="criteria-avoided-done"
+              className="min-h-touch rounded-full px-3 font-semibold text-accent"
+              onClick={() => setMode(undefined)}
+            >
+              {t.waypointsDone}
+            </button>
+          </div>
+        )}
         {/* Under the banner, which keeps asking for a point. */}
         <p
           role="status"
           data-testid="criteria-waypoint-refused"
           className="m-0 rounded-md bg-surface px-4 py-2 text-ink shadow-float empty:hidden"
         >
-          {placing && refused ? (refused === 'duplicate' ? t.waypointDuplicate : t.waypointUncovered) : ''}
+          {(placing || avoiding) && refused
+            ? refused === 'inside'
+              ? t.avoidedAreaOnPoint
+              : refused === 'duplicate'
+                ? t.waypointDuplicate
+                : t.waypointUncovered
+            : ''}
         </p>
       </div>
       {browser.refusal && (
@@ -729,9 +802,11 @@ function CriteriaFields({
   language,
   picking,
   waypoints,
+  avoidedAreas,
   draft,
   searched,
   waypointList,
+  avoidedList,
   onStartChange,
   onUnreadable,
   onPick,
@@ -743,9 +818,11 @@ function CriteriaFields({
   language: Language;
   picking: boolean;
   waypoints: Position[];
+  avoidedAreas: AvoidedArea[];
   draft: ReturnType<typeof useCriteriaDraft>;
   searched: boolean;
   waypointList: ReactNode;
+  avoidedList: ReactNode;
   onStartChange: (start: Position) => void;
   onUnreadable: () => void;
   onPick: () => void;
@@ -787,9 +864,11 @@ function CriteriaFields({
         start={start}
         startUncovered={startUncovered}
         waypoints={waypoints}
+        avoidedAreas={avoidedAreas}
         draft={draft}
         searched={searched}
         waypointList={waypointList}
+        avoidedList={avoidedList}
         onSubmit={onSubmit}
       />
     </>

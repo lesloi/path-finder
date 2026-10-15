@@ -10,7 +10,8 @@ import {
   type CriteriaField,
 } from '../contract/index.ts';
 import { PaceSlider, PRIMARY_BUTTON, SegmentedControl, Slider } from '../components/index.ts';
-import { formatDuration, samePositions, type Position, type RouteSetRequest } from '../core/index.ts';
+import type { AvoidedArea } from '../contract/index.ts';
+import { formatDuration, kmBetween, samePositions, type Position, type RouteSetRequest } from '../core/index.ts';
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { useSettings, type LastCriteria } from '../state/index.ts';
 
@@ -67,11 +68,26 @@ export function useCriteriaDraft(): [Draft, (draft: Draft) => void, () => void] 
  */
 export function criteriaRequest(
   draft: Draft,
-  { pace, start, waypoints }: { pace: number; start?: Position | undefined; waypoints?: Position[] | undefined },
+  {
+    pace,
+    start,
+    waypoints,
+    avoidedAreas,
+  }: {
+    pace: number;
+    start?: Position | undefined;
+    waypoints?: Position[] | undefined;
+    avoidedAreas?: AvoidedArea[] | undefined;
+  },
 ): RouteSetRequest | undefined {
   const distance = clamp(draft.distance, BOUNDS.distance.min, BOUNDS.distance.max);
   const gain = clamp(draft.gain, 0, BOUNDS.gain.max);
   const level = draft.level;
+  // A route is no longer than its target, and no point of it is farther from the start than that: an area beyond
+  // stays on the device, as a route cannot need it.
+  const reachKm = draft.target === 'distance' ? distance : draft.duration / pace;
+  const reachable =
+    start && avoidedAreas?.filter((area) => kmBetween(start, area.center) - area.radius / 1000 <= reachKm);
   return (
     start && {
       start,
@@ -81,9 +97,14 @@ export function criteriaRequest(
       surface: draft.surface,
       pace,
       ...(waypoints?.length && { waypoints }),
+      ...(reachable?.length && { avoidedAreas: reachable }),
     }
   );
 }
+
+const sameAreas = (a: AvoidedArea[], b: AvoidedArea[]) =>
+  a.length === b.length &&
+  a.every((area, i) => area.radius === b[i]!.radius && samePositions([area.center], [b[i]!.center]));
 
 /**
  * Whether `request` asks for something other than `found`, the request of the routes shown. A distance or an
@@ -106,6 +127,7 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
     samePositions([request.start], [found.start]) &&
     request.surface === found.surface &&
     samePositions(request.waypoints ?? [], found.waypoints ?? []) &&
+    sameAreas(request.avoidedAreas ?? [], found.avoidedAreas ?? []) &&
     ('distance' in b || request.pace === found.pace)
   );
 }
@@ -119,16 +141,20 @@ export function CriteriaForm({
   language,
   start,
   waypoints,
+  avoidedAreas,
   startUncovered = false,
   draft: kept,
   searched = false,
   waypointList,
+  avoidedList,
   onSubmit,
 }: {
   language: Language;
   start?: Position;
   /** The points the routes go through, in order: they are placed on the map, not in the form. */
   waypoints?: Position[] | undefined;
+  /** The areas routes keep out of: placed on the map, not in the form. */
+  avoidedAreas?: AvoidedArea[] | undefined;
   /** The start point is where the server has no routes: asking would only fail. */
   startUncovered?: boolean;
   /** From `useCriteriaDraft`, for a view that mounts the form in more than one place and keeps what was set. */
@@ -137,6 +163,8 @@ export function CriteriaForm({
   searched?: boolean;
   /** The waypoints as a list, between the criteria and the button. */
   waypointList?: ReactNode;
+  /** The list of the areas to avoid, under the waypoints. */
+  avoidedList?: ReactNode;
   onSubmit: (request: RouteSetRequest) => void;
 }) {
   const t = { ...commonText[language], ...criteriaText[language] };
@@ -149,7 +177,7 @@ export function CriteriaForm({
   const level = draft.level;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
-  const request = criteriaRequest(draft, { pace: settings.pace, start, waypoints });
+  const request = criteriaRequest(draft, { pace: settings.pace, start, waypoints, avoidedAreas });
   const field = request && invalidField(request);
 
   const sections: Record<Criterion, { title: string; content: ReactNode }> = {
@@ -288,6 +316,7 @@ export function CriteriaForm({
         </section>
       ))}
       {waypointList}
+      {avoidedList}
       {error}
       {findRoutes}
     </>
@@ -325,6 +354,7 @@ function message(
     surface: t.surfaceError,
     pace: t.paceError,
     waypoints: t.waypointsError,
+    avoidedAreas: t.avoidedAreasError,
   };
   return messages[field];
 }

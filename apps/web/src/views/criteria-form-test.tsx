@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { parseCriteria } from '../contract/index.ts';
+import { parseCriteria, type AvoidedArea } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
 import { criteriaText } from '../i18n/index.ts';
 import { CriteriaForm, criteriaChanged, criteriaRequest, invalidField } from './criteria-form.tsx';
@@ -312,6 +312,44 @@ describe('criteriaRequest', () => {
   });
 });
 
+describe('criteriaRequest and avoided areas', () => {
+  const draft = { target: 'distance', distance: 10, duration: 60, level: 'any', gain: 0, surface: 'any' } as const;
+  const near: AvoidedArea = { center: [6.14, 45.9], radius: 400 };
+  // About 111 km north of the start point.
+  const far: AvoidedArea = { center: [6.1294, 46.9], radius: 400 };
+
+  it('carries the areas a route of this length can reach', () => {
+    const request = criteriaRequest(draft, { pace: 6, start: START, avoidedAreas: [near] });
+
+    expect(request).toMatchObject({ avoidedAreas: [near] });
+  });
+
+  it('keeps an area that is out of reach on the device', () => {
+    const request = criteriaRequest(draft, { pace: 6, start: START, avoidedAreas: [near, far] });
+
+    expect(request?.avoidedAreas).toEqual([near]);
+  });
+
+  it('leaves the field out when no area is within reach', () => {
+    const request = criteriaRequest(draft, { pace: 6, start: START, avoidedAreas: [far] });
+
+    expect(request).not.toHaveProperty('avoidedAreas');
+  });
+
+  it('reaches as far as a duration allows at the pace of the user', () => {
+    // 20 min at 4 min/km is 5 km at most; the area is 11 km north, less its radius.
+    const eleven: AvoidedArea = { center: [6.1294, 45.9992], radius: 400 };
+    const short = { ...draft, target: 'duration', duration: 20 } as const;
+
+    expect(criteriaRequest(short, { pace: 4, start: START, avoidedAreas: [eleven] })).not.toHaveProperty(
+      'avoidedAreas',
+    );
+    expect(
+      criteriaRequest({ ...short, duration: 90 }, { pace: 4, start: START, avoidedAreas: [eleven] }),
+    ).toHaveProperty('avoidedAreas');
+  });
+});
+
 describe('criteriaChanged', () => {
   const found: RouteSetRequest = {
     start: [6.1, 45.8],
@@ -350,6 +388,18 @@ describe('criteriaChanged', () => {
     expect(criteriaChanged(found, withWaypoints)).toBe(true);
     expect(criteriaChanged({ ...found, waypoints: [b, a] }, withWaypoints)).toBe(true);
     expect(criteriaChanged({ ...found, waypoints: [a, [6.12, 45.89]] }, withWaypoints)).toBe(true);
+  });
+
+  it('sees an avoided area added, moved, resized or removed', () => {
+    const area: AvoidedArea = { center: [6.14, 45.9], radius: 400 };
+    const withArea = { ...found, avoidedAreas: [area] };
+
+    expect(criteriaChanged({ ...found, avoidedAreas: [] }, found)).toBe(false);
+    expect(criteriaChanged(withArea, { ...found, avoidedAreas: [{ ...area }] })).toBe(false);
+    expect(criteriaChanged(withArea, found)).toBe(true);
+    expect(criteriaChanged(found, withArea)).toBe(true);
+    expect(criteriaChanged({ ...found, avoidedAreas: [{ ...area, radius: 500 }] }, withArea)).toBe(true);
+    expect(criteriaChanged({ ...found, avoidedAreas: [{ ...area, center: [6.15, 45.9] }] }, withArea)).toBe(true);
   });
 
   it('sees a change of the pace by duration only', () => {

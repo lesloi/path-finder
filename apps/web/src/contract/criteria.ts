@@ -3,6 +3,8 @@ import {
   HILLY_MATCH_PER_KM,
   MAX_TARGET_DISTANCE,
   MAX_TARGET_ELEVATION_GAIN,
+  AVOIDED_AREA_RADIUS,
+  MAX_AVOIDED_AREAS,
   MAX_WAYPOINTS,
   MIN_TARGET_DISTANCE,
   SURFACES,
@@ -23,10 +25,32 @@ export type Criteria = {
   pace: number;
   /** Points the route goes through, in this order. */
   waypoints?: Position[];
+  /** Circles no route goes through. */
+  avoidedAreas?: AvoidedArea[];
 };
 
+/** A circle routes keep out of: its centre, and its radius in metres. */
+export type AvoidedArea = { center: Position; radius: number };
+
+const METRES_PER_DEGREE = 111_194.9;
+
+/** Whether a position is inside an area, as the server tells it. */
+export function areaContains({ center, radius }: AvoidedArea, [lon, lat]: Position): boolean {
+  const dy = (lat - center[1]) * METRES_PER_DEGREE;
+  const dx = (lon - center[0]) * METRES_PER_DEGREE * Math.cos((center[1] * Math.PI) / 180);
+  return Math.hypot(dx, dy) <= radius;
+}
+
 /** The criteria fields `parseCriteria` checks, so a form can say which one is wrong. */
-export const CRITERIA_FIELDS = ['start', 'target', 'elevationGain', 'surface', 'pace', 'waypoints'] as const;
+export const CRITERIA_FIELDS = [
+  'start',
+  'target',
+  'elevationGain',
+  'surface',
+  'pace',
+  'waypoints',
+  'avoidedAreas',
+] as const;
 export type CriteriaField = (typeof CRITERIA_FIELDS)[number];
 
 export const isCriteriaField = (value: unknown): value is CriteriaField =>
@@ -82,7 +106,7 @@ function targetDistance(criteria: Criteria): number {
  */
 export function parseCriteria(body: unknown, { countElevationGain = true } = {}): Criteria {
   check(isObject(body), 'start', 'Criteria must be an object');
-  const { start, target, elevationGain, surface, pace, waypoints } = body;
+  const { start, target, elevationGain, surface, pace, waypoints, avoidedAreas } = body;
 
   check(isPosition(start), 'start', 'start must be a longitude and a latitude');
 
@@ -116,6 +140,30 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
     check(isPosition(waypoint), 'waypoints', 'a waypoint must be a longitude and a latitude');
   }
 
+  check(
+    avoidedAreas === undefined || (Array.isArray(avoidedAreas) && avoidedAreas.length <= MAX_AVOIDED_AREAS),
+    'avoidedAreas',
+    'avoided areas must be a short list of circles',
+  );
+  const areas: AvoidedArea[] = [];
+  for (const area of avoidedAreas ?? []) {
+    check(
+      isObject(area) &&
+        isPosition(area.center) &&
+        within(area.radius, AVOIDED_AREA_RADIUS.min, AVOIDED_AREA_RADIUS.max),
+      'avoidedAreas',
+      'an avoided area must be a centre and a radius within bounds',
+    );
+    const parsed: AvoidedArea = { center: [area.center[0], area.center[1]], radius: area.radius };
+    check(!areaContains(parsed, start), 'avoidedAreas', 'the start is inside an avoided area');
+    check(
+      !(waypoints as Position[] | undefined)?.some((waypoint) => areaContains(parsed, waypoint)),
+      'avoidedAreas',
+      'a waypoint is inside an avoided area',
+    );
+    areas.push(parsed);
+  }
+
   const criteria: Criteria = {
     start: [start[0], start[1]],
     target: parsedTarget,
@@ -125,6 +173,7 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
     pace,
     ...(waypoints !== undefined &&
       waypoints.length > 0 && { waypoints: (waypoints as Position[]).map(([lon, lat]): Position => [lon, lat]) }),
+    ...(areas.length > 0 && { avoidedAreas: areas }),
   };
   let distance: number;
   try {

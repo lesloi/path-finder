@@ -423,10 +423,10 @@ func TestLiftedNodePicksTheHighestOrLowestNodeWithinReach(t *testing.T) {
 	e := openTest(t, g, false)
 	base := uint32(at(10, 10))
 	// Act
-	up := liftedNode(e.g, e.sp, base, 300, 1)
-	down := liftedNode(e.g, e.sp, base, 300, -1)
-	still := liftedNode(e.g, e.sp, base, 300, 0)
-	tooShort := liftedNode(e.g, e.sp, base, 20, 1)
+	up := liftedNode(e.g, e.sp, base, 300, 1, nil)
+	down := liftedNode(e.g, e.sp, base, 300, -1, nil)
+	still := liftedNode(e.g, e.sp, base, 300, 0, nil)
+	tooShort := liftedNode(e.g, e.sp, base, 20, 1, nil)
 	// Assert
 	if e.g.nodes[up].Elev <= e.g.nodes[base].Elev {
 		t.Errorf("up is not higher than the base node")
@@ -497,11 +497,11 @@ func TestAControlCircleTurnsToWhereWaysAre(t *testing.T) {
 	slat, slon := float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7
 	const rc, theta = 3000.0, math.Pi / 2 // towards the wall: its points fall 2 km from the band, past the 900 m reach
 	jitter := []float64{1, 1}
-	if _, ok := circlePoints(e.g, e.sp, slat, slon, rc, theta, jitter, 0); ok {
+	if _, ok := circlePoints(e.g, e.sp, slat, slon, rc, theta, jitter, 0, nil); ok {
 		t.Fatal("the first circle was meant to fall off the ways")
 	}
 	// Act
-	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, rc, theta, jitter, 0)
+	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, rc, theta, jitter, 0, nil)
 	// Assert
 	if !ok || len(nodes) != len(jitter) {
 		t.Fatalf("ok = %v with %d nodes, want a circle of %d points", ok, len(nodes), len(jitter))
@@ -518,7 +518,7 @@ func TestAControlCircleGivesUpWhenNoTurnReachesTheWays(t *testing.T) {
 	e := openTest(t, g, false)
 	sn := g.nodes[start]
 	// Act
-	_, _, ok := rotatedCircle(e.g, e.sp, float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7, 20_000, 0, []float64{1, 1, 1}, 0)
+	_, _, ok := rotatedCircle(e.g, e.sp, float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7, 20_000, 0, []float64{1, 1, 1}, 0, nil)
 	// Assert
 	if ok {
 		t.Error("a circle 20 km wide around a 100 m lattice found ways within reach")
@@ -554,7 +554,7 @@ func TestAControlPointDoesNotLandOnAnIsland(t *testing.T) {
 	sn := g.nodes[start]
 	slat, slon := float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7
 	// Act
-	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, 3000, math.Pi/2, []float64{1, 1}, 0)
+	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, 3000, math.Pi/2, []float64{1, 1}, 0, nil)
 	// Assert
 	if !ok || used == math.Pi/2 {
 		t.Fatalf("ok = %v, turn = %v: the first circle lands on the islands and should have been turned", ok, used)
@@ -577,7 +577,7 @@ func TestALiftedControlPointDoesNotLandOnAnIsland(t *testing.T) {
 		t.Fatal("the island is not small")
 	}
 	// Act
-	got := liftedNode(e.g, e.sp, uint32(start), 250, 1)
+	got := liftedNode(e.g, e.sp, uint32(start), 250, 1, nil)
 	// Assert
 	if e.g.small().has(got) {
 		t.Errorf("the control point was lifted onto the island, node %d", got)

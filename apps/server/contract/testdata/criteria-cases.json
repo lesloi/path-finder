@@ -638,5 +638,178 @@
     "expect": {
       "field": "waypoints"
     }
+  },
+  {
+    "name": "accepts avoided areas",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "avoidedAreas": [
+        {
+          "center": [6.15, 45.9],
+          "radius": 400
+        }
+      ]
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "any",
+        "pace": 6,
+        "avoidedAreas": [
+          {
+            "center": [6.15, 45.9],
+            "radius": 400
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "refuses more avoided areas than the bound",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "avoidedAreas": [
+        {
+          "center": [6.15, 45.9],
+          "radius": 400
+        },
+        {
+          "center": [6.15, 45.9],
+          "radius": 400
+        },
+        {
+          "center": [6.15, 45.9],
+          "radius": 400
+        },
+        {
+          "center": [6.15, 45.9],
+          "radius": 400
+        },
+        {
+          "center": [6.15, 45.9],
+          "radius": 400
+        },
+        {
+          "center": [6.15, 45.9],
+          "radius": 400
+        }
+      ]
+    },
+    "expect": {
+      "field": "avoidedAreas"
+    }
+  },
+  {
+    "name": "refuses an avoided area wider than the bound",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "avoidedAreas": [
+        {
+          "center": [6.15, 45.9],
+          "radius": 5000
+        }
+      ]
+    },
+    "expect": {
+      "field": "avoidedAreas"
+    }
+  },
+  {
+    "name": "refuses an avoided area narrower than the bound",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "avoidedAreas": [
+        {
+          "center": [6.15, 45.9],
+          "radius": 10
+        }
+      ]
+    },
+    "expect": {
+      "field": "avoidedAreas"
+    }
+  },
+  {
+    "name": "refuses an avoided area without a centre",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "avoidedAreas": [
+        {
+          "radius": 400
+        }
+      ]
+    },
+    "expect": {
+      "field": "avoidedAreas"
+    }
+  },
+  {
+    "name": "refuses a start inside an avoided area",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "avoidedAreas": [
+        {
+          "center": [6.1296, 45.8993],
+          "radius": 400
+        }
+      ]
+    },
+    "expect": {
+      "field": "avoidedAreas"
+    }
+  },
+  {
+    "name": "refuses a waypoint inside an avoided area",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "waypoints": [[6.15, 45.9]],
+      "avoidedAreas": [
+        {
+          "center": [6.15, 45.9],
+          "radius": 400
+        }
+      ]
+    },
+    "expect": {
+      "field": "avoidedAreas"
+    }
   }
 ]

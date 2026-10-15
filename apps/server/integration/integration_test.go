@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -354,4 +355,42 @@ func TestWaypointRefusalsNameAFieldOrANumberNeverAPosition(t *testing.T) {
 			t.Errorf("status %d: %s", code, out)
 		}
 	})
+}
+
+func TestRoutesKeepOutOfAnAvoidedArea(t *testing.T) {
+	// Arrange
+	h := newServer(t)
+	centre, radiusM := [2]float64{6.1380, 45.9030}, 300.0
+	body := criteria(`{"distance":10}`, `,"avoidedAreas":[{"center":[6.1380,45.9030],"radius":300}]`)
+	// Act
+	code, routes, out := routeSets(t, h, body)
+	// Assert
+	if code != 200 || len(routes) == 0 {
+		t.Fatalf("status %d, %d routes: %s", code, len(routes), out[:min(len(out), 200)])
+	}
+	cosl := math.Cos(centre[1] * math.Pi / 180)
+	for i, r := range routes {
+		for _, p := range r.Geometry {
+			if d := math.Hypot((p[0]-centre[0])*111194.9*cosl, (p[1]-centre[1])*111194.9); d <= radiusM {
+				t.Fatalf("route %d goes %.0f m from the centre of a %.0f m area", i, d, radiusM)
+			}
+		}
+	}
+}
+
+func TestAvoidedAreaRefusalsNameAFieldAndANumberNeverAPosition(t *testing.T) {
+	h := newServer(t)
+	cases := map[string]struct{ criteria, want string }{
+		"a start inside an area": {criteria(`{"distance":10}`, `,"avoidedAreas":[{"center":[6.1380,45.9030],"radius":300},{"center":[6.1294,45.8992],"radius":300}]`), `{"error":"invalid-criteria","field":"avoidedAreas","area":2}`},
+		"too many areas":         {criteria(`{"distance":10}`, `,"avoidedAreas":[`+strings.Repeat(`{"center":[6.2,45.9],"radius":100},`, 5)+`{"center":[6.2,45.9],"radius":100}]`), `{"error":"invalid-criteria","field":"avoidedAreas"}`},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			code, _, out := routeSets(t, h, tc.criteria)
+
+			if code != 400 || strings.TrimSpace(out) != tc.want {
+				t.Errorf("status %d: %s, want %s", code, out, tc.want)
+			}
+		})
+	}
 }

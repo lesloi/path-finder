@@ -253,6 +253,8 @@ describe('StartPointMap', () => {
       expect(map().layers.map(({ id }) => id)).toEqual([
         'background',
         'coverage-veil',
+        'avoided-areas-fill',
+        'avoided-areas-line',
         'pois-water',
         'pois-viewpoint',
         'routes-others',
@@ -623,6 +625,8 @@ describe('StartPointMap', () => {
       expect(map().layers.map(({ id }) => id)).toEqual([
         'background',
         'coverage-veil',
+        'avoided-areas-fill',
+        'avoided-areas-line',
         'pois-water',
         'pois-viewpoint',
         'routes-others',

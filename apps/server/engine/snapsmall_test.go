@@ -97,7 +97,7 @@ func TestAWaypointWithOnlyAnIslandInReachFindsNoRoute(t *testing.T) {
 	req.Waypoints = []Point{pointOf(g, island)}
 	// Act
 	_, err := e.Loops(context.Background(), req)
-	_, direct := e.DirectLoop(context.Background(), req.Start, req.Waypoints)
+	_, direct := e.DirectLoop(context.Background(), req.Start, req.Waypoints, nil)
 	// Assert
 	if !errors.Is(err, ErrNoRoute) || !errors.Is(direct, ErrNoRoute) {
 		t.Errorf("loops: %v, direct loop: %v, want ErrNoRoute", err, direct)
@@ -109,7 +109,7 @@ func TestADirectLoopKeepsAWaypointOnAnIslandWhereItIs(t *testing.T) {
 	g, island := islandBeside(-200)
 	e := openTest(t, g, false)
 	// Act
-	_, err := e.DirectLoop(context.Background(), pointOf(g, 15*30+15), []Point{pointOf(g, island)})
+	_, err := e.DirectLoop(context.Background(), pointOf(g, 15*30+15), []Point{pointOf(g, island)}, nil)
 	// Assert
 	if !errors.Is(err, ErrNoRoute) {
 		t.Errorf("err = %v, want ErrNoRoute", err)

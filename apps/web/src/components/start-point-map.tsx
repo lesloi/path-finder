@@ -13,7 +13,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { createPortal } from 'react-dom';
 
+import type { AvoidedArea } from '../contract/index.ts';
+
 import {
+  circlePolygon,
   DEFAULT_BASEMAP,
   distanceMarkers,
   formatDistance,
@@ -145,6 +148,7 @@ const PIN_BUBBLE_OFFSET = {
 
 // A default that keeps its identity, so that the markers are not drawn again on every render.
 const NO_WAYPOINTS: Position[] = [];
+const NO_AREAS: AvoidedArea[] = [];
 
 const poiLayerId = (category: PoiCategory) => `pois-${category}`;
 const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
@@ -203,6 +207,8 @@ export function StartPointMap({
   pickOnClick = false,
   waypoints = NO_WAYPOINTS,
   placing = false,
+  avoidedAreas = NO_AREAS,
+  avoiding = false,
   routes,
   summaries,
   coverage,
@@ -220,6 +226,7 @@ export function StartPointMap({
   onSnapshot,
   onStartChange,
   onWaypointAdd,
+  onAvoidedAreaAdd,
   onWaypointRefused,
   onWaypointRemove,
   onBasemapFail,
@@ -276,6 +283,11 @@ export function StartPointMap({
   waypoints?: Position[];
   /** A click or a tap places a waypoint, and a long press no longer sets the start point. */
   placing?: boolean;
+  /** The circles routes keep out of, drawn under the routes. */
+  avoidedAreas?: AvoidedArea[];
+  /** A click or a tap places an area to avoid, and a long press no longer sets the start point. */
+  avoiding?: boolean;
+  onAvoidedAreaAdd?: (center: Position) => void;
   /** `poi` is given when the tap fell on a point of interest: the waypoint is then at the point. */
   onWaypointAdd?: (waypoint: Position, poi?: WaypointPoi) => void;
   /** A tap fell on the veiled part of the map, where the server cannot route: no waypoint was placed. */
@@ -306,7 +318,7 @@ export function StartPointMap({
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
-  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick && !placing;
+  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick && !placing && !avoiding;
   const view = useRef<MapView>({ bearing: 0, rotated: false, movedAway: false });
   // Tells the app what changed in the view, and only when something did: the map moves many times a second.
   const changeView = useEffectEvent((change: Partial<MapView>) => {
@@ -318,14 +330,18 @@ export function StartPointMap({
   // The veiled part of the map is where the server cannot route: a waypoint there would only be refused.
   const canPlace = useEffectEvent(([lng, lat]: Position) => !coverage || isCovered(coverage, [lng, lat]));
   // What the pointer looks like where nothing else sets it: a crosshair while placing, which says a tap places a waypoint.
-  const isPlacing = useEffectEvent(() => Boolean(placing));
-  const idleCursor = useEffectEvent(() => (placing ? 'crosshair' : ''));
+  const isPlacing = useEffectEvent(() => Boolean(placing || avoiding));
+  const idleCursor = useEffectEvent(() => (placing || avoiding ? 'crosshair' : ''));
   const pick = useEffectEvent(
     (
       how: 'long-press' | 'click',
       { lng, lat }: { lng: number; lat: number },
       poi?: { position: Position; poi: WaypointPoi },
     ) => {
+      if (avoiding) {
+        if (how === 'click') onAvoidedAreaAdd?.([lng, lat]);
+        return;
+      }
       if (placing) {
         if (how === 'click') {
           const position = poi?.position ?? [lng, lat];
@@ -341,7 +357,7 @@ export function StartPointMap({
     },
   );
   const clickedBackground = useEffectEvent(() => {
-    if (!pickOnClick && !placing) onBackgroundClick?.();
+    if (!pickOnClick && !placing && !avoiding) onBackgroundClick?.();
   });
   const basemapFailed = useEffectEvent((previous: Basemap) => onBasemapFail?.(previous));
   const selectRoute = useEffectEvent((index: number) => {
@@ -408,6 +424,20 @@ export function StartPointMap({
         type: 'fill',
         source: 'coverage',
         paint: veilPaint(shownBasemap.current),
+      });
+      // The areas to avoid, over the veil and under the points of interest and the routes.
+      map.addSource('avoided-areas', { type: 'geojson', data: emptyRoutes });
+      map.addLayer({
+        id: 'avoided-areas-fill',
+        type: 'fill',
+        source: 'avoided-areas',
+        paint: { 'fill-color': MAP_COLORS.avoided, 'fill-opacity': 0.22 },
+      });
+      map.addLayer({
+        id: 'avoided-areas-line',
+        type: 'line',
+        source: 'avoided-areas',
+        paint: { 'line-color': MAP_COLORS.avoided, 'line-width': 2, 'line-dasharray': [2, 2] },
       });
       // Above the veil and under the routes. A seasonal point has the reverse badge: it may be dry.
       for (const category of POI_CATEGORIES) {
@@ -657,7 +687,7 @@ export function StartPointMap({
     };
     map.on('mousemove', follow);
     return () => void map.off('mousemove', follow);
-  }, [placing]);
+  }, [placing, avoiding]);
 
   // The waypoints' markers: a button each, which the pins (`WaypointPin`) are drawn into. Tapping one opens a bubble with a
   // button to remove it. The marker's own events stop here, as MapLibre would hear them as the map's: a click that
@@ -765,6 +795,20 @@ export function StartPointMap({
     if (!loaded || !source) return;
     source.setData(coverage?.length ? veilPolygon(coverage) : emptyRoutes);
   }, [loaded, coverage, styleVersion]);
+
+  // The areas to avoid, drawn as circles; a new style drops them, so they are set again.
+  useEffect(() => {
+    const source = mapRef.current?.getSource('avoided-areas') as GeoJSONSource | undefined;
+    if (!loaded || !source) return;
+    source.setData({
+      type: 'FeatureCollection',
+      features: avoidedAreas.map((area) => ({
+        type: 'Feature' as const,
+        properties: {},
+        geometry: { type: 'Polygon' as const, coordinates: [circlePolygon(area)] },
+      })),
+    });
+  }, [loaded, avoidedAreas, styleVersion]);
 
   // The points of interest in view: the tiles of the view are asked for only from zoom 11 and while a category is on,
   // since a tile says which ~30 km the user looks at. A view that moved on meanwhile drops the late answer.

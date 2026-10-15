@@ -24,7 +24,7 @@ type fakeLooper struct {
 	loopCalls   int
 }
 
-func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.Point, _ []engine.Point) (*engine.Route, error) {
+func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.Point, _ []engine.Point, _ []engine.Circle) (*engine.Route, error) {
 	f.directCalls++
 	return f.direct, f.directErr
 }
@@ -497,5 +497,21 @@ func TestGenerateStopsWhenLoopsStopAddingMatches(t *testing.T) {
 				t.Errorf("stopped after loop %d, want %d", stoppedAt, tc.stopsAt)
 			}
 		})
+	}
+}
+
+func TestGeneratePassesTheAvoidedAreasToTheEngine(t *testing.T) {
+	// Arrange
+	looper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
+	request := `{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"any","pace":6,"avoidedAreas":[{"center":[6.15,45.9],"radius":400}]}`
+	want := []engine.Circle{{Center: engine.Point{Lat: 45.9, Lon: 6.15}, RadiusM: 400}}
+	// Act
+	_, err := generate(t, looper, context.Background(), request)
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(looper.got.Avoided, want) {
+		t.Errorf("avoided = %+v, want %+v", looper.got.Avoided, want)
 	}
 }

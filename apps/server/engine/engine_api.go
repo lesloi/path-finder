@@ -79,6 +79,9 @@ type LoopRequest struct {
 	// Waypoints every loop goes through, in this order, between leaving Start and coming back to it. A
 	// route may retrace its steps to reach one. At most as many as the caller allows.
 	Waypoints []Point
+	// Avoided are areas no loop may touch: a way that comes within the radius of a centre is left out of the
+	// searches, so that a loop never goes through one.
+	Avoided []Circle
 	// Enough, when set, is called with the loops found so far after each new one, one call at a time
 	// and without retaining the slice. Returning true ends the search: the loops still being
 	// searched are dropped, so a caller that has what it needs spares the CPU.
@@ -196,11 +199,12 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if req.Distance <= 0 || req.Candidates <= 0 {
 		return nil, errors.New("engine: loops need a positive distance and candidate count")
 	}
-	start, err := e.snapLoopStart(req.Start)
+	forbidden := newForbidden(e.g, req.Avoided)
+	start, err := e.snapLoopStart(req.Start, forbidden)
 	if err != nil {
 		return nil, err
 	}
-	anchors, baseM, err := e.anchorLoop(ctx, start, req.Waypoints)
+	anchors, baseM, err := e.anchorLoop(ctx, start, req.Waypoints, forbidden)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +222,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	}
 	found, failure := generate(ctx, e, e.sp, &loopParams{
 		distM: req.Distance, ascentM: req.Ascent, ascentBand: req.AscentBand, candidates: req.Candidates, seed: req.Seed,
-		anchors: anchors, baseM: baseM, stats: req.Stats,
+		anchors: anchors, baseM: baseM, stats: req.Stats, forbidden: forbidden,
 	}, start, enough)
 	if failure != nil {
 		return nil, failure
@@ -239,15 +243,15 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 // snapWaypoints finds the node of each waypoint, or the *WaypointError of the first one too far from a way.
 // With leaveSmall, a waypoint moves off the small components to the nearest node outside them, as no leg
 // leads from the rest of the graph to one; with only small components in reach it fails with ErrNoRoute.
-func (e *Engine) snapWaypoints(waypoints []Point, leaveSmall bool) ([]uint32, error) {
+func (e *Engine) snapWaypoints(waypoints []Point, leaveSmall bool, f *forbidden) ([]uint32, error) {
 	nodes := make([]uint32, len(waypoints))
 	for i, w := range waypoints {
-		n, d, ok := e.sp.nearest(e.g, w.Lat, w.Lon)
+		n, d, ok := e.sp.nearestWhere(e.g, w.Lat, w.Lon, f.skip(), 0)
 		if !ok || d > maxWaypointSnapMeters {
 			return nil, &WaypointError{Index: i + 1}
 		}
 		if leaveSmall && e.g.small().has(n) {
-			if n, ok = e.nearestLarge(w, maxWaypointSnapMeters); !ok {
+			if n, ok = e.nearestLarge(w, maxWaypointSnapMeters, f); !ok {
 				return nil, ErrNoRoute
 			}
 		}
@@ -257,8 +261,8 @@ func (e *Engine) snapWaypoints(waypoints []Point, leaveSmall bool) ([]uint32, er
 }
 
 // snapStart finds the node of a start point, or fails with ErrOffGraph.
-func (e *Engine) snapStart(p Point) (uint32, error) {
-	n, d, ok := e.sp.nearest(e.g, p.Lat, p.Lon)
+func (e *Engine) snapStart(p Point, f *forbidden) (uint32, error) {
+	n, d, ok := e.sp.nearestWhere(e.g, p.Lat, p.Lon, f.skip(), 0)
 	if !ok || d > maxSnapMeters {
 		return 0, ErrOffGraph
 	}
@@ -268,20 +272,21 @@ func (e *Engine) snapStart(p Point) (uint32, error) {
 // snapLoopStart is snapStart for loops: a start on a small component moves to the nearest node outside the
 // small components within the same reach, and fails with ErrNoLoop when there is none, before any search
 // spends its budget on legs that cannot reach the rest of the graph.
-func (e *Engine) snapLoopStart(p Point) (uint32, error) {
-	n, err := e.snapStart(p)
+func (e *Engine) snapLoopStart(p Point, f *forbidden) (uint32, error) {
+	n, err := e.snapStart(p, f)
 	if err != nil || !e.g.small().has(n) {
 		return n, err
 	}
-	if n, ok := e.nearestLarge(p, maxSnapMeters); ok {
+	if n, ok := e.nearestLarge(p, maxSnapMeters, f); ok {
 		return n, nil
 	}
 	return 0, ErrNoLoop
 }
 
 // nearestLarge is the node nearest to p within reachM that is outside the small components.
-func (e *Engine) nearestLarge(p Point, reachM float64) (uint32, bool) {
-	n, d, ok := e.sp.nearestOutside(e.g, p.Lat, p.Lon, e.g.small(), reachM)
+func (e *Engine) nearestLarge(p Point, reachM float64, f *forbidden) (uint32, bool) {
+	small := e.g.small()
+	n, d, ok := e.sp.nearestWhere(e.g, p.Lat, p.Lon, func(n uint32) bool { return small != nil && small.has(n) || f.has(n) }, reachM)
 	return n, ok && d <= reachM
 }
 
@@ -290,8 +295,8 @@ func (e *Engine) nearestLarge(p Point, reachM float64) (uint32, bool) {
 // fewer than two means every waypoint is the start node, and the loop goes nowhere.
 // With leaveSmall the waypoints move off the small components (see snapWaypoints): loops want it, a direct loop
 // goes where it is told.
-func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Point, leaveSmall bool) (anchors, nodes, edges []uint32, err error) {
-	snapped, err := e.snapWaypoints(waypoints, leaveSmall)
+func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Point, leaveSmall bool, f *forbidden) (anchors, nodes, edges []uint32, err error) {
+	snapped, err := e.snapWaypoints(waypoints, leaveSmall, f)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -301,7 +306,7 @@ func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Poi
 	}
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
-	nodes, edges, cause := chainLegs(ctx, e, s, e.prof.UpPerMeter, searchLimits{loopLegMaxSettled}, false, anchors)
+	nodes, edges, cause := chainLegs(ctx, e, s, e.prof.UpPerMeter, searchLimits{loopLegMaxSettled, f}, false, anchors)
 	if err := ctx.Err(); err != nil {
 		return nil, nil, nil, err
 	}
@@ -313,11 +318,11 @@ func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Poi
 
 // anchorLoop gives the anchors of the loops through the waypoints and the length of the cheapest one,
 // or nil anchors when there are no waypoints, or all of them are the start node.
-func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point) (anchors []uint32, length float64, err error) {
+func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point, f *forbidden) (anchors []uint32, length float64, err error) {
 	if len(waypoints) == 0 {
 		return nil, 0, nil
 	}
-	anchors, nodes, edges, err := e.routeAnchors(ctx, start, waypoints, true)
+	anchors, nodes, edges, err := e.routeAnchors(ctx, start, waypoints, true, f)
 	if err != nil || len(anchors) < 2 {
 		return nil, 0, err
 	}
@@ -328,12 +333,13 @@ func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point
 // DirectLoop finds the cheapest loop from start through the waypoints in order and back, going back
 // over its steps where it must. It fails with ErrOffGraph for a start point off the ways, a
 // *WaypointError for a waypoint off them, and ErrNoRoute when they are not joined.
-func (e *Engine) DirectLoop(ctx context.Context, start Point, waypoints []Point) (*Route, error) {
-	src, err := e.snapStart(start)
+func (e *Engine) DirectLoop(ctx context.Context, start Point, waypoints []Point, avoided []Circle) (*Route, error) {
+	forbidden := newForbidden(e.g, avoided)
+	src, err := e.snapStart(start, forbidden)
 	if err != nil {
 		return nil, err
 	}
-	_, nodes, edges, err := e.routeAnchors(ctx, src, waypoints, false)
+	_, nodes, edges, err := e.routeAnchors(ctx, src, waypoints, false, forbidden)
 	if err != nil {
 		return nil, err
 	}

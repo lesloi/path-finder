@@ -15,6 +15,8 @@ type refusal struct {
 	Field string `json:"field,omitempty"`
 	// Waypoint is the waypoint at fault, counted from 1: a number, never a position.
 	Waypoint int `json:"waypoint,omitempty"`
+	// Area is the avoided area at fault, counted from 1.
+	Area int `json:"area,omitempty"`
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

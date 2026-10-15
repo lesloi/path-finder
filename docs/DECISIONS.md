@@ -84,6 +84,13 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   the waypoints is a candidate too. Criteria whose waypoints alone exceed the target are refused, by
   the straight lines first and by the loop through them then. A waypoint is moved to the nearest way
   within 250 m, beyond which the criteria are refused, naming the waypoint by its number.
+- **Avoided areas are circles that forbid the ways they touch, up to five per set of criteria.** A penalty, as the
+  loop legs get for the ways of the earlier ones, would not keep a route out of a closed trail, which is what the
+  user asks for. A way is forbidden when its straight line between nodes comes within the radius, so a long way
+  with both ends outside is caught too; removing ways keeps the landmark bounds valid, and the graph format does
+  not change. A start point or waypoint inside an area is refused by the criteria check, and the points the
+  engine snaps (start, waypoints, control points) skip the nodes inside, so no candidate dies unseen. Polygons
+  and picking one way wait: a way has no stable identifier across graph builds.
 - **A route set sends what it has when time is up.** Loops are searched in parallel and the search
   stops at five matches, after 60 loops in a row that add no match, or at the timeout; the routes found by
   then are ranked and sent, and `504` is for none at all. Asking for more would only make the user wait
