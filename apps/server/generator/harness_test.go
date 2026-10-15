@@ -59,6 +59,8 @@ type harnessCase struct {
 	DistanceKm float64 `json:"distanceKm"`
 	// Ascent is the target elevation gain in metres, 0 for none.
 	Ascent float64 `json:"ascent"`
+	// Shortcut asks for "flat" or "hilly" instead of an Ascent; the two exclude each other.
+	Shortcut string `json:"shortcut"`
 	// Waypoints runs the case from the starts' waypoints instead of without.
 	Waypoints bool `json:"waypoints"`
 }
@@ -67,6 +69,9 @@ func (c harnessCase) label() string {
 	s := fmt.Sprintf("%g km", c.DistanceKm)
 	if c.Ascent > 0 {
 		s += fmt.Sprintf(", +%g m", c.Ascent)
+	}
+	if c.Shortcut != "" {
+		s += ", " + c.Shortcut
 	}
 	if c.Waypoints {
 		s += ", waypoints"
@@ -158,8 +163,13 @@ func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStar
 		Start: [2]float64{st.Lon, st.Lat}, Target: contract.Target{Distance: c.DistanceKm},
 		Surface: cfg.Surface, Pace: cfg.Pace,
 	}
-	if c.Ascent > 0 {
+	switch {
+	case c.Ascent > 0 && c.Shortcut != "":
+		t.Fatalf("%s: ascent and shortcut exclude each other", c.label())
+	case c.Ascent > 0:
 		criteria.ElevationGain = &contract.ElevationGain{Metres: c.Ascent}
+	case c.Shortcut != "":
+		criteria.ElevationGain = &contract.ElevationGain{Shortcut: c.Shortcut}
 	}
 	if c.Waypoints {
 		criteria.Waypoints = st.Waypoints
