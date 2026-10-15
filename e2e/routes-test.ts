@@ -102,11 +102,10 @@ test.describe('the route set', () => {
   test('selects the route a swipe settles on in the carousel of a phone', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'The carousel is for phones.');
     await findRoutes(page);
-    await expect(page.getByTestId('routes-position')).toContainText(/^1\/\d/);
+    await expect(page.getByTestId('routes-row-0')).toHaveAttribute('data-selected', '');
 
     await swipeLeft(page, 'routes-list');
 
-    await expect(page.getByTestId('routes-position')).toContainText(/^2\/\d/);
     await expect(page.getByTestId('routes-row-1')).toHaveAttribute('data-selected', '');
   });
 

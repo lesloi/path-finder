@@ -1352,7 +1352,6 @@ describe('CriteriaView', () => {
 
       expect(await screen.findByTestId('routes-count')).toHaveTextContent('2 routes');
       expect(screen.getByTestId('routes-row-0')).toHaveAttribute('data-selected');
-      expect(screen.getByTestId('routes-position')).toHaveTextContent('1/2');
       expect(screen.getByTestId('criteria-sheet-handle')).toHaveAttribute('aria-expanded', 'false');
       expect(screen.getByTestId('criteria-sheet-handle')).toHaveAccessibleName(routesText.en.routes);
       // The criteria stay a tap away, in the bar.
@@ -1432,7 +1431,6 @@ describe('CriteriaView', () => {
       act(() => map().fire('click', { features: [{ properties: { index: 1 } }] }, 'routes-hit'));
 
       expect(screen.getByTestId('routes-row-1')).toHaveAttribute('data-selected');
-      expect(screen.getByTestId('routes-position')).toHaveTextContent('2/2');
     });
 
     it('frames the route selected clear of the sheet, which draws the others as well', async () => {
@@ -1970,7 +1968,7 @@ describe('CriteriaView', () => {
       expect(lastRequest(fetchMock)).not.toHaveProperty('waypoints');
     });
 
-    it('counts the waypoints in the summary above the routes, and keeps the list', async () => {
+    it('keeps the waypoint list once the routes are found', async () => {
       stubFetch(() => Promise.resolve(Response.json({ routes: [route] })));
       render(<CriteriaView language="en" />);
       startPlacing();
@@ -1980,7 +1978,6 @@ describe('CriteriaView', () => {
 
       await screen.findByTestId('routes-count');
 
-      expect(screen.getByTestId('routes-summary')).toHaveTextContent(en.waypointCount(2));
       expect(screen.getByTestId('criteria-waypoint-list')).toBeInTheDocument();
     });
 

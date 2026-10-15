@@ -144,27 +144,29 @@ export function RouteSetView({
   ));
   return (
     <>
-      <div className="flex items-center justify-between gap-2">
-        <strong data-testid="routes-count">{t.routeCount(routes.length)}</strong>
+      <div className="flex items-center justify-between gap-2 -mt-2 -mb-5">
+        <strong data-testid="routes-count" className="text-lg">
+          {t.routeCount(routes.length)}
+        </strong>
         {!desktop && selected !== undefined && (
-          <span data-testid="routes-position">
-            <span aria-hidden>
-              {selected + 1}/{routes.length}
-            </span>
-            <span className="sr-only">{t.route(selected + 1, routes.length)}</span>
+          // Said again as the carousel moves; the cards alone do not tell which one is in the middle.
+          <span data-testid="routes-position" className="sr-only" aria-live="polite">
+            {t.route(selected + 1, routes.length)}
           </span>
         )}
         <button
           type="button"
           data-testid="routes-clear"
-          className="ml-auto flex min-h-touch items-center gap-1 rounded-full px-2 text-accent"
+          className="ml-auto flex min-h-touch items-center gap-1 rounded-full px-2 text-sm text-accent hover:bg-surface-2"
           onClick={onClear}
         >
           <Trash2 size={18} aria-hidden />
           {t.clearRoutes}
         </button>
       </div>
-      <RoutePace paceUnit={paceUnit} language={language} pace={pace} onChange={onPaceChange} />
+      <div className="-mb-2">
+        <RoutePace paceUnit={paceUnit} language={language} pace={pace} onChange={onPaceChange} />
+      </div>
       {desktop ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
           {rows.map((row, index) => (
