@@ -700,6 +700,7 @@ func (r *splitmix) below(n uint64) uint64 { return r.next() % n }
 
 type loopParams struct {
 	distM, ascentM float64
+	ascentBand     AscentBand
 	candidates     int
 	seed           uint64
 	// anchors are the nodes every loop goes through in order, from the start node back to it: the start
@@ -816,16 +817,9 @@ func collapse(points []uint32) []uint32 {
 	return out
 }
 
-// A loop whose elevation gain is within ascentBand of the target, or within ascentBandFloorM for a small
-// target, is left alone. It is the band of a match of the route set (a fifth, 50 m), which the engine
-// cannot import from the generator.
-const (
-	ascentBand       = 0.2
-	ascentBandFloorM = 50.0
-	// liftReach is how far, as a share of the circle's radius, a control point may move to a higher or
-	// lower node when the loop is as far from its elevation gain as can be.
-	liftReach = 0.4
-)
+// liftReach is how far, as a share of the circle's radius, a control point may move to a higher or lower
+// node when the loop is as far from its elevation gain as can be.
+const liftReach = 0.4
 
 // A control point is moved to the nearest node within snapReach of it. On a long loop, in a valley with
 // steep sides, most points of the circle fall where no way is mapped within 400 m, and 87 of 100 candidates
@@ -838,9 +832,9 @@ func snapReach(radiusM float64) float64 {
 
 // climbLift tells how the next resizing should move the control points to fix the elevation gain: a share
 // of 1 at most towards higher nodes (positive) when the loop climbs too little, towards lower ones
-// (negative) when it climbs too much, and 0 with no target or inside the band.
-func climbLift(ascent, target float64) float64 {
-	if target <= 0 || math.Abs(ascent-target) <= math.Max(ascentBand*target, ascentBandFloorM) {
+// (negative) when it climbs too much, and 0 with no target, no band or inside the band.
+func climbLift(ascent, target float64, band AscentBand) float64 {
+	if target <= 0 || band == (AscentBand{}) || math.Abs(ascent-target) <= math.Max(band.Share*target, band.FloorM) {
 		return 0
 	}
 	return math.Max(-1, math.Min(1, (target-ascent)/target))
@@ -925,7 +919,7 @@ func candidate(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp *lo
 		if best == nil || sc < best.score {
 			best = &loopResult{nodes, edges, dist, asc, trail, overlap, sc}
 		}
-		lift = climbLift(asc, lp.ascentM)
+		lift = climbLift(asc, lp.ascentM, lp.ascentBand)
 		if math.Abs(dist-lp.distM) < 0.03*lp.distM && lift == 0 {
 			break
 		}

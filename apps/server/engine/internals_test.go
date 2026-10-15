@@ -380,6 +380,8 @@ func TestHeadersRoundTripAndRefuseAnotherVersion(t *testing.T) {
 	}
 }
 
+var matchBand = AscentBand{Share: 0.2, FloorM: 50}
+
 func TestClimbLiftIsZeroWithoutATargetOrWithinTheBand(t *testing.T) {
 	cases := []struct {
 		name           string
@@ -392,7 +394,7 @@ func TestClimbLiftIsZeroWithoutATargetOrWithinTheBand(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := climbLift(tc.ascent, tc.target); got != 0 {
+			if got := climbLift(tc.ascent, tc.target, matchBand); got != 0 {
 				t.Errorf("climbLift(%v, %v) = %v, want 0", tc.ascent, tc.target, got)
 			}
 		})
@@ -403,7 +405,7 @@ func TestClimbLiftPushesUpWhenTheLoopClimbsTooLittleAndDownWhenTooMuch(t *testin
 	// Arrange
 	target := 1000.0
 	// Act
-	slightly, far, over, wayOver := climbLift(700, target), climbLift(200, target), climbLift(1400, target), climbLift(5000, target)
+	slightly, far, over, wayOver := climbLift(700, target, matchBand), climbLift(200, target, matchBand), climbLift(1400, target, matchBand), climbLift(5000, target, matchBand)
 	// Assert
 	if !(slightly > 0 && far > slightly && far <= 1) {
 		t.Errorf("lifts %v (a bit short) and %v (far short) should be positive, growing and capped at 1", slightly, far)
@@ -454,5 +456,14 @@ func TestControlPointSnapReachGrowsWithTheCircle(t *testing.T) {
 				t.Errorf("snapReach(%v) = %v, want %v", tc.radiusM, got, tc.wantReach)
 			}
 		})
+	}
+}
+
+func TestClimbLiftIsZeroWithoutABand(t *testing.T) {
+	// Act
+	got := climbLift(200, 1000, AscentBand{})
+	// Assert
+	if got != 0 {
+		t.Errorf("climbLift with no band = %v, want 0: a caller that sets none gets no steering", got)
 	}
 }
