@@ -83,8 +83,11 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   the straight lines first and by the loop through them then. A waypoint is moved to the nearest way
   within 250 m, beyond which the criteria are refused, naming the waypoint by its number.
 - **A route set sends what it has when time is up.** Loops are searched in parallel and the search
-  stops at five matches or at the timeout; the routes found by then are ranked and sent, and `504` is
-  for none at all. Asking for more would only make the user wait longer for what they can already pick.
+  stops at five matches, after 60 loops in a row that add no match, or at the timeout; the routes found by
+  then are ranked and sent, and `504` is for none at all. Asking for more would only make the user wait
+  longer for what they can already pick. The budget is 400 candidates, a ceiling most requests never
+  reach: a fixed 100 ran out on hard criteria, while a fixed 400 took up to 15 s for one request in ten,
+  and stopping on stagnation gives a hard request time without making an easy one wait.
 
 ## Elevation
 

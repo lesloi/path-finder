@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -63,7 +64,7 @@ func TestGenerateAsksTheEngineForLoopsFromTheCriteria(t *testing.T) {
 	if _, err := generate(t, looper, context.Background(), body); err != nil {
 		t.Fatal(err)
 	}
-	want := engine.LoopRequest{Start: engine.Point{Lat: 45.8992, Lon: 6.1294}, Distance: 10_000, Ascent: 300, AscentBand: engine.AscentBand{Share: 0.2, FloorM: 50}, Candidates: 80, Seed: 42}
+	want := engine.LoopRequest{Start: engine.Point{Lat: 45.8992, Lon: 6.1294}, Distance: 10_000, Ascent: 300, AscentBand: engine.AscentBand{Share: 0.2, FloorM: 50}, Candidates: 400, Seed: 42}
 	got := looper.got
 	if got.Enough == nil {
 		t.Error("the engine is not told when to stop")
@@ -409,5 +410,78 @@ func TestGenerateKeepsAnEmptyAnswerForAStartPointOffTheWaysWithoutWaypoints(t *t
 
 	if err != nil || routes == nil || len(routes) != 0 {
 		t.Errorf("routes = %v, err = %v", routes, err)
+	}
+}
+
+func TestGenerateKeepsAtMostTheMaxRoutesItIsGiven(t *testing.T) {
+	// Arrange: three loops that do not overlap, all matches, and a cap of two
+	looper := &fakeLooper{loops: []*engine.Route{engineLoop(0), engineLoop(120), engineLoop(240)}}
+	g := &Generator{Engines: map[string]Looper{"any": looper}, MaxRoutes: 2, Seed: func() uint64 { return 42 }}
+	// Act
+	out, err := g.Generate(context.Background(), json.RawMessage(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Assert
+	if routes := out.([]contract.Route); len(routes) != 2 {
+		t.Errorf("%d routes, want the cap of 2", len(routes))
+	}
+}
+
+func TestGenerateStopsAtTheMaxRoutesItIsGiven(t *testing.T) {
+	// Arrange
+	next := enoughFor(t, &Generator{MaxRoutes: 2})
+	// Act and assert: loop after loop, all matches that do not overlap
+	if next(0) || !next(120) {
+		t.Error("the search should stop at two matches, not before")
+	}
+}
+
+// enoughFor runs Generate with g and returns a function that hands the engine's callback one more loop at a
+// time, as the engine does, and tells whether the search would stop there.
+func enoughFor(t *testing.T, g *Generator) func(heading float64) bool {
+	t.Helper()
+	looper := &fakeLooper{}
+	g.Engines, g.Seed = map[string]Looper{"any": looper}, func() uint64 { return 42 }
+	if _, err := g.Generate(context.Background(), json.RawMessage(body)); err != nil {
+		t.Fatal(err)
+	}
+	var found []*engine.Route
+	return func(heading float64) bool {
+		found = append(found, engineLoop(heading))
+		return looper.got.Enough(found)
+	}
+}
+
+func TestGenerateStopsWhenLoopsStopAddingMatches(t *testing.T) {
+	same := func(n int) []float64 { return make([]float64, n) } // the same loop again and again: a match, then nothing new
+	cases := []struct {
+		name      string
+		stopAfter int
+		headings  []float64
+		stopsAt   int // the loop after which the search stops, counted from 1, or 0 for never
+	}{
+		{"after loops that add nothing", 3, same(10), 4},
+		{"a new match starts the count again", 3, []float64{0, 0, 0, 120, 0, 0, 0}, 7},
+		{"after defaultStopAfter loops by default", 0, same(2 * defaultStopAfter), 1 + defaultStopAfter},
+		{"never when the limit is out of reach", math.MaxInt, same(200), 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Arrange
+			next := enoughFor(t, &Generator{StopAfter: tc.stopAfter})
+			// Act
+			stoppedAt := 0
+			for i, heading := range tc.headings {
+				if next(heading) {
+					stoppedAt = i + 1
+					break
+				}
+			}
+			// Assert
+			if stoppedAt != tc.stopsAt {
+				t.Errorf("stopped after loop %d, want %d", stoppedAt, tc.stopsAt)
+			}
+		})
 	}
 }

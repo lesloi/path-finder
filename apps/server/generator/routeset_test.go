@@ -67,7 +67,7 @@ func build(c contract.Criteria, candidates ...*candidate) []contract.Route {
 	if err != nil {
 		panic(err)
 	}
-	return buildRouteSet(c, km, candidates)
+	return buildRouteSet(c, km, candidates, maxRoutes)
 }
 
 func kinds(routes []contract.Route) (out []string) {
