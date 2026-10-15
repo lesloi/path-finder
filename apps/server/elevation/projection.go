@@ -15,9 +15,9 @@ type Projection interface {
 // utm is a Universal Transverse Mercator zone. The overseas BD ALTI tiles use it (RGAF09, RGFG95, RGR92,
 // RGM04 and RGSPM06 differ from WGS84 by under a metre, less than a cell of 25 m).
 type utm struct {
-	lon0, k0, y0, bigA float64
-	alpha              [4]float64
-	twoRootN           float64 // 2·√n/(1+n)
+	lon0, y0, scale float64 // scale is the scale factor times the rectifying radius
+	alpha           [4]float64
+	twoRootN        float64 // 2·√n/(1+n)
 }
 
 const utmScale = 0.9996
@@ -28,8 +28,7 @@ func newUTM(zone int, south bool) utm {
 	n := (1 - math.Sqrt(1-grsE*grsE)) / (1 + math.Sqrt(1-grsE*grsE))
 	u := utm{
 		lon0:     float64(6*zone-183) * rad,
-		k0:       utmScale,
-		bigA:     grsA / (1 + n) * (1 + n*n/4 + n*n*n*n/64),
+		scale:    utmScale * grsA / (1 + n) * (1 + n*n/4 + n*n*n*n/64),
 		twoRootN: 2 * math.Sqrt(n) / (1 + n),
 		alpha: [4]float64{
 			n/2 - 2*n*n/3 + 5*n*n*n/16 + 41*n*n*n*n/180,
@@ -56,7 +55,7 @@ func (u utm) Forward(latDeg, lonDeg float64) (x, y float64) {
 		sumX += a * math.Cos(k*xi) * math.Sinh(k*eta)
 		sumY += a * math.Sin(k*xi) * math.Cosh(k*eta)
 	}
-	return 500_000 + u.k0*u.bigA*sumX, u.y0 + u.k0*u.bigA*sumY
+	return 500_000 + u.scale*sumX, u.y0 + u.scale*sumY
 }
 
 var utmName = regexp.MustCompile(`^utm([1-9]|[1-5][0-9]|60)([ns])$`)
@@ -65,7 +64,7 @@ var utmName = regexp.MustCompile(`^utm([1-9]|[1-5][0-9]|60)([ns])$`)
 // such as "utm20n".
 func ParseProjection(name string) (Projection, error) {
 	if name == "lambert93" {
-		return l93, nil
+		return Lambert93Grid, nil
 	}
 	if m := utmName.FindStringSubmatch(name); m != nil {
 		zone, _ := strconv.Atoi(m[1])

@@ -42,7 +42,7 @@ func run(command string, args []string) error {
 		fs.Var(&pbfs, "pbf", "OSM PBF file (repeatable)")
 		dem := fs.String("dem", "", "directory holding the BD ALTI .asc tiles, plain or gzipped (.asc.gz)")
 		out := fs.String("out", filepath.Join(dataDir(), engine.GraphFileName), "graph file to write")
-		crs := fs.String("dem-crs", "lambert93", "projection of the BD ALTI tiles: lambert93 (metropolitan France), or utmZZn / utmZZs for the overseas ones (utm20n Guadeloupe and Martinique, utm22n French Guiana, utm40s Réunion, utm38s Mayotte, utm21n Saint-Pierre-et-Miquelon)")
+		crs := fs.String("dem-crs", "lambert93", "projection of the BD ALTI tiles: lambert93 (metropolitan France), or utmZZn / utmZZs for an overseas territory, see docs/INSTALL.md")
 		bbox := fs.String("bbox", "", "keep only this zone, as minLon,minLat,maxLon,maxLat: the memory then follows the zone, not the extract (one sorted -pbf)")
 		_ = fs.Parse(args)
 		proj, err := elevation.ParseProjection(*crs)

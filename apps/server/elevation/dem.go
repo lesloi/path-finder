@@ -335,9 +335,6 @@ func (d *DEM) Tiles() int { return len(d.tiles) }
 // Lambert93Grid is the projection of the metropolitan BD ALTI tiles.
 var Lambert93Grid Projection = l93
 
-// Lambert93 converts a WGS84 point in degrees to Lambert-93 metres, the projection of BD ALTI.
-func Lambert93(latDeg, lonDeg float64) (x, y float64) { return l93.Forward(latDeg, lonDeg) }
-
 // Unknown marks a node with no elevation: the point is outside the tiles, or its position is unknown.
 const Unknown = math.MinInt32
 

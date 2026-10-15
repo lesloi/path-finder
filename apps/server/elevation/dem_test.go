@@ -100,12 +100,12 @@ func TestDEMErrors(t *testing.T) {
 
 func TestLambertOfKnownPoints(t *testing.T) {
 	// The Lambert-93 origin: 3°E, 46.5°N is x = 700 000 m, y = 6 600 000 m.
-	x, y := Lambert93(46.5, 3)
+	x, y := Lambert93Grid.Forward(46.5, 3)
 	if math.Abs(x-700_000) > 1 || math.Abs(y-6_600_000) > 1 {
 		t.Errorf("origin = %.1f, %.1f", x, y)
 	}
 	// Paris, about (652 000, 6 862 000).
-	if x, y = Lambert93(48.8566, 2.3522); math.Abs(x-652_400) > 1000 || math.Abs(y-6_862_000) > 1000 {
+	if x, y = Lambert93Grid.Forward(48.8566, 2.3522); math.Abs(x-652_400) > 1000 || math.Abs(y-6_862_000) > 1000 {
 		t.Errorf("Paris = %.0f, %.0f", x, y)
 	}
 }
@@ -154,11 +154,11 @@ func lambertToWGS(t *testing.T, x, y float64) (lat, lon float64) {
 	t.Helper()
 	lat, lon = 45.0, 3.0
 	for range 50 {
-		px, py := Lambert93(lat, lon)
+		px, py := Lambert93Grid.Forward(lat, lon)
 		lat += (y - py) / 111_194.9
 		lon += (x - px) / (111_194.9 * math.Cos(lat*math.Pi/180))
 	}
-	if px, py := Lambert93(lat, lon); math.Abs(px-x) > 0.5 || math.Abs(py-y) > 0.5 {
+	if px, py := Lambert93Grid.Forward(lat, lon); math.Abs(px-x) > 0.5 || math.Abs(py-y) > 0.5 {
 		t.Fatalf("did not converge: %.2f, %.2f", px, py)
 	}
 	return
@@ -169,7 +169,7 @@ func TestLoadWithinReadsOnlyTheTilesOfTheBox(t *testing.T) {
 	paris := [2]float64{48.85, 2.35}
 	lyon := [2]float64{45.76, 4.84}
 	for name, at := range map[string][2]float64{"paris.asc.gz": paris, "lyon.asc": lyon} {
-		x, y := Lambert93(at[0], at[1])
+		x, y := Lambert93Grid.Forward(at[0], at[1])
 		writeTile(t, dir, name, math.Floor(x/100)*100-50, math.Floor(y/100)*100-50, func(c, r int) float64 { return 100 })
 	}
 	box := func(c [2]float64) [4]float64 { return [4]float64{c[0] - 0.01, c[1] - 0.01, c[0] + 0.01, c[1] + 0.01} } // minLat, minLon, maxLat, maxLon

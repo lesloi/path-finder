@@ -18,17 +18,19 @@ func TestParseProjection(t *testing.T) {
 	}
 }
 
-func TestUTMKeepsItsFalseOrigins(t *testing.T) {
+func TestUTMOnTheCentralMeridian(t *testing.T) {
 	cases := []struct {
 		name         string
 		lat, lon     float64
 		wantX, wantY float64
 	}{
-		// On the central meridian, x is the false easting; on the equator, y is the false northing.
+		// x is the false easting on the central meridian, and y the false northing on the equator.
 		{"utm20n", 0, -63, 500_000, 0},
 		{"utm22n", 0, -51, 500_000, 0},
 		{"utm38s", 0, 45, 500_000, 10_000_000},
 		{"utm40s", 0, 57, 500_000, 10_000_000},
+		// On the central meridian, y is k0 times the arc from the equator, about 4 984 944.4 m up to 45°N.
+		{"utm20n", 45, -63, 500_000, 0.9996 * 4_984_944.378},
 	}
 	for _, c := range cases {
 		p, err := ParseProjection(c.name)
@@ -47,14 +49,6 @@ func TestUTMOfAKnownPoint(t *testing.T) {
 	x, y := newUTM(18, false).Forward(40.7484, -73.9857)
 	if math.Abs(x-585_628) > 25 || math.Abs(y-4_511_322) > 25 {
 		t.Errorf("Empire State Building = %.0f, %.0f", x, y)
-	}
-}
-
-func TestUTMNorthingGrowsByTheMeridianArc(t *testing.T) {
-	// On the central meridian, y is k0 times the arc from the equator, about 4 984 944.4 m up to 45°N.
-	_, y := newUTM(20, false).Forward(45, -63)
-	if want := 0.9996 * 4_984_944.378; math.Abs(y-want) > 1 {
-		t.Errorf("y at 45°N = %.3f, want %.3f", y, want)
 	}
 }
 
