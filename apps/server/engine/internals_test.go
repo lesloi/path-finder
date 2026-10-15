@@ -564,3 +564,21 @@ func TestAControlPointDoesNotLandOnAnIsland(t *testing.T) {
 		}
 	}
 }
+
+func TestALiftedControlPointDoesNotLandOnAnIsland(t *testing.T) {
+	// Arrange: a high island 250 m north of the start, in the valley's band
+	g := &testGraph{}
+	start := valleyBand(g)
+	hi := g.addNode(250, 0, 900)
+	g.connect(hi, g.addNode(300, 0, 900), KindPath)
+	e := openTest(t, g, false)
+	if !e.g.small.has(uint32(hi)) {
+		t.Fatal("the island is not small")
+	}
+	// Act
+	got := liftedNode(e.g, e.sp, uint32(start), 250, 1)
+	// Assert
+	if e.g.small.has(got) {
+		t.Errorf("the control point was lifted onto the island, node %d", got)
+	}
+}

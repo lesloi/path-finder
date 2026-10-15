@@ -868,7 +868,8 @@ func climbLift(ascent, target float64, band AscentBand) float64 {
 }
 
 // liftedNode is the highest node (lift > 0) or lowest (lift < 0) among base and those nearest to eight
-// points reachM around it, or base for no lift. Fixed directions keep a seed's loops the same.
+// points reachM around it, leaving out the nodes of small components, or base for no lift. Fixed directions keep
+// a seed's loops the same.
 func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32 {
 	if lift == 0 {
 		return base
@@ -884,7 +885,7 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32
 	for k := 0; k < 8; k++ {
 		a := float64(k) * math.Pi / 4
 		n, d, ok := sp.nearest(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl))
-		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev {
+		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev && !g.small.has(n) {
 			best = n
 		}
 	}
