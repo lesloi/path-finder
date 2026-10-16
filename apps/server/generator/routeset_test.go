@@ -212,9 +212,9 @@ func TestComposition(t *testing.T) {
 		want       []string
 	}{
 		"matches before suggestions": {[]*candidate{suggestion(0), match(120)}, []string{"match", "suggestion"}},
-		"at most five matches": {
-			[]*candidate{match(0), match(50), match(100), match(150), match(200), match(250), match(300)},
-			[]string{"match", "match", "match", "match", "match"},
+		"at most eight matches": {
+			[]*candidate{match(0), match(40), match(80), match(120), match(160), match(200), match(240), match(280), match(320)},
+			[]string{"match", "match", "match", "match", "match", "match", "match", "match"},
 		},
 		"suggestions fill up to three": {
 			[]*candidate{match(0), suggestion(60), suggestion(120), suggestion(180), suggestion(240), suggestion(300)},

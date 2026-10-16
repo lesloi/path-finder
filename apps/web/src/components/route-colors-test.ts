@@ -7,7 +7,7 @@ const css = readFileSync(join(import.meta.dirname, 'index.css'), 'utf8');
 
 describe('route colours', () => {
   it('match the route tokens of the stylesheet, which paint the rest of the interface', () => {
-    const tokens = [1, 2, 3, 4, 5].map((n) => new RegExp(`--color-route-${n}: (#\\w+);`).exec(css)?.[1]);
+    const tokens = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => new RegExp(`--color-route-${n}: (#\\w+);`).exec(css)?.[1]);
 
     expect(tokens).toEqual(ROUTE_COLORS);
   });
@@ -24,6 +24,7 @@ describe('route colours', () => {
     expect(routeColor(1)).toBe(ROUTE_COLORS[1]);
     expect(routeColor(ROUTE_COLORS.length)).toBe(ROUTE_COLORS[0]);
     expect(routeBorder(2)).toBe('border-l-route-3');
-    expect(routeBorder(5)).toBe('border-l-route-1');
+    expect(routeBorder(7)).toBe('border-l-route-8');
+    expect(routeBorder(8)).toBe('border-l-route-1');
   });
 });

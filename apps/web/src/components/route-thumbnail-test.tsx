@@ -54,7 +54,7 @@ describe('RouteThumbnail', () => {
   });
 
   it('takes the colour of an index beyond the palette', () => {
-    render(<RouteThumbnail testId="thumb" geometry={geometry} index={5} />);
+    render(<RouteThumbnail testId="thumb" geometry={geometry} index={8} />);
 
     const lines = [...screen.getByTestId('thumb').querySelectorAll('polyline')];
     expect(lines.at(-1)).toHaveAttribute('stroke', '#e0115f');

@@ -39,7 +39,7 @@ describe('ProfileSparkline', () => {
   });
 
   it('takes the colour of an index beyond the palette', () => {
-    render(<ProfileSparkline testId="spark" geometry={loop([450, 480])} index={5} />);
+    render(<ProfileSparkline testId="spark" geometry={loop([450, 480])} index={8} />);
 
     expect(screen.getByTestId('spark').querySelector('polyline')).toHaveAttribute('stroke', '#e0115f');
   });

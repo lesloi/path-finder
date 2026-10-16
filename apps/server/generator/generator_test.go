@@ -180,9 +180,9 @@ func TestGenerateStopsTheSearchOnceTheSetIsFull(t *testing.T) {
 
 	// Loops that do not overlap, each a match, as the engine would deliver them one by one.
 	var found []*engine.Route
-	for i, heading := range []float64{0, 70, 140, 210, 280} {
+	for i, heading := range []float64{0, 40, 80, 120, 160, 200, 240, 280} {
 		found = append(found, engineLoop(heading))
-		if got, want := enough(found), i == 4; got != want {
+		if got, want := enough(found), i == 7; got != want {
 			t.Errorf("after %d matches: enough = %v, want %v", i+1, got, want)
 		}
 	}
@@ -193,7 +193,7 @@ func TestGenerateKeepsSearchingWhileTheSetIsNotFull(t *testing.T) {
 	if _, err := generate(t, looper, context.Background(), body); err != nil {
 		t.Fatal(err)
 	}
-	// Five loops, but all the same: one route, and suggestions or duplicates do not fill the set.
+	// Six loops, but all the same: one route, and suggestions or duplicates do not fill the set.
 	var found []*engine.Route
 	for range 6 {
 		found = append(found, engineLoop(0))
