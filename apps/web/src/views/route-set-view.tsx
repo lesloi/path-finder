@@ -391,16 +391,19 @@ function RouteDetail({
         waypointPois={waypointPois}
       />
       <SurfaceShare route={route} language={language} />
-      <button
-        type="button"
-        data-testid="route-export"
-        className={PRIMARY_BUTTON}
-        // Nothing awaited before the share sheet: it needs the tap that opened it.
-        onClick={() => void exportRoute(route, { language, paceUnit, waypoints, waypointPois }, pace)}
-      >
-        <Download size={18} aria-hidden />
-        {t.exportGpx}
-      </button>
+      {/* Pinned to the bottom of the sheet's scroll area: on a short phone the profile pushes it under the fold. The top padding masks what scrolls under it; the negative margin takes back the flex gap it replaces. */}
+      <div className="sticky bottom-0 -mt-3 bg-surface pt-3">
+        <button
+          type="button"
+          data-testid="route-export"
+          className={PRIMARY_BUTTON}
+          // Nothing awaited before the share sheet: it needs the tap that opened it.
+          onClick={() => void exportRoute(route, { language, paceUnit, waypoints, waypointPois }, pace)}
+        >
+          <Download size={18} aria-hidden />
+          {t.exportGpx}
+        </button>
+      </div>
     </div>
   );
 }
