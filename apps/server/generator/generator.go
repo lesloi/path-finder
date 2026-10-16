@@ -17,7 +17,7 @@ import (
 type Looper interface {
 	Loops(ctx context.Context, req engine.LoopRequest) ([]*engine.Route, error)
 	// DirectLoop is the cheapest loop through the waypoints, in order.
-	DirectLoop(ctx context.Context, start engine.Point, waypoints []engine.Point) (*engine.Route, error)
+	DirectLoop(ctx context.Context, req engine.DirectLoopRequest) (*engine.Route, error)
 }
 
 // Generator builds route sets. It is safe for concurrent use.
@@ -66,6 +66,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		Distance:   km * 1000,
 		Candidates: cmpOr(g.Candidates, defaultCandidates),
 		Seed:       g.seed(),
+		Avoided:    avoidedCircles(criteria.AvoidedAreas),
 	}
 	if criteria.ElevationGain != nil && criteria.ElevationGain.Shortcut == "" {
 		req.Ascent = criteria.ElevationGain.Metres
@@ -77,7 +78,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		for _, w := range criteria.Waypoints {
 			req.Waypoints = append(req.Waypoints, engine.Point{Lat: w[1], Lon: w[0]})
 		}
-		direct, err := throughWaypoints(ctx, looper, criteria, req.Waypoints)
+		direct, err := throughWaypoints(ctx, looper, criteria, req.Waypoints, req.Avoided)
 		if err != nil {
 			return nil, err
 		}
@@ -124,10 +125,19 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	return routes, nil
 }
 
+// avoidedCircles is the areas of the criteria as the engine takes them.
+func avoidedCircles(areas []contract.AvoidedArea) []engine.Circle {
+	var circles []engine.Circle
+	for _, a := range areas {
+		circles = append(circles, engine.Circle{Center: engine.Point{Lat: a.Center[1], Lon: a.Center[0]}, RadiusM: a.Radius})
+	}
+	return circles
+}
+
 // throughWaypoints routes the direct loop through the waypoints and refuses criteria whose waypoints
 // make a loop too long for the target to be met even by a wide suggestion, or that the engine cannot match
 // to a way. It returns the direct loop as a candidate, or nil when it goes nowhere.
-func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, points []engine.Point) (*candidate, error) {
+func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, points []engine.Point, avoided []engine.Circle) (*candidate, error) {
 	tooLong := &contract.CriteriaError{Field: "waypoints", Message: "waypoints make too long a route for the target"}
 	// A loop is never shorter than the straight lines through its points: no need to search. Climb only
 	// adds to a duration, so a duration target is judged on the flat loop.
@@ -139,7 +149,7 @@ func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, p
 	if km > limit*(1+wideTolerance.distance) {
 		return nil, tooLong
 	}
-	route, err := looper.DirectLoop(ctx, engine.Point{Lat: c.Start[1], Lon: c.Start[0]}, points)
+	route, err := looper.DirectLoop(ctx, engine.DirectLoopRequest{Start: engine.Point{Lat: c.Start[1], Lon: c.Start[0]}, Waypoints: points, Avoided: avoided})
 	var waypoint *engine.WaypointError
 	switch {
 	case errors.As(err, &waypoint):

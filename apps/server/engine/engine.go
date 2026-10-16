@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+
+	"github.com/lesloi/path-finder/apps/server/geo"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
@@ -26,7 +28,7 @@ const loopLegMaxSettled = 300_000
 const minDetourShare = 0.15
 
 // metersPerDegree converts degrees of latitude to metres.
-const metersPerDegree = 111194.9
+const metersPerDegree = geo.MetersPerDegree
 
 // Grid cell sizes of the spatial index, in 1e-7 degrees (about 220 m).
 const (
@@ -53,7 +55,15 @@ type graph struct {
 	// smallOnce guards smallSet: the pass reads the whole graph, which route-only traffic and startup never need.
 	smallOnce sync.Once
 	smallSet  nodeSet
-	file      mapped
+	// longOnce guards long, the ways too long for a scan of the nodes around an area to find: only requests with
+	// avoided areas need them.
+	longOnce sync.Once
+	long     [][2]uint32
+	// forbiddenMu guards lastForbidden, the set of the last areas asked for: a request asks twice, for its
+	// direct loop and for its loops, and the set is read only once built.
+	forbiddenMu   sync.Mutex
+	lastForbidden *forbidden
+	file          mapped
 }
 
 // small holds the nodes of components too small to hold a loop: control points keep off them. It is computed
@@ -344,6 +354,15 @@ func (s *spatial) nearest(g *graph, latDeg, lonDeg float64) (uint32, float64, bo
 // nearestOutside is the node closest to a point that is not in skip. With a positive reachM it looks no farther
 // than that, so a point with only skipped nodes around it is refused at once and not after the whole index.
 func (s *spatial) nearestOutside(g *graph, latDeg, lonDeg float64, skip nodeSet, reachM float64) (uint32, float64, bool) {
+	var skipFn func(uint32) bool
+	if skip != nil {
+		skipFn = skip.has
+	}
+	return s.nearestWhere(g, latDeg, lonDeg, skipFn, reachM)
+}
+
+// nearestWhere is nearestOutside for any set of nodes to skip, given as a filter, or nil for none.
+func (s *spatial) nearestWhere(g *graph, latDeg, lonDeg float64, skip func(uint32) bool, reachM float64) (uint32, float64, bool) {
 	rings := 200
 	if reachM > 0 {
 		rings = min(rings, int(reachM/ringM)+2)
@@ -358,7 +377,7 @@ func (s *spatial) nearestOutside(g *graph, latDeg, lonDeg float64, skip nodeSet,
 		}
 		c := y*s.nx + x
 		for _, n := range s.nodes[s.start[c]:s.start[c+1]] {
-			if skip != nil && skip.has(n) {
+			if skip != nil && skip(n) {
 				continue
 			}
 			dy := float64(g.nodes[n].Lat-lat) * 1e-7 * metersPerDegree
@@ -563,6 +582,8 @@ type searchLimits struct {
 	// maxSettled caps the nodes one search may settle (0 for no cap): a loop leg that needs more is not worth
 	// finding, and a huge search would also have to regrow its table, which cannot be interrupted.
 	maxSettled int
+	// forbidden, when set, is the ways a search must not use: those that touch an avoided area.
+	forbidden *forbidden
 }
 
 // route finds the cheapest route, or nil when there is none or ctx is cancelled.
@@ -655,6 +676,9 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 		for e := g.off[u]; e < g.off[u+1]; e++ {
 			ed := &edges[e]
 			nv := &nodes[ed.To]
+			if lim.forbidden.holds(u, ed.To) {
+				continue
+			}
 			c := ed.Len * cx.mult[ed.Kind][ed.Surf]
 			if dz := float32(nv.Elev-nu.Elev) * 0.1; dz > 0 {
 				c += dz * climb
@@ -755,6 +779,8 @@ type loopParams struct {
 	baseM   float64
 	// stats, when set, counts why candidates fail. Nil in the product: finding why costs extra searches.
 	stats *LoopStats
+	// forbidden is what the request's avoided areas leave out of the searches, or nil for none.
+	forbidden *forbidden
 }
 
 type loopResult struct {
@@ -894,7 +920,7 @@ func climbLift(ascent, target float64, band AscentBand) float64 {
 // liftedNode is the highest node (lift > 0) or lowest (lift < 0) among base and those nearest to eight
 // points reachM around it, leaving out the nodes of small components, or base for no lift. Fixed directions keep
 // a seed's loops the same.
-func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32 {
+func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64, f *forbidden) uint32 {
 	if lift == 0 {
 		return base
 	}
@@ -909,7 +935,7 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64) uint32
 	for k := 0; k < 8; k++ {
 		a := float64(k) * math.Pi / 4
 		n, d, ok := sp.nearest(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl))
-		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev && !small.has(n) {
+		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev && !small.has(n) && !f.has(n) {
 			best = n
 		}
 	}
@@ -924,7 +950,7 @@ const goldenAngle = 2.399963229728653
 
 // circlePoints is the node of each control point of the circle of radius rc whose centre lies towards theta
 // from the point (slat, slon), or false when one is farther than snapReach from any way.
-func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64) ([]uint32, bool) {
+func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64, f *forbidden) ([]uint32, bool) {
 	cosl := math.Cos(slat * rad)
 	cxm, cym := rc*math.Cos(theta), rc*math.Sin(theta)
 	nodes := make([]uint32, 0, len(jitter))
@@ -932,11 +958,11 @@ func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter [
 	for j := range jitter {
 		phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(len(jitter)+1)
 		x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
-		n, d, ok := sp.nearest(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl))
+		n, d, ok := sp.nearestWhere(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl), f.skip(), 0)
 		if !ok || d > snapReach(rc) || small.has(n) {
 			return nil, false
 		}
-		nodes = append(nodes, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift))
+		nodes = append(nodes, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift, f))
 	}
 	return nodes, true
 }
@@ -944,10 +970,10 @@ func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter [
 // rotatedCircle is circlePoints for theta, or for the first of the next turns that falls on ways. In a valley
 // most directions lead to a wall: at Chamonix, 30 km, 44 % of the circles had a point beyond reach, and turning
 // it up to circleTries times leaves none. The turn it used comes back, to be kept for the resizings.
-func rotatedCircle(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64) ([]uint32, float64, bool) {
+func rotatedCircle(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64, f *forbidden) ([]uint32, float64, bool) {
 	for r := 0; r < circleTries; r++ {
 		turned := theta + float64(r)*goldenAngle
-		if nodes, ok := circlePoints(g, sp, slat, slon, rc, turned, jitter, lift); ok {
+		if nodes, ok := circlePoints(g, sp, slat, slon, rc, turned, jitter, lift, f); ok {
 			return nodes, turned, true
 		}
 	}
@@ -992,7 +1018,7 @@ func candidateLoop(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp
 		if ctx.Err() != nil {
 			return best, CauseCanceled
 		}
-		circle, turned, ok := rotatedCircle(g, sp, slat, slon, rc, theta, jitter, lift)
+		circle, turned, ok := rotatedCircle(g, sp, slat, slon, rc, theta, jitter, lift, lp.forbidden)
 		if !ok {
 			return best, CauseNoSnap
 		}
@@ -1002,7 +1028,7 @@ func candidateLoop(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp
 			// The user's waypoints fix the order; the circle's points only add detours between them.
 			points = collapse(withControlPoints(lp.anchors, points[1:len(points)-1], xy))
 		}
-		nodes, edges, cause := chainLegs(ctx, cx, s, climb, searchLimits{loopLegMaxSettled}, lp.stats != nil, points)
+		nodes, edges, cause := chainLegs(ctx, cx, s, climb, searchLimits{loopLegMaxSettled, lp.forbidden}, lp.stats != nil, points)
 		if cause != CauseNone {
 			return best, cause
 		}

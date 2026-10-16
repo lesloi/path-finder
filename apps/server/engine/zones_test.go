@@ -289,13 +289,13 @@ func TestZonesFindTheDirectLoopInTheZoneOfTheStart(t *testing.T) {
 	profile := z.Profile("any")
 	toward := func(p Point, northM float64) Point { return Point{p.Lat + northM/metersPerDegree, p.Lon} }
 
-	r, err := profile.DirectLoop(context.Background(), eastCentre, []Point{toward(eastCentre, 300)})
+	r, err := profile.DirectLoop(context.Background(), DirectLoopRequest{Start: eastCentre, Waypoints: []Point{toward(eastCentre, 300)}})
 
 	if err != nil {
 		t.Fatal(err)
 	}
 	near(t, r.Distance, 700, 101, "distance") // 600 m there and back, or 800 m when the way back avoids the way there
-	if _, err := profile.DirectLoop(context.Background(), westCentre, []Point{toward(eastCentre, 300)}); !errors.Is(err, ErrOffGraph) {
+	if _, err := profile.DirectLoop(context.Background(), DirectLoopRequest{Start: westCentre, Waypoints: []Point{toward(eastCentre, 300)}}); !errors.Is(err, ErrOffGraph) {
 		t.Errorf("a waypoint in another zone: err = %v, want ErrOffGraph", err)
 	}
 }
@@ -317,7 +317,7 @@ func TestAWaypointOffTheWaysIsNotTakenForTheStartWhenAnotherZoneAnswersFirst(t *
 	}
 	offTheWays := Point{centre.Lat + 3000/metersPerDegree, centre.Lon} // 1 km north of the lattice's last row
 
-	_, err = z.Profile("any").DirectLoop(context.Background(), centre, []Point{offTheWays})
+	_, err = z.Profile("any").DirectLoop(context.Background(), DirectLoopRequest{Start: centre, Waypoints: []Point{offTheWays}})
 
 	var we *WaypointError
 	if !errors.As(err, &we) || we.Index != 1 {

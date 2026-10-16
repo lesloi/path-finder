@@ -347,8 +347,8 @@ func (a *ProfileZones) Loops(ctx context.Context, req LoopRequest) ([]*Route, er
 }
 
 // DirectLoop asks the zones as Loops does, for the cheapest loop through the waypoints.
-func (a *ProfileZones) DirectLoop(ctx context.Context, start Point, waypoints []Point) (*Route, error) {
-	return inZones(a, start, func(e *Engine) (*Route, error) { return e.DirectLoop(ctx, start, waypoints) })
+func (a *ProfileZones) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route, error) {
+	return inZones(a, req.Start, func(e *Engine) (*Route, error) { return e.DirectLoop(ctx, req) })
 }
 
 // inZones runs search on the engine of each zone whose box holds start, as Loops describes, until one

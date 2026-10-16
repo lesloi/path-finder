@@ -4,15 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+
+	"github.com/lesloi/path-finder/apps/server/geo"
 )
 
 // CriteriaError is a request body that is not valid criteria, with the field that failed.
 // Messages name the field, never its value: the server keeps no location.
 type CriteriaError struct {
-	Field   string // start, target, elevationGain, surface, pace or waypoints
+	Field   string // start, target, elevationGain, surface, pace, waypoints or avoidedAreas
 	Message string
 	// Waypoint is the waypoint at fault, counted from 1, or 0 when none is singled out.
 	Waypoint int
+	// Area is the avoided area at fault, counted from 1, or 0 when none is singled out.
+	Area int
 }
 
 func (e *CriteriaError) Error() string { return e.Message }
@@ -46,6 +50,21 @@ type Criteria struct {
 	Pace          float64        `json:"pace"`
 	// Waypoints a route goes through, in this order.
 	Waypoints [][2]float64 `json:"waypoints,omitempty"` // longitude, latitude
+	// AvoidedAreas no route goes through.
+	AvoidedAreas []AvoidedArea `json:"avoidedAreas,omitempty"`
+}
+
+// AvoidedArea is a circle routes keep out of: its centre as longitude and latitude, and its radius in metres.
+type AvoidedArea struct {
+	Center [2]float64 `json:"center"`
+	Radius float64    `json:"radius"`
+}
+
+// contains tells whether a position, as longitude and latitude, is inside the area.
+func (a AvoidedArea) contains(p [2]float64) bool {
+	dy := (p[1] - a.Center[1]) * geo.MetersPerDegree
+	dx := (p[0] - a.Center[0]) * geo.MetersPerDegree * math.Cos(a.Center[1]*math.Pi/180)
+	return math.Hypot(dx, dy) <= a.Radius
 }
 
 // TargetDistanceKm is the distance to ask the engine for. It fails when a target duration is too
@@ -167,6 +186,28 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 		}
 	}
 
+	if raw, present := obj["avoidedAreas"]; present {
+		list, ok := raw.([]any)
+		if !ok || len(list) > bounds.MaxAvoidedAreas {
+			return fail("avoidedAreas", "avoided areas must be a short list of circles")
+		}
+		for i, item := range list {
+			area, ok := avoidedArea(item)
+			if !ok {
+				return Criteria{}, &CriteriaError{Field: "avoidedAreas", Message: "an avoided area must be a centre and a radius within bounds", Area: i + 1}
+			}
+			if area.contains(c.Start) {
+				return Criteria{}, &CriteriaError{Field: "avoidedAreas", Message: "the start is inside an avoided area", Area: i + 1}
+			}
+			for _, w := range c.Waypoints {
+				if area.contains(w) {
+					return Criteria{}, &CriteriaError{Field: "avoidedAreas", Message: "a waypoint is inside an avoided area", Area: i + 1}
+				}
+			}
+			c.AvoidedAreas = append(c.AvoidedAreas, area)
+		}
+	}
+
 	if countElevationGain {
 		c.ElevationGain = gain
 	}
@@ -179,6 +220,17 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 		return fail("target", "target duration makes too long a route at this pace")
 	}
 	return c, nil
+}
+
+// avoidedArea reads a centre and a radius.
+func avoidedArea(v any) (AvoidedArea, bool) {
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return AvoidedArea{}, false
+	}
+	center, ok := position(obj["center"])
+	radius, radiusOK := within(obj["radius"], bounds.AvoidedRadius.Min, bounds.AvoidedRadius.Max)
+	return AvoidedArea{Center: center, Radius: radius}, ok && radiusOK
 }
 
 // position reads a longitude and a latitude.

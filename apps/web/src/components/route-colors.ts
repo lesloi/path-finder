@@ -36,6 +36,7 @@ export const MAP_COLORS = {
   routeMuted: '#9aa595',
   veil: '#4a4f47',
   veilOnPhoto: '#f4f2ea',
+  avoided: '#b42318',
 };
 
 /** The ink of a tag over the map, which stays light in dark mode: the light theme's, as the scale's. */
