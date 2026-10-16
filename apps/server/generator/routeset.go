@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	maxRoutes = 5
+	maxRoutes = 8
 	// minRoutes is how many routes suggestions, then wide suggestions, fill the set up to.
 	minRoutes = 3
 	// maxShared is the largest share of a route's geometry another route in the set may cover.

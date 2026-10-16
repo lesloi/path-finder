@@ -703,7 +703,7 @@ describe('StartPointMap', () => {
         renderRoutes({ routes: [out], summaries });
 
         expect(map().images['route-tag']).toMatchObject({ width: 36, height: 36 });
-        expect(Object.keys(map().images).filter((id) => id.startsWith('route-tag-'))).toHaveLength(5);
+        expect(Object.keys(map().images).filter((id) => id.startsWith('route-tag-'))).toHaveLength(8);
       });
 
       it('fills the tag of the selected route in its colour and leaves the others white', () => {

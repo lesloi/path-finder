@@ -7,7 +7,7 @@ import type { PoiCategory } from '../core/index.ts';
 /** The red, green and blue channels of a `#rrggbb` colour. */
 export const hexToRgb = (hex: string) => [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
 
-export const ROUTE_COLORS = ['#e0115f', '#2563eb', '#7a3fc4', '#0b7a75', '#c25e00'];
+export const ROUTE_COLORS = ['#e0115f', '#2563eb', '#7a3fc4', '#0b7a75', '#c25e00', '#32801a', '#7a7000', '#3b4252'];
 
 /** The left border of a route's row, in the route's colour. */
 const ROUTE_BORDERS = [
@@ -16,6 +16,9 @@ const ROUTE_BORDERS = [
   'border-l-route-3',
   'border-l-route-4',
   'border-l-route-5',
+  'border-l-route-6',
+  'border-l-route-7',
+  'border-l-route-8',
 ];
 
 /** The colour of the route at this position in its route set, which wraps past the last colour. */
