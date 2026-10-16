@@ -12,10 +12,10 @@ export type RouteSetError = ErrorCode | 'unreachable' | 'failed';
 
 /**
  * What a request got instead of routes: the error, and for an `invalid-criteria` refusal the field at fault and,
- * for a waypoint, its number counted from 1. `no-routes` is the API answering with an empty route set.
+ * for a waypoint or an avoided area, its number counted from 1. `no-routes` is the API answering with an empty route set.
  */
 export type Refusal =
-  | { error: 'invalid-criteria'; field?: CriteriaField; waypoint?: number }
+  | { error: 'invalid-criteria'; field?: CriteriaField; waypoint?: number; area?: number }
   | { error: Exclude<RouteSetError, 'invalid-criteria'> | 'no-routes' };
 
 // A gateway or a proxy answers these when the API behind it is down.
@@ -36,11 +36,12 @@ const isErrorCode = (value: unknown): value is ErrorCode =>
 
 // The refusal an `invalid-criteria` body names: the field it knows, and the waypoint as a number from 1.
 function invalidCriteria(body: object): Refusal {
-  const { field, waypoint } = body as { field?: unknown; waypoint?: unknown };
+  const { field, waypoint, area } = body as { field?: unknown; waypoint?: unknown; area?: unknown };
   if (!isCriteriaField(field)) return { error: 'invalid-criteria' };
-  return field === 'waypoints' && typeof waypoint === 'number' && Number.isInteger(waypoint) && waypoint > 0
-    ? { error: 'invalid-criteria', field, waypoint }
-    : { error: 'invalid-criteria', field };
+  const number = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value > 0;
+  if (field === 'waypoints' && number(waypoint)) return { error: 'invalid-criteria', field, waypoint };
+  if (field === 'avoidedAreas' && number(area)) return { error: 'invalid-criteria', field, area };
+  return { error: 'invalid-criteria', field };
 }
 
 /**

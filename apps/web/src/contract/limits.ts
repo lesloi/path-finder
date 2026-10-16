@@ -7,6 +7,11 @@ export const MAX_TARGET_DISTANCE = contract.maxDistanceKm;
 export const TARGET_DURATION = { min: contract.durationMinutes.min, max: contract.durationMinutes.max };
 export const MAX_TARGET_ELEVATION_GAIN = contract.maxElevationGainMetres;
 export const MAX_WAYPOINTS = contract.maxWaypoints;
+export const MAX_AVOIDED_AREAS = contract.maxAvoidedAreas;
+export const AVOIDED_AREA_RADIUS = {
+  min: contract.avoidedAreaRadiusMetres.min,
+  max: contract.avoidedAreaRadiusMetres.max,
+};
 export const CLIMB_PER_EFFORT_KM = contract.climbPerEffortKm;
 export const HILLY_MATCH_PER_KM = contract.hillyMatchPerKm;
 export const POI_TILE_ZOOM = contract.poiTileZoom;

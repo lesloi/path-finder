@@ -15,6 +15,7 @@ function linesFor(language: Language, refusal: Refusal): string[] {
     case 'invalid-criteria':
       // The form lets nothing else through, so a field a refusal names is a point that is too far from a way.
       if (refusal.field === 'start') return [t.startTooFar, t.startTooFarHint];
+      if (refusal.field === 'avoidedAreas' && refusal.area !== undefined) return [t.avoidedAreaRefused(refusal.area)];
       if (refusal.field !== 'waypoints') return [errorText[language]['invalid-criteria']];
       return refusal.waypoint === undefined
         ? [t.waypointsUnreachable]

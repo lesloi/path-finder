@@ -90,6 +90,20 @@ describe('requestRouteSet', () => {
     });
   });
 
+  it('returns the field and the avoided area an invalid criteria refusal names', async () => {
+    answer(Response.json({ error: 'invalid-criteria', field: 'avoidedAreas', area: 2 }, { status: 400 }));
+
+    expect(await requestRouteSet(request)).toEqual({
+      refusal: { error: 'invalid-criteria', field: 'avoidedAreas', area: 2 },
+    });
+  });
+
+  it('keeps no area number that is not a position in the list', async () => {
+    answer(Response.json({ error: 'invalid-criteria', field: 'avoidedAreas', area: 0 }, { status: 400 }));
+
+    expect(await requestRouteSet(request)).toEqual({ refusal: { error: 'invalid-criteria', field: 'avoidedAreas' } });
+  });
+
   it('returns the field alone when the refusal names no waypoint', async () => {
     answer(Response.json({ error: 'invalid-criteria', field: 'start' }, { status: 400 }));
 

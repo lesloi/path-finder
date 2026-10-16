@@ -1,3 +1,4 @@
+export * from './avoided-area.ts';
 export * from './basemap.ts';
 export * from './carousel.ts';
 export * from './coordinates.ts';

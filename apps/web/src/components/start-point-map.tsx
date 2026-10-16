@@ -7,13 +7,17 @@ import {
   type GeoJSONSource,
   type MapMouseEvent,
   type MapTouchEvent,
+  type PopupOptions,
   type SymbolLayerSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { createPortal } from 'react-dom';
 
+import type { AvoidedArea } from '../contract/index.ts';
+
 import {
+  circlePolygon,
   DEFAULT_BASEMAP,
   distanceMarkers,
   formatDistance,
@@ -51,6 +55,7 @@ import {
   routeTagImage,
 } from './route-tag-image.ts';
 import { useDesktop } from './use-desktop.ts';
+import { AvoidedAreaBadge } from './avoided-area-badge.tsx';
 import { WaypointPin } from './waypoint-pin.tsx';
 import { NORTH_EPSILON, useRouteSnapshot } from './use-route-snapshot.ts';
 
@@ -145,6 +150,10 @@ const PIN_BUBBLE_OFFSET = {
 
 // A default that keeps its identity, so that the markers are not drawn again on every render.
 const NO_WAYPOINTS: Position[] = [];
+const NO_AREAS: AvoidedArea[] = [];
+
+// The bubble of an avoided area opens above its badge, which is centred on the point.
+const AREA_BUBBLE_OFFSET = 16;
 
 const poiLayerId = (category: PoiCategory) => `pois-${category}`;
 const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
@@ -173,6 +182,8 @@ export type MapHandle = {
   centerOn: (position: Position) => void;
   /** Sets the pin of a waypoint apart, larger and in the accent colour: the one the user points at in a list. */
   highlightWaypoint: (index: number | undefined) => void;
+  /** Sets the circle and the number of an avoided area apart, the one the user points at in the list. */
+  highlightArea: (index: number | undefined) => void;
 };
 
 /** What the map writes on a route: its distance and, when known, its elevation gain. */
@@ -203,6 +214,8 @@ export function StartPointMap({
   pickOnClick = false,
   waypoints = NO_WAYPOINTS,
   placing = false,
+  avoidedAreas = NO_AREAS,
+  avoiding = false,
   routes,
   summaries,
   coverage,
@@ -220,8 +233,10 @@ export function StartPointMap({
   onSnapshot,
   onStartChange,
   onWaypointAdd,
+  onAvoidedAreaAdd,
   onWaypointRefused,
   onWaypointRemove,
+  onAvoidedAreaRemove,
   onBasemapFail,
   onViewChange,
   ref,
@@ -276,12 +291,19 @@ export function StartPointMap({
   waypoints?: Position[];
   /** A click or a tap places a waypoint, and a long press no longer sets the start point. */
   placing?: boolean;
+  /** The circles routes keep out of, drawn under the routes. */
+  avoidedAreas?: AvoidedArea[];
+  /** A click or a tap places an area to avoid, and a long press no longer sets the start point. */
+  avoiding?: boolean;
+  onAvoidedAreaAdd?: (center: Position) => void;
   /** `poi` is given when the tap fell on a point of interest: the waypoint is then at the point. */
   onWaypointAdd?: (waypoint: Position, poi?: WaypointPoi) => void;
   /** A tap fell on the veiled part of the map, where the server cannot route: no waypoint was placed. */
   onWaypointRefused?: () => void;
   /** The user asked to remove the waypoint at this index, from its bubble. */
   onWaypointRemove?: (index: number) => void;
+  /** The user asked to remove the avoided area at this index, from its bubble. */
+  onAvoidedAreaRemove?: (index: number) => void;
   /** The style of a new basemap could not be loaded: the map went back to this one, which the app should show. */
   onBasemapFail?: (basemap: Basemap) => void;
   /** The user turned or moved the map, or it was put back. */
@@ -306,7 +328,7 @@ export function StartPointMap({
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
-  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick && !placing;
+  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick && !(placing || avoiding);
   const view = useRef<MapView>({ bearing: 0, rotated: false, movedAway: false });
   // Tells the app what changed in the view, and only when something did: the map moves many times a second.
   const changeView = useEffectEvent((change: Partial<MapView>) => {
@@ -318,14 +340,19 @@ export function StartPointMap({
   // The veiled part of the map is where the server cannot route: a waypoint there would only be refused.
   const canPlace = useEffectEvent(([lng, lat]: Position) => !coverage || isCovered(coverage, [lng, lat]));
   // What the pointer looks like where nothing else sets it: a crosshair while placing, which says a tap places a waypoint.
-  const isPlacing = useEffectEvent(() => Boolean(placing));
-  const idleCursor = useEffectEvent(() => (placing ? 'crosshair' : ''));
+  const marking = placing || avoiding;
+  const isPlacing = useEffectEvent(() => marking);
+  const idleCursor = useEffectEvent(() => (marking ? 'crosshair' : ''));
   const pick = useEffectEvent(
     (
       how: 'long-press' | 'click',
       { lng, lat }: { lng: number; lat: number },
       poi?: { position: Position; poi: WaypointPoi },
     ) => {
+      if (avoiding) {
+        if (how === 'click') onAvoidedAreaAdd?.([lng, lat]);
+        return;
+      }
       if (placing) {
         if (how === 'click') {
           const position = poi?.position ?? [lng, lat];
@@ -341,13 +368,14 @@ export function StartPointMap({
     },
   );
   const clickedBackground = useEffectEvent(() => {
-    if (!pickOnClick && !placing) onBackgroundClick?.();
+    if (!pickOnClick && !(placing || avoiding)) onBackgroundClick?.();
   });
   const basemapFailed = useEffectEvent((previous: Basemap) => onBasemapFail?.(previous));
   const selectRoute = useEffectEvent((index: number) => {
     if (interactive) onRouteSelect?.(index);
   });
   const removeWaypoint = useEffectEvent((index: number) => onWaypointRemove?.(index));
+  const removeArea = useEffectEvent((index: number) => onAvoidedAreaRemove?.(index));
   // The bubble that offers to remove a waypoint.
   const bubbleRef = useRef<Popup>(undefined);
   const closeBubble = () => bubbleRef.current?.remove();
@@ -408,6 +436,24 @@ export function StartPointMap({
         type: 'fill',
         source: 'coverage',
         paint: veilPaint(shownBasemap.current),
+      });
+      // The areas to avoid, over the veil and under the points of interest and the routes.
+      map.addSource('avoided-areas', { type: 'geojson', data: emptyRoutes });
+      map.addLayer({
+        id: 'avoided-areas-fill',
+        type: 'fill',
+        source: 'avoided-areas',
+        paint: { 'fill-color': MAP_COLORS.avoided, 'fill-opacity': ['case', ['get', 'highlighted'], 0.4, 0.22] },
+      });
+      map.addLayer({
+        id: 'avoided-areas-line',
+        type: 'line',
+        source: 'avoided-areas',
+        paint: {
+          'line-color': MAP_COLORS.avoided,
+          'line-width': ['case', ['get', 'highlighted'], 4, 2],
+          'line-dasharray': [2, 2],
+        },
       });
       // Above the veil and under the routes. A seasonal point has the reverse badge: it may be dry.
       for (const category of POI_CATEGORIES) {
@@ -657,18 +703,63 @@ export function StartPointMap({
     };
     map.on('mousemove', follow);
     return () => void map.off('mousemove', follow);
-  }, [placing]);
+  }, [placing, avoiding]);
 
   // The waypoints' markers: a button each, which the pins (`WaypointPin`) are drawn into. Tapping one opens a bubble with a
   // button to remove it. The marker's own events stop here, as MapLibre would hear them as the map's: a click that
   // closes the bubble, or adds a waypoint, and a press that starts a long press.
   // A change keeps the markers before the first one that moved, and an open bubble with them.
+  // The button of a marker, which brings the focus and the keyboard with it: tapping it opens a bubble with a button to
+  // remove what the marker stands for. Its own events stop here, as the map would hear them as its own: a click that
+  // adds a point, a press that starts a long press. `bubbleFor` is the waypoint the bubble belongs to, or -1.
+  const markerButton = useEffectEvent(
+    ({
+      label,
+      at,
+      offset,
+      removeLabel,
+      onRemove,
+      bubbleFor,
+    }: {
+      label: string;
+      at: Position;
+      offset: PopupOptions['offset'];
+      removeLabel: string;
+      onRemove: () => void;
+      bubbleFor: number;
+    }) => {
+      const host = document.createElement('button');
+      host.type = 'button';
+      host.className = 'block cursor-pointer p-0';
+      host.setAttribute('aria-label', label);
+      for (const type of ['mousedown', 'touchstart']) host.addEventListener(type, (event) => event.stopPropagation());
+      host.addEventListener('click', (event) => {
+        event.stopPropagation();
+        closeBubble();
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = removeLabel;
+        remove.className = 'rounded-md px-2 py-1.5 font-semibold text-accent';
+        remove.addEventListener('click', () => {
+          closeBubble();
+          onRemove();
+        });
+        bubbleRef.current = new Popup({ closeButton: false, offset, className: 'waypoint-bubble' })
+          .setLngLat(at)
+          .setDOMContent(remove)
+          .addTo(mapRef.current!);
+        bubbleOn.current = bubbleFor;
+      });
+      return host;
+    },
+  );
   const [pinHosts, setPinHosts] = useState<HTMLElement[]>([]);
   const placed = useRef<{ marker: Marker; host: HTMLElement; waypoint: Position }[]>([]);
   const placedIn = useRef(language);
   const bubbleOn = useRef(-1);
   // Kept here, not in the app: pointing at a row must not draw the whole view again.
   const [highlightedWaypoint, setHighlightedWaypoint] = useState<number>();
+  const [highlightedArea, setHighlightedArea] = useState<number>();
   useEffect(() => {
     const map = mapRef.current!;
     let keep = 0;
@@ -685,30 +776,15 @@ export function StartPointMap({
     if (bubbleOn.current >= keep) closeBubble();
     for (const [index, waypoint] of waypoints.slice(keep).entries()) {
       const number = keep + index + 1;
-      // A button, which brings the focus and the keyboard with it.
-      const host = document.createElement('button');
-      host.type = 'button';
-      host.className = 'block cursor-pointer p-0';
-      host.setAttribute('aria-label', criteriaText[language].waypointName(number));
-      host.dataset.waypoint = String(number);
-      for (const type of ['mousedown', 'touchstart']) host.addEventListener(type, (event) => event.stopPropagation());
-      host.addEventListener('click', (event) => {
-        event.stopPropagation();
-        closeBubble();
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.textContent = criteriaText[language].removeWaypoint;
-        remove.className = 'rounded-md px-2 py-1.5 font-semibold text-accent';
-        remove.addEventListener('click', () => {
-          closeBubble();
-          removeWaypoint(number - 1);
-        });
-        bubbleRef.current = new Popup({ closeButton: false, offset: PIN_BUBBLE_OFFSET, className: 'waypoint-bubble' })
-          .setLngLat(waypoint)
-          .setDOMContent(remove)
-          .addTo(map);
-        bubbleOn.current = number - 1;
+      const host = markerButton({
+        label: criteriaText[language].waypointName(number),
+        at: waypoint,
+        offset: PIN_BUBBLE_OFFSET,
+        removeLabel: criteriaText[language].removeWaypoint,
+        onRemove: () => removeWaypoint(number - 1),
+        bubbleFor: number - 1,
       });
+      host.dataset.waypoint = String(number);
       placed.current.push({
         marker: new Marker({ element: host, anchor: 'bottom' }).setLngLat(waypoint).addTo(map),
         host,
@@ -717,6 +793,29 @@ export function StartPointMap({
     }
     setPinHosts(placed.current.map(({ host }) => host));
   }, [waypoints, language]);
+  // The number of each avoided area, at the centre of its circle. A marker moves with its circle, which a resize leaves
+  // where it is: the markers are made again only when a centre changes.
+  const [areaHosts, setAreaHosts] = useState<HTMLElement[]>([]);
+  const centres = avoidedAreas.map(({ center }) => center.join(','));
+  useEffect(() => {
+    const map = mapRef.current!;
+    const markers = avoidedAreas.map(({ center }, index) => {
+      const host = markerButton({
+        label: criteriaText[language].avoidedAreaName(index + 1),
+        at: center,
+        offset: AREA_BUBBLE_OFFSET,
+        removeLabel: criteriaText[language].removeAvoidedArea,
+        onRemove: () => removeArea(index),
+        bubbleFor: -1,
+      });
+      return { host, marker: new Marker({ element: host }).setLngLat(center).addTo(map) };
+    });
+    setAreaHosts(markers.map(({ host }) => host));
+    return () => {
+      closeBubble();
+      markers.forEach(({ marker }) => marker.remove());
+    };
+  }, [centres.join(';'), language]); // eslint-disable-line react-hooks/exhaustive-deps -- `avoidedAreas` changes with every resize
   // The pin set apart goes over the ones around it.
   useEffect(() => {
     for (const [index, { host }] of placed.current.entries()) {
@@ -765,6 +864,20 @@ export function StartPointMap({
     if (!loaded || !source) return;
     source.setData(coverage?.length ? veilPolygon(coverage) : emptyRoutes);
   }, [loaded, coverage, styleVersion]);
+
+  // The areas to avoid, drawn as circles; a new style drops them, so they are set again.
+  useEffect(() => {
+    const source = mapRef.current?.getSource('avoided-areas') as GeoJSONSource | undefined;
+    if (!loaded || !source) return;
+    source.setData({
+      type: 'FeatureCollection',
+      features: avoidedAreas.map((area, index) => ({
+        type: 'Feature' as const,
+        properties: { highlighted: index === highlightedArea },
+        geometry: { type: 'Polygon' as const, coordinates: [circlePolygon(area)] },
+      })),
+    });
+  }, [loaded, avoidedAreas, highlightedArea, styleVersion]);
 
   // The points of interest in view: the tiles of the view are asked for only from zoom 11 and while a category is on,
   // since a tile says which ~30 km the user looks at. A view that moved on meanwhile drops the late answer.
@@ -936,6 +1049,7 @@ export function StartPointMap({
     reframe: () => setReframes((count) => count + 1),
     centerOn: (center) => mapRef.current?.easeTo({ center }),
     highlightWaypoint: setHighlightedWaypoint,
+    highlightArea: setHighlightedArea,
   }));
   const refit = useEffectEvent(() => {
     const map = mapRef.current!;
@@ -970,6 +1084,13 @@ export function StartPointMap({
   return (
     <div className={`fixed inset-0 bg-white ${pickOnClick ? 'map-picking' : ''}`}>
       <div ref={container} className="size-full" />
+      {areaHosts.map((host, index) =>
+        createPortal(
+          <AvoidedAreaBadge number={index + 1} highlighted={index === highlightedArea} />,
+          host,
+          `area-${index}`,
+        ),
+      )}
       {pinHosts.map((host, index) =>
         createPortal(
           <WaypointPin number={index + 1} variant="map" highlighted={index === highlightedWaypoint} />,

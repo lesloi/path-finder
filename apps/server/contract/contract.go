@@ -20,6 +20,8 @@ type limits struct {
 	DurationMinutes  struct{ Min, Max float64 } `json:"durationMinutes"`
 	MaxGainMetres    float64                    `json:"maxElevationGainMetres"`
 	MaxWaypoints     int                        `json:"maxWaypoints"`
+	MaxAvoidedAreas  int                        `json:"maxAvoidedAreas"`
+	AvoidedRadius    struct{ Min, Max float64 } `json:"avoidedAreaRadiusMetres"`
 	ClimbPerEffortKm float64                    `json:"climbPerEffortKm"`
 	HillyMatchPerKm  float64                    `json:"hillyMatchPerKm"`
 	CoverageCell     float64                    `json:"coverageCellDegrees"`
