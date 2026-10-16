@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"sort"
 	"sync"
+
+	"github.com/lesloi/path-finder/apps/server/geo"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
@@ -26,7 +28,7 @@ const loopLegMaxSettled = 300_000
 const minDetourShare = 0.15
 
 // metersPerDegree converts degrees of latitude to metres.
-const metersPerDegree = 111194.9
+const metersPerDegree = geo.MetersPerDegree
 
 // Grid cell sizes of the spatial index, in 1e-7 degrees (about 220 m).
 const (
@@ -53,10 +55,15 @@ type graph struct {
 	// smallOnce guards smallSet: the pass reads the whole graph, which route-only traffic and startup never need.
 	smallOnce sync.Once
 	smallSet  nodeSet
-	// longestOnce guards longest, the length of the longest way: only requests with avoided areas need it.
-	longestOnce sync.Once
-	longest     float64
-	file        mapped
+	// longOnce guards long, the ways too long for a scan of the nodes around an area to find: only requests with
+	// avoided areas need them.
+	longOnce sync.Once
+	long     [][2]uint32
+	// forbiddenMu guards lastForbidden, the set of the last areas asked for: a request asks twice, for its
+	// direct loop and for its loops, and the set is read only once built.
+	forbiddenMu   sync.Mutex
+	lastForbidden *forbidden
+	file          mapped
 }
 
 // small holds the nodes of components too small to hold a loop: control points keep off them. It is computed

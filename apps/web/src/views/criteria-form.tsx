@@ -7,6 +7,7 @@ import {
   MIN_TARGET_DISTANCE,
   parseCriteria,
   TARGET_DURATION,
+  areaContains,
   type AvoidedArea,
   type CriteriaField,
 } from '../contract/index.ts';
@@ -306,7 +307,9 @@ export function CriteriaForm({
   );
   const error = field && (
     <p role="alert" data-testid="criteria-error" className="text-sm text-ink">
-      {message(field, draft.target, { language, distance: BOUNDS.distance, gain: BOUNDS.gain })}
+      {field === 'avoidedAreas' && start && avoidedAreas?.some((area) => areaContains(area, start))
+        ? t.startInAvoidedArea
+        : message(field, draft.target, { language, distance: BOUNDS.distance, gain: BOUNDS.gain })}
     </p>
   );
 

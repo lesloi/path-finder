@@ -123,3 +123,47 @@ func TestWithoutAreasNothingIsForbidden(t *testing.T) {
 		t.Error("an empty set of areas must cost the searches nothing")
 	}
 }
+
+func TestAVeryLongEdgeCrossingAnAreaFarFromBothEndsIsForbidden(t *testing.T) {
+	// Arrange: a 6 km way whose ends are each 3 km from the area on its middle.
+	g := &testGraph{}
+	a := g.addNode(0, 0, 100)
+	b := g.addNode(0, 6000, 100)
+	g.connect(a, b, KindPath)
+	c := g.addNode(500, 0, 100)
+	d := g.addNode(500, 6000, 100)
+	g.connect(a, c, KindPath)
+	g.connect(c, d, KindPath)
+	g.connect(d, b, KindPath)
+	area := circleAt(g, 0, 3000, 100)
+	e := openTest(t, g, false)
+	// Act
+	forbidden := newForbidden(e.g, []Circle{area})
+	// Assert
+	if !forbidden.holds(uint32(a), uint32(b)) {
+		t.Error("the long way through the area is allowed")
+	}
+	if forbidden.holds(uint32(c), uint32(d)) {
+		t.Error("the way that keeps clear of the area is forbidden")
+	}
+}
+
+func TestTheSameAreasShareOneForbiddenSetAcrossCalls(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	g.grid(5, 5, flat)
+	one := circleAt(g, 100, 100, 50)
+	other := circleAt(g, 300, 300, 50)
+	e := openTest(t, g, false)
+	// Act
+	first := e.g.forbiddenFor([]Circle{one})
+	again := e.g.forbiddenFor([]Circle{one})
+	changed := e.g.forbiddenFor([]Circle{other})
+	// Assert
+	if first != again {
+		t.Error("the set was built again for the same areas")
+	}
+	if changed == first {
+		t.Error("another area reused the set of the first")
+	}
+}

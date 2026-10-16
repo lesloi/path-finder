@@ -1,4 +1,10 @@
-import { circlePolygon, DEFAULT_AVOIDED_RADIUS, maxRadiusAround } from './avoided-area.ts';
+import {
+  AVOIDED_RADIUS_STEP,
+  circlePolygon,
+  DEFAULT_AVOIDED_RADIUS,
+  fitRadius,
+  maxRadiusAround,
+} from './avoided-area.ts';
 import { kmBetween } from './route.ts';
 
 describe('circlePolygon', () => {
@@ -40,5 +46,29 @@ describe('maxRadiusAround', () => {
 
   it('has no limit without a point', () => {
     expect(maxRadiusAround(centre, [])).toBe(Infinity);
+  });
+});
+
+describe('fitRadius', () => {
+  const centre: [number, number] = [6.1294, 45.8992];
+  // About 222 m north of the centre.
+  const north: [number, number] = [6.1294, 45.9012];
+  // About 56 m north of the centre.
+  const close: [number, number] = [6.1294, 45.8997];
+
+  it('keeps the radius asked for when no point is in the way', () => {
+    expect(fitRadius(400, centre, [])).toBe(400);
+  });
+
+  it('stops at a step of the slider short of the nearest point', () => {
+    const radius = fitRadius(400, centre, [north]);
+
+    expect(radius % AVOIDED_RADIUS_STEP).toBe(0);
+    expect(radius).toBeLessThan(222);
+    expect(radius).toBeGreaterThan(222 - 2 * AVOIDED_RADIUS_STEP);
+  });
+
+  it('never goes under the smallest radius the server takes', () => {
+    expect(fitRadius(400, centre, [close])).toBe(50);
   });
 });

@@ -17,7 +17,7 @@ import (
 type Looper interface {
 	Loops(ctx context.Context, req engine.LoopRequest) ([]*engine.Route, error)
 	// DirectLoop is the cheapest loop through the waypoints, in order.
-	DirectLoop(ctx context.Context, start engine.Point, waypoints []engine.Point, avoided []engine.Circle) (*engine.Route, error)
+	DirectLoop(ctx context.Context, req engine.DirectLoopRequest) (*engine.Route, error)
 }
 
 // Generator builds route sets. It is safe for concurrent use.
@@ -149,7 +149,7 @@ func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, p
 	if km > limit*(1+wideTolerance.distance) {
 		return nil, tooLong
 	}
-	route, err := looper.DirectLoop(ctx, engine.Point{Lat: c.Start[1], Lon: c.Start[0]}, points, avoided)
+	route, err := looper.DirectLoop(ctx, engine.DirectLoopRequest{Start: engine.Point{Lat: c.Start[1], Lon: c.Start[0]}, Waypoints: points, Avoided: avoided})
 	var waypoint *engine.WaypointError
 	switch {
 	case errors.As(err, &waypoint):

@@ -1,4 +1,4 @@
-import { METRES_PER_DEGREE, type AvoidedArea } from '../contract/index.ts';
+import { AVOIDED_AREA_RADIUS, METRES_PER_DEGREE, type AvoidedArea } from '../contract/index.ts';
 import type { Position } from './coordinates.ts';
 import { kmBetween } from './route.ts';
 
@@ -15,6 +15,18 @@ export const DEFAULT_AVOIDED_RADIUS = 400;
 export function maxRadiusAround(center: Position, points: Position[]): number {
   const nearest = Math.min(...points.map((point) => kmBetween(center, point) * 1000));
   return Math.floor(nearest) - MARGIN_M;
+}
+
+/** The step of the radius slider, in metres: a radius is always a multiple of it. */
+export const AVOIDED_RADIUS_STEP = 10;
+
+/**
+ * The radius to give an area around `center`: the one asked for, stopped short of the nearest point and rounded down
+ * to a step of the slider, but never under the smallest radius the server takes.
+ */
+export function fitRadius(radius: number, center: Position, points: Position[]): number {
+  const limit = Math.min(radius, maxRadiusAround(center, points));
+  return Math.max(AVOIDED_AREA_RADIUS.min, Math.floor(limit / AVOIDED_RADIUS_STEP) * AVOIDED_RADIUS_STEP);
 }
 
 /** The ring of a polygon that draws the area, closed on its first point. */

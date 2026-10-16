@@ -41,6 +41,7 @@ import { RouteSetView } from './route-set-view.tsx';
 import {
   criteriaSummary,
   DEFAULT_AVOIDED_RADIUS,
+  fitRadius,
   maxRadiusAround,
   formatPosition,
   isCovered,
@@ -185,6 +186,8 @@ const NO_START: Position = [0, 0];
 // Two readings of a point of interest this close are the same point.
 const SAME_POI_KM = 0.005;
 
+const NO_AREAS: AvoidedArea[] = [];
+
 export function CriteriaView({ language, pageOpen = false }: { language: Language; pageOpen?: boolean }) {
   const t = { ...commonText[language], ...criteriaText[language], ...routesText[language] };
   const desktop = useDesktop();
@@ -205,7 +208,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
   // The circles routes keep out of: kept here too, for this visit only, as the waypoints are.
-  const [avoidedAreas, setAvoidedAreas] = useState<AvoidedArea[]>([]);
+  const [drawnAreas, setAvoidedAreas] = useState<AvoidedArea[]>(NO_AREAS);
+  // A phone has neither the button nor the list to edit them: the areas drawn on a desktop do not apply there.
+  const avoidedAreas = desktop ? drawnAreas : NO_AREAS;
   // A tap on the veiled part of the map was refused: the banner says why for a while.
   const [refused, setRefused] = useState<'uncovered' | 'duplicate' | 'inside' | 'inArea'>();
   // The points of interest some waypoints were made from, by position; kept for the routes found, as for the criteria.
@@ -321,11 +326,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     if (avoidedAreas.length >= MAX_AVOIDED_AREAS) return;
     // A new area shrinks to stay clear of the start point and the waypoints, which the server refuses to find inside
     // one; it is refused only when there is no room left for the smallest.
-    const radius = Math.min(DEFAULT_AVOIDED_RADIUS, maxRadiusAround(center, points));
-    if (radius < AVOIDED_AREA_RADIUS.min) return setRefused('inside');
+    if (maxRadiusAround(center, points) < AVOIDED_AREA_RADIUS.min) return setRefused('inside');
     setRefused(undefined);
     deselect();
-    setAvoidedAreas([...avoidedAreas, { center, radius }]);
+    setAvoidedAreas([...avoidedAreas, { center, radius: fitRadius(DEFAULT_AVOIDED_RADIUS, center, points) }]);
     if (avoidedAreas.length + 1 >= MAX_AVOIDED_AREAS) setMode(undefined);
   }
 
@@ -333,9 +337,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     deselect();
     // An area grows up to the nearest point, not over it.
     setAvoidedAreas(
-      avoidedAreas.map((area, i) =>
-        i === index ? { ...area, radius: Math.min(radius, maxRadiusAround(area.center, points)) } : area,
-      ),
+      avoidedAreas.map((area, i) => (i === index ? { ...area, radius: fitRadius(radius, area.center, points) } : area)),
     );
   }
 

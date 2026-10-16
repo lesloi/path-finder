@@ -199,7 +199,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if req.Distance <= 0 || req.Candidates <= 0 {
 		return nil, errors.New("engine: loops need a positive distance and candidate count")
 	}
-	forbidden := newForbidden(e.g, req.Avoided)
+	forbidden := e.g.forbiddenFor(req.Avoided)
 	start, err := e.snapLoopStart(req.Start, forbidden)
 	if err != nil {
 		return nil, err
@@ -330,16 +330,24 @@ func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point
 	return anchors, length, nil
 }
 
+// DirectLoopRequest asks for the cheapest loop from Start through the Waypoints in order, keeping out of the
+// Avoided areas.
+type DirectLoopRequest struct {
+	Start     Point
+	Waypoints []Point
+	Avoided   []Circle
+}
+
 // DirectLoop finds the cheapest loop from start through the waypoints in order and back, going back
 // over its steps where it must. It fails with ErrOffGraph for a start point off the ways, a
 // *WaypointError for a waypoint off them, and ErrNoRoute when they are not joined.
-func (e *Engine) DirectLoop(ctx context.Context, start Point, waypoints []Point, avoided []Circle) (*Route, error) {
-	forbidden := newForbidden(e.g, avoided)
-	src, err := e.snapStart(start, forbidden)
+func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route, error) {
+	forbidden := e.g.forbiddenFor(req.Avoided)
+	src, err := e.snapStart(req.Start, forbidden)
 	if err != nil {
 		return nil, err
 	}
-	_, nodes, edges, err := e.routeAnchors(ctx, src, waypoints, false, forbidden)
+	_, nodes, edges, err := e.routeAnchors(ctx, src, req.Waypoints, false, forbidden)
 	if err != nil {
 		return nil, err
 	}

@@ -166,3 +166,15 @@ func TestPOITileOfCutsTheWorldOnAGridOfPoiTileZoom(t *testing.T) {
 		})
 	}
 }
+
+func TestAvoidedAreaRefusalsNumberTheAreaAtFault(t *testing.T) {
+	body := []byte(`{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"any","pace":6,` +
+		`"avoidedAreas":[{"center":[6.15,45.9],"radius":400},{"center":[6.1296,45.8993],"radius":400}]}`)
+
+	_, err := ParseCriteria(body, true)
+
+	var ce *CriteriaError
+	if !errors.As(err, &ce) || ce.Field != "avoidedAreas" || ce.Area != 2 {
+		t.Errorf("err = %#v, want a CriteriaError on avoidedAreas naming area 2", err)
+	}
+}

@@ -24,7 +24,7 @@ type fakeLooper struct {
 	loopCalls   int
 }
 
-func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.Point, _ []engine.Point, _ []engine.Circle) (*engine.Route, error) {
+func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.DirectLoopRequest) (*engine.Route, error) {
 	f.directCalls++
 	return f.direct, f.directErr
 }

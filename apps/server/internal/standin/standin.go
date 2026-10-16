@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/lesloi/path-finder/apps/server/engine"
+	"github.com/lesloi/path-finder/apps/server/geo"
 )
 
 // Start is the point the route scenarios start from, as longitude and latitude.
@@ -33,7 +34,7 @@ type Files struct {
 // from column technicalFrom on are tagged technical, so that a route set with and without them differs.
 func Write(dir string) (Files, error) {
 	var b engine.Builder
-	const metresPerDegree = 111194.9
+	const metresPerDegree = geo.MetersPerDegree
 	cosLat := math.Cos(Start[1] * math.Pi / 180)
 	at := func(x, y int) int { return y*side + x }
 	for y := 0; y < side; y++ {

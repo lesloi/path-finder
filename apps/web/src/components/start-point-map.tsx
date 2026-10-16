@@ -7,6 +7,7 @@ import {
   type GeoJSONSource,
   type MapMouseEvent,
   type MapTouchEvent,
+  type PopupOptions,
   type SymbolLayerSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -150,6 +151,9 @@ const PIN_BUBBLE_OFFSET = {
 // A default that keeps its identity, so that the markers are not drawn again on every render.
 const NO_WAYPOINTS: Position[] = [];
 const NO_AREAS: AvoidedArea[] = [];
+
+// The bubble of an avoided area opens above its badge, which is centred on the point.
+const AREA_BUBBLE_OFFSET = 16;
 
 const poiLayerId = (category: PoiCategory) => `pois-${category}`;
 const point = (position: Position) => ({ type: 'Point' as const, coordinates: position });
@@ -705,6 +709,50 @@ export function StartPointMap({
   // button to remove it. The marker's own events stop here, as MapLibre would hear them as the map's: a click that
   // closes the bubble, or adds a waypoint, and a press that starts a long press.
   // A change keeps the markers before the first one that moved, and an open bubble with them.
+  // The button of a marker, which brings the focus and the keyboard with it: tapping it opens a bubble with a button to
+  // remove what the marker stands for. Its own events stop here, as the map would hear them as its own: a click that
+  // adds a point, a press that starts a long press. `bubbleFor` is the waypoint the bubble belongs to, or -1.
+  const markerButton = useEffectEvent(
+    ({
+      label,
+      at,
+      offset,
+      removeLabel,
+      onRemove,
+      bubbleFor,
+    }: {
+      label: string;
+      at: Position;
+      offset: PopupOptions['offset'];
+      removeLabel: string;
+      onRemove: () => void;
+      bubbleFor: number;
+    }) => {
+      const host = document.createElement('button');
+      host.type = 'button';
+      host.className = 'block cursor-pointer p-0';
+      host.setAttribute('aria-label', label);
+      for (const type of ['mousedown', 'touchstart']) host.addEventListener(type, (event) => event.stopPropagation());
+      host.addEventListener('click', (event) => {
+        event.stopPropagation();
+        closeBubble();
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = removeLabel;
+        remove.className = 'rounded-md px-2 py-1.5 font-semibold text-accent';
+        remove.addEventListener('click', () => {
+          closeBubble();
+          onRemove();
+        });
+        bubbleRef.current = new Popup({ closeButton: false, offset, className: 'waypoint-bubble' })
+          .setLngLat(at)
+          .setDOMContent(remove)
+          .addTo(mapRef.current!);
+        bubbleOn.current = bubbleFor;
+      });
+      return host;
+    },
+  );
   const [pinHosts, setPinHosts] = useState<HTMLElement[]>([]);
   const placed = useRef<{ marker: Marker; host: HTMLElement; waypoint: Position }[]>([]);
   const placedIn = useRef(language);
@@ -728,30 +776,15 @@ export function StartPointMap({
     if (bubbleOn.current >= keep) closeBubble();
     for (const [index, waypoint] of waypoints.slice(keep).entries()) {
       const number = keep + index + 1;
-      // A button, which brings the focus and the keyboard with it.
-      const host = document.createElement('button');
-      host.type = 'button';
-      host.className = 'block cursor-pointer p-0';
-      host.setAttribute('aria-label', criteriaText[language].waypointName(number));
-      host.dataset.waypoint = String(number);
-      for (const type of ['mousedown', 'touchstart']) host.addEventListener(type, (event) => event.stopPropagation());
-      host.addEventListener('click', (event) => {
-        event.stopPropagation();
-        closeBubble();
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.textContent = criteriaText[language].removeWaypoint;
-        remove.className = 'rounded-md px-2 py-1.5 font-semibold text-accent';
-        remove.addEventListener('click', () => {
-          closeBubble();
-          removeWaypoint(number - 1);
-        });
-        bubbleRef.current = new Popup({ closeButton: false, offset: PIN_BUBBLE_OFFSET, className: 'waypoint-bubble' })
-          .setLngLat(waypoint)
-          .setDOMContent(remove)
-          .addTo(map);
-        bubbleOn.current = number - 1;
+      const host = markerButton({
+        label: criteriaText[language].waypointName(number),
+        at: waypoint,
+        offset: PIN_BUBBLE_OFFSET,
+        removeLabel: criteriaText[language].removeWaypoint,
+        onRemove: () => removeWaypoint(number - 1),
+        bubbleFor: number - 1,
       });
+      host.dataset.waypoint = String(number);
       placed.current.push({
         marker: new Marker({ element: host, anchor: 'bottom' }).setLngLat(waypoint).addTo(map),
         host,
@@ -766,30 +799,14 @@ export function StartPointMap({
   const centres = avoidedAreas.map(({ center }) => center.join(','));
   useEffect(() => {
     const map = mapRef.current!;
-    // A button, as the waypoints' pins are: tapping it opens a bubble with a button to remove the area. Its own events
-    // stop here, as the map would hear them as its own: a click that adds a point, a press that starts a long press.
     const markers = avoidedAreas.map(({ center }, index) => {
-      const host = document.createElement('button');
-      host.type = 'button';
-      host.className = 'block cursor-pointer p-0';
-      host.setAttribute('aria-label', criteriaText[language].avoidedAreaName(index + 1));
-      for (const type of ['mousedown', 'touchstart']) host.addEventListener(type, (event) => event.stopPropagation());
-      host.addEventListener('click', (event) => {
-        event.stopPropagation();
-        closeBubble();
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.textContent = criteriaText[language].removeAvoidedArea;
-        remove.className = 'rounded-md px-2 py-1.5 font-semibold text-accent';
-        remove.addEventListener('click', () => {
-          closeBubble();
-          removeArea(index);
-        });
-        bubbleRef.current = new Popup({ closeButton: false, offset: 16, className: 'waypoint-bubble' })
-          .setLngLat(center)
-          .setDOMContent(remove)
-          .addTo(map);
-        bubbleOn.current = -1;
+      const host = markerButton({
+        label: criteriaText[language].avoidedAreaName(index + 1),
+        at: center,
+        offset: AREA_BUBBLE_OFFSET,
+        removeLabel: criteriaText[language].removeAvoidedArea,
+        onRemove: () => removeArea(index),
+        bubbleFor: -1,
       });
       return { host, marker: new Marker({ element: host }).setLngLat(center).addTo(map) };
     });

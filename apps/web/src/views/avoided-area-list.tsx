@@ -2,11 +2,10 @@ import { useEffect } from 'react';
 import { CircleCheck, CirclePlus, X } from 'lucide-react';
 
 import { AVOIDED_AREA_RADIUS, type AvoidedArea } from '../contract/index.ts';
+import { AVOIDED_RADIUS_STEP } from '../core/index.ts';
 import { AvoidedAreaBadge } from '../components/avoided-area-badge.tsx';
 import { hint, tip } from '../components/index.ts';
 import { criteriaText, type Language } from '../i18n/index.ts';
-
-const RADIUS_STEP = 50;
 
 /** The areas routes keep out of, under the waypoints: each has its radius, and can be removed. */
 export function AvoidedAreaList({
@@ -85,7 +84,7 @@ export function AvoidedAreaList({
                 aria-valuetext={t.avoidedAreaRadius(area.radius)}
                 min={AVOIDED_AREA_RADIUS.min}
                 max={AVOIDED_AREA_RADIUS.max}
-                step={RADIUS_STEP}
+                step={AVOIDED_RADIUS_STEP}
                 value={area.radius}
                 onChange={(event) => onResize(index, Number(event.target.value))}
               />

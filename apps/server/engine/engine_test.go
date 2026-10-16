@@ -757,7 +757,7 @@ func TestDirectLoopGoesThroughTheWaypointsByTheCheapestWay(t *testing.T) {
 	e := openTest(t, g, false)
 	start := pointOf(g, at(10, 10))
 
-	r, err := e.DirectLoop(context.Background(), start, []Point{pointOf(g, at(14, 10)), pointOf(g, at(14, 13))}, nil)
+	r, err := e.DirectLoop(context.Background(), DirectLoopRequest{Start: start, Waypoints: []Point{pointOf(g, at(14, 10)), pointOf(g, at(14, 13))}})
 
 	if err != nil {
 		t.Fatal(err)
@@ -775,16 +775,16 @@ func TestDirectLoopErrors(t *testing.T) {
 	start, w := pointOf(g, at(10, 10)), pointOf(g, at(12, 10))
 
 	var we *WaypointError
-	if _, err := e.DirectLoop(context.Background(), start, []Point{w, offset(2300, 1000)}, nil); !errors.As(err, &we) || we.Index != 2 {
+	if _, err := e.DirectLoop(context.Background(), DirectLoopRequest{Start: start, Waypoints: []Point{w, offset(2300, 1000)}}); !errors.As(err, &we) || we.Index != 2 {
 		t.Errorf("waypoint off the graph: err = %v, want a *WaypointError for waypoint 2", err)
 	}
-	if _, err := e.DirectLoop(context.Background(), Point{46, 7}, []Point{w}, nil); !errors.Is(err, ErrOffGraph) || errors.As(err, &we) {
+	if _, err := e.DirectLoop(context.Background(), DirectLoopRequest{Start: Point{46, 7}, Waypoints: []Point{w}}); !errors.Is(err, ErrOffGraph) || errors.As(err, &we) {
 		t.Errorf("start off the graph: err = %v, want ErrOffGraph and no waypoint", err)
 	}
 	g.addNode(2100, 2100, 100) // a way of its own, joined to nothing
 	e = openTest(t, g, false)
 	island := offset(2100, 2100)
-	if _, err := e.DirectLoop(context.Background(), start, []Point{island}, nil); !errors.Is(err, ErrNoRoute) {
+	if _, err := e.DirectLoop(context.Background(), DirectLoopRequest{Start: start, Waypoints: []Point{island}}); !errors.Is(err, ErrNoRoute) {
 		t.Errorf("unreachable waypoint: err = %v, want ErrNoRoute", err)
 	}
 }
