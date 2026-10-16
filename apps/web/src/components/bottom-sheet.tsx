@@ -168,7 +168,12 @@ export function BottomSheet({
       <div
         ref={content}
         inert={folded}
-        className={'flex flex-col gap-3 overflow-y-auto ' + (folded ? 'max-h-0 flex-none' : 'min-h-0')}
+        // The scroll padding is the height of a primary button and its backdrop, which a view may pin to the bottom
+        // (`sticky`): what takes the focus scrolls clear of it, not under it.
+        className={
+          'flex scroll-pb-[calc(var(--spacing-touch)+--spacing(3))] flex-col gap-3 overflow-y-auto ' +
+          (folded ? 'max-h-0 flex-none' : 'min-h-0')
+        }
       >
         {children}
       </div>

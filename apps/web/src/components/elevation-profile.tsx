@@ -112,7 +112,7 @@ export function ElevationProfile({
         </div>
         <div
           data-testid={testId && `${testId}-plot`}
-          className="relative h-24 min-w-0 flex-1 touch-none select-none"
+          className="relative h-24 min-w-0 flex-1 touch-pan-y select-none"
           onPointerDown={(event) => {
             // A drag along the profile is not a swipe to another route.
             event.stopPropagation();
