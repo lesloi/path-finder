@@ -1,6 +1,7 @@
 import type { Criteria, Miss, SurfaceStretch } from '../contract/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
 import type { Position } from './coordinates.ts';
+import { estimatedDuration } from './pace.ts';
 import { formatHeight } from './units.ts';
 
 /** The body of a route set request: the criteria, as `parseCriteria` accepts them. */
@@ -193,15 +194,11 @@ export type WaypointOnRoute = {
   height?: number;
 };
 
-/**
- * Where a route passes each waypoint: the point of the route nearest to it, looked for after the one found for
- * the previous waypoint, so that waypoints keep their order on a route that goes by the same place twice.
- */
-export function waypointsOnRoute(geometry: Route['geometry'], waypoints: Position[]): WaypointOnRoute[] {
-  if (geometry.length === 0) return [];
-  const distances = distancesAlong(geometry);
+// The index of the point of the route nearest to each waypoint, looked for after the one found for the previous
+// waypoint, so that waypoints keep their order on a route that goes by the same place twice.
+function nearestIndexes(geometry: Route['geometry'], waypoints: Position[]): number[] {
   let from = 0;
-  return waypoints.map((waypoint, k) => {
+  return waypoints.map((waypoint) => {
     let nearest = Math.min(from, geometry.length - 1);
     let best = kmBetween(geometry[nearest], waypoint);
     for (let j = nearest + 1; j < geometry.length; j++) {
@@ -209,13 +206,157 @@ export function waypointsOnRoute(geometry: Route['geometry'], waypoints: Positio
       if (km < best) [nearest, best] = [j, km];
     }
     from = nearest + 1;
-    const [lon, lat, height] = geometry[nearest] as [number, number, number?];
+    return nearest;
+  });
+}
+
+/** Where a route passes each waypoint: the point of the route nearest to it, the waypoints keeping their order. */
+export function waypointsOnRoute(geometry: Route['geometry'], waypoints: Position[]): WaypointOnRoute[] {
+  if (geometry.length === 0) return [];
+  const distances = distancesAlong(geometry);
+  return nearestIndexes(geometry, waypoints).map((index, k) => {
+    const [lon, lat, height] = geometry[index] as [number, number, number?];
     return {
       number: k + 1,
-      distance: distances[nearest],
+      distance: distances[index],
       position: [lon, lat],
       ...(height !== undefined && { height }),
     };
+  });
+}
+
+/** A stop of the route's timeline: its start, a waypoint as the route passes it, its highest or lowest point, or its finish. */
+export type TimelineStep = {
+  kind: 'start' | 'waypoint' | 'summit' | 'lowest' | 'finish';
+  /** The waypoint's number, from 1, as on the map. */
+  number?: number;
+  /** Kilometres from the start. */
+  distance: number;
+  /** Metres, when the route has heights. */
+  height?: number;
+  /** Minutes since the start, at `pace` and with the effort of the climb, as the estimated duration is. */
+  elapsed: number;
+  /** The stretch from the previous stop to this one. The start has none. The legs add up to the route's figures. */
+  leg?: { distance: number; /** Minutes. */ duration: number; climb?: number; descent?: number };
+};
+
+// The dead band of the API's count of the climb and the descent, in metres: copied here, as the API sends no figure for
+// each stretch. `endedOn` makes up for any drift.
+const DEAD_BAND = 2;
+
+// The climb and the descent up to each of the points at `wanted` (ascending indexes), counted on the same heights as
+// the API does.
+function climbsAndDescentsAt(points: number[][], wanted: number[]): { climbs: number[]; descents: number[] } {
+  let [up, down, ref] = [0, 0, points[0][2]];
+  const climbs: number[] = [];
+  const descents: number[] = [];
+  let next = 0;
+  for (let k = 0; next < wanted.length && k < points.length; k++) {
+    const z = points[k][2];
+    if (Math.abs(z - ref) >= DEAD_BAND) {
+      if (z > ref) up += z - ref;
+      else down += ref - z;
+      ref = z;
+    }
+    for (; wanted[next] === k; next++) {
+      climbs.push(up);
+      descents.push(down);
+    }
+  }
+  return { climbs, descents };
+}
+
+// The totals at each stop, scaled so that the last is the API's figure: the sum over the points can only approach it,
+// and the descent, which the API counts backwards, is not the one counted forwards. Its gap is spread over the legs
+// rather than put on the last, unless nothing was counted to spread it over.
+function endedOn(counted: number[], total: number | undefined): number[] {
+  const last = counted.length - 1;
+  if (total === undefined) return counted;
+  if (counted[last] === 0) return counted.map((value, i) => (i === last ? total : value));
+  return counted.map((value) => (value * total) / counted[last]!);
+}
+
+// A highest or lowest point that is less than this above or below both the start and the finish is not worth a stop.
+const EXTREME_MIN_GAP = 20;
+
+// The index of the highest point (`sign` 1) or the lowest (-1), or undefined when it is the start or the finish or is
+// not far enough from them.
+function extremeIndex(points: number[][], sign: 1 | -1): number | undefined {
+  let best = 0;
+  for (let k = 1; k < points.length; k++) if (sign * points[k][2] > sign * points[best][2]) best = k;
+  const ends = sign === 1 ? Math.max(points[0][2], points.at(-1)![2]) : Math.min(points[0][2], points.at(-1)![2]);
+  return best === 0 || best === points.length - 1 || sign * (points[best][2] - ends) < EXTREME_MIN_GAP
+    ? undefined
+    : best;
+}
+
+/**
+ * The start, the waypoints in order and the finish of a route, each with the distance, height and time since the
+ * start, and the leg that ends there. The highest and lowest points of the route join them when they stand out
+ * from the start and the finish.
+ */
+export function routeTimeline(route: Route, waypoints: Position[], pace: number): TimelineStep[] {
+  const { geometry } = route;
+  if (geometry.length === 0) return [];
+  const distances = distancesAlong(geometry);
+  const hasHeights = geometry[0].length >= 3;
+  const stopsAlong: [TimelineStep['kind'], number, number?][] = nearestIndexes(geometry, waypoints).map((index, k) => [
+    'waypoint',
+    index,
+    k + 1,
+  ]);
+  if (hasHeights) {
+    const extremes: [TimelineStep['kind'], number | undefined][] = [
+      ['summit', extremeIndex(geometry, 1)],
+      ['lowest', extremeIndex(geometry, -1)],
+    ];
+    // Not where a waypoint already stands: it says as much.
+    for (const [kind, index] of extremes) {
+      if (index !== undefined && !stopsAlong.some(([, k]) => k === index)) stopsAlong.push([kind, index]);
+    }
+  }
+  // Waypoints are already in the order of the route, and the sort keeps it.
+  const indexes: [TimelineStep['kind'], number, number?][] = [
+    ['start', 0],
+    ...stopsAlong.sort(([, a], [, b]) => a - b),
+    ['finish', geometry.length - 1],
+  ];
+
+  const counted = hasHeights
+    ? climbsAndDescentsAt(
+        geometry,
+        indexes.map(([, k]) => k),
+      )
+    : undefined;
+  const climbs = counted && endedOn(counted.climbs, route.elevationGain);
+  const descents = counted && endedOn(counted.descents, route.elevationLoss);
+  // The time is scaled in the same way, so that no leg takes less than nothing.
+  const elapsedAt = indexes.map(([, k], i) =>
+    estimatedDuration({ distance: distances[k], elevationGain: climbs?.[i] }, pace),
+  );
+  const timeScale = elapsedAt.at(-1)! > 0 ? route.estimatedDuration / elapsedAt.at(-1)! : 1;
+
+  const stops = indexes.map(([kind, k, number], i): TimelineStep => {
+    const height = (geometry[k] as [number, number, number?])[2];
+    return {
+      kind,
+      ...(number !== undefined && { number }),
+      distance: distances[k],
+      ...(height !== undefined && { height }),
+      elapsed: elapsedAt[i]! * timeScale,
+    };
+  });
+  return stops.map((stop, i) => {
+    if (i === 0) return stop;
+    const leg: NonNullable<TimelineStep['leg']> = {
+      distance: stop.distance - stops[i - 1]!.distance,
+      duration: stop.elapsed - stops[i - 1]!.elapsed,
+    };
+    if (climbs && descents) {
+      leg.climb = climbs[i]! - climbs[i - 1]!;
+      leg.descent = descents[i]! - descents[i - 1]!;
+    }
+    return { ...stop, leg };
   });
 }
 
