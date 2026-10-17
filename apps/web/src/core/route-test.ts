@@ -15,6 +15,7 @@ import {
   projectRoute,
   gradeAt,
   surfaceAt,
+  routeTimeline,
   waypointsOnRoute,
   type MapSnapshot,
   type ProfilePoint,
@@ -445,5 +446,144 @@ describe('waypointsOnRoute', () => {
 
     expect(waypointsOnRoute(flat, [near(2)])[0]).not.toHaveProperty('height');
     expect(waypointsOnRoute(geometry, [])).toEqual([]);
+  });
+});
+
+describe('routeTimeline', () => {
+  // Points 100 m apart, due north, climbing 10 m each then dropping: 0, 0.1, ... 0.5 km.
+  const geometry = northward([400, 410, 420, 415, 425, 425]);
+  const at = (k: number): Position => [geometry[k][0], geometry[k][1]];
+  const timelineRoute: Route = { ...route, geometry, distance: 0.5, elevationGain: 30, estimatedDuration: 6 };
+
+  it('lists the start, the waypoints in order and the finish, with the distance and the height at each', () => {
+    const steps = routeTimeline(timelineRoute, [at(2), at(4)], 6);
+
+    expect(steps.map(({ kind, number }) => [kind, number])).toEqual([
+      ['start', undefined],
+      ['waypoint', 1],
+      ['waypoint', 2],
+      ['finish', undefined],
+    ]);
+    expect(steps.map(({ height }) => height)).toEqual([400, 420, 425, 425]);
+    expect(steps[1]!.distance).toBeCloseTo(0.2, 2);
+    expect(steps[3]!.distance).toBeCloseTo(0.5, 2);
+  });
+
+  it('adds the effort of the climb to the time, and ends on the estimated duration', () => {
+    const steps = routeTimeline({ ...timelineRoute, estimatedDuration: 8 }, [at(2)], 10);
+
+    // 0.2 km and 20 m of climb, at 100 m of climb per km of effort: 0.4 km of effort at 10 min/km.
+    expect(steps[1]!.elapsed).toBeCloseTo(4, 1);
+    expect(steps.at(-1)!.elapsed).toBe(8);
+  });
+
+  it('leaves the heights and the climb out of a route without heights', () => {
+    const flat = { ...timelineRoute, geometry: geometry.map(([lon, lat]) => [lon, lat] as [number, number]) };
+    delete flat.elevationGain;
+
+    const [start, , finish] = routeTimeline(flat, [at(2)], 6);
+
+    expect(start).not.toHaveProperty('height');
+    expect(finish!.leg).not.toHaveProperty('climb');
+  });
+
+  it('gives each stop the distance, the climb (counted as the server does, a drop within the dead band ignored) and the descent of the leg that ends there', () => {
+    // Heights 400 410 420 415 425 425: the drop of 5 m counts as descent.
+    const steps = routeTimeline({ ...timelineRoute, elevationLoss: 5 }, [at(2), at(4)], 6);
+
+    expect(steps[0]).not.toHaveProperty('leg');
+    expect(steps.slice(1).map(({ leg }) => leg!.climb)).toEqual([20, 10, 0]);
+    expect(steps.slice(1).map(({ leg }) => leg!.descent)).toEqual([0, 5, 0]);
+    expect(steps.slice(1).reduce((km, { leg }) => km + leg!.distance, 0)).toBeCloseTo(0.5, 2);
+  });
+
+  it('spreads the gap to the route elevation loss over the legs, not onto the last one', () => {
+    // The forward count is 5 m, all on the second leg: a loss of 10 m doubles it.
+    const steps = routeTimeline({ ...timelineRoute, elevationLoss: 10 }, [at(2), at(4)], 6);
+
+    expect(steps.slice(1).map(({ leg }) => leg!.descent)).toEqual([0, 10, 0]);
+  });
+
+  it('puts the loss on the last leg when the forward count found none', () => {
+    const rising = northward([400, 410, 420, 430, 440, 450]);
+
+    const steps = routeTimeline({ ...timelineRoute, geometry: rising, elevationLoss: 4 }, [at(2)], 6);
+
+    expect(steps.map(({ leg }) => leg?.descent)).toEqual([undefined, 0, 4]);
+  });
+
+  it('never gives a leg a negative time, whatever duration the route was estimated at', () => {
+    const steps = routeTimeline({ ...timelineRoute, estimatedDuration: 1 }, [at(2), at(4)], 6);
+
+    expect(steps.slice(1).every(({ leg }) => leg!.duration >= 0)).toBe(true);
+    expect(steps.at(-1)!.elapsed).toBe(1);
+  });
+
+  it('gives each leg its time, summing to the estimated duration', () => {
+    const steps = routeTimeline({ ...timelineRoute, estimatedDuration: 7 }, [at(2)], 6);
+
+    // 2.4 of the 4.8 minutes the points make up, scaled to the 7 minutes of the route.
+    expect(steps[1]!.leg!.duration).toBeCloseTo(3.5, 1);
+    expect(steps.slice(1).reduce((minutes, { leg }) => minutes + leg!.duration, 0)).toBeCloseTo(7, 5);
+  });
+
+  it('ends the descent on the route elevation loss, which the sum over the points only approaches', () => {
+    const steps = routeTimeline({ ...timelineRoute, elevationLoss: 9 }, [at(2)], 6);
+
+    expect(steps.slice(1).reduce((loss, { leg }) => loss + leg!.descent!, 0)).toBe(9);
+  });
+
+  it('leaves the climb and the descent out of the legs of a route without heights', () => {
+    const flat = { ...timelineRoute, geometry: geometry.map(([lon, lat]) => [lon, lat] as [number, number]) };
+
+    const [, finish] = routeTimeline(flat, [], 6);
+
+    expect(finish!.leg).not.toHaveProperty('climb');
+    expect(finish!.leg).not.toHaveProperty('descent');
+  });
+
+  it('lists the start and the finish for a route without waypoints, and its highest point between them', () => {
+    const steps = routeTimeline({ ...timelineRoute, geometry: northward([400, 410, 440, 420, 405]) }, [], 6);
+
+    expect(steps.map(({ kind }) => kind)).toEqual(['start', 'summit', 'finish']);
+    expect(steps[1]).toMatchObject({ height: 440 });
+    expect(steps[1]!.distance).toBeCloseTo(0.2, 2);
+  });
+
+  it('adds the lowest point too, in the order of the route, when it falls 20 m below the start and the finish', () => {
+    const steps = routeTimeline({ ...timelineRoute, geometry: northward([420, 400, 450, 380, 430]) }, [], 6);
+
+    expect(steps.map(({ kind }) => kind)).toEqual(['start', 'summit', 'lowest', 'finish']);
+    expect(steps[2]).toMatchObject({ height: 380 });
+  });
+
+  it('has no lowest point that falls less than 20 m below the start and the finish', () => {
+    const steps = routeTimeline({ ...timelineRoute, geometry: northward([420, 410, 450, 405, 430]) }, [], 6);
+
+    expect(steps.map(({ kind }) => kind)).toEqual(['start', 'summit', 'finish']);
+  });
+
+  it('has no highest point that rises less than 20 m above the start and the finish', () => {
+    const steps = routeTimeline({ ...timelineRoute, geometry: northward([400, 410, 419, 405, 400]) }, [], 6);
+
+    expect(steps.map(({ kind }) => kind)).toEqual(['start', 'finish']);
+  });
+
+  it('has no highest point when it is the start or the finish', () => {
+    const steps = routeTimeline({ ...timelineRoute, geometry: northward([400, 410, 420]) }, [], 6);
+
+    expect(steps.map(({ kind }) => kind)).toEqual(['start', 'finish']);
+  });
+
+  it('puts the highest point among the waypoints in the order of the route', () => {
+    const steps = routeTimeline({ ...timelineRoute, geometry: northward([400, 440, 420, 405]) }, [at(2)], 6);
+
+    expect(steps.map(({ kind }) => kind)).toEqual(['start', 'summit', 'waypoint', 'finish']);
+  });
+
+  it('leaves out an extreme point that a waypoint already stands on', () => {
+    const steps = routeTimeline({ ...timelineRoute, geometry: northward([400, 440, 420, 405]) }, [at(1)], 6);
+
+    expect(steps.map(({ kind }) => kind)).toEqual(['start', 'waypoint', 'finish']);
   });
 });

@@ -6,6 +6,10 @@ import { formatDistance, formatDuration, formatHeight, type Route } from '../cor
 import type { Language } from '../i18n/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
 
+// The icons of a climb and of a descent, in the figures and wherever else they are shown.
+export const CLIMB_ICON = ArrowUpRight;
+export const DESCENT_ICON = ArrowDownRight;
+
 /** The distance, duration, climb and descent of a route. `className` sizes it in its container. */
 export function RouteFigures({
   route,
@@ -26,12 +30,12 @@ export function RouteFigures({
         {formatDuration(route.estimatedDuration, language)}
       </Figure>
       {route.elevationGain !== undefined && (
-        <Figure label={t.climb} testId="route-climb" icon={<ArrowUpRight size={16} aria-hidden />}>
+        <Figure label={t.climb} testId="route-climb" icon={<CLIMB_ICON size={16} aria-hidden />}>
           {formatHeight(route.elevationGain, language)}
         </Figure>
       )}
       {route.elevationLoss !== undefined && (
-        <Figure label={t.descent} testId="route-descent" icon={<ArrowDownRight size={16} aria-hidden />}>
+        <Figure label={t.descent} testId="route-descent" icon={<DESCENT_ICON size={16} aria-hidden />}>
           {formatHeight(route.elevationLoss, language)}
         </Figure>
       )}
