@@ -122,10 +122,10 @@ export function RouteTimeline({
                 <span className="flex min-w-0 flex-col text-sm">
                   {name && <strong className="truncate">{name}</strong>}
                   <span className="text-ink-2">
-                    {/* The start is at no distance: nothing to say of it but where it is. */}
+                    {/* The start is at no distance and no time: nothing to say of it but where it is. */}
                     {step.kind !== 'start' && (
                       <>
-                        km {oneDecimal(language).format(step.distance)}
+                        km {oneDecimal(language).format(step.distance)} · {formatDuration(step.elapsed, language)}
                         {step.height !== undefined && ' · '}
                       </>
                     )}
