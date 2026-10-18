@@ -4,6 +4,7 @@ import {
   elevationProfile,
   missText,
   parseRoutes,
+  reverseRoute,
   projectOnSnapshot,
   toMercator,
   positionAt,
@@ -585,5 +586,90 @@ describe('routeTimeline', () => {
     const steps = routeTimeline({ ...timelineRoute, geometry: northward([400, 440, 420, 405]) }, [at(1)], 6);
 
     expect(steps.map(({ kind }) => kind)).toEqual(['start', 'waypoint', 'finish']);
+  });
+});
+
+describe('reverseRoute', () => {
+  const geometry = northward([400, 410, 420, 415, 425, 425]);
+  const original: Route = {
+    ...route,
+    geometry,
+    distance: 0.5,
+    elevationGain: 30,
+    elevationLoss: 5,
+    estimatedDuration: 6,
+    surfaces: [
+      { surface: 'paved', from: 0, to: 0.2 },
+      { surface: 'unpaved', from: 0.2, to: 0.5 },
+    ],
+    unpavedShare: 0.6,
+  };
+
+  it('runs the route the other way: the points reversed, the climb and the descent swapped', () => {
+    const reversed = reverseRoute(original, 6);
+
+    expect(reversed.geometry).toEqual([...geometry].reverse());
+    expect(reversed.elevationGain).toBe(5);
+    expect(reversed.elevationLoss).toBe(30);
+    expect(reversed.distance).toBe(0.5);
+    expect(reversed.unpavedShare).toBe(0.6);
+  });
+
+  it('turns the surface stretches round, keeping them in order', () => {
+    const { surfaces } = reverseRoute(original, 6);
+
+    expect(surfaces.map(({ surface }) => surface)).toEqual(['unpaved', 'paved']);
+    expect(surfaces[0]!.from).toBeCloseTo(0, 5);
+    expect(surfaces[0]!.to).toBeCloseTo(0.3, 5);
+    expect(surfaces[1]!.from).toBeCloseTo(0.3, 5);
+    expect(surfaces[1]!.to).toBeCloseTo(0.5, 5);
+  });
+
+  it('estimates the duration again from the new climb, and moves the gaps with the figures', () => {
+    const suggestion: Route = {
+      ...original,
+      kind: 'suggestion',
+      misses: [{ criterion: 'elevationGain', gap: 10 }],
+    };
+
+    const reversed = reverseRoute(suggestion, 6);
+
+    // 0.5 km and 5 m of climb, at 100 m of climb per km of effort.
+    expect(reversed.estimatedDuration).toBeCloseTo((0.5 + 0.05) * 6, 5);
+    expect(reversed.misses).toEqual([{ criterion: 'elevationGain', gap: 10 - 25 }]);
+  });
+
+  it('leaves a route without heights as it is, but turned round', () => {
+    const flat: Route = { ...original, geometry: geometry.map(([lon, lat]): [number, number] => [lon, lat]) };
+    delete flat.elevationGain;
+    delete flat.elevationLoss;
+
+    const reversed = reverseRoute(flat, 6);
+
+    expect(reversed).not.toHaveProperty('elevationGain');
+    expect(reversed.geometry[0]).toEqual([geometry.at(-1)![0], geometry.at(-1)![1]]);
+  });
+
+  it('gives the original back when reversed twice', () => {
+    const twice = reverseRoute(reverseRoute(original, 6), 6);
+
+    expect(twice.geometry).toEqual(original.geometry);
+    expect(twice.elevationGain).toBe(original.elevationGain);
+    expect(twice.elevationLoss).toBe(original.elevationLoss);
+    expect(twice.surfaces[0]!.to).toBeCloseTo(0.2, 5);
+    expect(twice.reversed).toBeUndefined();
+  });
+
+  it('keeps the waypoints numbered as on the map, in the order they are met on the way back', () => {
+    const at = (k: number): Position => [geometry[k][0], geometry[k][1]];
+    const reversed = reverseRoute(original, 6);
+
+    const onRoute = waypointsOnRoute(reversed.geometry, [at(1), at(3)], reversed.reversed);
+    const steps = routeTimeline(reversed, [at(1), at(3)], 6).filter(({ kind }) => kind === 'waypoint');
+
+    expect(onRoute.map(({ number }) => number)).toEqual([1, 2]);
+    expect(onRoute[0]!.distance).toBeCloseTo(0.4, 2);
+    expect(onRoute[1]!.distance).toBeCloseTo(0.2, 2);
+    expect(steps.map(({ number }) => number)).toEqual([2, 1]);
   });
 });

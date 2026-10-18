@@ -1,4 +1,4 @@
-import { Download, X } from 'lucide-react';
+import { ArrowLeftRight, Download, X } from 'lucide-react';
 
 import { DOCK, ElevationProfile, ICON_BUTTON, PRIMARY_BUTTON, tip } from '../components/index.ts';
 import { exportRoute, missText, type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
@@ -18,6 +18,7 @@ export function RouteDock({
   index,
   count,
   onClose,
+  onReverse,
   onHover,
   waypoints,
   waypointPois,
@@ -31,6 +32,7 @@ export function RouteDock({
   index: number;
   count: number;
   onClose: () => void;
+  onReverse: () => void;
   onHover: (position: Position | undefined) => void;
   /** The points the route was asked to go through, shown on its profile and kept in its GPX file. */
   waypoints?: Position[] | undefined;
@@ -44,7 +46,18 @@ export function RouteDock({
       aria-label={t.route(index + 1, count)}
     >
       <div className="flex w-52 flex-none flex-col gap-2">
-        <strong data-testid="route-position">{t.route(index + 1, count)}</strong>
+        <div className="flex items-center justify-between gap-2">
+          <strong data-testid="route-position">{t.route(index + 1, count)}</strong>
+          <button
+            type="button"
+            data-testid="route-reverse"
+            className={ICON_BUTTON}
+            {...tip(t.reverseRoute, 'bottom-end')}
+            onClick={onReverse}
+          >
+            <ArrowLeftRight size={18} aria-hidden />
+          </button>
+        </div>
         {/* Centred in the room above the export. */}
         <div className="flex flex-1 flex-col justify-center">
           <RouteFigures route={route} language={language} />

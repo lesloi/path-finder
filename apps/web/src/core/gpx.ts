@@ -16,6 +16,8 @@ export type GpxRoute = {
   elevationGain?: number;
   /** Minutes. */
   estimatedDuration: number;
+  /** Whether the route is run the other way, which changes the order its waypoints are met in. */
+  reversed?: boolean | undefined;
 };
 
 // Cycling (#131) will be a travel mode that chooses this; only running is generated for now.
@@ -53,7 +55,7 @@ export function gpxExport(
   const points = simplify(route.geometry, MAX_GPX_POINTS).map(trackPoint).join('\n');
   const climb = route.elevationGain === undefined ? [] : [`+${formatHeight(route.elevationGain, language)}`];
   const description = `${[...climb, duration].join(' · ')} (${formatPace(pace, paceUnit, language)})`;
-  const waypointPoints = waypointsOnRoute(route.geometry, waypoints)
+  const waypointPoints = waypointsOnRoute(route.geometry, waypoints, route.reversed)
     .map(({ number, position: [lon, lat], height }) => {
       const poi = waypointPoiAt(waypointPois, waypoints[number - 1]!);
       const label = poi ? poiLabel(poi, language) : criteriaText[language].waypointName(number);

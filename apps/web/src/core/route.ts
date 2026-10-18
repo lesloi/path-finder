@@ -28,6 +28,8 @@ export type Route = {
   surfaces: SurfaceStretch[];
   /** Holds a technical stretch: a way where the hands, ropes or chains are needed. */
   technical: boolean;
+  /** Set once the user runs the route the other way: its waypoints are met from the last to the first. */
+  reversed?: true;
 };
 
 /** A sample of the elevation profile: kilometres from the start, and the height there in metres. */
@@ -196,7 +198,9 @@ export type WaypointOnRoute = {
 
 // The index of the point of the route nearest to each waypoint, looked for after the one found for the previous
 // waypoint, so that waypoints keep their order on a route that goes by the same place twice.
-function nearestIndexes(geometry: Route['geometry'], waypoints: Position[]): number[] {
+function nearestIndexes(geometry: Route['geometry'], waypoints: Position[], reversed = false): number[] {
+  // A route run the other way meets the last waypoint first.
+  if (reversed) return nearestIndexes(geometry, [...waypoints].reverse()).reverse();
   let from = 0;
   return waypoints.map((waypoint) => {
     let nearest = Math.min(from, geometry.length - 1);
@@ -211,10 +215,14 @@ function nearestIndexes(geometry: Route['geometry'], waypoints: Position[]): num
 }
 
 /** Where a route passes each waypoint: the point of the route nearest to it, the waypoints keeping their order. */
-export function waypointsOnRoute(geometry: Route['geometry'], waypoints: Position[]): WaypointOnRoute[] {
+export function waypointsOnRoute(
+  geometry: Route['geometry'],
+  waypoints: Position[],
+  reversed = false,
+): WaypointOnRoute[] {
   if (geometry.length === 0) return [];
   const distances = distancesAlong(geometry);
-  return nearestIndexes(geometry, waypoints).map((index, k) => {
+  return nearestIndexes(geometry, waypoints, reversed).map((index, k) => {
     const [lon, lat, height] = geometry[index] as [number, number, number?];
     return {
       number: k + 1,
@@ -300,11 +308,9 @@ export function routeTimeline(route: Route, waypoints: Position[], pace: number)
   if (geometry.length === 0) return [];
   const distances = distancesAlong(geometry);
   const hasHeights = geometry[0].length >= 3;
-  const stopsAlong: [TimelineStep['kind'], number, number?][] = nearestIndexes(geometry, waypoints).map((index, k) => [
-    'waypoint',
-    index,
-    k + 1,
-  ]);
+  const stopsAlong: [TimelineStep['kind'], number, number?][] = nearestIndexes(geometry, waypoints, route.reversed).map(
+    (index, k) => ['waypoint', index, k + 1],
+  );
   if (hasHeights) {
     const extremes: [TimelineStep['kind'], number | undefined][] = [
       ['summit', extremeIndex(geometry, 1)],
@@ -358,6 +364,33 @@ export function routeTimeline(route: Route, waypoints: Position[], pace: number)
     }
     return { ...stop, leg };
   });
+}
+
+/**
+ * The route run the other way, as the user asks to: the same ways from the finish back to the start, with the climb and
+ * the descent swapped. The duration is estimated again at `pace`, and the gaps of a suggestion move with the figures
+ * they measure. Reversing twice gives the route back.
+ */
+export function reverseRoute(route: Route, pace: number): Route {
+  const { reversed, elevationGain, elevationLoss, surfaces, ...rest } = route;
+  const total = surfaces.at(-1)?.to ?? route.distance;
+  const turned: Route = {
+    ...rest,
+    geometry: [...route.geometry].reverse() as Route['geometry'],
+    surfaces: surfaces.map(({ surface, from, to }) => ({ surface, from: total - to, to: total - from })).reverse(),
+    ...(elevationLoss !== undefined && { elevationGain: elevationLoss }),
+    ...(elevationGain !== undefined && { elevationLoss: elevationGain }),
+    ...(!reversed && { reversed: true as const }),
+  };
+  turned.estimatedDuration = estimatedDuration(turned, pace);
+  const gapShift = (criterion: Miss['criterion']) =>
+    criterion === 'duration'
+      ? turned.estimatedDuration - route.estimatedDuration
+      : criterion === 'elevationGain'
+        ? (turned.elevationGain ?? 0) - (elevationGain ?? 0)
+        : 0;
+  turned.misses = route.misses.map(({ criterion, gap }) => ({ criterion, gap: gap + gapShift(criterion) }));
+  return turned;
 }
 
 /** The position halfway along the route: the far side of a loop. */
