@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpRight, ChevronRight, Clock, Download, Mountain, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, ArrowUpRight, ChevronRight, Clock, Download, Mountain, Trash2 } from 'lucide-react';
 import { useRef, type PointerEvent } from 'react';
 
 import {
@@ -35,6 +35,8 @@ const SWIPE_PX = 50;
 /** The box of a route's row; the placeholder of the results draws the same. */
 export const ROUTE_ROW_BOX = 'flex min-h-13 w-full flex-col gap-2 rounded-md border border-l-4 border-border p-2';
 
+const TEXT_BUTTON = 'flex min-h-touch items-center gap-1 rounded-full px-2 text-sm text-accent hover:bg-surface-2';
+
 // The words of the route set: its own, and the labels it shares with the criteria.
 const words = (language: Language) => ({ ...criteriaText[language], ...routesText[language] });
 
@@ -59,6 +61,7 @@ export function RouteSetView({
   onDetailChange,
   onPaceChange,
   onClear,
+  onReverse,
   onHover,
   waypoints,
   waypointPois,
@@ -81,6 +84,8 @@ export function RouteSetView({
   /** Absent when the pace cannot change the routes' durations alone, such as by duration. */
   onPaceChange?: (pace: number) => void;
   onClear: () => void;
+  /** The user asks to run the route at this index the other way. */
+  onReverse: (index: number) => void;
   onHover: (position: Position | undefined) => void;
   /** The points the routes were asked to go through, shown on the profile of a route and kept in its GPX file. */
   waypoints?: Position[] | undefined;
@@ -99,6 +104,7 @@ export function RouteSetView({
         selected={selected ?? 0}
         onSelect={onSelect}
         onBack={() => onDetailChange(false)}
+        onReverse={() => onReverse(selected ?? 0)}
         onHover={onHover}
         waypoints={waypoints}
         waypointPois={waypointPois}
@@ -137,12 +143,7 @@ export function RouteSetView({
             {t.route(selected + 1, routes.length)}
           </span>
         )}
-        <button
-          type="button"
-          data-testid="routes-clear"
-          className="ml-auto flex min-h-touch items-center gap-1 rounded-full px-2 text-sm text-accent hover:bg-surface-2"
-          onClick={onClear}
-        >
+        <button type="button" data-testid="routes-clear" className={`${TEXT_BUTTON} ml-auto`} onClick={onClear}>
           <Trash2 size={18} aria-hidden />
           {t.clearRoutes}
         </button>
@@ -275,6 +276,7 @@ function RouteDetail({
   selected,
   onSelect,
   onBack,
+  onReverse,
   onHover,
   waypoints,
   waypointPois,
@@ -288,6 +290,7 @@ function RouteDetail({
   selected: number;
   onSelect: (index: number) => void;
   onBack: () => void;
+  onReverse: () => void;
   onHover: (position: Position | undefined) => void;
   waypoints?: Position[] | undefined;
   waypointPois?: WaypointPois | undefined;
@@ -330,6 +333,10 @@ function RouteDetail({
         >
           <ArrowLeft size={18} aria-hidden />
           {t.routes}
+        </button>
+        <button type="button" data-testid="route-reverse" className={TEXT_BUTTON} onClick={onReverse}>
+          <ArrowLeftRight size={18} aria-hidden />
+          {t.reverseRoute}
         </button>
         <strong data-testid="route-position" aria-label={t.route(selected + 1, routes.length)}>
           {selected + 1}/{routes.length}

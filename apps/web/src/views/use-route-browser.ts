@@ -18,6 +18,8 @@ export function useRouteBrowser() {
   // The stop of the phone's sheet: folded down to its handle to see more of the map, or expanded for the detail.
   const [sheet, setSheet] = useState<SheetState>('collapsed');
   const [hover, setHover] = useState<Position>();
+  // The routes the user runs the other way, by their place in the route set.
+  const [reversed, setReversed] = useState<ReadonlySet<number>>(new Set());
   const [mapSnapshot, setSnapshot] = useState<MapSnapshot>();
   // Kept while the route set does, so the map's effects only run for a new one.
   const geometries = useMemo(
@@ -48,6 +50,16 @@ export function useRouteBrowser() {
     detail: sheet === 'expanded',
     hover,
     geometries,
+    reversed,
+    toggleReversed: (index: number) => {
+      // The place pointed at belongs to the profile of the other direction.
+      setHover(undefined);
+      setReversed((current) => {
+        const next = new Set(current);
+        if (!next.delete(index)) next.add(index);
+        return next;
+      });
+    },
     select: setSelected,
     setPreview,
     setHover,
@@ -56,12 +68,14 @@ export function useRouteBrowser() {
       setRefusal(undefined);
       setSelected(undefined);
       setPreview(undefined);
+      setReversed(new Set());
       setSheet('collapsed');
       find(request);
     },
     /** Forgets the route set, and any search under way, such as when a new start point makes it stale. */
     drop() {
       clear();
+      setReversed(new Set());
       setSelected(undefined);
       setPreview(undefined);
       setSheet('collapsed');
