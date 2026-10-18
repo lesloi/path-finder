@@ -58,6 +58,7 @@ function View({
   onHover = () => {},
   onPaceChange,
   onClear = () => {},
+  onReverse = () => {},
   pace = 6,
   open = false,
   waypoints,
@@ -70,6 +71,7 @@ function View({
   onHover?: (position: unknown) => void;
   onPaceChange?: (pace: number) => void;
   onClear?: () => void;
+  onReverse?: (index: number) => void;
   pace?: number;
   open?: boolean;
   waypoints?: [number, number][];
@@ -92,6 +94,7 @@ function View({
       onDetailChange={setDetail}
       onPaceChange={onPaceChange}
       onClear={onClear}
+      onReverse={onReverse}
       onHover={onHover}
       {...(waypoints && { waypoints })}
     />
@@ -406,6 +409,15 @@ describe('RouteSetView', () => {
       );
     });
 
+    it('mentions the technical stretches of the opened route, and only those', () => {
+      const { unmount } = render(<View list={[route({ technical: true })]} open />);
+      expect(screen.getByTestId('route-technical')).toHaveTextContent(en.technical);
+      unmount();
+
+      render(<View list={[route()]} open />);
+      expect(screen.queryByTestId('route-technical')).not.toBeInTheDocument();
+    });
+
     it('puts the distance and the estimated duration side by side, then the climb and the descent', () => {
       open();
 
@@ -518,6 +530,15 @@ describe('RouteSetView', () => {
 
         expect(onSelect).toHaveBeenCalledWith(1);
       });
+    });
+
+    it('runs the route the other way from its button', () => {
+      const onReverse = vi.fn();
+      render(<View open onReverse={onReverse} />);
+
+      fireEvent.click(screen.getByTestId('route-reverse'));
+
+      expect(onReverse).toHaveBeenCalledWith(0);
     });
 
     describe('the GPX export', () => {

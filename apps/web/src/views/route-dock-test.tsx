@@ -33,6 +33,7 @@ function dock(language: 'en' | 'fr' = 'en', props: Partial<Parameters<typeof Rou
       index={1}
       count={3}
       onClose={() => {}}
+      onReverse={() => {}}
       onHover={() => {}}
       {...props}
     />,
@@ -46,9 +47,18 @@ describe('RouteDock', () => {
     expect(screen.getByTestId('route-dock')).toHaveAccessibleName(routesText.en.route(2, 3));
     expect(screen.getByTestId('route-distance')).toHaveTextContent('12.3 km');
     expect(screen.getByTestId('route-climb')).toHaveTextContent('340 m');
-    expect(screen.getByTestId('route-miss')).toHaveTextContent(`${routesText.en.misses.elevationGain}`);
+    expect(screen.getByTestId('route-miss-elevationGain')).toHaveTextContent(`${routesText.en.misses.elevationGain}`);
     expect(screen.getByTestId('route-surface')).toHaveTextContent('70%');
     expect(screen.getByTestId('route-profile')).toBeInTheDocument();
+  });
+
+  it('mentions the technical stretches of the route, and only those', () => {
+    const { unmount } = dock('en', { route: { ...route, technical: true } });
+    expect(screen.getByTestId('route-technical')).toHaveTextContent(routesText.en.technical);
+    unmount();
+
+    dock('en', { route: { ...route, misses: [] } });
+    expect(screen.queryByTestId('route-technical')).not.toBeInTheDocument();
   });
 
   it('closes from its button', () => {
@@ -58,6 +68,15 @@ describe('RouteDock', () => {
     fireEvent.click(screen.getByTestId('route-close'));
 
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('runs the route the other way from its button', () => {
+    const onReverse = vi.fn();
+    dock('en', { onReverse });
+
+    fireEvent.click(screen.getByTestId('route-reverse'));
+
+    expect(onReverse).toHaveBeenCalledOnce();
   });
 
   it('hands the place hovered on the profile on', () => {

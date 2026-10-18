@@ -52,7 +52,10 @@ export function ElevationProfile({
 }) {
   const t = routesText[language];
   const [at, setAt] = useState<number>();
-  const onRoute = useMemo(() => waypointsOnRoute(route.geometry, waypoints), [route.geometry, waypoints]);
+  const onRoute = useMemo(
+    () => waypointsOnRoute(route.geometry, waypoints, route.reversed),
+    [route.geometry, route.reversed, waypoints],
+  );
   const profile = elevationProfile(route.geometry);
   if (!profile) return null;
 

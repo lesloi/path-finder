@@ -34,6 +34,7 @@ export const routesText = {
     profileCursor: 'Position along the route',
     slope: 'Slope',
     exportGpx: 'Export GPX',
+    reverseRoute: 'Reverse direction',
     technical: 'technical stretches',
     finding: 'Finding routes…',
     // The worded gap of a missed criterion: "+30% elevation gain".
@@ -79,6 +80,7 @@ export const routesText = {
     profileCursor: 'Position le long du parcours',
     slope: 'Pente',
     exportGpx: 'Exporter en GPX',
+    reverseRoute: 'Inverser le sens',
     technical: 'passages techniques',
     finding: 'Recherche de parcours…',
     misses: { distance: 'de distance', duration: 'de durée', elevationGain: 'de dénivelé' },
