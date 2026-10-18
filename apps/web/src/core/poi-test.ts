@@ -2,6 +2,7 @@ import {
   POI_MIN_ZOOM,
   parsePoiTile,
   poiTileOf,
+  poiTilesAround,
   poiTilesCovering,
   shownPoiCategories,
   waypointPoiAt,
@@ -108,5 +109,22 @@ describe('waypointPoiAt', () => {
 
     expect(waypointPoiAt(pois, [6.1, 45.9])).toBe(fountain);
     expect(waypointPoiAt(pois, [6.1, 45.90001])).toBeUndefined();
+  });
+});
+
+describe('poiTilesAround', () => {
+  it('covers the tile a route is in, and the next one when the margin crosses their edge', () => {
+    const [x, y] = poiTileOf([6.1294, 45.8992]);
+    // A tile at zoom 10 is ~0.35° wide: put a point 20 m inside its eastern edge.
+    const edge = ((x + 1) / 2 ** 10) * 360 - 180;
+
+    const tiles = poiTilesAround([[edge - 0.0002, 45.8992]], 100);
+
+    expect(tiles).toContainEqual([x, y]);
+    expect(tiles).toContainEqual([x + 1, y]);
+  });
+
+  it('asks for one tile when the margin stays inside it', () => {
+    expect(poiTilesAround([[6.1294, 45.8992]], 100)).toEqual([poiTileOf([6.1294, 45.8992])]);
   });
 });

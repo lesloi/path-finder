@@ -21,6 +21,7 @@ import {
   type MapSnapshot,
   type ProfilePoint,
   type Route,
+  nearestOnRoute,
 } from './route.ts';
 
 // Metres per degree of latitude.
@@ -671,5 +672,24 @@ describe('reverseRoute', () => {
     expect(onRoute[0]!.distance).toBeCloseTo(0.4, 2);
     expect(onRoute[1]!.distance).toBeCloseTo(0.2, 2);
     expect(steps.map(({ number }) => number)).toEqual([2, 1]);
+  });
+});
+
+describe('nearestOnRoute', () => {
+  const geometry = [
+    [6, 45],
+    [6, 45.01],
+  ];
+
+  it('measures to the segment and says where along the route that is', () => {
+    const { metres, along } = nearestOnRoute(geometry, [6 + 0.0005, 45.005]);
+
+    expect(metres).toBeCloseTo(0.0005 * Math.cos((45 * Math.PI) / 180) * METRES_PER_DEGREE, 0);
+    expect(along).toBeCloseTo(0.5, 5);
+  });
+
+  it('gives no distance for a position beyond the reach, so the route is not measured for it', () => {
+    expect(nearestOnRoute(geometry, [6.01, 45.005], 100).metres).toBe(Infinity);
+    expect(nearestOnRoute(geometry, [6.0005, 45.005], 100).metres).toBeLessThan(100);
   });
 });

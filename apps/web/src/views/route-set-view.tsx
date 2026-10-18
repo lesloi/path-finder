@@ -1,10 +1,9 @@
-import { ArrowLeft, ArrowLeftRight, ArrowUpRight, ChevronRight, Clock, Download, Mountain, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, ArrowUpRight, ChevronRight, Clock, Mountain, Trash2 } from 'lucide-react';
 import { useRef, type PointerEvent } from 'react';
 
 import {
   ElevationProfile,
   hint,
-  PRIMARY_BUTTON,
   ProfileSparkline,
   routeBorder,
   RouteThumbnail,
@@ -15,7 +14,6 @@ import {
   formatDistance,
   formatDuration,
   formatHeight,
-  exportRoute,
   missText,
   type Position,
   type WaypointPois,
@@ -28,6 +26,7 @@ import { Marker, MissMarker, RouteFigures, RouteMarkers, SurfaceShare, surfaceSh
 import { RouteTimeline } from './route-timeline.tsx';
 import { RouteCarousel } from './route-carousel.tsx';
 import { RoutePace } from './route-pace.tsx';
+import { RouteExportButton } from './route-export-button.tsx';
 
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
@@ -364,16 +363,14 @@ function RouteDetail({
       <RouteTimeline route={route} language={language} pace={pace} waypoints={waypoints} waypointPois={waypointPois} />
       {/* Pinned to the bottom of the sheet's scroll area: on a short phone the profile pushes it under the fold. The top padding masks what scrolls under it; the negative margin takes back the flex gap it replaces. */}
       <div className="sticky bottom-0 -mt-3 bg-surface pt-3">
-        <button
-          type="button"
-          data-testid="route-export"
-          className={PRIMARY_BUTTON}
-          // Nothing awaited before the share sheet: it needs the tap that opened it.
-          onClick={() => void exportRoute(route, { language, paceUnit, waypoints, waypointPois }, pace)}
-        >
-          <Download size={18} aria-hidden />
-          {t.exportGpx}
-        </button>
+        <RouteExportButton
+          route={route}
+          language={language}
+          paceUnit={paceUnit}
+          pace={pace}
+          waypoints={waypoints}
+          waypointPois={waypointPois}
+        />
       </div>
     </div>
   );
