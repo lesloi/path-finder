@@ -45,6 +45,7 @@ import { requestPoiTile } from '../state/index.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
 import { POI_IMAGE_RATIO, poiImage, poiImageId } from './poi-image.ts';
+import { ROUTE_ARROW_RATIO, ROUTE_ARROW_SPACING, routeArrowImage } from './route-arrow-image.ts';
 import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
 import {
   ROUTE_TAG_MUTED,
@@ -218,7 +219,7 @@ export function StartPointMap({
   avoiding = false,
   routes,
   summaries,
-  reversedRoutes,
+  directedRoutes,
   coverage,
   language = 'en',
   poiCategories = [],
@@ -248,8 +249,11 @@ export function StartPointMap({
   routes?: Position[][];
   /** The distance and elevation gain of each route, in the same order, for its label. */
   summaries?: RouteSummary[];
-  /** The routes run the other way, by their place in `routes`: their distance markers count from the other end. */
-  reversedRoutes?: ReadonlySet<number>;
+  /**
+   * The geometry of each route in the way the user runs it, which the arrows and the distance markers follow.
+   * `routes` stays the same when a route is reversed, as it keys the framing; without this, they follow it.
+   */
+  directedRoutes?: Position[][];
   /** The cells where the server can route: the rest of the map is veiled. None draws no veil. */
   coverage?: CoverageCell[] | undefined;
   /** The language of the labels. */
@@ -480,7 +484,7 @@ export function StartPointMap({
       }
       const line = { 'line-join': 'round', 'line-cap': 'round' } as const;
       map.addSource('routes', { type: 'geojson', data: emptyRoutes });
-      // The selected route has a white casing and a dashed white marking along its line, and its own colour;
+      // The selected route has a white casing, white arrows along its line, and its own colour;
       // the others are one thin grey line, so the eye goes to the one the user looks at.
       // The others come first, so that where they cross the selected route they pass under its casing.
       map.addLayer({
@@ -507,13 +511,21 @@ export function StartPointMap({
         layout: line,
         paint: { 'line-color': ['get', 'color'], 'line-width': 6 },
       });
+      map.addImage('route-arrow', routeArrowImage(), { pixelRatio: ROUTE_ARROW_RATIO });
       map.addLayer({
-        id: 'routes-marking',
-        type: 'line',
+        id: 'routes-arrows',
+        type: 'symbol',
         source: 'routes',
         filter: ['==', ['get', 'selected'], true],
-        layout: { 'line-join': 'round' },
-        paint: { 'line-color': MAP_COLORS.white, 'line-width': 2.6, 'line-dasharray': [3, 5.4] },
+        layout: {
+          'symbol-placement': 'line',
+          'symbol-spacing': ROUTE_ARROW_SPACING,
+          'icon-image': 'route-arrow',
+          // Placed after the badges and the markers above them, an arrow yields to them rather than hiding under
+          // a label; and left out of the collisions, it does not push the basemap's labels away.
+          'icon-allow-overlap': false,
+          'icon-ignore-placement': true,
+        },
       });
       map.addLayer({
         id: 'routes-hit',
@@ -843,7 +855,7 @@ export function StartPointMap({
   useEffect(() => {
     const source = mapRef.current?.getSource('routes') as GeoJSONSource | undefined;
     if (!loaded || !source) return;
-    const features = (drawnFor === routes ? (routes ?? []) : [])
+    const features = (drawnFor === routes ? (directedRoutes ?? routes ?? []) : [])
       .map((geometry, index) => ({
         type: 'Feature' as const,
         geometry: { type: 'LineString' as const, coordinates: geometry },
@@ -859,7 +871,7 @@ export function StartPointMap({
     // The selected route last, so it is drawn on top.
     features.sort((a, b) => Number(a.properties.selected) - Number(b.properties.selected));
     source.setData({ type: 'FeatureCollection', features });
-  }, [loaded, routes, selectedRoute, framing, drawnFor, styleVersion]);
+  }, [loaded, routes, directedRoutes, selectedRoute, framing, drawnFor, styleVersion]);
 
   // The veil covers what no cell does; a new style drops it, so it is set again.
   useEffect(() => {
@@ -934,7 +946,7 @@ export function StartPointMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!loaded || !map?.getSource('route-badges')) return;
-    const drawn = drawnFor === routes ? (routes ?? []) : [];
+    const drawn = drawnFor === routes ? (directedRoutes ?? routes ?? []) : [];
     const detail = framing === 'selected';
     const project = ([lon, lat]: Position) => map.project([lon, lat]);
     // Read once: it asks the browser for a layout.
@@ -971,9 +983,7 @@ export function StartPointMap({
     // The route with markers: the one of the open detail, or the one a desktop marks while it shows the others.
     const marked = detail ? selectedRoute : markedRoute;
     const summary = marked === undefined ? undefined : summaries?.[marked];
-    const markedGeometry = marked === undefined ? undefined : drawn[marked];
-    const geometry =
-      marked !== undefined && reversedRoutes?.has(marked) ? markedGeometry?.toReversed() : markedGeometry;
+    const geometry = marked === undefined ? undefined : drawn[marked];
     const interval = summary && markerInterval(summary.distance);
     const markerArea = freeArea(map, desktop, sheetHeight, space, [MARKER_HALF, MARKER_HALF]);
     const markers =
@@ -1002,8 +1012,8 @@ export function StartPointMap({
   }, [
     loaded,
     routes,
+    directedRoutes,
     summaries,
-    reversedRoutes,
     language,
     selectedRoute,
     markedRoute,
