@@ -46,6 +46,7 @@ import {
   formatPosition,
   isCovered,
   parsePosition,
+  reverseRoute,
   routesAtPace,
   type Position,
   type RouteSetRequest,
@@ -234,10 +235,22 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Clearing leaves nothing on screen: a status says it, for those who cannot see the list go.
   const [cleared, setCleared] = useState(false);
   const { routeSet, loading } = browser;
-  const atPace = useMemo(() => routeSet && routesAtPace(routeSet.request, routeSet.routes, pace), [routeSet, pace]);
+  // Apart from the pace, so that a new pace only re-estimates the durations: by distance `routesAtPace` overrides the
+  // duration estimated here, and by duration the request's pace is the one the routes were found at.
+  const directed = useMemo(
+    () =>
+      routeSet?.routes.map((route, index) =>
+        browser.reversed.has(index) ? reverseRoute(route, routeSet.request.pace) : route,
+      ),
+    [routeSet, browser.reversed],
+  );
+  const atPace = useMemo(
+    () => routeSet && directed && routesAtPace(routeSet.request, directed, pace),
+    [routeSet, directed, pace],
+  );
   const summaries = useMemo(
-    () => routeSet?.routes.map(({ distance, elevationGain }) => ({ distance, elevationGain })),
-    [routeSet],
+    () => directed?.map(({ distance, elevationGain }) => ({ distance, elevationGain })),
+    [directed],
   );
   const routesShown = Boolean(routeSet);
   const listShown = desktop && (loading || Boolean(routeSet));
@@ -436,6 +449,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           // The button is gone: the focus goes on from the settings, as after a button that puts the map back.
           settingsLink.current?.focus();
         }}
+        onReverse={browser.toggleReversed}
         onHover={browser.setHover}
         waypoints={routeSet.request.waypoints}
         waypointPois={waypointPois}
@@ -532,6 +546,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         pickOnClick={picking}
         routes={browser.geometries}
         summaries={summaries}
+        reversedRoutes={browser.reversed}
         coverage={coverage}
         language={language}
         poiCategories={shownPoiCategories(poiLayers)}
@@ -738,6 +753,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           index={selected}
           count={atPace.routes.length}
           onClose={deselect}
+          onReverse={() => browser.toggleReversed(selected)}
           onHover={browser.setHover}
           waypoints={routeSet?.request.waypoints}
           waypointPois={waypointPois}

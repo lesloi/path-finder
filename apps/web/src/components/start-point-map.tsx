@@ -218,6 +218,7 @@ export function StartPointMap({
   avoiding = false,
   routes,
   summaries,
+  reversedRoutes,
   coverage,
   language = 'en',
   poiCategories = [],
@@ -247,6 +248,8 @@ export function StartPointMap({
   routes?: Position[][];
   /** The distance and elevation gain of each route, in the same order, for its label. */
   summaries?: RouteSummary[];
+  /** The routes run the other way, by their place in `routes`: their distance markers count from the other end. */
+  reversedRoutes?: ReadonlySet<number>;
   /** The cells where the server can route: the rest of the map is veiled. None draws no veil. */
   coverage?: CoverageCell[] | undefined;
   /** The language of the labels. */
@@ -968,7 +971,9 @@ export function StartPointMap({
     // The route with markers: the one of the open detail, or the one a desktop marks while it shows the others.
     const marked = detail ? selectedRoute : markedRoute;
     const summary = marked === undefined ? undefined : summaries?.[marked];
-    const geometry = marked === undefined ? undefined : drawn[marked];
+    const markedGeometry = marked === undefined ? undefined : drawn[marked];
+    const geometry =
+      marked !== undefined && reversedRoutes?.has(marked) ? markedGeometry?.toReversed() : markedGeometry;
     const interval = summary && markerInterval(summary.distance);
     const markerArea = freeArea(map, desktop, sheetHeight, space, [MARKER_HALF, MARKER_HALF]);
     const markers =
@@ -998,6 +1003,7 @@ export function StartPointMap({
     loaded,
     routes,
     summaries,
+    reversedRoutes,
     language,
     selectedRoute,
     markedRoute,

@@ -33,6 +33,7 @@ function dock(language: 'en' | 'fr' = 'en', props: Partial<Parameters<typeof Rou
       index={1}
       count={3}
       onClose={() => {}}
+      onReverse={() => {}}
       onHover={() => {}}
       {...props}
     />,
@@ -58,6 +59,15 @@ describe('RouteDock', () => {
     fireEvent.click(screen.getByTestId('route-close'));
 
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('runs the route the other way from its button', () => {
+    const onReverse = vi.fn();
+    dock('en', { onReverse });
+
+    fireEvent.click(screen.getByTestId('route-reverse'));
+
+    expect(onReverse).toHaveBeenCalledOnce();
   });
 
   it('hands the place hovered on the profile on', () => {
