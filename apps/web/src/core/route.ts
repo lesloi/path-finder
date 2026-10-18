@@ -1,8 +1,6 @@
-import { METRES_PER_DEGREE, type Criteria, type Miss, type SurfaceStretch } from '../contract/index.ts';
-import { routesText, type Language } from '../i18n/index.ts';
+import { METRES_PER_DEGREE, type Criteria, type SurfaceStretch } from '../contract/index.ts';
 import type { Position } from './coordinates.ts';
 import { estimatedDuration } from './pace.ts';
-import { formatHeight } from './units.ts';
 
 /** The body of a route set request: the criteria, as `parseCriteria` accepts them. */
 export type RouteSetRequest = Criteria;
@@ -22,8 +20,6 @@ export type Route = {
   /** Minutes. */
   estimatedDuration: number;
   kind: 'match' | 'suggestion';
-  /** Each criterion a suggestion misses, with its gap in the criterion's unit. */
-  misses: Miss[];
   unpavedShare: number;
   surfaces: SurfaceStretch[];
   /** Holds a technical stretch: a way where the hands, ropes or chains are needed. */
@@ -38,10 +34,7 @@ export type ProfilePoint = { distance: number; height: number };
 // Kilometres between profile samples: adjacent route points can be a few metres apart, and their
 // heights to the decimetre would make noisy grades.
 const PROFILE_STEP = 0.05;
-// Below this target, in metres, a gap in elevation gain reads better in metres than as a share.
-const MIN_SHARED_ELEVATION_GAIN = 100;
 
-const MISS_CRITERIA: Miss['criterion'][] = ['distance', 'duration', 'elevationGain'];
 const SURFACES: SurfaceStretch['surface'][] = ['paved', 'unpaved'];
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
@@ -58,7 +51,6 @@ function parseRoute(value: unknown): Route | undefined {
     elevationLoss,
     estimatedDuration,
     kind,
-    misses,
     unpavedShare,
     surfaces,
     technical,
@@ -69,11 +61,6 @@ function parseRoute(value: unknown): Route | undefined {
   if (elevationLoss !== undefined && !isNumber(elevationLoss)) return undefined;
   if (kind !== 'match' && kind !== 'suggestion') return undefined;
   if (typeof technical !== 'boolean') return undefined;
-  const validMisses =
-    Array.isArray(misses) &&
-    misses.every(
-      (miss) => isObject(miss) && MISS_CRITERIA.includes(miss.criterion as Miss['criterion']) && isNumber(miss.gap),
-    );
   const validSurfaces =
     Array.isArray(surfaces) &&
     surfaces.every(
@@ -83,7 +70,7 @@ function parseRoute(value: unknown): Route | undefined {
         isNumber(stretch.from) &&
         isNumber(stretch.to),
     );
-  if (!validMisses || !validSurfaces) return undefined;
+  if (!validSurfaces) return undefined;
   return {
     geometry: geometry as Route['geometry'],
     distance,
@@ -91,7 +78,6 @@ function parseRoute(value: unknown): Route | undefined {
     ...(elevationLoss !== undefined && { elevationLoss }),
     estimatedDuration,
     kind,
-    misses: (misses as Miss[]).map(({ criterion, gap }) => ({ criterion, gap })),
     unpavedShare,
     surfaces: (surfaces as SurfaceStretch[]).map(({ surface, from, to }) => ({ surface, from, to })),
     technical,
@@ -416,8 +402,8 @@ export function routeTimeline(route: Route, waypoints: Position[], pace: number)
 
 /**
  * The route run the other way, as the user asks to: the same ways from the finish back to the start, with the climb and
- * the descent swapped. The duration is estimated again at `pace`, and the gaps of a suggestion move with the figures
- * they measure. Reversing twice gives the route back.
+ * the descent swapped. The duration is estimated again at `pace`.
+ * Reversing twice gives the route back.
  */
 export function reverseRoute(route: Route, pace: number): Route {
   const { reversed, elevationGain, elevationLoss, surfaces, ...rest } = route;
@@ -431,13 +417,6 @@ export function reverseRoute(route: Route, pace: number): Route {
     ...(!reversed && { reversed: true as const }),
   };
   turned.estimatedDuration = estimatedDuration(turned, pace);
-  const gapShift = (criterion: Miss['criterion']) =>
-    criterion === 'duration'
-      ? turned.estimatedDuration - route.estimatedDuration
-      : criterion === 'elevationGain'
-        ? (turned.elevationGain ?? 0) - (elevationGain ?? 0)
-        : 0;
-  turned.misses = route.misses.map(({ criterion, gap }) => ({ criterion, gap: gap + gapShift(criterion) }));
   return turned;
 }
 
@@ -504,24 +483,6 @@ export function distanceMarkers(geometry: Route['geometry'], step: number): Dist
     markers.push({ position: positionAlong(geometry, distances, count * step), count });
   }
   return markers;
-}
-
-/**
- * A missed criterion of a suggestion as the user reads it, such as "+30% elevation gain": its gap
- * as a share of the target, or in metres for a small target elevation gain.
- */
-export function missText({ criterion, gap }: Miss, route: Route, language: Language): string {
-  const value = { distance: route.distance, duration: route.estimatedDuration, elevationGain: route.elevationGain }[
-    criterion
-  ];
-  // The route's value minus the gap gives the target, also for the flat and hilly bounds.
-  const target = (value ?? 0) - gap;
-  const words = routesText[language].misses[criterion];
-  if (criterion === 'elevationGain' && target < MIN_SHARED_ELEVATION_GAIN) {
-    return `${gap < 0 ? '-' : '+'}${formatHeight(Math.abs(gap), language)} ${words}`;
-  }
-  const share = new Intl.NumberFormat(language, { style: 'percent', signDisplay: 'always' }).format(gap / target);
-  return `${share} ${words}`;
 }
 
 // Radius of the sphere of Web Mercator (EPSG:3857), the projection of the map, in metres.

@@ -1,4 +1,3 @@
-import type { Miss } from '../contract/index.ts';
 import type { Language } from './language.ts';
 
 /**
@@ -37,8 +36,6 @@ export const routesText = {
     reverseRoute: 'Reverse direction',
     technical: 'technical stretches',
     finding: 'Finding routes…',
-    // The worded gap of a missed criterion: "+30% elevation gain".
-    misses: { distance: 'distance', duration: 'duration', elevationGain: 'elevation gain' },
     noRoutes: 'No route found around this start point.',
     noRoutesHint: 'Try another start point or other criteria.',
     unreachable: 'The service cannot be reached.',
@@ -83,7 +80,6 @@ export const routesText = {
     reverseRoute: 'Inverser le sens',
     technical: 'passages techniques',
     finding: 'Recherche de parcours…',
-    misses: { distance: 'de distance', duration: 'de durée', elevationGain: 'de dénivelé' },
     noRoutes: 'Aucun parcours trouvé autour de ce point de départ.',
     noRoutesHint: 'Essayez un autre point de départ ou d’autres critères.',
     unreachable: 'Le service est injoignable.',
@@ -97,4 +93,4 @@ export const routesText = {
     waypointsUnreachable: 'Aucun parcours ne passe par ces points.',
     avoidedAreaRefused: (area: number) => `La zone ${area} ne peut pas contenir le départ ou un point de passage.`,
   },
-} satisfies Record<Language, { misses: Record<Miss['criterion'], string> } & Record<string, unknown>>;
+} satisfies Record<Language, Record<string, unknown>>;

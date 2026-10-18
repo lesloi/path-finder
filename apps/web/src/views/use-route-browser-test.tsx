@@ -19,7 +19,6 @@ const route: Route = {
   distance: 10,
   estimatedDuration: 60,
   kind: 'match',
-  misses: [],
   unpavedShare: 0,
   surfaces: [{ surface: 'paved', from: 0, to: 10 }],
   technical: false,

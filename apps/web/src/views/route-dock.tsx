@@ -4,7 +4,7 @@ import { DOCK, ElevationProfile, ICON_BUTTON, tip } from '../components/index.ts
 import { type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
 import { RouteExportButton } from './route-export-button.tsx';
-import { RouteFigures, RouteMarkers, SurfaceShare } from './route-figures.tsx';
+import { RouteFigures, SurfaceShare, TechnicalMarker } from './route-figures.tsx';
 
 /**
  * The desktop dock along the bottom of the map: the figures, the elevation profile and the GPX export of the
@@ -86,7 +86,7 @@ export function RouteDock({
         />
         <SurfaceShare route={route} language={language} />
         {/* Here rather than in the figures' column, which has no room left for them. */}
-        <RouteMarkers route={route} language={language} className="justify-center" />
+        {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" className="justify-center" />}
       </div>
       <button
         type="button"

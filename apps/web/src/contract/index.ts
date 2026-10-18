@@ -12,7 +12,7 @@ export {
   type CriteriaField,
   type Position,
 } from './criteria.ts';
-export type { ApiError, ErrorCode, Miss, SurfaceStretch } from './errors.ts';
+export type { ApiError, ErrorCode, SurfaceStretch } from './errors.ts';
 export {
   AVOIDED_AREA_RADIUS,
   CLIMB_PER_EFFORT_KM,
