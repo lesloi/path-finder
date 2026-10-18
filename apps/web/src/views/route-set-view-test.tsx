@@ -191,7 +191,9 @@ describe('RouteSetView', () => {
     it('shows no gap to the criteria on a suggestion', () => {
       render(<View />);
 
-      expect(screen.getByTestId('routes-row-1').querySelector('[data-testid*="-miss"]')).toBeNull();
+      const row = screen.getByTestId('routes-row-1');
+      expect(row).not.toHaveTextContent('%');
+      expect(row).not.toHaveAccessibleName(expect.stringMatching(/[+-]\d+%/));
     });
 
     it('previews the route of a row the pointer or the focus reaches on desktops, without selecting it', () => {

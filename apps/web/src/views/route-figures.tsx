@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, Mountain, type LucideIcon } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Mountain } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { SURFACE_CLASSES } from '../components/index.ts';
@@ -87,30 +87,20 @@ function Figure({
   );
 }
 
-/** A remark on a route, such as a technical stretch it holds. */
-export function Marker({ icon: Icon, text, testId }: { icon: LucideIcon; text: string; testId: string }) {
-  return (
-    <span data-testid={testId} className="flex items-center gap-1 text-sm font-semibold text-ink">
-      <Icon size={14} aria-hidden className="text-miss" />
-      {text}
-    </span>
-  );
-}
-
-/** The technical stretches of a route, or nothing for a route without. */
-export function RouteMarkers({
-  route,
-  language,
+/** The remark on a route that holds technical stretches, where the hands, ropes or chains are needed. */
+export function TechnicalMarker({
+  text,
+  testId,
   className = '',
 }: {
-  route: Route;
-  language: Language;
+  text: string;
+  testId: string;
   className?: string;
 }) {
-  if (!route.technical) return null;
   return (
-    <div className={`flex ${className}`}>
-      <Marker icon={Mountain} text={routesText[language].technical} testId="route-technical" />
-    </div>
+    <span data-testid={testId} className={`flex items-center gap-1 text-sm font-semibold text-ink ${className}`}>
+      <Mountain size={14} aria-hidden className="text-technical" />
+      {text}
+    </span>
   );
 }

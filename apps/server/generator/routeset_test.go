@@ -361,6 +361,16 @@ func TestWideSuggestionComesAfterANormalOne(t *testing.T) {
 	equal(t, distances(r), []float64{12.4, 13}, "distances")
 }
 
+func TestWideSuggestionOffOnTwoCriteriaIsKept(t *testing.T) {
+	c := criteria(nil)
+
+	r := build(c, compose(withDistance(13), withGain(ptr(500))))
+
+	if len(r) != 1 || r[0].Kind != "suggestion" {
+		t.Errorf("routes = %+v", r)
+	}
+}
+
 func TestBeyondTheWideTolerancesARouteIsDropped(t *testing.T) {
 	c := criteria(nil)
 	for name, cand := range map[string]*candidate{

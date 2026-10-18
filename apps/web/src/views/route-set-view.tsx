@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowLeftRight, ArrowUpRight, ChevronRight, Clock, Download, Mountain, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, ArrowUpRight, ChevronRight, Clock, Download, Trash2 } from 'lucide-react';
 import { useRef, type PointerEvent } from 'react';
 
 import {
@@ -23,7 +23,7 @@ import {
   type PaceUnit,
 } from '../core/index.ts';
 import { criteriaText, routesText, type Language } from '../i18n/index.ts';
-import { Marker, RouteFigures, RouteMarkers, SurfaceShare, surfaceShares } from './route-figures.tsx';
+import { RouteFigures, SurfaceShare, TechnicalMarker, surfaceShares } from './route-figures.tsx';
 import { RouteTimeline } from './route-timeline.tsx';
 import { RouteCarousel } from './route-carousel.tsx';
 import { RoutePace } from './route-pace.tsx';
@@ -250,7 +250,7 @@ function RouteRow({
               {duration}
             </span>
           </span>
-          {route.technical && <Marker icon={Mountain} text={t.technical} testId={`routes-row-${index}-technical`} />}
+          {route.technical && <TechnicalMarker text={t.technical} testId={`routes-row-${index}-technical`} />}
         </span>
         {/* The empty width of the row: where the route climbs, at a glance. */}
         <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
@@ -345,7 +345,7 @@ function RouteDetail({
         />
         <RouteFigures route={route} language={language} className="flex-1" />
       </div>
-      <RouteMarkers route={route} language={language} />
+      {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" />}
       <ElevationProfile
         testId="route-profile"
         route={route}
