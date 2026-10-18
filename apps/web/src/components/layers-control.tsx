@@ -1,4 +1,4 @@
-import { Layers } from 'lucide-react';
+import { MapPinned } from 'lucide-react';
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 
 import { POI_LAYER_KEYS, type PoiLayers } from '../core/index.ts';
@@ -63,7 +63,7 @@ export function LayersControl({
         aria-controls={`${id}-popover`}
         onClick={() => setOpen(!open)}
       >
-        <Layers size={20} aria-hidden />
+        <MapPinned size={20} aria-hidden />
       </button>
       {open && (
         <div
