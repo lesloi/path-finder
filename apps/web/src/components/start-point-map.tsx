@@ -483,7 +483,7 @@ export function StartPointMap({
       }
       const line = { 'line-join': 'round', 'line-cap': 'round' } as const;
       map.addSource('routes', { type: 'geojson', data: emptyRoutes });
-      // The selected route has a white casing and white arrows along its line, in its direction, and its own colour;
+      // The selected route has a white casing, a dashed white marking along its line and white arrows in its direction, and its own colour;
       // the others are one thin grey line, so the eye goes to the one the user looks at.
       // The others come first, so that where they cross the selected route they pass under its casing.
       map.addLayer({
@@ -510,9 +510,17 @@ export function StartPointMap({
         layout: line,
         paint: { 'line-color': ['get', 'color'], 'line-width': 6 },
       });
-      map.addImage('route-arrow', routeArrowImage(), { pixelRatio: ROUTE_ARROW_RATIO });
       map.addLayer({
         id: 'routes-marking',
+        type: 'line',
+        source: 'routes',
+        filter: ['==', ['get', 'selected'], true],
+        layout: { 'line-join': 'round' },
+        paint: { 'line-color': MAP_COLORS.white, 'line-width': 2.6, 'line-dasharray': [3, 5.4] },
+      });
+      map.addImage('route-arrow', routeArrowImage(), { pixelRatio: ROUTE_ARROW_RATIO });
+      map.addLayer({
+        id: 'routes-arrows',
         type: 'symbol',
         source: 'routes',
         filter: ['==', ['get', 'selected'], true],

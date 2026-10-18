@@ -261,6 +261,7 @@ describe('StartPointMap', () => {
         'routes-casing',
         'routes-line',
         'routes-marking',
+        'routes-arrows',
         'routes-hit',
         'route-badges',
         'route-markers',
@@ -633,6 +634,7 @@ describe('StartPointMap', () => {
         'routes-casing',
         'routes-line',
         'routes-marking',
+        'routes-arrows',
         'routes-hit',
         'route-badges',
         'route-markers',
@@ -786,7 +788,7 @@ describe('StartPointMap', () => {
         renderRoutes({ routes: [out], summaries });
 
         expect(map().images['route-arrow']).toMatchObject({ width: 24, height: 24 });
-        expect(map().layers.find(({ id }) => id === 'routes-marking')).toMatchObject({
+        expect(map().layers.find(({ id }) => id === 'routes-arrows')).toMatchObject({
           type: 'symbol',
           layout: { 'symbol-placement': 'line', 'icon-image': 'route-arrow' },
         });
