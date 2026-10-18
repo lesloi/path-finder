@@ -45,7 +45,7 @@ import { requestPoiTile } from '../state/index.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
 import { POI_IMAGE_RATIO, poiImage, poiImageId } from './poi-image.ts';
-import { ROUTE_ARROW_RATIO, routeArrowImage } from './route-arrow-image.ts';
+import { ROUTE_ARROW_RATIO, ROUTE_ARROW_SPACING, routeArrowImage } from './route-arrow-image.ts';
 import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
 import {
   ROUTE_TAG_MUTED,
@@ -70,8 +70,6 @@ const NO_ROOM = 0;
 const MIN_FRAME = 240;
 // A width that makes a thin route easy to tap.
 const HIT_WIDTH = 22;
-// An arrow is 18 px long: this leaves a gap between two, so that they read as dashes.
-const ROUTE_ARROW_SPACING = 26;
 
 // What the panels and their margins cover of the map, as `index.css` gives it: custom properties of the
 // stylesheet, read together from one probe. The top is the bar a phone shows over the map.
@@ -523,8 +521,9 @@ export function StartPointMap({
           'symbol-placement': 'line',
           'symbol-spacing': ROUTE_ARROW_SPACING,
           'icon-image': 'route-arrow',
-          'icon-allow-overlap': true,
-          // Placed first among the symbols, the arrows must not push the basemap's labels away.
+          // Placed after the badges and the markers above them, an arrow yields to them rather than hiding under
+          // a label; and left out of the collisions, it does not push the basemap's labels away.
+          'icon-allow-overlap': false,
           'icon-ignore-placement': true,
         },
       });

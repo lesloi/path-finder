@@ -13,6 +13,9 @@ const HEAD_MARGIN = 5;
 /** Pixels per CSS pixel of the image: it is drawn at twice its size for sharp screens. */
 export const ROUTE_ARROW_RATIO = 2;
 
+/** Pixels between two arrows along the route: their length plus a gap, so that they read as dashes. */
+export const ROUTE_ARROW_SPACING = WIDTH / ROUTE_ARROW_RATIO + 8;
+
 // How much of a pixel at this distance from a stroke's axis lies inside it, from 0 to 1.
 const coverage = (distance: number) => Math.min(1, Math.max(0, THICKNESS / 2 - distance + 0.5));
 
