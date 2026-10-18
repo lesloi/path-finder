@@ -39,8 +39,8 @@ function Delta({
   language: Language;
 }) {
   return (
-    <span className="flex items-center">
-      <Icon size={12} aria-hidden />
+    <span className="inline-flex items-center">
+      <Icon size={12} className="mr-0.5" aria-hidden />
       <span className="sr-only">{label}</span>
       {formatHeight(metres, language)}
     </span>
@@ -91,16 +91,29 @@ export function RouteTimeline({
           return (
             <Fragment key={`${step.kind}-${step.number ?? ''}`}>
               {leg && leg.distance >= MIN_LEG_KM && (
-                <li data-testid="route-timeline-leg" className={`${LINE} flex gap-2 pl-5 text-xs text-ink-2 italic`}>
-                  <span>
-                    {formatDistance(leg.distance, language)} · {formatDuration(leg.duration, language)}
-                  </span>
-                  {(climb !== undefined || descent !== undefined) && <span aria-hidden>·</span>}
-                  {climb !== undefined && (
-                    <Delta icon={CLIMB_ICON} label={t.climb} metres={climb} language={language} />
-                  )}
-                  {descent !== undefined && (
-                    <Delta icon={DESCENT_ICON} label={t.descent} metres={descent} language={language} />
+                <li data-testid="route-timeline-leg" className={`${LINE} pl-5 text-xs text-ink-2 italic`}>
+                  {/* Plain inline text, so that every separator is one space, as in the step rows. */}
+                  {formatDistance(leg.distance, language)} · {formatDuration(leg.duration, language)}
+                  {/* Kept together, so that the dot never ends a line. */}
+                  {(climb !== undefined || descent !== undefined) && (
+                    <>
+                      {' '}
+                      <span className="whitespace-nowrap">
+                        <span aria-hidden>·</span>
+                        {climb !== undefined && (
+                          <>
+                            {' '}
+                            <Delta icon={CLIMB_ICON} label={t.climb} metres={climb} language={language} />
+                          </>
+                        )}
+                        {descent !== undefined && (
+                          <>
+                            {' '}
+                            <Delta icon={DESCENT_ICON} label={t.descent} metres={descent} language={language} />
+                          </>
+                        )}
+                      </span>
+                    </>
                   )}
                 </li>
               )}
