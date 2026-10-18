@@ -44,6 +44,7 @@ import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { requestPoiTile } from '../state/index.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
+import { ROUTE_ARROW_RATIO, routeArrowImage } from './route-arrow-image.ts';
 import { POI_IMAGE_RATIO, poiImage, poiImageId } from './poi-image.ts';
 import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
 import {
@@ -69,6 +70,8 @@ const NO_ROOM = 0;
 const MIN_FRAME = 240;
 // A width that makes a thin route easy to tap.
 const HIT_WIDTH = 22;
+// Pixels between two direction arrows along the selected route.
+const ROUTE_ARROW_SPACING = 60;
 
 // What the panels and their margins cover of the map, as `index.css` gives it: custom properties of the
 // stylesheet, read together from one probe. The top is the bar a phone shows over the map.
@@ -480,7 +483,7 @@ export function StartPointMap({
       }
       const line = { 'line-join': 'round', 'line-cap': 'round' } as const;
       map.addSource('routes', { type: 'geojson', data: emptyRoutes });
-      // The selected route has a white casing and a dashed white marking along its line, and its own colour;
+      // The selected route has a white casing and white arrows along its line, in its direction, and its own colour;
       // the others are one thin grey line, so the eye goes to the one the user looks at.
       // The others come first, so that where they cross the selected route they pass under its casing.
       map.addLayer({
@@ -507,13 +510,20 @@ export function StartPointMap({
         layout: line,
         paint: { 'line-color': ['get', 'color'], 'line-width': 6 },
       });
+      map.addImage('route-arrow', routeArrowImage(), { pixelRatio: ROUTE_ARROW_RATIO });
       map.addLayer({
         id: 'routes-marking',
-        type: 'line',
+        type: 'symbol',
         source: 'routes',
         filter: ['==', ['get', 'selected'], true],
-        layout: { 'line-join': 'round' },
-        paint: { 'line-color': MAP_COLORS.white, 'line-width': 2.6, 'line-dasharray': [3, 5.4] },
+        layout: {
+          'symbol-placement': 'line',
+          'symbol-spacing': ROUTE_ARROW_SPACING,
+          'icon-image': 'route-arrow',
+          'icon-allow-overlap': true,
+          // Placed first among the symbols, the arrows must not push the basemap's labels away.
+          'icon-ignore-placement': true,
+        },
       });
       map.addLayer({
         id: 'routes-hit',

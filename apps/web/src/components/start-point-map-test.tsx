@@ -782,6 +782,16 @@ describe('StartPointMap', () => {
         expect(map().images['distance-marker']).toMatchObject({ width: 52, height: 52 });
       });
 
+      it('marks the way of the selected route with arrows placed along its line', () => {
+        renderRoutes({ routes: [out], summaries });
+
+        expect(map().images['route-arrow']).toMatchObject({ width: 24, height: 24 });
+        expect(map().layers.find(({ id }) => id === 'routes-marking')).toMatchObject({
+          type: 'symbol',
+          layout: { 'symbol-placement': 'line', 'icon-image': 'route-arrow' },
+        });
+      });
+
       it('has no label until the snapshot is taken', () => {
         render(<StartPointMap routes={[out]} summaries={summaries} onStartChange={vi.fn()} />);
         act(() => map().fire('style.load'));
