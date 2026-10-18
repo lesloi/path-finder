@@ -1,9 +1,9 @@
 import { ArrowLeftRight, Download, X } from 'lucide-react';
 
 import { DOCK, ElevationProfile, ICON_BUTTON, PRIMARY_BUTTON, tip } from '../components/index.ts';
-import { exportRoute, missText, type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
+import { exportRoute, type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
-import { RouteFigures, SurfaceShare } from './route-figures.tsx';
+import { RouteFigures, RouteMarkers, SurfaceShare } from './route-figures.tsx';
 
 /**
  * The desktop dock along the bottom of the map: the figures, the elevation profile and the GPX export of the
@@ -87,15 +87,7 @@ export function RouteDock({
         />
         <SurfaceShare route={route} language={language} />
         {/* Here rather than in the figures' column, which has no room left for them. */}
-        {route.misses.length > 0 && (
-          <div className="flex flex-wrap justify-center gap-x-4">
-            {route.misses.map((miss) => (
-              <span key={miss.criterion} data-testid="route-miss" className="text-sm font-semibold text-ink">
-                {missText(miss, route, language)}
-              </span>
-            ))}
-          </div>
-        )}
+        <RouteMarkers route={route} language={language} className="justify-center" />
       </div>
       <button
         type="button"

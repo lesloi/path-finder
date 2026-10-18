@@ -1,20 +1,6 @@
-import {
-  ArrowLeft,
-  ArrowLeftRight,
-  ArrowUpRight,
-  ChevronRight,
-  Clock,
-  Download,
-  Mountain,
-  Ruler,
-  Timer,
-  Trash2,
-  TrendingUp,
-  type LucideIcon,
-} from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, ArrowUpRight, ChevronRight, Clock, Download, Mountain, Trash2 } from 'lucide-react';
 import { useRef, type PointerEvent } from 'react';
 
-import type { Miss } from '../contract/index.ts';
 import {
   ElevationProfile,
   hint,
@@ -38,7 +24,7 @@ import {
   type PaceUnit,
 } from '../core/index.ts';
 import { criteriaText, routesText, type Language } from '../i18n/index.ts';
-import { RouteFigures, SurfaceShare, surfaceShares } from './route-figures.tsx';
+import { Marker, MissMarker, RouteFigures, RouteMarkers, SurfaceShare, surfaceShares } from './route-figures.tsx';
 import { RouteTimeline } from './route-timeline.tsx';
 import { RouteCarousel } from './route-carousel.tsx';
 import { RoutePace } from './route-pace.tsx';
@@ -50,11 +36,6 @@ const SWIPE_PX = 50;
 export const ROUTE_ROW_BOX = 'flex min-h-13 w-full flex-col gap-2 rounded-md border border-l-4 border-border p-2';
 
 const TEXT_BUTTON = 'flex min-h-touch items-center gap-1 rounded-full px-2 text-sm text-accent hover:bg-surface-2';
-
-const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp } satisfies Record<
-  Miss['criterion'],
-  LucideIcon
->;
 
 // The words of the route set: its own, and the labels it shares with the criteria.
 const words = (language: Language) => ({ ...criteriaText[language], ...routesText[language] });
@@ -286,20 +267,6 @@ function RouteRow({
   );
 }
 
-/** A criterion a suggestion misses, with its gap, such as "+30% elevation gain". */
-function MissMarker({ miss, text, testId }: { miss: Miss; text: string; testId: string }) {
-  return <Marker icon={MISS_ICONS[miss.criterion]} text={text} testId={`${testId}-${miss.criterion}`} />;
-}
-
-function Marker({ icon: Icon, text, testId }: { icon: LucideIcon; text: string; testId: string }) {
-  return (
-    <span data-testid={testId} className="flex items-center gap-1 text-sm font-semibold text-ink">
-      <Icon size={14} aria-hidden className="text-miss" />
-      {text}
-    </span>
-  );
-}
-
 function RouteDetail({
   language,
   paceUnit,
@@ -384,13 +351,7 @@ function RouteDetail({
         />
         <RouteFigures route={route} language={language} className="flex-1" />
       </div>
-      {route.misses.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {route.misses.map((miss) => (
-            <MissMarker key={miss.criterion} miss={miss} text={missText(miss, route, language)} testId="route-miss" />
-          ))}
-        </div>
-      )}
+      <RouteMarkers route={route} language={language} className="gap-y-1" />
       <ElevationProfile
         testId="route-profile"
         route={route}
