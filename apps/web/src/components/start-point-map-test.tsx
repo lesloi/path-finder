@@ -260,7 +260,6 @@ describe('StartPointMap', () => {
         'routes-others',
         'routes-casing',
         'routes-line',
-        'routes-marking',
         'routes-arrows',
         'routes-hit',
         'route-badges',
@@ -633,7 +632,6 @@ describe('StartPointMap', () => {
         'routes-others',
         'routes-casing',
         'routes-line',
-        'routes-marking',
         'routes-arrows',
         'routes-hit',
         'route-badges',
@@ -787,7 +785,7 @@ describe('StartPointMap', () => {
       it('marks the way of the selected route with arrows placed along its line', () => {
         renderRoutes({ routes: [out], summaries });
 
-        expect(map().images['route-arrow']).toMatchObject({ width: 24, height: 24 });
+        expect(map().images['route-arrow']).toMatchObject({ width: 36, height: 24 });
         expect(map().layers.find(({ id }) => id === 'routes-arrows')).toMatchObject({
           type: 'symbol',
           layout: { 'symbol-placement': 'line', 'icon-image': 'route-arrow' },

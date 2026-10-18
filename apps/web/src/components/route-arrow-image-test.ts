@@ -4,14 +4,17 @@ describe('routeArrowImage', () => {
   const { width, height, data } = routeArrowImage();
   const alpha = (x: number, y: number) => data[(y * width + x) * 4 + 3];
 
-  it('is a square of RGBA pixels', () => {
-    expect(width).toBe(height);
+  it('is made of RGBA pixels', () => {
     expect(data).toHaveLength(width * height * 4);
   });
 
   it('is white and opaque on the tip', () => {
     const tip = (Math.floor(height / 2) * width + width - 6) * 4;
     expect([...data.slice(tip, tip + 4)]).toEqual([255, 255, 255, 255]);
+  });
+
+  it('has a shaft behind the head', () => {
+    expect(alpha(8, height / 2)).toBe(255);
   });
 
   it('is transparent in the corners', () => {
