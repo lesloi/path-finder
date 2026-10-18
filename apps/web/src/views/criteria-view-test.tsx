@@ -577,6 +577,103 @@ describe('CriteriaView', () => {
       expect(map().easedTo).toEqual({ center: [5.7, 45.2], zoom: 14 });
     });
 
+    describe('while waiting for the position', () => {
+      const pending = () => {
+        const callbacks: { success?: PositionCallback; failure?: PositionErrorCallback } = {};
+        getCurrentPosition.mockImplementation((success: PositionCallback, failure: PositionErrorCallback) => {
+          callbacks.success = success;
+          callbacks.failure = failure;
+        });
+        return callbacks;
+      };
+
+      it('marks the button as busy and says the location is in progress', () => {
+        pending();
+        render(<CriteriaView language="en" />);
+
+        fireEvent.click(screen.getByTestId('criteria-locate'));
+
+        const button = screen.getByTestId('criteria-locate');
+        expect(button).toHaveAttribute('aria-busy', 'true');
+        expect(button).toHaveAccessibleName(en.locating);
+      });
+
+      it('does the same on the desktop button', () => {
+        onDesktop();
+        pending();
+        render(<CriteriaView language="en" />);
+
+        fireEvent.click(screen.getByTestId('criteria-start-locate'));
+
+        const button = screen.getByTestId('criteria-start-locate');
+        expect(button).toHaveAttribute('aria-busy', 'true');
+        expect(button).toHaveAccessibleName(en.locating);
+      });
+
+      it('does not ask twice, even for two taps before the next render', () => {
+        pending();
+        render(<CriteriaView language="en" />);
+        const button = screen.getByTestId('criteria-locate');
+
+        act(() => {
+          button.click();
+          button.click();
+        });
+
+        expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+      });
+
+      it('gives up when the browser never answers, so the user can tap again', () => {
+        vi.useFakeTimers();
+        pending();
+        render(<CriteriaView language="en" />);
+        fireEvent.click(screen.getByTestId('criteria-locate'));
+
+        act(() => vi.advanceTimersByTime(15_000));
+        fireEvent.click(screen.getByTestId('criteria-locate'));
+
+        expect(screen.getByTestId('criteria-locate')).toHaveAttribute('aria-busy', 'true');
+        expect(getCurrentPosition).toHaveBeenCalledTimes(2);
+      });
+
+      it('is not reset by the answer of a request it gave up on', () => {
+        vi.useFakeTimers();
+        const callbacks = pending();
+        render(<CriteriaView language="en" />);
+        fireEvent.click(screen.getByTestId('criteria-locate'));
+        const abandoned = callbacks.failure;
+        act(() => vi.advanceTimersByTime(15_000));
+        fireEvent.click(screen.getByTestId('criteria-locate'));
+
+        act(() => abandoned?.({ code: 1 } as GeolocationPositionError));
+
+        expect(screen.getByTestId('criteria-locate')).toHaveAttribute('aria-busy', 'true');
+      });
+
+      it('goes back to normal once the position arrives', () => {
+        const callbacks = pending();
+        render(<CriteriaView language="en" />);
+        fireEvent.click(screen.getByTestId('criteria-locate'));
+
+        act(() => callbacks.success?.({ coords: { longitude: 5.7, latitude: 45.2 } } as GeolocationPosition));
+
+        const button = screen.getByTestId('criteria-locate');
+        expect(button).toHaveAttribute('aria-busy', 'false');
+        expect(button).toHaveAccessibleName(en.myLocation);
+      });
+
+      it('goes back to normal and shows the toast when the location fails', () => {
+        const callbacks = pending();
+        render(<CriteriaView language="en" />);
+        fireEvent.click(screen.getByTestId('criteria-locate'));
+
+        act(() => callbacks.failure?.({ code: 1 } as GeolocationPositionError));
+
+        expect(screen.getByTestId('criteria-locate')).toHaveAttribute('aria-busy', 'false');
+        expect(screen.getByTestId('criteria-toast')).toBeInTheDocument();
+      });
+    });
+
     it('shows a toast inviting a long press when the location is refused', () => {
       refuse();
       render(<CriteriaView language="fr" />);
