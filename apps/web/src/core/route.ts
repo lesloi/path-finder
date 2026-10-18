@@ -1,4 +1,4 @@
-import type { Criteria, SurfaceStretch } from '../contract/index.ts';
+import { METRES_PER_DEGREE, type Criteria, type SurfaceStretch } from '../contract/index.ts';
 import type { Position } from './coordinates.ts';
 import { estimatedDuration } from './pace.ts';
 
@@ -95,6 +95,54 @@ export function parseRoutes(body: unknown): Route[] | undefined {
 export function kmBetween([lonA, latA]: number[], [lonB, latB]: number[]): number {
   const cos = Math.cos((((latA + latB) / 2) * Math.PI) / 180);
   return Math.hypot((lonB - lonA) * cos, latB - latA) * 111.195;
+}
+
+/**
+ * How far a position is from the route, in metres, and where along it the nearest spot is, as the index of a
+ * point plus how far towards the next (so it sorts along the route). Measured to the segments, since a leg of a
+ * route can be longer than the distances that matter. Beyond `reach` metres the distance is left as Infinity,
+ * which spares the projection of every segment that is clearly too far.
+ */
+export function nearestOnRoute(
+  geometry: number[][],
+  [lon, lat]: number[],
+  reach = Infinity,
+): { metres: number; along: number } {
+  const cos = Math.cos((lat * Math.PI) / 180);
+  const degrees = reach / METRES_PER_DEGREE;
+  let [metres, along] = [Infinity, 0];
+  let [ax, ay] = [(geometry[0][0] - lon) * cos, geometry[0][1] - lat];
+  for (let k = 1; k < geometry.length; k++) {
+    const [bx, by] = [(geometry[k][0] - lon) * cos, geometry[k][1] - lat];
+    const far =
+      (ax > degrees && bx > degrees) ||
+      (ax < -degrees && bx < -degrees) ||
+      (ay > degrees && by > degrees) ||
+      (ay < -degrees && by < -degrees);
+    if (!far) {
+      const [dx, dy] = [bx - ax, by - ay];
+      const span = dx * dx + dy * dy;
+      const t = span ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / span)) : 0;
+      const distance = Math.hypot(ax + t * dx, ay + t * dy) * METRES_PER_DEGREE;
+      if (distance < metres && distance <= reach) [metres, along] = [distance, k - 1 + t];
+    }
+    [ax, ay] = [bx, by];
+  }
+  return { metres, along };
+}
+
+/** West, south, east and north of a route and a margin around it, in metres. */
+export function boundsAround(geometry: number[][], margin: number): [number, number, number, number] {
+  let [west, south, east, north] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [lon, lat] of geometry) {
+    if (lon < west) west = lon;
+    if (lon > east) east = lon;
+    if (lat < south) south = lat;
+    if (lat > north) north = lat;
+  }
+  const dLat = margin / METRES_PER_DEGREE;
+  const dLon = dLat / Math.cos((Math.max(Math.abs(south), Math.abs(north)) * Math.PI) / 180);
+  return [west - dLon, south - dLat, east + dLon, north + dLat];
 }
 
 // Kilometres from the start to each point.

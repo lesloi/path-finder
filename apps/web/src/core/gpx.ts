@@ -1,6 +1,6 @@
 import { commonText, criteriaText, LINKS, type Language } from '../i18n/index.ts';
-import { poiLabel, waypointPoiAt, type WaypointPois } from './poi.ts';
-import { waypointsOnRoute } from './route.ts';
+import { poiLabel, waypointPoiAt, waypointPoiKey, type Poi, type WaypointPois } from './poi.ts';
+import { boundsAround, nearestOnRoute, waypointsOnRoute } from './route.ts';
 import type { Position } from './coordinates.ts';
 import { formatDistance, formatHeight, formatPace, type PaceUnit } from './units.ts';
 
@@ -23,6 +23,15 @@ export type GpxRoute = {
 // Cycling (#131) will be a travel mode that chooses this; only running is generated for now.
 const TRAVEL_MODE = { type: 'running', label: 'Running' };
 
+/** How far from the route a water point is still worth carrying to the watch, in metres. */
+export const WATER_POINT_MAX_METRES = 100;
+
+/** Watches take only so many waypoints, and a street of fountains would drown the user's own: the nearest are kept. */
+export const MAX_WATER_POINTS = 50;
+
+/** The `sym` watches know for a water point. */
+const WATER_SYMBOL = 'Drinking Water';
+
 /** Older watches truncate longer tracks. */
 export const MAX_GPX_POINTS = 2_000;
 
@@ -39,12 +48,15 @@ export function gpxExport(
     paceUnit,
     waypoints = [],
     waypointPois = {},
+    pois = [],
   }: {
     language: Language;
     paceUnit: PaceUnit;
     waypoints?: Position[] | undefined;
     /** The points of interest some waypoints were made from, which name them. */
     waypointPois?: WaypointPois | undefined;
+    /** The points of interest loaded around the route: only the water points within `WATER_POINT_MAX_METRES` are written. */
+    pois?: Poi[] | undefined;
   },
   /** Minutes per km, the one the estimated duration was computed at. */
   pace: number,
@@ -63,6 +75,16 @@ export function gpxExport(
       return `<wpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${ele}<name>${escapeXml(label)}</name></wpt>`;
     })
     .join('\n');
+  const waterPointPoints = waterPointsOnRoute(route.geometry, pois, waypoints)
+    .map((poi) => {
+      const [lon, lat] = poi.position;
+      const label = poiLabel(poi, language);
+      // Without a name the label already says it is seasonal; a name hides it, so the mark goes in the description.
+      const desc = poi.seasonal && poi.name ? `<desc>${escapeXml(commonText[language].seasonalWaterPoint)}</desc>` : '';
+      return `<wpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}"><name>${escapeXml(label)}</name>${desc}<sym>${WATER_SYMBOL}</sym></wpt>`;
+    })
+    .join('\n');
+  const allWaypoints = [waypointPoints, waterPointPoints].filter(Boolean).join('\n');
   // The schema fixes the order of the elements, in the metadata as in the track.
   const content = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Path finder" xmlns="http://www.topografix.com/GPX/1/1">
@@ -71,7 +93,7 @@ export function gpxExport(
 <link href="${LINKS.app}"><text>Path finder</text></link>
 <time>${exportedAt.toISOString()}</time>
 </metadata>
-${waypointPoints ? `${waypointPoints}\n` : ''}<trk>
+${allWaypoints ? `${allWaypoints}\n` : ''}<trk>
 <name>${name}</name>
 <desc>${description}</desc>
 <type>${TRAVEL_MODE.type}</type>
@@ -82,6 +104,25 @@ ${points}
 </gpx>
 `;
   return { fileName: `${fileName(route, exportedAt)}.gpx`, content };
+}
+
+/** The water points near enough to the route, in the order it meets them; one already a waypoint is not written twice. */
+function waterPointsOnRoute(geometry: GpxRoute['geometry'], pois: Poi[], waypoints: Position[]): Poi[] {
+  // By the waypoints, not `waypointPois`: that keeps the points of waypoints the user has removed since.
+  const taken = new Set(waypoints.map(waypointPoiKey));
+  // A tile holds hundreds of points and a route up to thousands: only the few in its box are measured.
+  const [west, south, east, north] = boundsAround(geometry, WATER_POINT_MAX_METRES);
+  return pois
+    .filter(
+      ({ category, position: [lon, lat] }) =>
+        category === 'water' && lon >= west && lon <= east && lat >= south && lat <= north,
+    )
+    .map((poi) => ({ poi, ...nearestOnRoute(geometry, poi.position, WATER_POINT_MAX_METRES) }))
+    .filter(({ metres, poi }) => metres < Infinity && !taken.has(waypointPoiKey(poi.position)))
+    .sort((a, b) => a.metres - b.metres)
+    .slice(0, MAX_WATER_POINTS)
+    .sort((a, b) => a.along - b.along)
+    .map(({ poi }) => poi);
 }
 
 function trackPoint([lon, lat, ele]: [number, number, number?]): string {
