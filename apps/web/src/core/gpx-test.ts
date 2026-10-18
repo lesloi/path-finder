@@ -1,5 +1,5 @@
-import { gpxExport, MAX_GPX_POINTS, type GpxRoute } from './gpx.ts';
-import { waypointPoiKey } from './poi.ts';
+import { gpxExport, MAX_GPX_POINTS, MAX_WATER_POINTS, WATER_POINT_MAX_METRES, type GpxRoute } from './gpx.ts';
+import { waypointPoiKey, type Poi } from './poi.ts';
 
 const DAY = new Date(2026, 8, 28, 12);
 /** Minutes per km. */
@@ -194,5 +194,164 @@ describe('gpxExport', () => {
     expect(points.length).toBeLessThanOrEqual(MAX_GPX_POINTS);
     expect(points[0].getAttribute('lat')).toBe(long.geometry[0][1].toFixed(6));
     expect(points.at(-1)?.textContent).toBe((450 + 19_999).toFixed(1));
+  });
+});
+
+describe('gpxExport water points', () => {
+  // Straight north for 1.1 km, two points only: a water point beside its middle is far from both vertices.
+  const straight: GpxRoute = {
+    geometry: [
+      [6, 45],
+      [6, 45.01],
+    ],
+    distance: 1.1,
+    estimatedDuration: 6,
+  };
+  /** Degrees of longitude that make `metres` at this latitude. */
+  const east = (metres: number) => metres / (111_195 * Math.cos((45 * Math.PI) / 180));
+  const water = (metres: number, lat = 45.005, extra: Partial<Poi> = {}): Poi => ({
+    category: 'water',
+    position: [6 + east(metres), lat],
+    seasonal: false,
+    ...extra,
+  });
+  const waterPoints = (content: string) => [...parse(content).querySelectorAll('gpx > wpt')];
+
+  it('adds a point within the limit as a named drinking water point, beside the middle of a long leg', () => {
+    const { content } = gpxExport(straight, DAY, { ...french, pois: [water(WATER_POINT_MAX_METRES - 10)] }, PACE);
+
+    const [point] = waterPoints(content);
+    expect(point.querySelector('name')?.textContent).toBe('Eau potable');
+    expect(point.querySelector('sym')?.textContent).toBe('Drinking Water');
+    expect(point.getAttribute('lat')).toBe('45.005000');
+  });
+
+  it('writes them before the track and their children in the order the schema fixes', () => {
+    const { content } = gpxExport(
+      straight,
+      DAY,
+      { ...french, pois: [water(10, 45.005, { seasonal: true, name: 'Source' })] },
+      PACE,
+    );
+
+    const document = parse(content);
+    const order = [...document.documentElement.children].map((element) => element.tagName);
+    expect(order.indexOf('wpt')).toBeLessThan(order.indexOf('trk'));
+    expect([...waterPoints(content)[0].children].map((element) => element.tagName)).toEqual(['name', 'desc', 'sym']);
+  });
+
+  it('leaves out a point beyond the limit', () => {
+    const { content } = gpxExport(straight, DAY, { ...french, pois: [water(WATER_POINT_MAX_METRES + 20)] }, PACE);
+
+    expect(waterPoints(content)).toHaveLength(0);
+  });
+
+  it('leaves out a point beyond the end of the route even when it is within the limit of the line', () => {
+    const { content } = gpxExport(straight, DAY, { ...french, pois: [water(0, 45.01 + 0.0013)] }, PACE);
+
+    expect(waterPoints(content)).toHaveLength(0);
+  });
+
+  it('measures against the whole route, not the points kept of a long one', () => {
+    // 20 000 points, so the track is simplified; the point is 50 m from a vertex that is not kept.
+    const long: GpxRoute = { ...route, geometry: loop(20_000) };
+    const [lon, lat] = long.geometry[9_999];
+    const near: Poi = { category: 'water', position: [lon + east(50), lat], seasonal: false };
+
+    const { content } = gpxExport(long, DAY, { ...french, pois: [near] }, PACE);
+
+    expect(waterPoints(content)).toHaveLength(1);
+  });
+
+  it('marks a seasonal one, named or not', () => {
+    const { content } = gpxExport(
+      straight,
+      DAY,
+      {
+        ...french,
+        pois: [water(10, 45.002, { seasonal: true }), water(10, 45.006, { seasonal: true, name: 'Source des Pins' })],
+      },
+      PACE,
+    );
+
+    const [unnamed, named] = waterPoints(content);
+    expect(unnamed.querySelector('name')?.textContent).toBe('Eau potable saisonnière');
+    expect(unnamed.querySelector('desc')).toBeNull();
+    expect(named.querySelector('name')?.textContent).toBe('Source des Pins');
+    expect(named.querySelector('desc')?.textContent).toBe('Eau potable saisonnière');
+  });
+
+  it('names them in the language of the settings, and escapes an OSM name', () => {
+    const { content } = gpxExport(
+      straight,
+      DAY,
+      { language: 'en', paceUnit: 'min/km', pois: [water(10, 45.002), water(10, 45.006, { name: '<b>&Co' })] },
+      PACE,
+    );
+
+    expect(waterPoints(content).map((point) => point.querySelector('name')?.textContent)).toEqual([
+      'Drinking water',
+      '<b>&Co',
+    ]);
+  });
+
+  it('lists them in the order the route meets them', () => {
+    const { content } = gpxExport(
+      straight,
+      DAY,
+      { ...french, pois: [water(10, 45.008, { name: 'B' }), water(10, 45.002, { name: 'A' })] },
+      PACE,
+    );
+
+    expect(waterPoints(content).map((point) => point.querySelector('name')?.textContent)).toEqual(['A', 'B']);
+  });
+
+  it('does not write twice a water point the user made a waypoint, but writes one they removed from the waypoints', () => {
+    const point = water(10);
+    const waypointPois = { [waypointPoiKey(point.position)]: { category: 'water', seasonal: false } } as const;
+
+    const kept = gpxExport(
+      straight,
+      DAY,
+      { ...french, waypoints: [point.position], waypointPois, pois: [point] },
+      PACE,
+    );
+    const removed = gpxExport(straight, DAY, { ...french, waypoints: [], waypointPois, pois: [point] }, PACE);
+
+    expect(waterPoints(kept.content)).toHaveLength(1);
+    expect(waterPoints(kept.content)[0].querySelector('sym')).toBeNull();
+    expect(waterPoints(removed.content)[0].querySelector('sym')?.textContent).toBe('Drinking Water');
+  });
+
+  it('ignores any other category', () => {
+    const { content } = gpxExport(straight, DAY, { ...french, pois: [{ ...water(10), category: 'viewpoint' }] }, PACE);
+
+    expect(waterPoints(content)).toHaveLength(0);
+  });
+
+  it('keeps the nearest ones when there are more than watches take, still in the order of the route', () => {
+    const many = Array.from({ length: MAX_WATER_POINTS + 5 }, (_, k) =>
+      water(k < MAX_WATER_POINTS ? 5 : 90, 45 + 0.0001 * (k + 1), { name: `P${k}` }),
+    );
+
+    const { content } = gpxExport(straight, DAY, { ...french, pois: many }, PACE);
+
+    const names = waterPoints(content).map((point) => point.querySelector('name')?.textContent);
+    expect(names).toEqual(many.slice(0, MAX_WATER_POINTS).map(({ name }) => name));
+  });
+
+  it('is the same file without any, or with none near', () => {
+    const plain = gpxExport(straight, DAY, french, PACE).content;
+
+    expect(gpxExport(straight, DAY, { ...french, pois: [] }, PACE).content).toBe(plain);
+    expect(gpxExport(straight, DAY, { ...french, pois: [water(1_000)] }, PACE).content).toBe(plain);
+  });
+
+  it('keeps the OSM attribution', () => {
+    const { content } = gpxExport(straight, DAY, { ...french, pois: [water(10)] }, PACE);
+
+    expect(parse(content).querySelector('metadata > copyright')?.getAttribute('author')).toBe(
+      'OpenStreetMap contributors',
+    );
   });
 });

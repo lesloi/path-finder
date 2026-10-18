@@ -1,8 +1,9 @@
-import { ArrowLeftRight, Download, X } from 'lucide-react';
+import { ArrowLeftRight, X } from 'lucide-react';
 
-import { DOCK, ElevationProfile, ICON_BUTTON, PRIMARY_BUTTON, tip } from '../components/index.ts';
-import { exportRoute, type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
+import { DOCK, ElevationProfile, ICON_BUTTON, tip } from '../components/index.ts';
+import { type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
+import { RouteExportButton } from './route-export-button.tsx';
 import { RouteFigures, RouteMarkers, SurfaceShare } from './route-figures.tsx';
 
 /**
@@ -63,16 +64,14 @@ export function RouteDock({
           <RouteFigures route={route} language={language} />
         </div>
         <div className="self-center">
-          <button
-            type="button"
-            data-testid="route-export"
-            className={PRIMARY_BUTTON}
-            // Nothing awaited before the share sheet: it needs the click that opened it.
-            onClick={() => void exportRoute(route, { language, paceUnit, waypoints, waypointPois }, pace)}
-          >
-            <Download size={18} aria-hidden />
-            {t.exportGpx}
-          </button>
+          <RouteExportButton
+            route={route}
+            language={language}
+            paceUnit={paceUnit}
+            pace={pace}
+            waypoints={waypoints}
+            waypointPois={waypointPois}
+          />
         </div>
       </div>
       {/* Room on the right for the close button, which the pins of the profile would otherwise sit under. */}

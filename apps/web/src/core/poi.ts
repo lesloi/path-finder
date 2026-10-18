@@ -1,6 +1,7 @@
 import { POI_TILE_ZOOM } from '../contract/index.ts';
 import { commonText, type Language } from '../i18n/index.ts';
 import type { Position } from './coordinates.ts';
+import { boundsAround } from './route.ts';
 
 /** The kinds of points of interest the map can show. */
 export type PoiCategory = 'water' | 'viewpoint';
@@ -65,6 +66,10 @@ export function poiTilesCovering([west, south, east, north]: [number, number, nu
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) tiles.push([x, y]);
   return tiles;
 }
+
+/** The tiles that hold every point of a route and the margin around it, in metres. */
+export const poiTilesAround = (geometry: number[][], margin: number): [number, number][] =>
+  poiTilesCovering(boundsAround(geometry, margin));
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 const isCategory = (value: unknown): value is PoiCategory => POI_CATEGORIES.includes(value as PoiCategory);
