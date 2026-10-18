@@ -11,7 +11,6 @@ export const ROUTE_ARROW_RATIO = 2;
 // How much of a pixel at this distance from a stroke's axis lies inside it, from 0 to 1.
 const coverage = (distance: number) => Math.min(1, Math.max(0, THICKNESS / 2 - distance + 0.5));
 
-// Distance from a point to a segment.
 function distanceToSegment(px: number, py: number, [ax, ay]: number[], [bx, by]: number[]) {
   const t = Math.min(
     1,
@@ -27,13 +26,10 @@ export function routeArrowImage() {
   const tail = [3, HEIGHT / 2];
   const upper = [tip[0] - 9, 5];
   const lower = [tip[0] - 9, HEIGHT - 5];
+  const strokes = [tail, upper, lower];
   for (let y = 0; y < HEIGHT; y++) {
     for (let x = 0; x < WIDTH; x++) {
-      const distance = Math.min(
-        distanceToSegment(x + 0.5, y + 0.5, tail, tip),
-        distanceToSegment(x + 0.5, y + 0.5, upper, tip),
-        distanceToSegment(x + 0.5, y + 0.5, lower, tip),
-      );
+      const distance = Math.min(...strokes.map((from) => distanceToSegment(x + 0.5, y + 0.5, from, tip)));
       data.set([255, 255, 255, 255 * coverage(distance)], (y * WIDTH + x) * 4);
     }
   }

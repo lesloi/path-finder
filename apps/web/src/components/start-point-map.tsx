@@ -44,8 +44,8 @@ import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { requestPoiTile } from '../state/index.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
-import { ROUTE_ARROW_RATIO, routeArrowImage } from './route-arrow-image.ts';
 import { POI_IMAGE_RATIO, poiImage, poiImageId } from './poi-image.ts';
+import { ROUTE_ARROW_RATIO, routeArrowImage } from './route-arrow-image.ts';
 import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
 import {
   ROUTE_TAG_MUTED,
@@ -70,7 +70,10 @@ const NO_ROOM = 0;
 const MIN_FRAME = 240;
 // A width that makes a thin route easy to tap.
 const HIT_WIDTH = 22;
-// Pixels between two direction arrows (dashes) along the selected route.
+// The arrows follow the order of the coordinates, so a reversed route is drawn the other way round.
+const inDirection = <T,>(geometry: T[], reversed = false) => (reversed ? geometry.toReversed() : geometry);
+
+// An arrow is 18 px long: this leaves a gap between two, so that they read as dashes.
 const ROUTE_ARROW_SPACING = 26;
 
 // What the panels and their margins cover of the map, as `index.css` gives it: custom properties of the
@@ -483,7 +486,7 @@ export function StartPointMap({
       }
       const line = { 'line-join': 'round', 'line-cap': 'round' } as const;
       map.addSource('routes', { type: 'geojson', data: emptyRoutes });
-      // The selected route has a white casing and, along its line, white dashes that end in an arrowhead pointing the way, and its own colour;
+      // The selected route has a white casing, white arrows along its line, and its own colour;
       // the others are one thin grey line, so the eye goes to the one the user looks at.
       // The others come first, so that where they cross the selected route they pass under its casing.
       map.addLayer({
@@ -856,11 +859,7 @@ export function StartPointMap({
     const features = (drawnFor === routes ? (routes ?? []) : [])
       .map((geometry, index) => ({
         type: 'Feature' as const,
-        // The arrows follow the order of the coordinates, so a reversed route is drawn the other way round.
-        geometry: {
-          type: 'LineString' as const,
-          coordinates: reversedRoutes?.has(index) ? geometry.toReversed() : geometry,
-        },
+        geometry: { type: 'LineString' as const, coordinates: inDirection(geometry, reversedRoutes?.has(index)) },
         properties: {
           index,
           selected: index === selectedRoute,
@@ -986,8 +985,7 @@ export function StartPointMap({
     const marked = detail ? selectedRoute : markedRoute;
     const summary = marked === undefined ? undefined : summaries?.[marked];
     const markedGeometry = marked === undefined ? undefined : drawn[marked];
-    const geometry =
-      marked !== undefined && reversedRoutes?.has(marked) ? markedGeometry?.toReversed() : markedGeometry;
+    const geometry = markedGeometry && inDirection(markedGeometry, reversedRoutes?.has(marked!));
     const interval = summary && markerInterval(summary.distance);
     const markerArea = freeArea(map, desktop, sheetHeight, space, [MARKER_HALF, MARKER_HALF]);
     const markers =
