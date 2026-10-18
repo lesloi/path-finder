@@ -109,7 +109,7 @@ export function RouteMarkers({
 }) {
   if (!route.technical) return null;
   return (
-    <div className={`flex flex-wrap gap-x-4 ${className}`}>
+    <div className={`flex ${className}`}>
       <Marker icon={Mountain} text={routesText[language].technical} testId="route-technical" />
     </div>
   );

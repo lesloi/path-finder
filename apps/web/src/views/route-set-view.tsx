@@ -345,7 +345,7 @@ function RouteDetail({
         />
         <RouteFigures route={route} language={language} className="flex-1" />
       </div>
-      <RouteMarkers route={route} language={language} className="gap-y-1" />
+      <RouteMarkers route={route} language={language} />
       <ElevationProfile
         testId="route-profile"
         route={route}
