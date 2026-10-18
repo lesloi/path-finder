@@ -2,6 +2,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Crosshair,
+  LoaderCircle,
   LocateFixed,
   MapPinCheck,
   MapPinPlus,
@@ -186,6 +187,8 @@ const NO_START: Position = [0, 0];
  */
 // Two readings of a point of interest this close are the same point.
 const SAME_POI_KM = 0.005;
+// Some browsers never call back when the permission prompt is dismissed; the 10 s timeout starts only after it is granted.
+const LOCATE_GIVE_UP = 15_000;
 
 const NO_AREAS: AvoidedArea[] = [];
 
@@ -195,6 +198,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Kept here: the form is mounted in the column or in the sheet, whichever the screen shows.
   const draft = useCriteriaDraft();
   const [start, setStart] = useState<Position>();
+  const [locating, setLocating] = useState(false);
+  const locateTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Where the server can route; unknown until it says, or if it cannot: then the server's own refusal stands.
   const coverage = useCoverage();
   const uncoveredId = useId();
@@ -411,14 +416,33 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   // Geolocation is asked for only here, when the user taps a "My location" button.
   function locate() {
+    if (locateTimer.current) return;
     setToast(undefined);
     if (!navigator.geolocation) return warn('unavailable');
+    setLocating(true);
+    // The ref, not the state, guards: two taps can come before the next render.
+    const request = setTimeout(() => settle(request), LOCATE_GIVE_UP);
+    locateTimer.current = request;
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => moveStart([coords.longitude, coords.latitude]),
-      () => warn('unavailable'),
+      ({ coords }) => {
+        settle(request);
+        moveStart([coords.longitude, coords.latitude]);
+      },
+      () => {
+        settle(request);
+        warn('unavailable');
+      },
       // Without a timeout, a position that never comes would never show the toast.
       { timeout: 10_000 },
     );
+  }
+
+  // A request that was given up on must not end the one that replaced it.
+  function settle(request: ReturnType<typeof setTimeout>) {
+    if (locateTimer.current !== request) return;
+    clearTimeout(request);
+    locateTimer.current = undefined;
+    setLocating(false);
   }
 
   const refusals = {
@@ -521,6 +545,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         setMode(picking ? undefined : 'pick');
         setLayerOpen(false);
       }}
+      locating={locating}
       onLocate={locate}
       onSubmit={(request) => {
         setLayerOpen(false);
@@ -633,10 +658,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           data-testid="criteria-locate"
           className={`${FLOATING_BUTTON} fixed z-5 ${STACKED}`}
           style={slotStyle(0)}
-          {...tip(t.myLocation, 'stack')}
+          {...tip(locating ? t.locating : t.myLocation, 'stack')}
+          aria-busy={locating}
           onClick={locate}
         >
-          <LocateFixed size={20} aria-hidden />
+          <LocateIcon locating={locating} />
         </button>
       )}
       {reframeShown && (
@@ -844,6 +870,7 @@ function CriteriaFields({
   onStartChange,
   onUnreadable,
   onPick,
+  locating,
   onLocate,
   onSubmit,
 }: {
@@ -860,6 +887,7 @@ function CriteriaFields({
   onStartChange: (start: Position) => void;
   onUnreadable: () => void;
   onPick: () => void;
+  locating: boolean;
   onLocate: () => void;
   onSubmit: (request: RouteSetRequest) => void;
 }) {
@@ -887,10 +915,11 @@ function CriteriaFields({
           type="button"
           className={ICON_BUTTON}
           data-testid="criteria-start-locate"
-          {...tip(t.myLocation, 'bottom-end')}
+          {...tip(locating ? t.locating : t.myLocation, 'bottom-end')}
+          aria-busy={locating}
           onClick={onLocate}
         >
-          <LocateFixed size={20} aria-hidden />
+          <LocateIcon locating={locating} />
         </button>
       </StartPointField>
       <CriteriaForm
@@ -1005,5 +1034,13 @@ function StartPointField({
         </p>
       )}
     </div>
+  );
+}
+
+function LocateIcon({ locating }: { locating: boolean }) {
+  return locating ? (
+    <LoaderCircle size={20} aria-hidden className="animate-spin motion-reduce:animate-none" />
+  ) : (
+    <LocateFixed size={20} aria-hidden />
   );
 }
