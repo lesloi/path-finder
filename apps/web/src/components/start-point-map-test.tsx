@@ -344,6 +344,17 @@ describe('StartPointMap', () => {
     const features = () =>
       (map().getSource('routes') as GeoJSONSource & { data: { features: { properties: object }[] } }).data.features;
 
+    it('draws a reversed route the other way round, so that its arrows follow', () => {
+      const coordinates = () =>
+        (
+          map().getSource('routes') as GeoJSONSource & { data: { features: { geometry: { coordinates: unknown } }[] } }
+        ).data.features.map(({ geometry }) => geometry.coordinates);
+
+      renderRoutes({ reversedRoutes: new Set([0]) });
+
+      expect(coordinates()).toEqual([routes[0].toReversed(), ...routes.slice(1)]);
+    });
+
     it('draws the selected route in its colour, last, and the others in grey', () => {
       renderRoutes({ selectedRoute: 0 });
 

@@ -856,7 +856,11 @@ export function StartPointMap({
     const features = (drawnFor === routes ? (routes ?? []) : [])
       .map((geometry, index) => ({
         type: 'Feature' as const,
-        geometry: { type: 'LineString' as const, coordinates: geometry },
+        // The arrows follow the order of the coordinates, so a reversed route is drawn the other way round.
+        geometry: {
+          type: 'LineString' as const,
+          coordinates: reversedRoutes?.has(index) ? geometry.toReversed() : geometry,
+        },
         properties: {
           index,
           selected: index === selectedRoute,
@@ -869,7 +873,7 @@ export function StartPointMap({
     // The selected route last, so it is drawn on top.
     features.sort((a, b) => Number(a.properties.selected) - Number(b.properties.selected));
     source.setData({ type: 'FeatureCollection', features });
-  }, [loaded, routes, selectedRoute, framing, drawnFor, styleVersion]);
+  }, [loaded, routes, reversedRoutes, selectedRoute, framing, drawnFor, styleVersion]);
 
   // The veil covers what no cell does; a new style drops it, so it is set again.
   useEffect(() => {
