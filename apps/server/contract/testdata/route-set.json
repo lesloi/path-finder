@@ -10,7 +10,6 @@
       "elevationLoss": 240,
       "estimatedDuration": 62,
       "kind": "match",
-      "misses": [],
       "unpavedShare": 0.4,
       "surfaces": [
         {
@@ -34,12 +33,6 @@
       "distance": 12.9,
       "estimatedDuration": 80,
       "kind": "suggestion",
-      "misses": [
-        {
-          "criterion": "distance",
-          "gap": 2.9
-        }
-      ],
       "unpavedShare": 0,
       "surfaces": [
         {

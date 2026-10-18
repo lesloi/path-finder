@@ -15,6 +15,3 @@ export type ApiError =
 
 /** A part of a route on one surface, `from` and `to` in kilometres along the route, in order and without gaps. */
 export type SurfaceStretch = { surface: 'paved' | 'unpaved'; from: number; to: number };
-
-/** `gap` is in the criterion's unit: kilometres, minutes, or metres. */
-export type Miss = { criterion: 'distance' | 'duration' | 'elevationGain'; gap: number };

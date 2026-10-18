@@ -48,13 +48,6 @@ const (
 	CodeGenerationTimeout = "generation-timeout"
 )
 
-// Miss is a criterion a suggestion misses, with its gap in the criterion's unit: kilometres,
-// minutes, or metres.
-type Miss struct {
-	Criterion string  `json:"criterion"` // distance, duration or elevationGain
-	Gap       float64 `json:"gap"`
-}
-
 // SurfaceStretch is a part of a route on one surface, from and to in kilometres along the route.
 // The stretches of a route are in order and cover it from 0 to its distance without gaps.
 type SurfaceStretch struct {
@@ -72,7 +65,6 @@ type Route struct {
 	ElevationLoss     *float64         `json:"elevationLoss,omitempty"`
 	EstimatedDuration float64          `json:"estimatedDuration"` // minutes
 	Kind              string           `json:"kind"`              // match or suggestion
-	Misses            []Miss           `json:"misses"`
 	UnpavedShare      float64          `json:"unpavedShare"`
 	Surfaces          []SurfaceStretch `json:"surfaces"`
 	Technical         bool             `json:"technical"` // holds a technical stretch

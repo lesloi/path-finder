@@ -20,7 +20,7 @@
   --color-veil: #4a4f47;
   --color-veil-on-photo: #f4f2ea;
 
-  /* Road surfaces of a route (#9), and the icon of a criterion a suggestion misses. */
+  /* Road surfaces of a route (#9); also the icon of a technical stretch. */
   --color-miss: #ef6c00;
   --color-paved: #c3c8d0;
   --color-unpaved: #e0703a;

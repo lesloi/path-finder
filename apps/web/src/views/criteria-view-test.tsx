@@ -756,7 +756,6 @@ describe('CriteriaView', () => {
       elevationGain: 300,
       estimatedDuration: 70,
       kind: 'match',
-      misses: [],
       unpavedShare: 0.3,
       surfaces: [{ surface: 'paved', from: 0, to: 10 }],
       technical: false,
@@ -961,7 +960,7 @@ describe('CriteriaView', () => {
 
     it('shows the route set in the column, and draws its routes on the map', async () => {
       onDesktop();
-      ask(answer(route(0), route(1, { kind: 'suggestion', misses: [{ criterion: 'distance', gap: 1 }] })));
+      ask(answer(route(0), route(1, { kind: 'suggestion' })));
       render(<CriteriaView language="en" />);
       act(() => map().fire('style.load'));
 
@@ -1650,7 +1649,6 @@ describe('CriteriaView', () => {
       elevationGain: 30,
       estimatedDuration: 70,
       kind: 'match',
-      misses: [],
       unpavedShare: 0.3,
       surfaces: [{ surface: 'paved', from: 0, to: 10 }],
       technical: false,
