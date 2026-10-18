@@ -70,9 +70,6 @@ const NO_ROOM = 0;
 const MIN_FRAME = 240;
 // A width that makes a thin route easy to tap.
 const HIT_WIDTH = 22;
-// The arrows follow the order of the coordinates, so a reversed route is drawn the other way round.
-const inDirection = <T,>(geometry: T[], reversed = false) => (reversed ? geometry.toReversed() : geometry);
-
 // An arrow is 18 px long: this leaves a gap between two, so that they read as dashes.
 const ROUTE_ARROW_SPACING = 26;
 
@@ -224,7 +221,7 @@ export function StartPointMap({
   avoiding = false,
   routes,
   summaries,
-  reversedRoutes,
+  directedRoutes,
   coverage,
   language = 'en',
   poiCategories = [],
@@ -254,8 +251,11 @@ export function StartPointMap({
   routes?: Position[][];
   /** The distance and elevation gain of each route, in the same order, for its label. */
   summaries?: RouteSummary[];
-  /** The routes run the other way, by their place in `routes`: their distance markers count from the other end. */
-  reversedRoutes?: ReadonlySet<number>;
+  /**
+   * The geometry of each route in the way the user runs it, which the arrows and the distance markers follow.
+   * `routes` stays the same when a route is reversed, as it keys the framing; without this, they follow it.
+   */
+  directedRoutes?: Position[][];
   /** The cells where the server can route: the rest of the map is veiled. None draws no veil. */
   coverage?: CoverageCell[] | undefined;
   /** The language of the labels. */
@@ -856,10 +856,10 @@ export function StartPointMap({
   useEffect(() => {
     const source = mapRef.current?.getSource('routes') as GeoJSONSource | undefined;
     if (!loaded || !source) return;
-    const features = (drawnFor === routes ? (routes ?? []) : [])
+    const features = (drawnFor === routes ? (directedRoutes ?? routes ?? []) : [])
       .map((geometry, index) => ({
         type: 'Feature' as const,
-        geometry: { type: 'LineString' as const, coordinates: inDirection(geometry, reversedRoutes?.has(index)) },
+        geometry: { type: 'LineString' as const, coordinates: geometry },
         properties: {
           index,
           selected: index === selectedRoute,
@@ -872,7 +872,7 @@ export function StartPointMap({
     // The selected route last, so it is drawn on top.
     features.sort((a, b) => Number(a.properties.selected) - Number(b.properties.selected));
     source.setData({ type: 'FeatureCollection', features });
-  }, [loaded, routes, reversedRoutes, selectedRoute, framing, drawnFor, styleVersion]);
+  }, [loaded, routes, directedRoutes, selectedRoute, framing, drawnFor, styleVersion]);
 
   // The veil covers what no cell does; a new style drops it, so it is set again.
   useEffect(() => {
@@ -947,7 +947,7 @@ export function StartPointMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!loaded || !map?.getSource('route-badges')) return;
-    const drawn = drawnFor === routes ? (routes ?? []) : [];
+    const drawn = drawnFor === routes ? (directedRoutes ?? routes ?? []) : [];
     const detail = framing === 'selected';
     const project = ([lon, lat]: Position) => map.project([lon, lat]);
     // Read once: it asks the browser for a layout.
@@ -984,8 +984,7 @@ export function StartPointMap({
     // The route with markers: the one of the open detail, or the one a desktop marks while it shows the others.
     const marked = detail ? selectedRoute : markedRoute;
     const summary = marked === undefined ? undefined : summaries?.[marked];
-    const markedGeometry = marked === undefined ? undefined : drawn[marked];
-    const geometry = markedGeometry && inDirection(markedGeometry, reversedRoutes?.has(marked!));
+    const geometry = marked === undefined ? undefined : drawn[marked];
     const interval = summary && markerInterval(summary.distance);
     const markerArea = freeArea(map, desktop, sheetHeight, space, [MARKER_HALF, MARKER_HALF]);
     const markers =
@@ -1014,8 +1013,8 @@ export function StartPointMap({
   }, [
     loaded,
     routes,
+    directedRoutes,
     summaries,
-    reversedRoutes,
     language,
     selectedRoute,
     markedRoute,

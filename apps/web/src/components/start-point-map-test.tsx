@@ -348,8 +348,8 @@ describe('StartPointMap', () => {
         }
       ).data.features;
 
-    it('draws a reversed route the other way round, so that its arrows follow', () => {
-      renderRoutes({ reversedRoutes: new Set([0]) });
+    it('draws the routes in the direction it is given, so that the arrows follow', () => {
+      renderRoutes({ directedRoutes: [routes[0].toReversed(), ...routes.slice(1)] });
 
       expect(features().map(({ geometry }) => geometry.coordinates)).toEqual([
         routes[0].toReversed(),

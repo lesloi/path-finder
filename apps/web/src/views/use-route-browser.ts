@@ -27,6 +27,12 @@ export function useRouteBrowser() {
     [routeSet],
   );
 
+  // The same, with the routes the user runs the other way turned round, for what follows their direction.
+  const directedGeometries = useMemo(
+    () => geometries?.map((geometry, index) => (reversed.has(index) ? geometry.toReversed() : geometry)),
+    [geometries, reversed],
+  );
+
   const changeSheet = (state: SheetState) => {
     setSheet(state);
     setHover(undefined);
@@ -50,6 +56,7 @@ export function useRouteBrowser() {
     detail: sheet === 'expanded',
     hover,
     geometries,
+    directedGeometries,
     reversed,
     toggleReversed: (index: number) => {
       // The place pointed at belongs to the profile of the other direction.

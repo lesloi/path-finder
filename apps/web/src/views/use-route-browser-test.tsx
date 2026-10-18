@@ -184,4 +184,14 @@ describe('useRouteBrowser', () => {
     act(() => result.current.setSnapshot({ of: [] } as unknown as MapSnapshot));
     expect(result.current.snapshot).toBeUndefined();
   });
+
+  it('turns round the geometry of a reversed route only, and keeps the one that frames the map', async () => {
+    const { result } = await browse();
+    const framing = result.current.geometries;
+
+    act(() => result.current.toggleReversed(0));
+
+    expect(result.current.directedGeometries).toEqual([route.geometry.toReversed(), route.geometry]);
+    expect(result.current.geometries).toBe(framing);
+  });
 });
