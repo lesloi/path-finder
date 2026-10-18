@@ -406,6 +406,15 @@ describe('RouteSetView', () => {
       );
     });
 
+    it('mentions the technical stretches of the opened route, and only those', () => {
+      const { unmount } = render(<View list={[route({ technical: true })]} open />);
+      expect(screen.getByTestId('route-technical')).toHaveTextContent(en.technical);
+      unmount();
+
+      render(<View list={[route()]} open />);
+      expect(screen.queryByTestId('route-technical')).not.toBeInTheDocument();
+    });
+
     it('puts the distance and the estimated duration side by side, then the climb and the descent', () => {
       open();
 

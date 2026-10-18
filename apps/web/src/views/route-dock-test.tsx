@@ -46,9 +46,18 @@ describe('RouteDock', () => {
     expect(screen.getByTestId('route-dock')).toHaveAccessibleName(routesText.en.route(2, 3));
     expect(screen.getByTestId('route-distance')).toHaveTextContent('12.3 km');
     expect(screen.getByTestId('route-climb')).toHaveTextContent('340 m');
-    expect(screen.getByTestId('route-miss')).toHaveTextContent(`${routesText.en.misses.elevationGain}`);
+    expect(screen.getByTestId('route-miss-elevationGain')).toHaveTextContent(`${routesText.en.misses.elevationGain}`);
     expect(screen.getByTestId('route-surface')).toHaveTextContent('70%');
     expect(screen.getByTestId('route-profile')).toBeInTheDocument();
+  });
+
+  it('mentions the technical stretches of the route, and only those', () => {
+    const { unmount } = dock('en', { route: { ...route, technical: true } });
+    expect(screen.getByTestId('route-technical')).toHaveTextContent(routesText.en.technical);
+    unmount();
+
+    dock('en', { route: { ...route, misses: [] } });
+    expect(screen.queryByTestId('route-technical')).not.toBeInTheDocument();
   });
 
   it('closes from its button', () => {
