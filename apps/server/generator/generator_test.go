@@ -213,7 +213,7 @@ func TestCmpOrFallsBackOnlyForANonPositiveValue(t *testing.T) {
 
 func TestGenerateTellsWhichRoutesHoldATechnicalStretch(t *testing.T) {
 	technical, plain := engineLoop(0), engineLoop(1.5)
-	technical.Technical = true
+	technical.Stretches = []engine.Stretch{{Meters: 5000}, {Meters: 5000, Technical: true}}
 	looper := &fakeLooper{loops: []*engine.Route{technical, plain}}
 	routes, err := generate(t, looper, context.Background(), body)
 	if err != nil {
@@ -295,6 +295,19 @@ func TestTechnicalStretchesOnDifferentSurfacesMakeOne(t *testing.T) {
 	}
 	if len(c.surfaces) != 2 {
 		t.Errorf("surfaces = %+v, want the technical split to leave two", c.surfaces)
+	}
+}
+
+func TestATechnicalStretchTooShortToBeLocatedDoesNotMakeTheRouteTechnical(t *testing.T) {
+	r := engineLoop(0)
+	r.Distance = 10_000
+	r.Technical = true
+	r.Stretches = []engine.Stretch{{Meters: 9999.9998}, {Meters: 0.0002, Technical: true}}
+
+	c := toCandidate(r)
+
+	if c.technical || len(c.technicalStretches) != 0 {
+		t.Errorf("technical %v, stretches %+v, want none", c.technical, c.technicalStretches)
 	}
 }
 

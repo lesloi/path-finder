@@ -131,19 +131,21 @@ export function ElevationProfile({
           onPointerLeave={leave}
         >
           {/* Hatched behind the profile, in HTML: a pattern in the stretched SVG would be warped. */}
-          {route.technicalStretches.map(({ from, to }, k) => (
-            <span
-              key={k}
-              data-testid={testId && `${testId}-technical-${k}`}
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 opacity-60"
-              style={{
-                left: `${percent(from / route.distance)}%`,
-                width: `${percent((to - from) / route.distance)}%`,
-                backgroundImage: 'repeating-linear-gradient(45deg, var(--color-technical) 0 2px, transparent 2px 6px)',
-              }}
-            />
-          ))}
+          {route.distance > 0 &&
+            route.technicalStretches.map(({ from, to }, k) => (
+              <span
+                key={k}
+                data-testid={testId && `${testId}-technical-${k}`}
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 opacity-60"
+                style={{
+                  left: `${percent(from / route.distance)}%`,
+                  width: `${percent((to - from) / route.distance)}%`,
+                  backgroundImage:
+                    'repeating-linear-gradient(45deg, var(--color-technical) 0 2px, transparent 2px 6px)',
+                }}
+              />
+            ))}
           <svg
             className="absolute inset-0 size-full"
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}

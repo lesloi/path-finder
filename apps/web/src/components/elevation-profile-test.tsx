@@ -127,6 +127,12 @@ describe('ElevationProfile', () => {
       expect(bands[1]).toHaveStyle({ left: '75%', width: '25%' });
     });
 
+    it('shows none for a route with no length', () => {
+      plot(vi.fn(), { distance: 0, technical: true, technicalStretches: [{ from: 0, to: 0 }] });
+
+      expect(screen.queryAllByTestId(/^profile-technical-/)).toHaveLength(0);
+    });
+
     it('shows none for a route without', () => {
       plot();
 
