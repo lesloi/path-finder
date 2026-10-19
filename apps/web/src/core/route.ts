@@ -1,4 +1,4 @@
-import { METRES_PER_DEGREE, type Criteria, type SurfaceStretch } from '../contract/index.ts';
+import { METRES_PER_DEGREE, type Criteria, type SurfaceStretch, type TechnicalStretch } from '../contract/index.ts';
 import type { Position } from './coordinates.ts';
 import { estimatedDuration } from './pace.ts';
 
@@ -24,6 +24,8 @@ export type Route = {
   surfaces: SurfaceStretch[];
   /** Holds a technical stretch: a way where the hands, ropes or chains are needed. */
   technical: boolean;
+  /** Where they are along the route, in order. */
+  technicalStretches: TechnicalStretch[];
   /** Set once the user runs the route the other way: its waypoints are met from the last to the first. */
   reversed?: true;
 };
@@ -54,6 +56,7 @@ function parseRoute(value: unknown): Route | undefined {
     unpavedShare,
     surfaces,
     technical,
+    technicalStretches,
   } = value;
   if (!Array.isArray(geometry) || !geometry.every(isPoint)) return undefined;
   if (!isNumber(distance) || !isNumber(estimatedDuration) || !isNumber(unpavedShare)) return undefined;
@@ -71,6 +74,10 @@ function parseRoute(value: unknown): Route | undefined {
         isNumber(stretch.to),
     );
   if (!validSurfaces) return undefined;
+  const validTechnical =
+    Array.isArray(technicalStretches) &&
+    technicalStretches.every((stretch) => isObject(stretch) && isNumber(stretch.from) && isNumber(stretch.to));
+  if (!validTechnical) return undefined;
   return {
     geometry: geometry as Route['geometry'],
     distance,
@@ -81,6 +88,7 @@ function parseRoute(value: unknown): Route | undefined {
     unpavedShare,
     surfaces: (surfaces as SurfaceStretch[]).map(({ surface, from, to }) => ({ surface, from, to })),
     technical,
+    technicalStretches: (technicalStretches as TechnicalStretch[]).map(({ from, to }) => ({ from, to })),
   };
 }
 
@@ -406,12 +414,14 @@ export function routeTimeline(route: Route, waypoints: Position[], pace: number)
  * Reversing twice gives the route back.
  */
 export function reverseRoute(route: Route, pace: number): Route {
-  const { reversed, elevationGain, elevationLoss, surfaces, ...rest } = route;
+  const { reversed, elevationGain, elevationLoss, surfaces, technicalStretches, ...rest } = route;
   const total = surfaces.at(-1)?.to ?? route.distance;
+  const mirror = ({ from, to }: TechnicalStretch) => ({ from: total - to, to: total - from });
   const turned: Route = {
     ...rest,
     geometry: [...route.geometry].reverse() as Route['geometry'],
-    surfaces: surfaces.map(({ surface, from, to }) => ({ surface, from: total - to, to: total - from })).reverse(),
+    surfaces: surfaces.map((stretch) => ({ surface: stretch.surface, ...mirror(stretch) })).reverse(),
+    technicalStretches: technicalStretches.map(mirror).reverse(),
     ...(elevationLoss !== undefined && { elevationGain: elevationLoss }),
     ...(elevationGain !== undefined && { elevationLoss: elevationGain }),
     ...(!reversed && { reversed: true as const }),

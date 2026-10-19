@@ -213,7 +213,7 @@ func TestCmpOrFallsBackOnlyForANonPositiveValue(t *testing.T) {
 
 func TestGenerateTellsWhichRoutesHoldATechnicalStretch(t *testing.T) {
 	technical, plain := engineLoop(0), engineLoop(1.5)
-	technical.Technical = true
+	technical.Stretches = []engine.Stretch{{Meters: 5000}, {Meters: 5000, Technical: true}}
 	looper := &fakeLooper{loops: []*engine.Route{technical, plain}}
 	routes, err := generate(t, looper, context.Background(), body)
 	if err != nil {
@@ -259,6 +259,65 @@ func TestStretchesDropTheOnesWithoutLengthAndMergeTheirNeighbours(t *testing.T) 
 	want := []contract.SurfaceStretch{{Surface: "paved", From: 0, To: 10}}
 	if got := toCandidate(r).surfaces; !reflect.DeepEqual(got, want) {
 		t.Errorf("surfaces = %+v, want %+v", got, want)
+	}
+}
+
+func TestTechnicalStretchesAreLocatedAlongTheRoute(t *testing.T) {
+	// Arrange: plain 3 km, technical 2 km, plain 5 km.
+	r := engineLoop(0)
+	r.Distance = 10_000
+	r.Technical = true
+	r.Stretches = []engine.Stretch{{Meters: 3000}, {Meters: 2000, Technical: true}, {Meters: 5000}}
+	want := []contract.TechnicalStretch{{From: 3, To: 5}}
+
+	// Act
+	got := toCandidate(r).technicalStretches
+
+	// Assert
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("technical stretches = %+v, want %+v", got, want)
+	}
+}
+
+func TestTechnicalStretchesOnDifferentSurfacesMakeOne(t *testing.T) {
+	r := engineLoop(0)
+	r.Distance = 10_000
+	r.Technical = true
+	r.Stretches = []engine.Stretch{
+		{Meters: 4000}, {Meters: 1000, Technical: true}, {Unpaved: true, Meters: 1000, Technical: true}, {Unpaved: true, Meters: 4000},
+	}
+	want := []contract.TechnicalStretch{{From: 4, To: 6}}
+
+	c := toCandidate(r)
+
+	if !reflect.DeepEqual(c.technicalStretches, want) {
+		t.Errorf("technical stretches = %+v, want %+v", c.technicalStretches, want)
+	}
+	if len(c.surfaces) != 2 {
+		t.Errorf("surfaces = %+v, want the technical split to leave two", c.surfaces)
+	}
+}
+
+func TestATechnicalStretchTooShortToBeLocatedDoesNotMakeTheRouteTechnical(t *testing.T) {
+	r := engineLoop(0)
+	r.Distance = 10_000
+	r.Technical = true
+	r.Stretches = []engine.Stretch{{Meters: 9999.9998}, {Meters: 0.0002, Technical: true}}
+
+	c := toCandidate(r)
+
+	if c.technical || len(c.technicalStretches) != 0 {
+		t.Errorf("technical %v, stretches %+v, want none", c.technical, c.technicalStretches)
+	}
+}
+
+func TestARouteWithoutTechnicalStretchSendsNoneButAnEmptyList(t *testing.T) {
+	r := engineLoop(0)
+
+	got := toCandidate(r).technicalStretches
+
+	if got == nil || len(got) != 0 {
+		t.Errorf("technical stretches = %#v, want an empty non-nil list", got)
 	}
 }
 

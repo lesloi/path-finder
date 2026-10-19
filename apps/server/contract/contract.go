@@ -56,6 +56,13 @@ type SurfaceStretch struct {
 	To      float64 `json:"to"`
 }
 
+// TechnicalStretch is a part of a route on technical ways, from and to in kilometres along the route.
+// The stretches of a route are in order, apart and within its distance.
+type TechnicalStretch struct {
+	From float64 `json:"from"`
+	To   float64 `json:"to"`
+}
+
 // Route is one route of a route set. A geometry point is longitude, latitude and, with elevation
 // data, the height in metres.
 type Route struct {
@@ -68,6 +75,8 @@ type Route struct {
 	UnpavedShare      float64          `json:"unpavedShare"`
 	Surfaces          []SurfaceStretch `json:"surfaces"`
 	Technical         bool             `json:"technical"` // holds a technical stretch
+	// TechnicalStretches locates them; empty, never null, for a route with none.
+	TechnicalStretches []TechnicalStretch `json:"technicalStretches"`
 }
 
 // CoverageCellsPerDegree is how many cells of the coverage grid make a degree: the grid is the same on

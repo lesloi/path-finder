@@ -17,6 +17,7 @@ const route: Route = {
   unpavedShare: 0,
   surfaces: [{ surface: 'paved', from: 0, to: 1.2 }],
   technical: false,
+  technicalStretches: [],
 };
 const at = (k: number): Position => [route.geometry[k][0], route.geometry[k][1]];
 

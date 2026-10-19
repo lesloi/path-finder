@@ -22,6 +22,7 @@ function route(overrides: Partial<Route> = {}): Route {
       { surface: 'unpaved', from: 7, to: 10 },
     ],
     technical: false,
+    technicalStretches: [],
     ...overrides,
   };
 }

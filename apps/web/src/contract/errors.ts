@@ -15,3 +15,6 @@ export type ApiError =
 
 /** A part of a route on one surface, `from` and `to` in kilometres along the route, in order and without gaps. */
 export type SurfaceStretch = { surface: 'paved' | 'unpaved'; from: number; to: number };
+
+/** A part of a route on technical ways, `from` and `to` in kilometres along the route. */
+export type TechnicalStretch = { from: number; to: number };

@@ -61,7 +61,8 @@ _Avoid_: Road type, terrain filter
 **Technical stretch**:
 A way tagged as asking for the hands, ropes or chains: on foot, `sac_scale` `demanding_mountain_hiking` (T3).
 T1 and T2 are ordinary hiking and trail running. T3 ways are part of the routes, with no switch in the criteria:
-a route that holds one carries the badge « passages techniques ». An untagged way is never flagged. Ways from
+a route that holds one carries the badge « passages techniques », and the elevation profile hatches where
+they are along the route. An untagged way is never flagged. Ways from
 `alpine_hiking` (T4) up are not in the graph at all, whatever the surface preference.
 _Avoid_: Dangerous, difficult, T3
 

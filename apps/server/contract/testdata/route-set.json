@@ -23,7 +23,13 @@
           "to": 10.2
         }
       ],
-      "technical": true
+      "technical": true,
+      "technicalStretches": [
+        {
+          "from": 4.5,
+          "to": 7.8
+        }
+      ]
     },
     {
       "geometry": [
@@ -41,7 +47,8 @@
           "to": 12.9
         }
       ],
-      "technical": false
+      "technical": false,
+      "technicalStretches": []
     }
   ]
 }

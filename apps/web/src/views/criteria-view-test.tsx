@@ -759,6 +759,7 @@ describe('CriteriaView', () => {
       unpavedShare: 0.3,
       surfaces: [{ surface: 'paved', from: 0, to: 10 }],
       technical: false,
+      technicalStretches: [],
       ...overrides,
     });
     const answer = (...routes: object[]) => Response.json({ routes });
@@ -1652,6 +1653,7 @@ describe('CriteriaView', () => {
       unpavedShare: 0.3,
       surfaces: [{ surface: 'paved', from: 0, to: 10 }],
       technical: false,
+      technicalStretches: [],
     };
     const startPlacing = () => {
       setStart();

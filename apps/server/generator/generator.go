@@ -211,7 +211,7 @@ func toCandidate(l *engine.Route) *candidate {
 	gain, loss := round(l.Ascent, 1), round(l.Descent, 1)
 	c := &candidate{
 		geometry: geometry, distance: round(l.Distance/1000, 3), elevationGain: &gain, elevationLoss: &loss,
-		unpavedShare: unpaved / total, technical: l.Technical,
+		unpavedShare: unpaved / total, technicalStretches: []contract.TechnicalStretch{},
 	}
 	// Each stretch starts where the previous ends, and the last ends at the route's distance, so
 	// they cover it without gaps. One that rounds to no length is dropped, and the stretches of one
@@ -230,12 +230,31 @@ func toCandidate(l *engine.Route) *candidate {
 		if to == from {
 			continue
 		}
-		if n := len(c.surfaces); n > 0 && c.surfaces[n-1].Surface == surface {
-			c.surfaces[n-1].To = to
-		} else {
-			c.surfaces = append(c.surfaces, contract.SurfaceStretch{Surface: surface, From: from, To: to})
+		if s.Technical {
+			c.technicalStretches = appendTechnical(c.technicalStretches, from, to)
 		}
+		c.surfaces = appendSurface(c.surfaces, surface, from, to)
 		from = to
 	}
+	// Told from the stretches kept, so that the badge never shows for a route with nothing to hatch.
+	c.technical = len(c.technicalStretches) > 0
 	return c
+}
+
+// appendSurface adds a stretch, merged into the last one when it is on the same surface.
+func appendSurface(list []contract.SurfaceStretch, surface string, from, to float64) []contract.SurfaceStretch {
+	if n := len(list); n > 0 && list[n-1].Surface == surface {
+		list[n-1].To = to
+		return list
+	}
+	return append(list, contract.SurfaceStretch{Surface: surface, From: from, To: to})
+}
+
+// appendTechnical adds a stretch, merged into the last one when it follows it.
+func appendTechnical(list []contract.TechnicalStretch, from, to float64) []contract.TechnicalStretch {
+	if n := len(list); n > 0 && list[n-1].To == from {
+		list[n-1].To = to
+		return list
+	}
+	return append(list, contract.TechnicalStretch{From: from, To: to})
 }

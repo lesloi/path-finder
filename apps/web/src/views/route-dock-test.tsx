@@ -20,6 +20,7 @@ const route: Route = {
     { surface: 'unpaved', from: 7, to: 10 },
   ],
   technical: false,
+  technicalStretches: [],
 };
 
 function dock(language: 'en' | 'fr' = 'en', props: Partial<Parameters<typeof RouteDock>[0]> = {}) {
