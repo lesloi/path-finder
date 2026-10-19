@@ -21,6 +21,7 @@ const route: Route = {
   unpavedShare: 0,
   surfaces: [{ surface: 'paved', from: 0, to: 10 }],
   technical: false,
+  technicalStretches: [],
 };
 
 function answer(response: Response | Promise<Response>) {

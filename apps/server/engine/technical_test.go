@@ -162,3 +162,23 @@ func TestAGraphOfAnOlderFormatIsRefused(t *testing.T) {
 		})
 	}
 }
+
+func TestStretchesSplitWhereAWayIsTechnical(t *testing.T) {
+	// Arrange: a path of three ways, the middle one technical, all on one surface.
+	g := &testGraph{}
+	n := []int{g.addNode(0, 0, 100), g.addNode(0, 100, 100), g.addNode(0, 200, 100), g.addNode(0, 300, 100)}
+	for i := 0; i < 3; i++ {
+		g.connect(n[i], n[i+1], KindPath)
+	}
+	g.edges[n[1]][1].Flags = EdgeTechnical // the way from n[1] to n[2]
+	e := openTest(t, g, true)
+	edges := []uint32{e.g.off[n[0]], e.g.off[n[1]] + 1, e.g.off[n[2]] + 1}
+
+	// Act
+	got, technical := e.stretches(edges)
+
+	// Assert
+	if !technical || len(got) != 3 || got[0].Technical || !got[1].Technical || got[2].Technical {
+		t.Errorf("stretches = %+v, technical %v, want plain, technical, plain", got, technical)
+	}
+}

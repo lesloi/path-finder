@@ -44,10 +44,11 @@ type Position struct {
 	Elevation float64
 }
 
-// Stretch is a part of a route on one kind of surface.
+// Stretch is a part of a route on one kind of surface, technical or not.
 type Stretch struct {
-	Unpaved bool
-	Meters  float64
+	Unpaved   bool
+	Technical bool
+	Meters    float64
 }
 
 // Route is a generated route: its geometry and its measures, in metres.
@@ -57,7 +58,7 @@ type Route struct {
 	Ascent     float64
 	Descent    float64
 	TrailShare float64   // share of the distance on trails, 0 to 1
-	Stretches  []Stretch // the surface along the route, consecutive stretches of one kind merged
+	Stretches  []Stretch // the surface and technical ways along the route, consecutive stretches of one kind merged
 	Technical  bool      // the route holds a technical stretch
 }
 
@@ -387,12 +388,13 @@ func isUnpaved(kind, surf uint8) bool {
 func (e *Engine) stretches(edges []uint32) (out []Stretch, technical bool) {
 	for _, id := range edges {
 		ed := e.g.edges[id]
-		technical = technical || ed.Flags&EdgeTechnical != 0
+		isTechnical := ed.Flags&EdgeTechnical != 0
+		technical = technical || isTechnical
 		unpaved := isUnpaved(ed.Kind, ed.Surf)
-		if n := len(out); n > 0 && out[n-1].Unpaved == unpaved {
+		if n := len(out); n > 0 && out[n-1].Unpaved == unpaved && out[n-1].Technical == isTechnical {
 			out[n-1].Meters += float64(ed.Len)
 		} else {
-			out = append(out, Stretch{unpaved, float64(ed.Len)})
+			out = append(out, Stretch{Unpaved: unpaved, Technical: isTechnical, Meters: float64(ed.Len)})
 		}
 	}
 	return out, technical

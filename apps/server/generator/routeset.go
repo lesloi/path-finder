@@ -72,6 +72,8 @@ type candidate struct {
 	unpavedShare  float64
 	technical     bool
 	surfaces      []contract.SurfaceStretch
+	// technicalStretches is never nil: the contract sends [] and not null for a route with none.
+	technicalStretches []contract.TechnicalStretch
 }
 
 // effortDistance is the distance plus the climb, in kilometres.
@@ -195,6 +197,7 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 		Geometry: cand.geometry, Distance: cand.distance, ElevationGain: cand.elevationGain,
 		ElevationLoss: cand.elevationLoss, EstimatedDuration: estimated, Kind: kind,
 		UnpavedShare: cand.unpavedShare, Surfaces: cand.surfaces, Technical: cand.technical,
+		TechnicalStretches: cand.technicalStretches,
 	}, score, worst, cells}, true
 }
 

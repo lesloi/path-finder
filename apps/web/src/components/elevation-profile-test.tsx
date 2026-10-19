@@ -16,6 +16,7 @@ const route: Route = {
   unpavedShare: 0,
   surfaces: [{ surface: 'paved', from: 0, to: 1.2 }],
   technical: false,
+  technicalStretches: [],
 };
 
 function plot(onHover = vi.fn(), props: Partial<Route> = {}, language: 'en' | 'fr' = 'en') {
@@ -106,6 +107,30 @@ describe('ElevationProfile', () => {
       show();
 
       expect(screen.queryByTestId('profile-waypoint-1')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('technical stretches', () => {
+    it('shows a band over each, as wide as the stretch is long', () => {
+      plot(vi.fn(), {
+        technical: true,
+        technicalStretches: [
+          { from: 0.3, to: 0.6 },
+          { from: 0.9, to: 1.2 },
+        ],
+      });
+
+      const bands = screen.getAllByTestId(/^profile-technical-/);
+
+      expect(bands).toHaveLength(2);
+      expect(bands[0]).toHaveStyle({ left: '25%', width: '25%' });
+      expect(bands[1]).toHaveStyle({ left: '75%', width: '25%' });
+    });
+
+    it('shows none for a route without', () => {
+      plot();
+
+      expect(screen.queryAllByTestId(/^profile-technical-/)).toHaveLength(0);
     });
   });
 

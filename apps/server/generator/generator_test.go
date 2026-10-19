@@ -262,6 +262,52 @@ func TestStretchesDropTheOnesWithoutLengthAndMergeTheirNeighbours(t *testing.T) 
 	}
 }
 
+func TestTechnicalStretchesAreLocatedAlongTheRoute(t *testing.T) {
+	// Arrange: plain 3 km, technical 2 km, plain 5 km.
+	r := engineLoop(0)
+	r.Distance = 10_000
+	r.Technical = true
+	r.Stretches = []engine.Stretch{{Meters: 3000}, {Meters: 2000, Technical: true}, {Meters: 5000}}
+	want := []contract.TechnicalStretch{{From: 3, To: 5}}
+
+	// Act
+	got := toCandidate(r).technicalStretches
+
+	// Assert
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("technical stretches = %+v, want %+v", got, want)
+	}
+}
+
+func TestTechnicalStretchesOnDifferentSurfacesMakeOne(t *testing.T) {
+	r := engineLoop(0)
+	r.Distance = 10_000
+	r.Technical = true
+	r.Stretches = []engine.Stretch{
+		{Meters: 4000}, {Meters: 1000, Technical: true}, {Unpaved: true, Meters: 1000, Technical: true}, {Unpaved: true, Meters: 4000},
+	}
+	want := []contract.TechnicalStretch{{From: 4, To: 6}}
+
+	c := toCandidate(r)
+
+	if !reflect.DeepEqual(c.technicalStretches, want) {
+		t.Errorf("technical stretches = %+v, want %+v", c.technicalStretches, want)
+	}
+	if len(c.surfaces) != 2 {
+		t.Errorf("surfaces = %+v, want the technical split to leave two", c.surfaces)
+	}
+}
+
+func TestARouteWithoutTechnicalStretchSendsNoneButAnEmptyList(t *testing.T) {
+	r := engineLoop(0)
+
+	got := toCandidate(r).technicalStretches
+
+	if got == nil || len(got) != 0 {
+		t.Errorf("technical stretches = %#v, want an empty non-nil list", got)
+	}
+}
+
 // withWaypoints is body with waypoints: two near the start point, 1 km and 2 km to the north-east.
 func withWaypoints(waypoints string) string {
 	return `{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"any","pace":6,"waypoints":` + waypoints + `}`

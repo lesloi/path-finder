@@ -44,6 +44,7 @@ const route: Route = {
     { surface: 'unpaved', from: 7, to: 10 },
   ],
   technical: false,
+  technicalStretches: [],
 };
 
 describe('parseRoutes', () => {
@@ -76,10 +77,22 @@ describe('parseRoutes', () => {
     ['an elevation loss that is not a number', { routes: [{ ...route, elevationLoss: '390' }] }],
     ['no technical flag', { routes: [{ ...route, technical: undefined }] }],
     ['a technical flag that is not a boolean', { routes: [{ ...route, technical: 'yes' }] }],
+    ['no technical stretches', { routes: [{ ...route, technicalStretches: undefined }] }],
+    ['a technical stretch without an end', { routes: [{ ...route, technicalStretches: [{ from: 1 }] }] }],
     ['an unknown kind', { routes: [{ ...route, kind: 'perfect' }] }],
     ['an unknown surface', { routes: [{ ...route, surfaces: [{ surface: 'ice', from: 0, to: 10 }] }] }],
   ])('refuses an answer with %s', (_, body) => {
     expect(parseRoutes(body)).toBeUndefined();
+  });
+
+  it('reads where the technical stretches are, leaving out what else they hold', () => {
+    const technicalStretches = [{ from: 2, to: 3.5 }];
+
+    const [parsed] = parseRoutes({
+      routes: [{ ...route, technical: true, technicalStretches: [{ ...technicalStretches[0], extra: 1 }] }],
+    })!;
+
+    expect(parsed!.technicalStretches).toEqual(technicalStretches);
   });
 
   it('leaves out the fields it does not know', () => {
@@ -596,6 +609,26 @@ describe('reverseRoute', () => {
     expect(surfaces[0]!.to).toBeCloseTo(0.3, 5);
     expect(surfaces[1]!.from).toBeCloseTo(0.3, 5);
     expect(surfaces[1]!.to).toBeCloseTo(0.5, 5);
+  });
+
+  it('turns the technical stretches round too', () => {
+    const { technicalStretches } = reverseRoute(
+      {
+        ...original,
+        technical: true,
+        technicalStretches: [
+          { from: 0.1, to: 0.2 },
+          { from: 0.4, to: 0.5 },
+        ],
+      },
+      6,
+    );
+
+    expect(technicalStretches).toHaveLength(2);
+    expect(technicalStretches[0]!.from).toBeCloseTo(0, 5);
+    expect(technicalStretches[0]!.to).toBeCloseTo(0.1, 5);
+    expect(technicalStretches[1]!.from).toBeCloseTo(0.3, 5);
+    expect(technicalStretches[1]!.to).toBeCloseTo(0.4, 5);
   });
 
   it('estimates the duration again from the new climb, ', () => {
