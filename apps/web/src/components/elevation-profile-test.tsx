@@ -140,6 +140,23 @@ describe('ElevationProfile', () => {
     });
   });
 
+  it('lays what it is given under the plot, as wide as the plot', () => {
+    render(
+      <ElevationProfile
+        testId="profile"
+        route={route}
+        language="en"
+        onHover={vi.fn()}
+        below={<p data-testid="below">Under</p>}
+      />,
+    );
+
+    const below = screen.getByTestId('below');
+    expect(screen.getByTestId('profile')).toContainElement(below);
+    // The plot and what is under it share a column, which the altitudes on the left leave to them.
+    expect(below.parentElement?.parentElement).toBe(screen.getByTestId('profile-plot').parentElement);
+  });
+
   it('goes along the profile with the keyboard, as a pointer does', () => {
     const { onHover } = plot();
     const slider = screen.getByTestId('profile-cursor');

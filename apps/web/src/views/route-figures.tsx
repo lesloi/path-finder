@@ -15,14 +15,20 @@ export function RouteFigures({
   route,
   language,
   className = '',
+  compact = false,
 }: {
   route: Route;
   language: Language;
   className?: string;
+  /** The figures closer together, for a narrow column. */
+  compact?: boolean;
 }) {
   const t = { ...criteriaText[language], ...routesText[language] };
   return (
-    <dl className={`m-0 grid grid-cols-2 gap-x-4 gap-y-2 ${className}`} data-testid="route-figures">
+    <dl
+      className={`m-0 grid grid-cols-2 ${compact ? 'gap-x-2' : 'gap-x-4'} gap-y-2 ${className}`}
+      data-testid="route-figures"
+    >
       <Figure label={t.distance} testId="route-distance">
         {formatDistance(route.distance, language)}
       </Figure>
@@ -55,12 +61,20 @@ export function SurfaceShare({ route, language }: { route: Route; language: Lang
   const t = criteriaText[language];
   const shares = surfaceShares(route, language);
   return (
-    <p data-testid="route-surface" className="m-0 flex items-center justify-center gap-1 text-sm text-ink-2">
-      <i className={`size-2 rounded-full ${SURFACE_CLASSES.paved.dot}`} aria-hidden />
-      {t.paved} {shares.paved}
-      <span className="whitespace-pre"> · </span>
-      <i className={`size-2 rounded-full ${SURFACE_CLASSES.unpaved.dot}`} aria-hidden />
-      {t.unpaved} {shares.unpaved}
+    <p
+      data-testid="route-surface"
+      className="m-0 flex flex-wrap items-center justify-center gap-x-3 text-sm text-ink-2"
+    >
+      <span className="flex items-center gap-1">
+        <i className={`size-2 rounded-full ${SURFACE_CLASSES.paved.dot}`} aria-hidden />
+        {t.paved} {shares.paved}
+      </span>
+      {/* Not drawn, the gap does it: but read and copied as the text of the legend. */}
+      <span className="sr-only"> · </span>
+      <span className="flex items-center gap-1">
+        <i className={`size-2 rounded-full ${SURFACE_CLASSES.unpaved.dot}`} aria-hidden />
+        {t.unpaved} {shares.unpaved}
+      </span>
     </p>
   );
 }

@@ -32,7 +32,8 @@
   --spacing-column: 380px;
   /* The desktop route list on the right of the map, and the profile dock under it. */
   --spacing-list: 340px;
-  --spacing-dock: 232px;
+  /* Tall enough for the profile and the stops of the route under it (`RouteStepStrip`): change both together. */
+  --spacing-dock: 300px;
 
   --radius-*: initial;
   --radius-sm: 8px;

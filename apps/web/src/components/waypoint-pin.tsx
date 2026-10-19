@@ -27,6 +27,13 @@ const VARIANTS = {
     poi: 'relative block size-6',
     badge: 'absolute top-0 left-0 size-6',
   },
+  // On a card, at the size of the 14 px icons beside the other stops' names.
+  step: {
+    box: 'relative block h-[18px] w-[15px]',
+    number: 'top-0 flex h-[15px] items-center justify-center text-[10px]',
+    poi: 'relative block size-[18px]',
+    badge: 'absolute top-0 left-0 size-[18px]',
+  },
 };
 
 /**
