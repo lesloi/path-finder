@@ -2,7 +2,6 @@ import type { SurfaceStretch } from '../contract/index.ts';
 import type { Position } from './coordinates.ts';
 import {
   elevationProfile,
-  missText,
   parseRoutes,
   reverseRoute,
   projectOnSnapshot,
@@ -39,7 +38,6 @@ const route: Route = {
   elevationLoss: 390,
   estimatedDuration: 84,
   kind: 'match',
-  misses: [],
   unpavedShare: 0.3,
   surfaces: [
     { surface: 'paved', from: 0, to: 7 },
@@ -79,7 +77,6 @@ describe('parseRoutes', () => {
     ['no technical flag', { routes: [{ ...route, technical: undefined }] }],
     ['a technical flag that is not a boolean', { routes: [{ ...route, technical: 'yes' }] }],
     ['an unknown kind', { routes: [{ ...route, kind: 'perfect' }] }],
-    ['an unknown missed criterion', { routes: [{ ...route, misses: [{ criterion: 'surface', gap: 1 }] }] }],
     ['an unknown surface', { routes: [{ ...route, surfaces: [{ surface: 'ice', from: 0, to: 10 }] }] }],
   ])('refuses an answer with %s', (_, body) => {
     expect(parseRoutes(body)).toBeUndefined();
@@ -264,31 +261,6 @@ describe('distanceMarkers', () => {
 
   it('has none on a route shorter than a step', () => {
     expect(distanceMarkers(geometry, 5)).toEqual([]);
-  });
-});
-
-describe('missText', () => {
-  const metric = 'en';
-
-  it.each([
-    ['a distance too long', { criterion: 'distance', gap: 2 }, { distance: 12 }, '+20% distance'],
-    ['a distance too short', { criterion: 'distance', gap: -2 }, { distance: 8 }, '-20% distance'],
-    ['a duration too long', { criterion: 'duration', gap: 15 }, { estimatedDuration: 75 }, '+25% duration'],
-    ['too much climb', { criterion: 'elevationGain', gap: 120 }, { elevationGain: 520 }, '+30% elevation gain'],
-  ] as const)('gives %s as a share of the target', (_, miss, values, expected) => {
-    expect(missText(miss, { ...route, ...values }, metric)).toBe(expected);
-  });
-
-  it('gives a gap in elevation gain in metres when the target is too small for a share', () => {
-    expect(missText({ criterion: 'elevationGain', gap: 80 }, { ...route, elevationGain: 80 }, metric)).toBe(
-      '+80 m elevation gain',
-    );
-  });
-
-  it('follows the language', () => {
-    const miss = { criterion: 'elevationGain', gap: 80 } as const;
-
-    expect(missText(miss, { ...route, elevationGain: 90 }, 'fr')).toBe('+80 m de dénivelé');
   });
 });
 
@@ -626,18 +598,11 @@ describe('reverseRoute', () => {
     expect(surfaces[1]!.to).toBeCloseTo(0.5, 5);
   });
 
-  it('estimates the duration again from the new climb, and moves the gaps with the figures', () => {
-    const suggestion: Route = {
-      ...original,
-      kind: 'suggestion',
-      misses: [{ criterion: 'elevationGain', gap: 10 }],
-    };
-
-    const reversed = reverseRoute(suggestion, 6);
+  it('estimates the duration again from the new climb, ', () => {
+    const reversed = reverseRoute(original, 6);
 
     // 0.5 km and 5 m of climb, at 100 m of climb per km of effort.
     expect(reversed.estimatedDuration).toBeCloseTo((0.5 + 0.05) * 6, 5);
-    expect(reversed.misses).toEqual([{ criterion: 'elevationGain', gap: 10 - 25 }]);
   });
 
   it('leaves a route without heights as it is, but turned round', () => {

@@ -1,9 +1,8 @@
-import { ArrowDownRight, ArrowUpRight, Mountain, Ruler, Timer, TrendingUp, type LucideIcon } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Mountain } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { SURFACE_CLASSES } from '../components/index.ts';
-import type { Miss } from '../contract/index.ts';
-import { formatDistance, formatDuration, formatHeight, missText, type Route } from '../core/index.ts';
+import { formatDistance, formatDuration, formatHeight, type Route } from '../core/index.ts';
 import type { Language } from '../i18n/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
 
@@ -102,43 +101,20 @@ function Figure({
   );
 }
 
-/** A remark on a route, such as a criterion it misses or a technical stretch it holds. */
-export function Marker({ icon: Icon, text, testId }: { icon: LucideIcon; text: string; testId: string }) {
-  return (
-    <span data-testid={testId} className="flex items-center gap-1 text-sm font-semibold text-ink">
-      <Icon size={14} aria-hidden className="text-miss" />
-      {text}
-    </span>
-  );
-}
-
-const MISS_ICONS = { distance: Ruler, duration: Timer, elevationGain: TrendingUp } satisfies Record<
-  Miss['criterion'],
-  LucideIcon
->;
-
-/** A criterion a suggestion misses, with its gap, such as "+30% elevation gain". */
-export function MissMarker({ miss, text, testId }: { miss: Miss; text: string; testId: string }) {
-  return <Marker icon={MISS_ICONS[miss.criterion]} text={text} testId={`${testId}-${miss.criterion}`} />;
-}
-
-/** The criteria a route misses and its technical stretches, or nothing for a route with neither. */
-export function RouteMarkers({
-  route,
-  language,
+/** The remark on a route that holds technical stretches, where the hands, ropes or chains are needed. */
+export function TechnicalMarker({
+  text,
+  testId,
   className = '',
 }: {
-  route: Route;
-  language: Language;
+  text: string;
+  testId: string;
   className?: string;
 }) {
-  if (route.misses.length === 0 && !route.technical) return null;
   return (
-    <div className={`flex flex-wrap gap-x-4 ${className}`}>
-      {route.misses.map((miss) => (
-        <MissMarker key={miss.criterion} miss={miss} text={missText(miss, route, language)} testId="route-miss" />
-      ))}
-      {route.technical && <Marker icon={Mountain} text={routesText[language].technical} testId="route-technical" />}
-    </div>
+    <span data-testid={testId} className={`flex items-center gap-1 text-sm font-semibold text-ink ${className}`}>
+      <Mountain size={14} aria-hidden className="text-technical" />
+      {text}
+    </span>
   );
 }

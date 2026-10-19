@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowLeftRight, ArrowUpRight, ChevronRight, Clock, Mountain, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, ArrowUpRight, ChevronRight, Clock, Trash2 } from 'lucide-react';
 import { useRef, type PointerEvent } from 'react';
 
 import {
@@ -14,7 +14,6 @@ import {
   formatDistance,
   formatDuration,
   formatHeight,
-  missText,
   type Position,
   type WaypointPois,
   type MapSnapshot,
@@ -22,7 +21,7 @@ import {
   type PaceUnit,
 } from '../core/index.ts';
 import { criteriaText, routesText, type Language } from '../i18n/index.ts';
-import { Marker, MissMarker, RouteFigures, RouteMarkers, SurfaceShare, surfaceShares } from './route-figures.tsx';
+import { RouteFigures, SurfaceShare, TechnicalMarker, surfaceShares } from './route-figures.tsx';
 import { RouteTimeline } from './route-timeline.tsx';
 import { RouteCarousel } from './route-carousel.tsx';
 import { RoutePace } from './route-pace.tsx';
@@ -196,7 +195,6 @@ function RouteRow({
   const distance = formatDistance(route.distance, language);
   const duration = formatDuration(route.estimatedDuration, language);
   const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, language);
-  const misses = route.misses.map((miss) => missText(miss, route, language));
   const shares = surfaceShares(route, language);
   const surface = `${t.paved} ${shares.paved} · ${t.unpaved} ${shares.unpaved}`;
   const name = [
@@ -205,7 +203,6 @@ function RouteRow({
     ...(gain ? [`${t.elevationGain} ${gain}`] : []),
     `${t.estimatedDuration} ${duration}`,
     surface,
-    ...misses,
     ...(route.technical ? [t.technical] : []),
   ].join(', ');
   return (
@@ -252,10 +249,7 @@ function RouteRow({
               {duration}
             </span>
           </span>
-          {route.misses.map((miss, k) => (
-            <MissMarker key={miss.criterion} miss={miss} text={misses[k]} testId={`routes-row-${index}-miss`} />
-          ))}
-          {route.technical && <Marker icon={Mountain} text={t.technical} testId={`routes-row-${index}-technical`} />}
+          {route.technical && <TechnicalMarker text={t.technical} testId={`routes-row-${index}-technical`} />}
         </span>
         {/* The empty width of the row: where the route climbs, at a glance. */}
         <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
@@ -350,7 +344,7 @@ function RouteDetail({
         />
         <RouteFigures route={route} language={language} className="flex-1" />
       </div>
-      <RouteMarkers route={route} language={language} className="gap-y-1" />
+      {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" />}
       <ElevationProfile
         testId="route-profile"
         route={route}

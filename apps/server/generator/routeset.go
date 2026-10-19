@@ -85,12 +85,11 @@ func effortDistance(distance float64, elevationGain *float64) float64 {
 // check is how a route fares against one criterion. relative is its gap relative to the
 // criterion, for ranking.
 type check struct {
-	criterion     string
 	gap, relative float64
 	tier          tier
 }
 
-func againstTarget(criterion string, gap, scale float64, bounds [tierOut]float64) check {
+func againstTarget(gap, scale float64, bounds [tierOut]float64) check {
 	size := math.Abs(gap)
 	t := tierOut
 	for i, bound := range bounds {
@@ -99,7 +98,7 @@ func againstTarget(criterion string, gap, scale float64, bounds [tierOut]float64
 			break
 		}
 	}
-	return check{criterion, gap, size / scale, t}
+	return check{gap, size / scale, t}
 }
 
 // tierOfLevel is the tier of a shortcut, which has no wide level: a shortcut is a kind of terrain, not a
@@ -123,19 +122,19 @@ func againstLevel(distance, gain float64, level string) check {
 	bound := l.match * distance
 	gap := gain - bound
 	if level == "flat" {
-		return check{"elevationGain", gap, math.Max(0, gap) / bound, tierOfLevel(perKm <= l.match, perKm <= l.suggestion)}
+		return check{gap, math.Max(0, gap) / bound, tierOfLevel(perKm <= l.match, perKm <= l.suggestion)}
 	}
-	return check{"elevationGain", gap, math.Max(0, -gap) / bound, tierOfLevel(perKm >= l.match, perKm >= l.suggestion)}
+	return check{gap, math.Max(0, -gap) / bound, tierOfLevel(perKm >= l.match, perKm >= l.suggestion)}
 }
 
 func checks(c contract.Criteria, cand *candidate, estimatedDuration float64) []check {
 	var out []check
 	if c.Target.Distance > 0 {
 		t := c.Target.Distance
-		out = append(out, againstTarget("distance", cand.distance-t, t, boundsOf(t, tolerance.distanceBound)))
+		out = append(out, againstTarget(cand.distance-t, t, boundsOf(t, tolerance.distanceBound)))
 	} else {
 		t := c.Target.Duration
-		out = append(out, againstTarget("duration", estimatedDuration-t, t, boundsOf(t, tolerance.distanceBound)))
+		out = append(out, againstTarget(estimatedDuration-t, t, boundsOf(t, tolerance.distanceBound)))
 	}
 	// Without a target elevation gain, or a route with none, only the distance counts.
 	if cand.elevationGain == nil || c.ElevationGain == nil {
@@ -147,7 +146,7 @@ func checks(c contract.Criteria, cand *candidate, estimatedDuration float64) []c
 	}
 	t := c.ElevationGain.Metres
 	m := matchTolerance
-	return append(out, againstTarget("elevationGain", gain-t,
+	return append(out, againstTarget(gain-t,
 		// Below this target, the floor of the match tolerance applies.
 		math.Max(t, m.elevationGainFloor/m.elevationGain),
 		boundsOf(t, tolerance.gainBound)))
@@ -174,14 +173,10 @@ type ranked struct {
 func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, bool) {
 	estimated := effortDistance(cand.distance, cand.elevationGain) * c.Pace
 	results := checks(c, cand, estimated)
-	misses := []contract.Miss{}
 	score, worst := 0.0, tierMatch
 	for _, r := range results {
 		if r.tier == tierOut {
 			return ranked{}, false
-		}
-		if r.tier != tierMatch {
-			misses = append(misses, contract.Miss{Criterion: r.criterion, Gap: r.gap})
 		}
 		worst = max(worst, r.tier)
 		score += r.relative
@@ -198,7 +193,7 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	}
 	return ranked{contract.Route{
 		Geometry: cand.geometry, Distance: cand.distance, ElevationGain: cand.elevationGain,
-		ElevationLoss: cand.elevationLoss, EstimatedDuration: estimated, Kind: kind, Misses: misses,
+		ElevationLoss: cand.elevationLoss, EstimatedDuration: estimated, Kind: kind,
 		UnpavedShare: cand.unpavedShare, Surfaces: cand.surfaces, Technical: cand.technical,
 	}, score, worst, cells}, true
 }

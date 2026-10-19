@@ -98,11 +98,11 @@ func distances(routes []contract.Route) (out []float64) {
 
 func TestDistanceTolerances(t *testing.T) {
 	c := criteria(nil)
-	if r := build(c, compose(withDistance(10.9))); len(r) != 1 || r[0].Kind != "match" || len(r[0].Misses) != 0 {
+	if r := build(c, compose(withDistance(10.9))); len(r) != 1 || r[0].Kind != "match" {
 		t.Errorf("10.9 km: %+v", r)
 	}
 	r := build(c, compose(withDistance(7.6)))
-	if len(r) != 1 || r[0].Kind != "suggestion" || r[0].Misses[0].Criterion != "distance" || math.Abs(r[0].Misses[0].Gap+2.4) > 1e-9 {
+	if len(r) != 1 || r[0].Kind != "suggestion" {
 		t.Errorf("7.6 km: %+v", r)
 	}
 	if r := build(c, compose(withDistance(13.6))); len(r) != 0 {
@@ -113,7 +113,7 @@ func TestDistanceTolerances(t *testing.T) {
 func TestElevationGainTolerances(t *testing.T) {
 	c := criteria(nil)
 	r := build(c, compose(withGain(ptr(420))))
-	if len(r) != 1 || r[0].Kind != "suggestion" || r[0].Misses[0].Criterion != "elevationGain" || r[0].Misses[0].Gap != 120 {
+	if len(r) != 1 || r[0].Kind != "suggestion" {
 		t.Errorf("420 m: %+v", r)
 	}
 	if r := build(c, compose(withGain(ptr(530)))); len(r) != 0 {
@@ -129,7 +129,7 @@ func TestElevationGainFloors(t *testing.T) {
 		compose(withGain(ptr(151)), withHeading(240)),
 	)
 	equal(t, kinds(r), []string{"match", "suggestion"}, "kinds")
-	if *r[1].ElevationGain != 100 || r[1].Misses[0].Gap != 100 {
+	if *r[1].ElevationGain != 100 {
 		t.Errorf("suggestion = %+v", r[1])
 	}
 }
@@ -147,11 +147,11 @@ func TestOnlyTheDistanceCountsWithoutAGainToCheck(t *testing.T) {
 
 func TestHillyShortcut(t *testing.T) {
 	hilly := criteria(func(c *contract.Criteria) { c.ElevationGain = &contract.ElevationGain{Shortcut: "hilly"} })
-	if r := build(hilly, compose(withGain(ptr(900)))); len(r) != 1 || r[0].Kind != "match" || len(r[0].Misses) != 0 {
+	if r := build(hilly, compose(withGain(ptr(900)))); len(r) != 1 || r[0].Kind != "match" {
 		t.Errorf("900 m: %+v", r)
 	}
 	r := build(hilly, compose(withGain(ptr(60))))
-	if len(r) != 1 || r[0].Kind != "suggestion" || r[0].Misses[0].Gap != -40 {
+	if len(r) != 1 || r[0].Kind != "suggestion" {
 		t.Errorf("60 m: %+v", r)
 	}
 	if r := build(hilly, compose(withGain(ptr(40)))); len(r) != 0 {
@@ -171,7 +171,7 @@ func TestFlatShortcut(t *testing.T) {
 		t.Errorf("100 m: %+v", r)
 	}
 	r := build(flatLevelCriteria, compose(withGain(ptr(160))))
-	if len(r) != 1 || r[0].Kind != "suggestion" || r[0].Misses[0].Gap != 60 {
+	if len(r) != 1 || r[0].Kind != "suggestion" {
 		t.Errorf("160 m: %+v", r)
 	}
 	if r := build(flatLevelCriteria, compose(withGain(ptr(210)))); len(r) != 0 {
@@ -195,7 +195,7 @@ func TestTargetDuration(t *testing.T) {
 		t.Errorf("69 min: %+v", r)
 	}
 	r := build(byDuration, compose(withDistance(10)))
-	if len(r) != 1 || r[0].Kind != "suggestion" || r[0].Misses[0].Criterion != "duration" || r[0].Misses[0].Gap != 11 {
+	if len(r) != 1 || r[0].Kind != "suggestion" {
 		t.Errorf("78 min: %+v", r)
 	}
 	if r := build(byDuration, compose(withDistance(12.2))); len(r) != 0 {
@@ -361,16 +361,13 @@ func TestWideSuggestionComesAfterANormalOne(t *testing.T) {
 	equal(t, distances(r), []float64{12.4, 13}, "distances")
 }
 
-func TestWideSuggestionReportsItsMisses(t *testing.T) {
+func TestWideSuggestionOffOnTwoCriteriaIsKept(t *testing.T) {
 	c := criteria(nil)
 
 	r := build(c, compose(withDistance(13), withGain(ptr(500))))
 
-	if len(r) != 1 || r[0].Kind != "suggestion" || len(r[0].Misses) != 2 {
-		t.Fatalf("routes = %+v", r)
-	}
-	if r[0].Misses[0].Gap != 3 || r[0].Misses[1].Gap != 200 {
-		t.Errorf("misses = %+v", r[0].Misses)
+	if len(r) != 1 || r[0].Kind != "suggestion" {
+		t.Errorf("routes = %+v", r)
 	}
 }
 
@@ -405,7 +402,7 @@ func TestWideDurationTarget(t *testing.T) {
 
 	r := build(c, compose(withDistance(13)))
 
-	if len(r) != 1 || r[0].Kind != "suggestion" || r[0].Misses[0].Criterion != "duration" {
+	if len(r) != 1 || r[0].Kind != "suggestion" {
 		t.Errorf("routes = %+v", r)
 	}
 }

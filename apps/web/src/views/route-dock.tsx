@@ -4,7 +4,7 @@ import { DOCK, ElevationProfile, ICON_BUTTON, tip } from '../components/index.ts
 import { elevationProfile, type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
 import { RouteExportButton } from './route-export-button.tsx';
-import { RouteFigures, RouteMarkers, SurfaceShare } from './route-figures.tsx';
+import { RouteFigures, SurfaceShare, TechnicalMarker } from './route-figures.tsx';
 import { RouteStepStrip } from './route-step-strip.tsx';
 
 /**
@@ -72,7 +72,7 @@ export function RouteDock({
           </button>
         </div>
         <RouteFigures route={route} language={language} compact />
-        <RouteMarkers route={route} language={language} className="justify-center" />
+        {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" className="justify-center" />}
         <SurfaceShare route={route} language={language} />
         {/* Under the rest, whatever its height. */}
         <div className="mt-auto">

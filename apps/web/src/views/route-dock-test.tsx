@@ -14,7 +14,6 @@ const route: Route = {
   elevationLoss: 352,
   estimatedDuration: 85,
   kind: 'suggestion',
-  misses: [{ criterion: 'elevationGain', gap: 120 }],
   unpavedShare: 0.3,
   surfaces: [
     { surface: 'paved', from: 0, to: 7 },
@@ -41,13 +40,12 @@ function dock(language: 'en' | 'fr' = 'en', props: Partial<Parameters<typeof Rou
 }
 
 describe('RouteDock', () => {
-  it('names the route, with its figures and the criteria it misses', () => {
+  it('names the route, with its figures', () => {
     dock();
 
     expect(screen.getByTestId('route-dock')).toHaveAccessibleName(routesText.en.route(2, 3));
     expect(screen.getByTestId('route-distance')).toHaveTextContent('12.3 km');
     expect(screen.getByTestId('route-climb')).toHaveTextContent('340 m');
-    expect(screen.getByTestId('route-miss-elevationGain')).toHaveTextContent(`${routesText.en.misses.elevationGain}`);
     expect(screen.getByTestId('route-surface')).toHaveTextContent('70%');
     expect(screen.getByTestId('route-profile')).toBeInTheDocument();
   });
@@ -57,7 +55,7 @@ describe('RouteDock', () => {
     expect(screen.getByTestId('route-technical')).toHaveTextContent(routesText.en.technical);
     unmount();
 
-    dock('en', { route: { ...route, misses: [] } });
+    dock('en', { route });
     expect(screen.queryByTestId('route-technical')).not.toBeInTheDocument();
   });
 

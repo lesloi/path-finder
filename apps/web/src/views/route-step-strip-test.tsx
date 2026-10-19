@@ -14,7 +14,6 @@ const route: Route = {
   elevationLoss: 120,
   estimatedDuration: 20,
   kind: 'match',
-  misses: [],
   unpavedShare: 0,
   surfaces: [{ surface: 'paved', from: 0, to: 1.2 }],
   technical: false,

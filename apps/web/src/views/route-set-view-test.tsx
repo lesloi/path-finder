@@ -16,7 +16,6 @@ function route(overrides: Partial<Route> = {}): Route {
     elevationLoss: 352,
     estimatedDuration: 85,
     kind: 'match',
-    misses: [],
     unpavedShare: 0.3,
     surfaces: [
       { surface: 'paved', from: 0, to: 7 },
@@ -38,7 +37,6 @@ const suggestion = route({
   distance: 9,
   elevationGain: 520,
   kind: 'suggestion',
-  misses: [{ criterion: 'elevationGain', gap: 120 }],
 });
 const routes = [route(), suggestion, route({ distance: 10.5, elevationGain: 80 })];
 const onDesktop = () =>
@@ -181,16 +179,6 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('routes-row-0-surface')).toHaveAccessibleName('Paved 0% · Unpaved 100%');
     });
 
-    it('marks a missed criterion on the suggestion, with its gap', () => {
-      render(<View />);
-
-      const marker = screen.getByTestId('routes-row-1-miss-elevationGain');
-      expect(marker).toHaveTextContent(`+30% ${routesText.en.misses.elevationGain}`);
-      expect(screen.getByTestId('routes-row-1')).toHaveAccessibleName(
-        expect.stringContaining(`+30% ${routesText.en.misses.elevationGain}`),
-      );
-    });
-
     it('badges the routes that hold a technical stretch, and only those', () => {
       render(<View list={[route({ technical: true }), route()]} />);
 
@@ -200,27 +188,12 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('routes-row-1')).not.toHaveAccessibleName(expect.stringContaining(en.technical));
     });
 
-    it('marks no criterion on a match', () => {
+    it('shows no gap to the criteria on a suggestion', () => {
       render(<View />);
 
-      expect(screen.getByTestId('routes-row-0').querySelector('[data-testid*="-miss-"]')).toBeNull();
-    });
-
-    it('marks every criterion a suggestion misses', () => {
-      const both = route({
-        distance: 11.5,
-        kind: 'suggestion',
-        misses: [
-          { criterion: 'distance', gap: 1.5 },
-          { criterion: 'elevationGain', gap: 120 },
-        ],
-      });
-      render(<View list={[both]} />);
-
-      expect(screen.getByTestId('routes-row-0-miss-distance')).toHaveTextContent(
-        `+15% ${routesText.en.misses.distance}`,
-      );
-      expect(screen.getByTestId('routes-row-0-miss-elevationGain')).toBeInTheDocument();
+      const row = screen.getByTestId('routes-row-1');
+      expect(row).not.toHaveTextContent('%');
+      expect(row).not.toHaveAccessibleName(expect.stringMatching(/[+-]\d+%/));
     });
 
     it('previews the route of a row the pointer or the focus reaches on desktops, without selecting it', () => {
@@ -398,15 +371,6 @@ describe('RouteSetView', () => {
       expect(screen.queryByTestId('route-climb')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-descent')).not.toBeInTheDocument();
       expect(screen.queryByTestId('route-profile')).not.toBeInTheDocument();
-    });
-
-    it('marks the missed criterion of a suggestion', () => {
-      render(<View open />);
-      swipe([200, 100], [100, 100]);
-
-      expect(screen.getByTestId('route-miss-elevationGain')).toHaveTextContent(
-        `+30% ${routesText.en.misses.elevationGain}`,
-      );
     });
 
     it('mentions the technical stretches of the opened route, and only those', () => {

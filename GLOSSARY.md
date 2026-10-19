@@ -131,9 +131,8 @@ preference only affects ranking, never whether a route is a match.
 _Avoid_: Good route, result
 
 **Suggestion**:
-A route outside the tolerances but within a wider margin. Each criterion it misses is
-marked on the route itself, with how far off it is. It fills the route set when there are
-not enough matches.
+A route outside the tolerances but within a wider margin. It fills the route set when there
+are not enough matches.
 _Avoid_: Alternative, fallback
 
 **GPX export**:
