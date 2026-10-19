@@ -1,4 +1,4 @@
-import { useMemo, useState, type PointerEvent } from 'react';
+import { useMemo, useState, type PointerEvent, type ReactNode } from 'react';
 
 import {
   elevationProfile,
@@ -39,6 +39,7 @@ export function ElevationProfile({
   onHover,
   waypoints = NO_WAYPOINTS,
   waypointPois = NO_POIS,
+  below,
   testId,
 }: {
   route: Route;
@@ -48,6 +49,8 @@ export function ElevationProfile({
   waypoints?: Position[] | undefined;
   /** The points of interest some of them were made from: their icon replaces the pin, and their name the number in the label. */
   waypointPois?: WaypointPois | undefined;
+  /** Laid under the plot, in the column of its width, such as what a place of the profile leads to. */
+  below?: ReactNode;
   testId?: string;
 }) {
   const t = routesText[language];
@@ -93,7 +96,7 @@ export function ElevationProfile({
       <figcaption data-testid={testId && `${testId}-title`} className="mb-1 text-sm font-semibold text-ink-2">
         {t.altitude}
       </figcaption>
-      <div className="flex gap-2">
+      <div className="grid grid-cols-[auto_1fr] gap-x-2">
         {/* The altitudes of the top, the middle and the bottom of the plot, beside it and not over the trace. */}
         <div className="relative h-24 flex-none text-right text-sm text-ink-2" aria-hidden>
           {/* As wide as the widest altitude, which the others are placed in. */}
@@ -233,6 +236,7 @@ export function ElevationProfile({
             </>
           )}
         </div>
+        {below && <div className="col-start-2 min-w-0">{below}</div>}
       </div>
     </figure>
   );

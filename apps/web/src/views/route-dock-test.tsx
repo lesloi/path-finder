@@ -61,6 +61,22 @@ describe('RouteDock', () => {
     expect(screen.queryByTestId('route-technical')).not.toBeInTheDocument();
   });
 
+  it('lays the stops of the route under its profile', () => {
+    dock();
+
+    const steps = screen.getAllByTestId('route-step');
+    expect(steps.length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByTestId('route-profile')).toContainElement(steps[0]!);
+  });
+
+  it('still lays the stops out for a route without heights, which has no profile to join them to', () => {
+    dock('en', { route: { ...route, geometry: route.geometry.map(([lon, lat]) => [lon, lat]) } });
+
+    expect(screen.queryByTestId('route-profile')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('route-step').length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByTestId('route-step-links')).not.toBeInTheDocument();
+  });
+
   it('closes from its button', () => {
     const onClose = vi.fn();
     dock('en', { onClose });

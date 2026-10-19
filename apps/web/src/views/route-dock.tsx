@@ -1,15 +1,16 @@
 import { ArrowLeftRight, X } from 'lucide-react';
 
 import { DOCK, ElevationProfile, ICON_BUTTON, tip } from '../components/index.ts';
-import { type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
+import { elevationProfile, type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
 import { RouteExportButton } from './route-export-button.tsx';
 import { RouteFigures, RouteMarkers, SurfaceShare } from './route-figures.tsx';
+import { RouteStepStrip } from './route-step-strip.tsx';
 
 /**
- * The desktop dock along the bottom of the map: the figures, the elevation profile and the GPX export of the
- * route selected. It is only there with a selection, and `onClose` deselects. `onHover` hears the place the user
- * points at on the profile.
+ * The desktop dock along the bottom of the map: the figures, the elevation profile with the stops of the route under
+ * it, and the GPX export of the route selected. It is only there with a selection, and `onClose` deselects.
+ * `onHover` hears the place the user points at on the profile.
  */
 export function RouteDock({
   language,
@@ -40,13 +41,24 @@ export function RouteDock({
   waypointPois?: WaypointPois | undefined;
 }) {
   const t = routesText[language];
+  const hasProfile = elevationProfile(route.geometry) !== undefined;
+  const strip = (
+    <RouteStepStrip
+      route={route}
+      language={language}
+      pace={pace}
+      waypoints={waypoints}
+      waypointPois={waypointPois}
+      linked={hasProfile}
+    />
+  );
   return (
     <section
       data-testid="route-dock"
       className={`${DOCK} items-stretch gap-4 p-4`}
       aria-label={t.route(index + 1, count)}
     >
-      <div className="flex w-52 flex-none flex-col gap-2">
+      <div className="flex w-52 flex-none flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
           <strong data-testid="route-position">{t.route(index + 1, count)}</strong>
           <button
@@ -59,11 +71,11 @@ export function RouteDock({
             <ArrowLeftRight size={18} aria-hidden />
           </button>
         </div>
-        {/* Centred in the room above the export. */}
-        <div className="flex flex-1 flex-col justify-center">
-          <RouteFigures route={route} language={language} />
-        </div>
-        <div className="self-center">
+        <RouteFigures route={route} language={language} compact />
+        <RouteMarkers route={route} language={language} className="justify-center" />
+        <SurfaceShare route={route} language={language} />
+        {/* Under the rest, whatever its height. */}
+        <div className="mt-auto">
           <RouteExportButton
             route={route}
             language={language}
@@ -75,18 +87,21 @@ export function RouteDock({
         </div>
       </div>
       {/* Room on the right for the close button, which the pins of the profile would otherwise sit under. */}
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 pr-10">
-        <ElevationProfile
-          testId="route-profile"
-          route={route}
-          language={language}
-          onHover={onHover}
-          waypoints={waypoints}
-          waypointPois={waypointPois}
-        />
-        <SurfaceShare route={route} language={language} />
-        {/* Here rather than in the figures' column, which has no room left for them. */}
-        <RouteMarkers route={route} language={language} className="justify-center" />
+      <div className="flex min-w-0 flex-1 flex-col justify-center pr-10">
+        {hasProfile ? (
+          <ElevationProfile
+            testId="route-profile"
+            route={route}
+            language={language}
+            onHover={onHover}
+            waypoints={waypoints}
+            waypointPois={waypointPois}
+            below={strip}
+          />
+        ) : (
+          // No heights, no profile: the stops are still there to list, with nothing to be joined to.
+          strip
+        )}
       </div>
       <button
         type="button"
