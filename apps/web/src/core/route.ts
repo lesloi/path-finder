@@ -416,11 +416,12 @@ export function routeTimeline(route: Route, waypoints: Position[], pace: number)
 export function reverseRoute(route: Route, pace: number): Route {
   const { reversed, elevationGain, elevationLoss, surfaces, technicalStretches, ...rest } = route;
   const total = surfaces.at(-1)?.to ?? route.distance;
+  const mirror = ({ from, to }: TechnicalStretch) => ({ from: total - to, to: total - from });
   const turned: Route = {
     ...rest,
     geometry: [...route.geometry].reverse() as Route['geometry'],
-    surfaces: surfaces.map(({ surface, from, to }) => ({ surface, from: total - to, to: total - from })).reverse(),
-    technicalStretches: technicalStretches.map(({ from, to }) => ({ from: total - to, to: total - from })).reverse(),
+    surfaces: surfaces.map((stretch) => ({ surface: stretch.surface, ...mirror(stretch) })).reverse(),
+    technicalStretches: technicalStretches.map(mirror).reverse(),
     ...(elevationLoss !== undefined && { elevationGain: elevationLoss }),
     ...(elevationGain !== undefined && { elevationLoss: elevationGain }),
     ...(!reversed && { reversed: true as const }),
