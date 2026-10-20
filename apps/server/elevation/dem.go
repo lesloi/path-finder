@@ -291,17 +291,22 @@ func load(dir string, proj Projection, keep func(ascHeader) bool) (*DEM, error) 
 	for _, f := range files {
 		key := [2]int{int(math.Round((f.xll - d.x0) / d.tileW)), int(math.Round((f.yll - d.y0) / d.tileH))}
 		if prev := d.tiles[key]; prev != nil {
-			// Border tiles come with each neighbouring département, empty outside it: merge them.
-			for i, v := range f.tile.v {
-				if math.IsNaN(float64(prev.v[i])) {
-					prev.v[i] = v
-				}
-			}
+			prev.mergeFrom(f.tile)
 			continue
 		}
 		d.tiles[key] = f.tile
 	}
 	return d, nil
+}
+
+// mergeFrom fills the empty cells of t from another file of the same tile: border tiles come with each neighbouring
+// département, empty outside it. The loaded and the lazy DEM both use it, so that they merge alike.
+func (t *demTile) mergeFrom(other *demTile) {
+	for i, v := range other.v {
+		if math.IsNaN(float64(t.v[i])) {
+			t.v[i] = v
+		}
+	}
 }
 
 func (d *DEM) cell(gi, gj int) float32 {

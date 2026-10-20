@@ -313,6 +313,12 @@ func gridSize(minLat, minLon, maxLat, maxLon int32) (nx, ny int) {
 	return int((maxLon-minLon)/cellLon) + 1, int((maxLat-minLat)/cellLat) + 1
 }
 
+// cellIndex is the cell of the grid that holds a point, given the least latitude and longitude of the grid and the
+// number of cells along longitude.
+func cellIndex(lat, lon, minLat, minLon int32, nx int) int {
+	return int((lat-minLat)/cellLat)*nx + int((lon-minLon)/cellLon)
+}
+
 func computeSpatial(nodes []node) *spatial {
 	s := &spatial{bounds: bounds{minLat: math.MaxInt32, minLon: math.MaxInt32, maxLat: math.MinInt32, maxLon: math.MinInt32}}
 	for _, n := range nodes {
@@ -324,9 +330,7 @@ func computeSpatial(nodes []node) *spatial {
 	}
 	s.nx, s.ny = gridSize(s.minLat, s.minLon, s.maxLat, s.maxLon)
 	s.start = make([]uint32, s.nx*s.ny+1)
-	cell := func(i int) int {
-		return int((nodes[i].Lat-s.minLat)/cellLat)*s.nx + int((nodes[i].Lon-s.minLon)/cellLon)
-	}
+	cell := func(i int) int { return cellIndex(nodes[i].Lat, nodes[i].Lon, s.minLat, s.minLon, s.nx) }
 	for i := range nodes {
 		s.start[cell(i)+1]++
 	}

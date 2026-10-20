@@ -23,11 +23,12 @@ func WriteGraphFromParts(path string, parts GraphParts) error {
 	return writeAtomic(path, func(tmp string) error { return writeGraphFromParts(tmp, parts) })
 }
 
-// Grid cell sizes of the spatial index, in 1e-7 degrees (about 220 m).
-const (
-	CellLat = cellLat
-	CellLon = cellLon
-)
+// CellOf is the cell of the spatial index that holds a point, for a graph whose nodes lie in the box b (least latitude,
+// least longitude, greatest latitude, greatest longitude).
+func CellOf(b [4]int32, lat, lon int32) uint32 {
+	nx, _ := GridSize(b)
+	return uint32(cellIndex(lat, lon, b[0], b[1], nx))
+}
 
 // writeAtomic has write fill a temporary file beside path, then moves it into place, so a server that
 // starts, or a job that copies the directory, never sees a half-written file.

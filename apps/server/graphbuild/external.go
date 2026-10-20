@@ -572,7 +572,8 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	byNode.finish(&tot)
 
 	// Ranks: the nodes and their offsets are written in rank order, and the grid of the spatial index is counted.
-	nx, ny := engine.GridSize([4]int32{minLat, minLon, maxLat, maxLon})
+	box := [4]int32{minLat, minLon, maxLat, maxLon}
+	nx, ny := engine.GridSize(box)
 	counts := make([]uint32, nx*ny+1)
 	byCell := newSpill(dir, "cell", cellNodeCodec, chunk)
 	nodesOut, err := createTable(dir, "nodes.sec", wordCodec)
@@ -611,7 +612,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		if err := offOut.put(cum); err != nil {
 			return rep, err
 		}
-		cell := uint32(int((c.lat-minLat)/engine.CellLat)*nx + int((c.lon-minLon)/engine.CellLon))
+		cell := engine.CellOf(box, c.lat, c.lon)
 		counts[cell+1]++
 		if err := byCell.push(cellNode{cell, rank}); err != nil {
 			return rep, err
@@ -713,7 +714,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	}
 	err = engine.WriteGraphFromParts(outPath, engine.GraphParts{
 		Nodes: nodesOut.path, Off: offOut.path, Edges: edgesOut.path, GridCells: cellsOut.path, GridNodes: gridOut.path,
-		NodeCount: kept, EdgeCount: uint32(edges), Bounds: [4]int32{minLat, minLon, maxLat, maxLon},
+		NodeCount: kept, EdgeCount: uint32(edges), Bounds: box,
 	})
 	if err != nil {
 		return rep, err

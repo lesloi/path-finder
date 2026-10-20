@@ -3,6 +3,7 @@ package engine
 import (
 	"bufio"
 	"encoding/binary"
+	"hash"
 	"hash/crc64"
 	"io"
 	"math"
@@ -222,16 +223,16 @@ func writeGraphFromParts(path string, p GraphParts) (err error) {
 	if _, err := w.Write(make([]byte, graphHeaderSize)); err != nil {
 		return err
 	}
-	sum, pos := uint64(0), int64(graphHeaderSize)
+	pos, crc := int64(graphHeaderSize), crc64.New(fingerprintTable)
 	for _, s := range []struct {
 		file          string
 		fingerprinted bool
 	}{{p.Nodes, true}, {p.Off, true}, {p.Edges, true}, {p.GridCells, false}, {p.GridNodes, false}} {
-		n, crc, err := copySection(w, s.file, s.fingerprinted, sum)
+		n, err := copySection(w, crc, s.file, s.fingerprinted)
 		if err != nil {
 			return err
 		}
-		sum, pos = crc, pos+n
+		pos += n
 		pad := pad16(pos)
 		if _, err := w.Write(make([]byte, pad)); err != nil {
 			return err
@@ -241,37 +242,24 @@ func writeGraphFromParts(path string, p GraphParts) (err error) {
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	head := graphHead{nodes: p.NodeCount, edges: p.EdgeCount, fingerprint: sum, bounds: bounds{p.Bounds[0], p.Bounds[1], p.Bounds[2], p.Bounds[3]}}
+	head := graphHead{nodes: p.NodeCount, edges: p.EdgeCount, fingerprint: crc.Sum64(), bounds: bounds{p.Bounds[0], p.Bounds[1], p.Bounds[2], p.Bounds[3]}}
 	if _, err := f.WriteAt(head.encode(), 0); err != nil {
 		return err
 	}
 	return f.Sync()
 }
 
-// copySection appends the file to w, and folds its bytes into the checksum sum when it is part of the fingerprint.
-func copySection(w io.Writer, file string, fingerprinted bool, sum uint64) (n int64, crc uint64, err error) {
+// copySection appends the file to w, and to the checksum when it is part of the fingerprint.
+func copySection(w io.Writer, crc hash.Hash64, file string, fingerprinted bool) (int64, error) {
 	in, err := os.Open(file)
 	if err != nil {
-		return 0, sum, err
+		return 0, err
 	}
 	defer in.Close()
-	buf := make([]byte, 1<<20)
-	for {
-		k, rerr := in.Read(buf)
-		if fingerprinted {
-			sum = crc64.Update(sum, fingerprintTable, buf[:k])
-		}
-		if _, err := w.Write(buf[:k]); err != nil {
-			return n, sum, err
-		}
-		n += int64(k)
-		if rerr == io.EOF {
-			return n, sum, nil
-		}
-		if rerr != nil {
-			return n, sum, rerr
-		}
+	if fingerprinted {
+		w = io.MultiWriter(w, crc)
 	}
+	return io.Copy(w, in)
 }
 
 // writeLandmarks writes landmark rows in the format above, for the graph with the given fingerprint.

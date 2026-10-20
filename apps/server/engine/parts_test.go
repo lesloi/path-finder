@@ -57,7 +57,7 @@ func TestGraphFromPartsIsTheGraphFromMemory(t *testing.T) {
 }
 
 func TestGridSizeExportsTheGridOfTheIndex(t *testing.T) {
-	nx, ny := GridSize([4]int32{0, 0, 2*CellLat + 5, 3*CellLon + 5})
+	nx, ny := GridSize([4]int32{0, 0, 2*cellLat + 5, 3*cellLon + 5})
 
 	if nx != 4 || ny != 3 {
 		t.Errorf("grid %d by %d, want 4 by 3", nx, ny)

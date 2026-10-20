@@ -91,12 +91,7 @@ func (d *LazyDEM) tile(key [2]int) (*demTile, error) {
 			merged = f.tile
 			continue
 		}
-		// Border tiles come with each neighbouring département, empty outside it: merge them.
-		for i, v := range f.tile.v {
-			if math.IsNaN(float64(merged.v[i])) {
-				merged.v[i] = v
-			}
-		}
+		merged.mergeFrom(f.tile)
 	}
 	d.loads++
 	if d.order.Len() >= d.capacity {
