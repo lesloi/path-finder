@@ -160,23 +160,7 @@ func readASC(path string) (*ascFile, error) {
 	}
 	nc, nr, nodata := h.ncols, h.nrows, h.nodata
 	t := &demTile{ncols: nc, nrows: nr, v: make([]float32, 0, nc*nr)}
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 1<<20), 1<<24)
-	sc.Split(bufio.ScanWords)
-	for sc.Scan() {
-		v, err := strconv.ParseFloat(sc.Text(), 64)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
-		}
-		if v == nodata {
-			t.v = append(t.v, float32(math.NaN()))
-		} else {
-			t.v = append(t.v, float32(v))
-		}
-	}
-	// A gzip file reports a damaged stream, and its checksum, as a read error: without this a tile that is cut or
-	// corrupt could still hold the right number of values.
-	if err := sc.Err(); err != nil {
+	if t.v, err = readValues(r, nodata, t.v); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	if len(t.v) != nc*nr {

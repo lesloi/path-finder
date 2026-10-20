@@ -87,6 +87,8 @@ func (s *spill[R]) merge() (*merger[R], error) {
 	if err := s.flush(); err != nil {
 		return nil, err
 	}
+	// The records are all on disk now, and the buffer would stay until finish, beside the buffers of the sorts that follow.
+	s.buf = nil
 	m := &merger[R]{c: s.c}
 	for i, p := range s.runs {
 		f, err := os.Open(p)

@@ -64,10 +64,18 @@ func (d *LazyDEM) Tiles() int { return len(d.files) }
 // Loads is how many times a tile was read from its files so far.
 func (d *LazyDEM) Loads() uint64 { return d.loads }
 
+// Project is the place of a point, given in 1e-7 degrees, in metres in the projection of the tiles. A caller that asks for
+// the key of a point and then for its height projects it once, and gives the result to TileKeyAt and SampleAt.
+func (d *LazyDEM) Project(lat, lon int32) (x, y float64) {
+	return d.proj.Forward(float64(lat)*1e-7, float64(lon)*1e-7)
+}
+
 // TileKey is the tile a point falls in, as a number that sorts the tiles by row from the south, then from the west:
 // points taken in this order stay in a few tiles. A point outside the grid shares the key of the nearest ring of tiles.
-func (d *LazyDEM) TileKey(lat, lon int32) uint32 {
-	x, y := d.proj.Forward(float64(lat)*1e-7, float64(lon)*1e-7)
+func (d *LazyDEM) TileKey(lat, lon int32) uint32 { return d.TileKeyAt(d.Project(lat, lon)) }
+
+// TileKeyAt is TileKey for a projected point.
+func (d *LazyDEM) TileKeyAt(x, y float64) uint32 {
 	i, j, _, _ := gridPoint(x, y, d.x0, d.y0, d.cs)
 	part := func(v int) uint32 { return uint32(min(max(v+1, 0), 0xffff)) }
 	return part(floorDiv(j, d.nrows))<<16 | part(floorDiv(i, d.ncols))
@@ -75,6 +83,10 @@ func (d *LazyDEM) TileKey(lat, lon int32) uint32 {
 
 // tile returns the tile at key, read and merged on a miss; nil when no file holds it.
 func (d *LazyDEM) tile(key [2]int) (*demTile, error) {
+	// Consecutive points mostly share a tile, which is the front of the list: that skips the map.
+	if front := d.order.Front(); front != nil && front.Value.(*cachedTile).key == key {
+		return front.Value.(*cachedTile).tile, nil
+	}
 	if el, ok := d.cache[key]; ok {
 		d.order.MoveToFront(el)
 		return el.Value.(*cachedTile).tile, nil
@@ -119,7 +131,12 @@ func (d *LazyDEM) Sample(lat, lon int32) (int32, error) {
 	if lat == math.MinInt32 {
 		return Unknown, nil
 	}
-	x, y := d.proj.Forward(float64(lat)*1e-7, float64(lon)*1e-7)
+	return d.SampleAt(d.Project(lat, lon))
+}
+
+// SampleAt is Sample for a projected point. The point must have a known position: one that was never read (see Sample)
+// is not projected, it goes through Sample.
+func (d *LazyDEM) SampleAt(x, y float64) (int32, error) {
 	i, j, tx, ty := gridPoint(x, y, d.x0, d.y0, d.cs)
 	var c [4]float32
 	for k, at := range [4][2]int{{i, j}, {i + 1, j}, {i, j + 1}, {i + 1, j + 1}} {
