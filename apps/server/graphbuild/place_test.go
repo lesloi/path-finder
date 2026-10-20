@@ -29,11 +29,9 @@ func readPlaced(p *placed[nodeElev]) ([]uint32, error) {
 
 var errLost = errors.New("a record lost its value on the way")
 
-func nodeIndex(r nodeElev) uint32 { return r.node }
-
 func TestPlacedGivesTheRecordsInTheOrderOfTheirIndex(t *testing.T) {
 	// Arrange: seven records over partitions of three, the last one partial
-	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeIndex, 7, 3)
+	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeElevNode, 7, 3)
 	pushAll(t, p, []uint32{5, 0, 6, 3, 1, 4, 2})
 
 	// Act
@@ -55,7 +53,7 @@ func TestPlacedGivesTheRecordsInTheOrderOfTheirIndex(t *testing.T) {
 
 func TestPlacedGivesTheSameRecordsWhenReadTwice(t *testing.T) {
 	// Arrange
-	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeIndex, 5, 2)
+	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeElevNode, 5, 2)
 	pushAll(t, p, []uint32{4, 2, 0, 3, 1})
 	first, err := readPlaced(p)
 	if err != nil {
@@ -78,7 +76,7 @@ func TestPlacedGivesTheSameRecordsWhenReadTwice(t *testing.T) {
 
 func TestPlacedRefusesAMissingIndex(t *testing.T) {
 	// Arrange: index 3 never comes
-	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeIndex, 5, 2)
+	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeElevNode, 5, 2)
 	pushAll(t, p, []uint32{4, 2, 0, 1})
 
 	// Act
@@ -92,7 +90,7 @@ func TestPlacedRefusesAMissingIndex(t *testing.T) {
 
 func TestPlacedRefusesAnIndexGivenTwice(t *testing.T) {
 	// Arrange: as many records as indices, but 2 twice and 3 never
-	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeIndex, 5, 2)
+	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeElevNode, 5, 2)
 	pushAll(t, p, []uint32{4, 2, 0, 1, 2})
 
 	// Act
@@ -106,7 +104,7 @@ func TestPlacedRefusesAnIndexGivenTwice(t *testing.T) {
 
 func TestPlacedRefusesAnIndexBeyondItsCount(t *testing.T) {
 	// Arrange
-	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeIndex, 3, 2)
+	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeElevNode, 3, 2)
 
 	// Act
 	err := p.push(nodeElev{3, 0})
@@ -120,7 +118,7 @@ func TestPlacedRefusesAnIndexBeyondItsCount(t *testing.T) {
 func TestPlacedLeavesNoFileOnceFinished(t *testing.T) {
 	// Arrange
 	dir := t.TempDir()
-	p := newPlaced(dir, "n", nodeElevCodec, nodeIndex, 4, 2)
+	p := newPlaced(dir, "n", nodeElevCodec, nodeElevNode, 4, 2)
 	pushAll(t, p, []uint32{3, 2, 1, 0})
 	if _, err := readPlaced(p); err != nil {
 		t.Fatal(err)

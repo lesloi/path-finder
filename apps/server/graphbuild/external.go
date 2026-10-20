@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"time"
 
 	"github.com/paulmach/osm"
@@ -367,6 +366,13 @@ func scratch(tmp string) (string, func(), error) {
 	return dir, func() { os.RemoveAll(dir) }, nil
 }
 
+// take gives the next place of i and moves it on.
+func take(next []uint32, i uint32) uint32 {
+	at := next[i]
+	next[i]++
+	return at
+}
+
 // forEachStep calls f for each step of each way, in the order of the ways, with the two references of the step and the
 // position of the second among all the references. The references come in the order of their position.
 func forEachStep(refs *placed[ref], ways []wayInfo, f func(a, b ref, attrs uint32) error) error {
@@ -591,7 +597,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	// Ranks: the nodes are written in rank order. Each node's next edge, and each cell's next node, has its place counted
 	// from where the node's edges, or the cell's nodes, start.
 	byCell := newPlaced(dir, "cell", cellNodeCodec, cellNodeAt, kept, chunk)
-	nextInCell := slices.Clone(cells[:len(cells)-1])
+	nextInCell := cells[:len(cells)-1] // the starts are written: they become the cursors of the cells
 	cells = nil
 	remap := make([]uint32, nodes)
 	nextEdge := make([]uint32, kept)
@@ -607,11 +613,8 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		}
 		nextEdge[rank] = cum
 		cum += c.deg
-		cell := cellOf(c.lat, c.lon)
-		at := nextInCell[cell]
-		nextInCell[cell]++
 		rank++
-		return byCell.push(cellNode{at, rank - 1})
+		return byCell.push(cellNode{take(nextInCell, cellOf(c.lat, c.lon)), rank - 1})
 	})
 	if err != nil {
 		return rep, err
@@ -634,21 +637,16 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	// The edges, in the order of the rank of their source, then of the way steps: the steps come in order, so each edge
 	// takes the next place of its source. Once they are all in, a node's next place is where its edges end.
 	byEdge := newPlaced(dir, "edge", outEdgeCodec, outEdgeAt, uint32(edges), chunk)
-	place := func(src uint32) uint32 {
-		at := nextEdge[src]
-		nextEdge[src]++
-		return at
-	}
 	err = forEachStep(bySeq, ways, func(a, b ref, attrs uint32) error {
 		if !usable(a, b) {
 			return nil
 		}
 		ra, rb := remap[a.node], remap[b.node]
 		length := math.Float32bits(float32(haversineM(a.lat, a.lon, b.lat, b.lon)))
-		if err := byEdge.push(outEdge{place(ra), rb, length, attrs}); err != nil {
+		if err := byEdge.push(outEdge{take(nextEdge, ra), rb, length, attrs}); err != nil {
 			return err
 		}
-		return byEdge.push(outEdge{place(rb), ra, length, attrs})
+		return byEdge.push(outEdge{take(nextEdge, rb), ra, length, attrs})
 	})
 	if err != nil {
 		return rep, err
@@ -658,13 +656,11 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	// The edges leave in the order of the graph, so the two sections that depend on them are found as they go: the
 	// ways too long for a scan of the nodes around an area, and the components, joined by each way once.
 	components := engine.NewComponents(int(kept))
-	var written uint64
 	var src uint32
 	err = byEdge.each(func(e outEdge) error {
 		for e.at >= nextEdge[src] {
 			src++
 		}
-		written++
 		length := math.Float32frombits(e.length)
 		if e.dst > src { // every edge is stored both ways
 			components.Join(src, e.dst)
@@ -681,9 +677,6 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	}
 	byEdge.finish(&tot)
 	nextEdge = nil
-	if written != edges {
-		return rep, fmt.Errorf("%d edges out, %d in", written, edges)
-	}
 	for _, word := range components.SmallBitmap(engine.SmallComponentNodes) {
 		if err := graph.Small(word); err != nil {
 			return rep, err

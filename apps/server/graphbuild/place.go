@@ -18,11 +18,8 @@ type placed[R any] struct {
 	c         codec[R]
 	index     func(R) uint32
 	n, per    uint32
-	files     []*os.File
-	writers   []*bufio.Writer
-	b         []byte
+	parts     []*table[R]
 	bytes     int64
-	written   bool
 }
 
 // The writers of a partition are small: a step can have hundreds of partitions open at once.
@@ -31,15 +28,10 @@ const placedWriter = 64 << 10
 func newPlaced[R any](dir, name string, c codec[R], index func(R) uint32, n uint32, chunk int) *placed[R] {
 	per := uint32(max(chunk, 1))
 	parts := (uint64(n) + uint64(per) - 1) / uint64(per)
-	return &placed[R]{
-		dir: dir, name: name, c: c, index: index, n: n, per: per,
-		files: make([]*os.File, parts), writers: make([]*bufio.Writer, parts), b: make([]byte, c.size),
-	}
+	return &placed[R]{dir: dir, name: name, c: c, index: index, n: n, per: per, parts: make([]*table[R], parts)}
 }
 
-func (p *placed[R]) path(part int) string {
-	return filepath.Join(p.dir, fmt.Sprintf("%s-%d.part", p.name, part))
-}
+func (p *placed[R]) path(part int) string { return fmt.Sprintf("%s-%d.part", p.name, part) }
 
 func (p *placed[R]) push(r R) error {
 	i := p.index(r)
@@ -47,38 +39,26 @@ func (p *placed[R]) push(r R) error {
 		return fmt.Errorf("%s: index %d of %d records", p.name, i, p.n)
 	}
 	part := int(i / p.per)
-	if p.writers[part] == nil {
-		f, err := os.Create(p.path(part))
+	if p.parts[part] == nil {
+		t, err := createTableSize(p.dir, p.path(part), p.c, placedWriter)
 		if err != nil {
 			return err
 		}
-		p.files[part], p.writers[part] = f, bufio.NewWriterSize(f, placedWriter)
+		p.parts[part] = t
 	}
-	p.c.put(p.b, r)
-	_, err := p.writers[part].Write(p.b)
 	p.bytes += int64(p.c.size)
-	return err
+	return p.parts[part].put(r)
 }
 
-// close ends the writing, once the last record is in.
+// close ends the writing, once the last record is in; it can be called again.
 func (p *placed[R]) close() error {
-	if p.written {
-		return nil
-	}
-	p.written = true
-	for part, w := range p.writers {
-		if w == nil {
-			continue
-		}
-		err := w.Flush()
-		if cerr := p.files[part].Close(); err == nil {
-			err = cerr
-		}
-		if err != nil {
-			return err
+	for _, t := range p.parts {
+		if t != nil {
+			if err := t.finish(); err != nil {
+				return err
+			}
 		}
 	}
-	p.files, p.writers = nil, nil
 	return nil
 }
 
@@ -109,9 +89,8 @@ func (p *placed[R]) each(f func(R) error) error {
 // finish adds what was written to the totals and removes the partitions.
 func (p *placed[R]) finish(t *totals) {
 	p.close()
-	parts := int((uint64(p.n) + uint64(p.per) - 1) / uint64(p.per))
-	for part := range parts {
-		if os.Remove(p.path(part)) == nil {
+	for _, part := range p.parts {
+		if part != nil && os.Remove(part.path) == nil {
 			t.runs++
 		}
 	}
@@ -128,7 +107,7 @@ type placedReader[R any] struct {
 
 func (r *placedReader[R]) next() (rec R, ok bool, err error) {
 	if r.at == len(r.buf) {
-		if uint64(r.part)*uint64(r.p.per) >= uint64(r.p.n) {
+		if r.part == len(r.p.parts) {
 			r.buf = nil
 			return rec, false, nil
 		}
@@ -149,7 +128,7 @@ func (r *placedReader[R]) load() error {
 	size := min(p.per, p.n-base)
 	r.buf, r.at = r.buf[:size], 0
 	filled := make([]uint64, (size+63)/64)
-	f, err := os.Open(p.path(r.part))
+	f, err := os.Open(filepath.Join(p.dir, p.path(r.part)))
 	if err != nil {
 		return fmt.Errorf("%s: records %d to %d were lost on the way: %w", p.name, base, base+size-1, err)
 	}

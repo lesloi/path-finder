@@ -21,21 +21,22 @@ type GraphWriter struct {
 	head                                        graphHead
 	crc                                         hash.Hash64
 	nodes, off, edges, cells, grid, small, long *section
-	end                                         int64 // where the list of long ways starts
-	b                                           [12]byte
+	// The records are written from the structs a graph in memory holds, so that both writers share their layout.
+	node [1]node
+	edge [1]edge
+	b    [8]byte
 }
 
-// section is the part of the file one kind of record goes to, from start, want records of size bytes.
+// section is the part of the file one kind of record goes to, from start: want records.
 type section struct {
-	name      string
-	w         *bufio.Writer
-	size      int
-	n, want   uint64
-	unbounded bool // the long ways: their count is known at the end
+	name    string
+	w       *bufio.Writer
+	start   int64
+	n, want uint64
 }
 
 func (s *section) write(b []byte) error {
-	if !s.unbounded && s.n == s.want {
+	if s.n == s.want {
 		return fmt.Errorf("engine: more than %d %s", s.want, s.name)
 	}
 	s.n++
@@ -70,9 +71,10 @@ func CreateGraph(path string, nodes, edges uint32, box [4]int32) (*GraphWriter, 
 		if fingerprinted {
 			out = io.MultiWriter(out, w.crc)
 		}
+		s := &section{name: name, w: bufio.NewWriterSize(out, 1<<20), start: pos, want: want}
 		pos += int64(want) * int64(size)
 		pos += pad16(pos)
-		return &section{name: name, w: bufio.NewWriterSize(out, 1<<20), size: size, want: want}
+		return s
 	}
 	n := uint64(nodes)
 	w.nodes = add("nodes", n, 12, true)
@@ -81,19 +83,14 @@ func CreateGraph(path string, nodes, edges uint32, box [4]int32) (*GraphWriter, 
 	w.cells = add("grid cells", uint64(nx*ny+1), 4, false)
 	w.grid = add("grid nodes", n, 4, false)
 	w.small = add("small component words", (n+63)/64, 8, false)
-	w.end = pos
-	w.long = add("long ways", 0, 8, false)
-	w.long.unbounded = true
+	w.long = add("long ways", math.MaxUint64, 8, false) // the last section: how many is known at the end
 	return w, nil
 }
 
 // Node adds the next node.
 func (w *GraphWriter) Node(n Node) error {
-	le := binary.LittleEndian
-	le.PutUint32(w.b[0:], uint32(n.Lat))
-	le.PutUint32(w.b[4:], uint32(n.Lon))
-	le.PutUint32(w.b[8:], uint32(n.Elev))
-	return w.nodes.write(w.b[:12])
+	w.node[0] = n
+	return w.nodes.write(bytesOf(w.node[:]))
 }
 
 // Offset adds where the edges of the next node start, then, last, how many edges there are. The nodes are all in.
@@ -114,11 +111,8 @@ func (w *GraphWriter) Edge(e Edge) error {
 			return err
 		}
 	}
-	le := binary.LittleEndian
-	le.PutUint32(w.b[0:], e.To)
-	le.PutUint32(w.b[4:], math.Float32bits(e.Len))
-	w.b[8], w.b[9], w.b[10], w.b[11] = e.Kind, e.Surf, e.Flags, 0
-	return w.edges.write(w.b[:12])
+	w.edge[0] = e
+	return w.edges.write(bytesOf(w.edge[:]))
 }
 
 // GridCell adds where the nodes of the next cell of the spatial index start, then, last, how many nodes there are.
@@ -177,7 +171,7 @@ func (w *GraphWriter) finish() error {
 	}
 	w.head.longEdges = uint32(w.long.n)
 	w.head.fingerprint = w.crc.Sum64()
-	end := w.end + int64(w.long.n)*8
+	end := w.long.start + int64(w.long.n)*8
 	if err := w.f.Truncate(end + pad16(end)); err != nil {
 		return err
 	}

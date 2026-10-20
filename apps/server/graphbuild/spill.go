@@ -9,9 +9,9 @@ import (
 	"slices"
 )
 
-// codec is what a sort on disk needs to know of its records: how big they are on disk, how they are written and read, and
-// in which order they come out. Records that compare equal come out in no particular order, so each sort names a key
-// that tells its records apart whenever the order of the output depends on it.
+// codec is what a step on disk needs to know of its records: how big they are on disk and how they are written and read;
+// for a sort (see spill), in which order they come out. Records that compare equal come out in no particular order, so
+// each sort names a key that tells its records apart whenever the order of the output depends on it.
 type codec[R any] struct {
 	size int
 	put  func(b []byte, r R)
@@ -79,12 +79,16 @@ func (s *spill[R]) flushInBackground() error {
 	s.buf, s.spare = s.spare[:0], full
 	path, c, done := s.nextRun(full), s.c, make(chan error, 1)
 	s.writing = done
-	go func() { done <- writeRun(path, c, full) }()
+	go func() {
+		slices.SortFunc(full, c.cmp)
+		done <- writeRun(path, c, full)
+	}()
 	return nil
 }
 
-// flush writes what the buffer holds, once the run being written is done.
+// flush writes what the buffer holds, once the run being written is done; it is sorted while that one is written.
 func (s *spill[R]) flush() error {
+	slices.SortFunc(s.buf, s.c.cmp)
 	if err := s.wait(); err != nil {
 		return err
 	}
@@ -98,8 +102,8 @@ func (s *spill[R]) flush() error {
 	return nil
 }
 
+// writeRun writes records, sorted, as the run at path.
 func writeRun[R any](path string, c codec[R], records []R) error {
-	slices.SortFunc(records, c.cmp)
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -136,10 +140,17 @@ func (s *spill[R]) merge() (*merger[R], error) {
 		}
 		m.files = append(m.files, f)
 		m.readers = append(m.readers, bufio.NewReaderSize(f, 1<<20))
-		if err := m.refill(i, false); err != nil {
+		rec, ok, err := m.read(i)
+		if err != nil {
 			m.close()
 			return nil, err
 		}
+		if ok {
+			m.items = append(m.items, headItem[R]{rec, i})
+		}
+	}
+	for k := len(m.items)/2 - 1; k >= 0; k-- {
+		m.down(k)
 	}
 	return m, nil
 }
@@ -181,10 +192,10 @@ func (m *merger[R]) less(a, b headItem[R]) bool {
 	return a.run < b.run
 }
 
-// down moves the record at the top of the heap down to its place. It is written for the records, not through
-// container/heap, whose interface calls cost more than the comparison: this runs once per record.
-func (m *merger[R]) down() {
-	items, k := m.items, 0
+// down moves the record at k down to its place in the heap. It is written for the records, not through container/heap,
+// whose interface calls cost more than the comparison: this runs once per record.
+func (m *merger[R]) down(k int) {
+	items := m.items
 	for {
 		c := 2*k + 1
 		if c >= len(items) {
@@ -201,40 +212,35 @@ func (m *merger[R]) down() {
 	}
 }
 
-// refill reads the next record of run i, whose last record was the top of the heap; top is false at the start, when the
-// heap does not hold one of its records yet.
-func (m *merger[R]) refill(i int, top bool) error {
+// read reads the next record of run i; ok is false at its end.
+func (m *merger[R]) read(i int) (r R, ok bool, err error) {
 	if m.b == nil {
 		m.b = make([]byte, m.c.size)
 	}
-	_, err := io.ReadFull(m.readers[i], m.b)
-	switch {
-	case err == nil:
-		it := headItem[R]{m.c.get(m.b), i}
-		if !top {
-			m.items = append(m.items, it)
-			for k := len(m.items) - 1; k > 0; {
-				p := (k - 1) / 2
-				if !m.less(m.items[k], m.items[p]) {
-					break
-				}
-				m.items[k], m.items[p] = m.items[p], m.items[k]
-				k = p
-			}
-		} else {
-			m.items[0] = it
-			m.down()
-		}
-	case err == io.EOF:
-		if top {
-			last := len(m.items) - 1
-			m.items[0] = m.items[last]
-			m.items = m.items[:last]
-			m.down()
-		}
+	switch _, err := io.ReadFull(m.readers[i], m.b); err {
+	case nil:
+		return m.c.get(m.b), true, nil
+	case io.EOF:
+		return r, false, nil
 	default:
+		return r, false, err
+	}
+}
+
+// refill puts the next record of the run of the top of the heap in its place, or takes the run out at its end.
+func (m *merger[R]) refill() error {
+	rec, ok, err := m.read(m.items[0].run)
+	if err != nil {
 		return err
 	}
+	if ok {
+		m.items[0].rec = rec
+	} else {
+		last := len(m.items) - 1
+		m.items[0] = m.items[last]
+		m.items = m.items[:last]
+	}
+	m.down(0)
 	return nil
 }
 
@@ -244,7 +250,7 @@ func (m *merger[R]) next() (r R, ok bool, err error) {
 		return r, false, nil
 	}
 	top := m.items[0]
-	if err := m.refill(top.run, true); err != nil {
+	if err := m.refill(); err != nil {
 		m.close()
 		return r, false, err
 	}
@@ -282,12 +288,17 @@ type table[R any] struct {
 }
 
 func createTable[R any](dir, name string, c codec[R]) (*table[R], error) {
+	return createTableSize(dir, name, c, 1<<20)
+}
+
+// createTableSize is createTable with a writer of size bytes.
+func createTableSize[R any](dir, name string, c codec[R], size int) (*table[R], error) {
 	path := filepath.Join(dir, name)
 	f, err := os.Create(path)
 	if err != nil {
 		return nil, err
 	}
-	return &table[R]{path: path, c: c, f: f, w: bufio.NewWriterSize(f, 1<<20), b: make([]byte, c.size)}, nil
+	return &table[R]{path: path, c: c, f: f, w: bufio.NewWriterSize(f, size), b: make([]byte, c.size)}, nil
 }
 
 func (t *table[R]) put(r R) error {
