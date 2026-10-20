@@ -65,7 +65,7 @@ func TestDEMReadsTilesAndInterpolates(t *testing.T) {
 	}
 	// Cell centres are 12.5 m into each cell, and heights are interpolated between them.
 	for x, want := range map[float64]float64{800_012.5: 100, 800_025: 105, 800_037.5: 110} {
-		if z := dem.elevationAt(x, 6_500_050); math.Abs(float64(z)-want) > 0.01 {
+		if z := dem.elevationAt(x, 6_500_050); math.IsNaN(float64(z)) || math.Abs(float64(z)-want) > 0.01 {
 			t.Errorf("height at x=%v is %v, want %v", x, z, want)
 		}
 	}
