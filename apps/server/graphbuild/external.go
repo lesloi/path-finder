@@ -21,15 +21,16 @@ import (
 )
 
 // The build of a graph whose memory does not grow with the country: the steps that held every node in memory (the index
-// of the nodes, the elevation, the degrees and the ranks are the big ones) are done by sorting records on disk and
-// reading them back in order. It writes the same graph file as Build, byte for byte, for one extract that is sorted by
-// node id; Build stays for several extracts and as the oracle of the tests.
+// of the nodes, the elevation, the degrees and the ranks are the big ones) are done by putting records in order on disk
+// and reading them back in that order. A step whose records each know their place in the output puts them there (see
+// placed); the others sort them (see spill). It writes the same graph file as Build, byte for byte, for one extract that
+// is sorted by node id; Build stays for several extracts and as the oracle of the tests.
 //
 // The order of the steps: the references of the ways are sorted by node id and joined with the extract; each node is
 // numbered as it is met, and its references go back to the order of the ways; the nodes are sorted by DEM tile to be
 // given their elevation; the steps of the ways are counted to find the nodes that are kept; those are sorted along the
-// Hilbert curve, which gives their rank; the edges are sorted by the rank of their source; the sections are then put in
-// one file. The tie of the curve is the order a node was first met in, as in Build.
+// Hilbert curve, which gives their rank; the edges go to their place, after those of the nodes of lower rank; the
+// sections are then put in one file. The tie of the curve is the order a node was first met in, as in Build.
 
 const none uint32 = math.MaxUint32 // the number of a node the extract does not hold
 
@@ -71,8 +72,9 @@ var refCodec = codec[ref]{
 		put32(b, 12, uint32(r.lon))
 	},
 	get: func(b []byte) ref { return ref{le32(b, 0), le32(b, 4), int32(le32(b, 8)), int32(le32(b, 12))} },
-	cmp: func(a, b ref) int { return cmp.Compare(a.seq, b.seq) },
 }
+
+func refSeq(r ref) uint32 { return r.seq }
 
 // tileNode is a node and the DEM tile it falls in; the nodes of a tile are sorted by number, which is the order they
 // were met in. The node's place is already projected onto the grid of the tiles: the projection is the dearest part of
@@ -107,8 +109,9 @@ var nodeElevCodec = codec[nodeElev]{
 	size: 8,
 	put:  func(b []byte, r nodeElev) { put32(b, 0, r.node); put32(b, 4, uint32(r.elev)) },
 	get:  func(b []byte) nodeElev { return nodeElev{le32(b, 0), int32(le32(b, 4))} },
-	cmp:  func(a, b nodeElev) int { return cmp.Compare(a.node, b.node) },
 }
+
+func nodeElevNode(r nodeElev) uint32 { return r.node }
 
 // seen is what the table of nodes holds: the position of the first reference to a node, and where the node is.
 type seen struct {
@@ -122,16 +125,18 @@ var seenCodec = codec[seen]{
 	get:  func(b []byte) seen { return seen{le32(b, 0), int32(le32(b, 4)), int32(le32(b, 8))} },
 }
 
-// curved is a node that is kept, with its place along the Hilbert curve and the position of its first reference.
+// curved is a node that is kept, with its place along the Hilbert curve, the position of its first reference and its
+// degree: carried here, the degrees are not in memory while the ranks are given.
 type curved struct {
 	key         uint64
 	first, node uint32
 	lat, lon    int32
 	elev        int32
+	deg         uint32
 }
 
 var curvedCodec = codec[curved]{
-	size: 28,
+	size: 32,
 	put: func(b []byte, r curved) {
 		binary.LittleEndian.PutUint64(b, r.key)
 		put32(b, 8, r.first)
@@ -139,74 +144,45 @@ var curvedCodec = codec[curved]{
 		put32(b, 16, uint32(r.lat))
 		put32(b, 20, uint32(r.lon))
 		put32(b, 24, uint32(r.elev))
+		put32(b, 28, r.deg)
 	},
 	get: func(b []byte) curved {
-		return curved{binary.LittleEndian.Uint64(b), le32(b, 8), le32(b, 12), int32(le32(b, 16)), int32(le32(b, 20)), int32(le32(b, 24))}
+		return curved{binary.LittleEndian.Uint64(b), le32(b, 8), le32(b, 12), int32(le32(b, 16)), int32(le32(b, 20)), int32(le32(b, 24)), le32(b, 28)}
 	},
 	cmp: func(a, b curved) int {
 		return cmp.Or(cmp.Compare(a.key, b.key), cmp.Compare(a.first, b.first))
 	},
 }
 
-// cellNode is a node of the graph, by rank, and the cell of the spatial index it is in.
-type cellNode struct{ cell, rank uint32 }
+// cellNode is a node of the graph, by rank, and its place in the list of the nodes by cell of the spatial index.
+type cellNode struct{ at, rank uint32 }
 
 var cellNodeCodec = codec[cellNode]{
 	size: 8,
-	put:  func(b []byte, r cellNode) { put32(b, 0, r.cell); put32(b, 4, r.rank) },
+	put:  func(b []byte, r cellNode) { put32(b, 0, r.at); put32(b, 4, r.rank) },
 	get:  func(b []byte) cellNode { return cellNode{le32(b, 0), le32(b, 4)} },
-	cmp: func(a, b cellNode) int {
-		return cmp.Or(cmp.Compare(a.cell, b.cell), cmp.Compare(a.rank, b.rank))
-	},
 }
 
-// outEdge is an edge of the graph by the rank of its source, and the position of the step it comes from, which orders
-// the edges of a node as Build meets them.
+func cellNodeAt(r cellNode) uint32 { return r.at }
+
+// outEdge is an edge of the graph and its place among the edges: the edges of a node are in the order of the steps of
+// the ways, as Build meets them.
 type outEdge struct {
-	src, step, dst, length, attrs uint32
+	at, dst, length, attrs uint32
 }
 
 var outEdgeCodec = codec[outEdge]{
-	size: 20,
+	size: 16,
 	put: func(b []byte, r outEdge) {
-		put32(b, 0, r.src)
-		put32(b, 4, r.step)
-		put32(b, 8, r.dst)
-		put32(b, 12, r.length)
-		put32(b, 16, r.attrs)
+		put32(b, 0, r.at)
+		put32(b, 4, r.dst)
+		put32(b, 8, r.length)
+		put32(b, 12, r.attrs)
 	},
-	get: func(b []byte) outEdge { return outEdge{le32(b, 0), le32(b, 4), le32(b, 8), le32(b, 12), le32(b, 16)} },
-	cmp: func(a, b outEdge) int { return cmp.Or(cmp.Compare(a.src, b.src), cmp.Compare(a.step, b.step)) },
+	get: func(b []byte) outEdge { return outEdge{le32(b, 0), le32(b, 4), le32(b, 8), le32(b, 12)} },
 }
 
-// tripleCodec is three 32-bit numbers of a section of the graph file: a node (latitude, longitude, elevation), or an
-// edge (the target, the length, then the kind, the surface, the flags and a padding byte).
-var tripleCodec = codec[[3]uint32]{
-	size: 12,
-	put:  func(b []byte, r [3]uint32) { put32(b, 0, r[0]); put32(b, 4, r[1]); put32(b, 8, r[2]) },
-	get:  func(b []byte) [3]uint32 { return [3]uint32{le32(b, 0), le32(b, 4), le32(b, 8)} },
-}
-
-// wordCodec is one 32-bit number of a section of the graph file.
-var wordCodec = codec[uint32]{
-	size: 4,
-	put:  func(b []byte, v uint32) { put32(b, 0, v) },
-	get:  func(b []byte) uint32 { return le32(b, 0) },
-}
-
-// bitsCodec is one 64-bit word of the bitmap of small components in the graph file.
-var bitsCodec = codec[uint64]{
-	size: 8,
-	put:  func(b []byte, v uint64) { binary.LittleEndian.PutUint64(b, v) },
-	get:  func(b []byte) uint64 { return binary.LittleEndian.Uint64(b) },
-}
-
-// pairCodec is two 32-bit numbers: the two end nodes of a long way in a section of the graph file.
-var pairCodec = codec[[2]uint32]{
-	size: 8,
-	put:  func(b []byte, r [2]uint32) { put32(b, 0, r[0]); put32(b, 4, r[1]) },
-	get:  func(b []byte) [2]uint32 { return [2]uint32{le32(b, 0), le32(b, 4)} },
-}
+func outEdgeAt(r outEdge) uint32 { return r.at }
 
 // wayInfo is what the build needs to know of a way once its references are in order: how many, and what kind of way it is.
 type wayInfo struct{ length, attrs uint32 }
@@ -238,6 +214,7 @@ type refs struct {
 // spillRefs writes the references of the walkable ways of the extract as runs sorted by node id.
 func spillRefs(pbf, dir string, chunk int) (*refs, error) {
 	r := &refs{byID: newSpill(dir, "id", idRefCodec, chunk)}
+	defer r.byID.wait()
 	err := scanPBF(pbf, true, false, func(o osm.Object) error {
 		w, ok := o.(*osm.Way)
 		if !ok {
@@ -390,14 +367,20 @@ func scratch(tmp string) (string, func(), error) {
 	return dir, func() { os.RemoveAll(dir) }, nil
 }
 
+// take gives the next place of i and moves it on.
+func take(next []uint32, i uint32) uint32 {
+	at := next[i]
+	next[i]++
+	return at
+}
+
 // forEachStep calls f for each step of each way, in the order of the ways, with the two references of the step and the
-// position of the second among all the references. The references come sorted by position.
-func forEachStep(refs *spill[ref], ways []wayInfo, f func(a, b ref, attrs uint32) error) error {
-	m, err := refs.merge()
+// position of the second among all the references. The references come in the order of their position.
+func forEachStep(refs *placed[ref], ways []wayInfo, f func(a, b ref, attrs uint32) error) error {
+	m, err := refs.reader()
 	if err != nil {
 		return err
 	}
-	defer m.close()
 	var expect uint32
 	take := func() (ref, error) {
 		r, ok, err := m.next()
@@ -455,8 +438,10 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		return rep, err
 	}
 	defer seenTab.finish()
+	defer r.byID.wait()
 	byTile := newSpill(dir, "tile", tileNodeCodec, chunk)
-	bySeq := newSpill(dir, "seq", refCodec, chunk)
+	defer byTile.wait()
+	bySeq := newPlaced(dir, "seq", refCodec, refSeq, r.count, chunk)
 	var nodes uint32
 	current := none
 	err = joinNodes(pbf, r, func(h idRef, at *[2]int32, first bool) error {
@@ -493,7 +478,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 
 	// The elevation of every node, tile by tile; only whether it is known stays in memory, the number goes back on disk.
 	known := make([]uint64, (nodes+63)/64)
-	byNode := newSpill(dir, "elev", nodeElevCodec, chunk)
+	byNode := newPlaced(dir, "elev", nodeElevCodec, nodeElevNode, nodes, chunk)
 	tiles, err := byTile.merge()
 	if err != nil {
 		return rep, err
@@ -560,19 +545,24 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	all.close()
 	p.step("graph: %d nodes, %d directed edges", kept, edges)
 
-	// The nodes along the Hilbert curve; a tie goes to the node met first.
+	// The nodes along the Hilbert curve; a tie goes to the node met first. The nodes of each cell of the spatial index
+	// are counted on the way, so that each node's place in the grid is known when its rank is.
 	cv := newCurve(minLat, minLon, maxLat, maxLon)
+	box := [4]int32{minLat, minLon, maxLat, maxLon}
+	nx, ny := engine.GridSize(box)
+	cellOf := engine.Cells(box)
+	cells := make([]uint32, nx*ny+1)
 	byCurve := newSpill(dir, "curve", curvedCodec, chunk)
+	defer byCurve.wait()
 	all, err = seenTab.reader()
 	if err != nil {
 		return rep, err
 	}
 	defer all.close()
-	elevs, err := byNode.merge()
+	elevs, err := byNode.reader()
 	if err != nil {
 		return rep, err
 	}
-	defer elevs.close()
 	for u, d := range deg {
 		s, err := all.next()
 		if err != nil {
@@ -583,35 +573,38 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 			return rep, fmt.Errorf("an elevation was lost on the way: %v", err)
 		}
 		if d > 0 {
-			if err := byCurve.push(curved{cv.key(s.lat, s.lon), s.first, uint32(u), s.lat, s.lon, e.elev}); err != nil {
+			cells[cellOf(s.lat, s.lon)+1]++
+			if err := byCurve.push(curved{cv.key(s.lat, s.lon), s.first, uint32(u), s.lat, s.lon, e.elev, d}); err != nil {
 				return rep, err
 			}
 		}
 	}
 	all.close()
-	elevs.close()
 	byNode.finish(&tot)
+	deg = nil
+	for c := 1; c < len(cells); c++ {
+		cells[c] += cells[c-1]
+	}
 
-	// Ranks: the nodes and their offsets are written in rank order, and the grid of the spatial index is counted.
-	box := [4]int32{minLat, minLon, maxLat, maxLon}
-	nx, ny := engine.GridSize(box)
-	cellOf := engine.Cells(box)
-	counts := make([]uint32, nx*ny+1)
-	byCell := newSpill(dir, "cell", cellNodeCodec, chunk)
-	nodesOut, err := createTable(dir, "nodes.sec", tripleCodec)
+	// The graph file: each section goes to its place as it comes, and the spatial index's cell starts are known now.
+	graph, err := engine.CreateGraph(outPath, kept, uint32(edges), box)
 	if err != nil {
 		return rep, err
 	}
-	defer nodesOut.finish()
-	offOut, err := createTable(dir, "off.sec", wordCodec)
-	if err != nil {
-		return rep, err
+	defer graph.Abort()
+	for _, c := range cells {
+		if err := graph.GridCell(c); err != nil {
+			return rep, err
+		}
 	}
-	defer offOut.finish()
-	if err := offOut.put(0); err != nil {
-		return rep, err
-	}
+
+	// Ranks: the nodes are written in rank order. Each node's next edge, and each cell's next node, has its place counted
+	// from where the node's edges, or the cell's nodes, start.
+	byCell := newPlaced(dir, "cell", cellNodeCodec, cellNodeAt, kept, chunk)
+	nextInCell := cells[:len(cells)-1] // the starts are written: they become the cursors of the cells
+	cells = nil
 	remap := make([]uint32, nodes)
+	nextEdge := make([]uint32, kept)
 	var rank, cum uint32
 	ordered, err := byCurve.merge()
 	if err != nil {
@@ -619,17 +612,13 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	}
 	err = ordered.each(func(c curved) error {
 		remap[c.node] = rank
-		if err := nodesOut.put([3]uint32{uint32(c.lat), uint32(c.lon), uint32(c.elev)}); err != nil {
+		if err := graph.Node(engine.Node{Lat: c.lat, Lon: c.lon, Elev: c.elev}); err != nil {
 			return err
 		}
-		cum += deg[c.node]
-		if err := offOut.put(cum); err != nil {
-			return err
-		}
-		cell := cellOf(c.lat, c.lon)
-		counts[cell+1]++
+		nextEdge[rank] = cum
+		cum += c.deg
 		rank++
-		return byCell.push(cellNode{cell, rank - 1})
+		return byCell.push(cellNode{take(nextInCell, cellOf(c.lat, c.lon)), rank - 1})
 	})
 	if err != nil {
 		return rep, err
@@ -638,118 +627,74 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if rank != kept || uint64(cum) != edges {
 		return rep, fmt.Errorf("%d nodes and %d edges out, %d and %d in", rank, cum, kept, edges)
 	}
-	deg = nil
+	nextInCell = nil
+	// The offsets are where the edges of each node start, before the edges move them on.
+	for _, o := range nextEdge {
+		if err := graph.Offset(o); err != nil {
+			return rep, err
+		}
+	}
+	if err := graph.Offset(cum); err != nil {
+		return rep, err
+	}
 
-	// The edges, in the order of the rank of their source, then of the way steps.
-	byEdge := newSpill(dir, "edge", outEdgeCodec, chunk)
+	// The edges, in the order of the rank of their source, then of the way steps: the steps come in order, so each edge
+	// takes the next place of its source. Once they are all in, a node's next place is where its edges end.
+	byEdge := newPlaced(dir, "edge", outEdgeCodec, outEdgeAt, uint32(edges), chunk)
 	err = forEachStep(bySeq, ways, func(a, b ref, attrs uint32) error {
 		if !usable(a, b) {
 			return nil
 		}
 		ra, rb := remap[a.node], remap[b.node]
 		length := math.Float32bits(float32(haversineM(a.lat, a.lon, b.lat, b.lon)))
-		if err := byEdge.push(outEdge{ra, b.seq, rb, length, attrs}); err != nil {
+		if err := byEdge.push(outEdge{take(nextEdge, ra), rb, length, attrs}); err != nil {
 			return err
 		}
-		return byEdge.push(outEdge{rb, b.seq, ra, length, attrs})
+		return byEdge.push(outEdge{take(nextEdge, rb), ra, length, attrs})
 	})
 	if err != nil {
 		return rep, err
 	}
 	bySeq.finish(&tot)
 	remap = nil
-	edgesOut, err := createTable(dir, "edges.sec", tripleCodec)
-	if err != nil {
-		return rep, err
-	}
-	defer edgesOut.finish()
 	// The edges leave in the order of the graph, so the two sections that depend on them are found as they go: the
 	// ways too long for a scan of the nodes around an area, and the components, joined by each way once.
-	longOut, err := createTable(dir, "long.sec", pairCodec)
-	if err != nil {
-		return rep, err
-	}
-	defer longOut.finish()
 	components := engine.NewComponents(int(kept))
-	var written uint64
-	var longCount uint32
-	ordered2, err := byEdge.merge()
-	if err != nil {
-		return rep, err
-	}
-	err = ordered2.each(func(e outEdge) error {
-		written++
-		if e.dst > e.src { // every edge is stored both ways
-			components.Join(e.src, e.dst)
-			if math.Float32frombits(e.length) > engine.LongEdgeMeters {
-				longCount++
-				if err := longOut.put([2]uint32{e.src, e.dst}); err != nil {
+	var src uint32
+	err = byEdge.each(func(e outEdge) error {
+		for e.at >= nextEdge[src] {
+			src++
+		}
+		length := math.Float32frombits(e.length)
+		if e.dst > src { // every edge is stored both ways
+			components.Join(src, e.dst)
+			if length > engine.LongEdgeMeters {
+				if err := graph.Long(src, e.dst); err != nil {
 					return err
 				}
 			}
 		}
-		return edgesOut.put([3]uint32{e.dst, e.length, e.attrs & 0xFFFFFF})
+		return graph.Edge(engine.Edge{To: e.dst, Len: length, Kind: uint8(e.attrs), Surf: uint8(e.attrs >> 8), Flags: uint8(e.attrs >> 16)})
 	})
 	if err != nil {
 		return rep, err
 	}
 	byEdge.finish(&tot)
-	if written != edges {
-		return rep, fmt.Errorf("%d edges out, %d in", written, edges)
-	}
-
-	smallOut, err := createTable(dir, "small.sec", bitsCodec)
-	if err != nil {
-		return rep, err
-	}
-	defer smallOut.finish()
+	nextEdge = nil
 	for _, word := range components.SmallBitmap(engine.SmallComponentNodes) {
-		if err := smallOut.put(word); err != nil {
+		if err := graph.Small(word); err != nil {
 			return rep, err
 		}
 	}
 	components = nil
 
-	// The spatial index: where each cell starts, and the nodes sorted by cell.
-	for c := 1; c < len(counts); c++ {
-		counts[c] += counts[c-1]
-	}
-	cellsOut, err := createTable(dir, "cells.sec", wordCodec)
-	if err != nil {
-		return rep, err
-	}
-	defer cellsOut.finish()
-	for _, c := range counts {
-		if err := cellsOut.put(c); err != nil {
-			return rep, err
-		}
-	}
-	counts = nil
-	gridOut, err := createTable(dir, "grid.sec", wordCodec)
-	if err != nil {
-		return rep, err
-	}
-	defer gridOut.finish()
-	ordered3, err := byCell.merge()
-	if err != nil {
-		return rep, err
-	}
-	err = ordered3.each(func(c cellNode) error { return gridOut.put(c.rank) })
+	// The spatial index: the nodes by cell.
+	err = byCell.each(func(c cellNode) error { return graph.GridNode(c.rank) })
 	if err != nil {
 		return rep, err
 	}
 	byCell.finish(&tot)
-	for _, t := range []interface{ finish() error }{nodesOut, offOut, edgesOut, cellsOut, gridOut, smallOut, longOut} {
-		if err := t.finish(); err != nil {
-			return rep, err
-		}
-	}
-	err = engine.WriteGraphFromParts(outPath, engine.GraphParts{
-		Nodes: nodesOut.path, Off: offOut.path, Edges: edgesOut.path, GridCells: cellsOut.path, GridNodes: gridOut.path,
-		Small: smallOut.path, Long: longOut.path, LongCount: longCount,
-		NodeCount: kept, EdgeCount: uint32(edges), Bounds: box,
-	})
-	if err != nil {
+	if err := graph.Close(); err != nil {
 		return rep, err
 	}
 	st, _ := os.Stat(outPath)

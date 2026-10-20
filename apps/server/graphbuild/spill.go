@@ -2,7 +2,6 @@ package graphbuild
 
 import (
 	"bufio"
-	"container/heap"
 	"fmt"
 	"io"
 	"os"
@@ -10,9 +9,9 @@ import (
 	"slices"
 )
 
-// codec is what a sort on disk needs to know of its records: how big they are on disk, how they are written and read, and
-// in which order they come out. Records that compare equal come out in no particular order, so each sort names a key
-// that tells its records apart whenever the order of the output depends on it.
+// codec is what a step on disk needs to know of its records: how big they are on disk and how they are written and read;
+// for a sort (see spill), in which order they come out. Records that compare equal come out in no particular order, so
+// each sort names a key that tells its records apart whenever the order of the output depends on it.
 type codec[R any] struct {
 	size int
 	put  func(b []byte, r R)
@@ -21,49 +20,99 @@ type codec[R any] struct {
 }
 
 // spill gathers records up to a chunk, sorts them and writes them as a run: the memory of a sort is a chunk, whatever
-// the number of records. merge reads every run back in order.
+// the number of records. merge reads every run back in order. The chunk is two buffers: one is sorted and written in the
+// background while the other fills, so that the step that makes the records does not wait for the disk.
 type spill[R any] struct {
-	dir, name string
-	c         codec[R]
-	chunk     int
-	buf       []R
-	runs      []string
-	bytes     int64
+	dir, name  string
+	c          codec[R]
+	half       int
+	buf, spare []R
+	writing    chan error // the run being written, nil when none is
+	runs       []string
+	bytes      int64
 }
 
 func newSpill[R any](dir, name string, c codec[R], chunk int) *spill[R] {
-	return &spill[R]{dir: dir, name: name, c: c, chunk: max(chunk, 1)}
+	return &spill[R]{dir: dir, name: name, c: c, half: max(chunk/2, 1)}
 }
 
 func (s *spill[R]) push(r R) error {
-	if len(s.buf) == cap(s.buf) && cap(s.buf) < s.chunk {
-		// It grows by doubling up to the chunk and never past it: a small input holds a small buffer, and a big one
-		// does not hold the room that append would leave beyond the chunk.
-		grown := make([]R, len(s.buf), min(max(2*cap(s.buf), 1<<10), s.chunk))
+	if len(s.buf) == cap(s.buf) && cap(s.buf) < s.half {
+		// It grows by doubling up to its half of the chunk and never past it: a small input holds a small buffer, and a
+		// big one does not hold the room that append would leave beyond it.
+		grown := make([]R, len(s.buf), min(max(2*cap(s.buf), 1<<10), s.half))
 		copy(grown, s.buf)
 		s.buf = grown
 	}
 	s.buf = append(s.buf, r)
-	if len(s.buf) >= s.chunk {
-		return s.flush()
+	if len(s.buf) >= s.half {
+		return s.flushInBackground()
 	}
 	return nil
 }
 
+// wait waits for the run being written, and says how its writing went. A step that may stop early defers it, so that no
+// run is still being written when the scratch directory is removed.
+func (s *spill[R]) wait() error {
+	if s.writing == nil {
+		return nil
+	}
+	err := <-s.writing
+	s.writing = nil
+	return err
+}
+
+// nextRun names the next run and counts what it holds.
+func (s *spill[R]) nextRun(records []R) string {
+	path := filepath.Join(s.dir, fmt.Sprintf("%s-%d.run", s.name, len(s.runs)))
+	s.runs = append(s.runs, path)
+	s.bytes += int64(len(records) * s.c.size)
+	return path
+}
+
+// flushInBackground writes the full buffer as a run while the other one fills; a run that fails says so at the next
+// flush, or at the merge.
+func (s *spill[R]) flushInBackground() error {
+	if err := s.wait(); err != nil {
+		return err
+	}
+	full := s.buf
+	s.buf, s.spare = s.spare[:0], full
+	path, c, done := s.nextRun(full), s.c, make(chan error, 1)
+	s.writing = done
+	go func() {
+		slices.SortFunc(full, c.cmp)
+		done <- writeRun(path, c, full)
+	}()
+	return nil
+}
+
+// flush writes what the buffer holds, once the run being written is done; it is sorted while that one is written.
 func (s *spill[R]) flush() error {
+	slices.SortFunc(s.buf, s.c.cmp)
+	if err := s.wait(); err != nil {
+		return err
+	}
 	if len(s.buf) == 0 {
 		return nil
 	}
-	slices.SortFunc(s.buf, s.c.cmp)
-	path := filepath.Join(s.dir, fmt.Sprintf("%s-%d.run", s.name, len(s.runs)))
+	if err := writeRun(s.nextRun(s.buf), s.c, s.buf); err != nil {
+		return err
+	}
+	s.buf = s.buf[:0]
+	return nil
+}
+
+// writeRun writes records, sorted, as the run at path.
+func writeRun[R any](path string, c codec[R], records []R) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	w := bufio.NewWriterSize(f, 1<<20)
-	b := make([]byte, s.c.size)
-	for _, r := range s.buf {
-		s.c.put(b, r)
+	b := make([]byte, c.size)
+	for _, r := range records {
+		c.put(b, r)
 		if _, err := w.Write(b); err != nil {
 			f.Close()
 			return err
@@ -73,13 +122,7 @@ func (s *spill[R]) flush() error {
 		f.Close()
 		return err
 	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	s.bytes += int64(len(s.buf) * s.c.size)
-	s.buf = s.buf[:0]
-	s.runs = append(s.runs, path)
-	return nil
+	return f.Close()
 }
 
 // merge reads everything back in order, once the last record is in. It can be called again to read the records again.
@@ -87,8 +130,8 @@ func (s *spill[R]) merge() (*merger[R], error) {
 	if err := s.flush(); err != nil {
 		return nil, err
 	}
-	// The records are all on disk now, and the buffer would stay until finish, beside the buffers of the sorts that follow.
-	s.buf = nil
+	// The records are all on disk now, and the buffers would stay until finish, beside the buffers of the sorts that follow.
+	s.buf, s.spare = nil, nil
 	m := &merger[R]{c: s.c}
 	for i, p := range s.runs {
 		f, err := os.Open(p)
@@ -98,22 +141,30 @@ func (s *spill[R]) merge() (*merger[R], error) {
 		}
 		m.files = append(m.files, f)
 		m.readers = append(m.readers, bufio.NewReaderSize(f, 1<<20))
-		if err := m.refill(i, -1); err != nil {
+		rec, ok, err := m.read(i)
+		if err != nil {
 			m.close()
 			return nil, err
 		}
+		if ok {
+			m.items = append(m.items, headItem[R]{rec, i})
+		}
+	}
+	for k := len(m.items)/2 - 1; k >= 0; k-- {
+		m.down(k)
 	}
 	return m, nil
 }
 
 // finish adds what was written to the totals and removes the runs: the disk of a step is freed as soon as it is read.
 func (s *spill[R]) finish(t *totals) {
+	s.wait() // a build that failed may leave a run being written: it is removed with the others
 	t.runs += len(s.runs)
 	t.bytes += s.bytes
 	for _, p := range s.runs {
 		os.Remove(p)
 	}
-	s.runs, s.buf = nil, nil
+	s.runs, s.buf, s.spare = nil, nil, nil
 }
 
 type totals struct {
@@ -135,12 +186,6 @@ type merger[R any] struct {
 	b       []byte
 }
 
-func (m *merger[R]) Len() int           { return len(m.items) }
-func (m *merger[R]) Swap(i, j int)      { m.items[i], m.items[j] = m.items[j], m.items[i] }
-func (m *merger[R]) Less(i, j int) bool { return m.less(m.items[i], m.items[j]) }
-func (m *merger[R]) Push(any)           { panic("the merger is filled by refill") }
-func (m *merger[R]) Pop() any           { panic("the merger is emptied by next") }
-
 func (m *merger[R]) less(a, b headItem[R]) bool {
 	if c := m.c.cmp(a.rec, b.rec); c != 0 {
 		return c < 0
@@ -148,43 +193,55 @@ func (m *merger[R]) less(a, b headItem[R]) bool {
 	return a.run < b.run
 }
 
-// refill reads the next record of run i. A replaced is the position in the heap of the record that was taken from the
-// run, or -1 at the start, when the heap does not hold it yet.
-func (m *merger[R]) refill(i, replaced int) error {
+// down moves the record at k down to its place in the heap. It is written for the records, not through container/heap,
+// whose interface calls cost more than the comparison: this runs once per record.
+func (m *merger[R]) down(k int) {
+	items := m.items
+	for {
+		c := 2*k + 1
+		if c >= len(items) {
+			return
+		}
+		if c+1 < len(items) && m.less(items[c+1], items[c]) {
+			c++
+		}
+		if !m.less(items[c], items[k]) {
+			return
+		}
+		items[k], items[c] = items[c], items[k]
+		k = c
+	}
+}
+
+// read reads the next record of run i; ok is false at its end.
+func (m *merger[R]) read(i int) (r R, ok bool, err error) {
 	if m.b == nil {
 		m.b = make([]byte, m.c.size)
 	}
-	_, err := io.ReadFull(m.readers[i], m.b)
-	switch {
-	case err == nil:
-		it := headItem[R]{m.c.get(m.b), i}
-		if replaced < 0 {
-			m.items = append(m.items, it)
-			// Sifting up by hand keeps the records out of an interface: this runs once per record.
-			for k := len(m.items) - 1; k > 0; {
-				p := (k - 1) / 2
-				if !m.less(m.items[k], m.items[p]) {
-					break
-				}
-				m.items[k], m.items[p] = m.items[p], m.items[k]
-				k = p
-			}
-		} else {
-			m.items[replaced] = it
-			heap.Fix(m, replaced)
-		}
-	case err == io.EOF:
-		if replaced >= 0 {
-			last := len(m.items) - 1
-			m.items[replaced] = m.items[last]
-			m.items = m.items[:last]
-			if replaced < last {
-				heap.Fix(m, replaced)
-			}
-		}
+	switch _, err := io.ReadFull(m.readers[i], m.b); err {
+	case nil:
+		return m.c.get(m.b), true, nil
+	case io.EOF:
+		return r, false, nil
 	default:
+		return r, false, err
+	}
+}
+
+// refill puts the next record of the run of the top of the heap in its place, or takes the run out at its end.
+func (m *merger[R]) refill() error {
+	rec, ok, err := m.read(m.items[0].run)
+	if err != nil {
 		return err
 	}
+	if ok {
+		m.items[0].rec = rec
+	} else {
+		last := len(m.items) - 1
+		m.items[0] = m.items[last]
+		m.items = m.items[:last]
+	}
+	m.down(0)
 	return nil
 }
 
@@ -194,7 +251,7 @@ func (m *merger[R]) next() (r R, ok bool, err error) {
 		return r, false, nil
 	}
 	top := m.items[0]
-	if err := m.refill(top.run, 0); err != nil {
+	if err := m.refill(); err != nil {
 		m.close()
 		return r, false, err
 	}
@@ -232,12 +289,17 @@ type table[R any] struct {
 }
 
 func createTable[R any](dir, name string, c codec[R]) (*table[R], error) {
+	return createTableSize(dir, name, c, 1<<20)
+}
+
+// createTableSize is createTable with a writer of size bytes.
+func createTableSize[R any](dir, name string, c codec[R], size int) (*table[R], error) {
 	path := filepath.Join(dir, name)
 	f, err := os.Create(path)
 	if err != nil {
 		return nil, err
 	}
-	return &table[R]{path: path, c: c, f: f, w: bufio.NewWriterSize(f, 1<<20), b: make([]byte, c.size)}, nil
+	return &table[R]{path: path, c: c, f: f, w: bufio.NewWriterSize(f, size), b: make([]byte, c.size)}, nil
 }
 
 func (t *table[R]) put(r R) error {
