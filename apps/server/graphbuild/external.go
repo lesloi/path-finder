@@ -126,16 +126,18 @@ var seenCodec = codec[seen]{
 	get:  func(b []byte) seen { return seen{le32(b, 0), int32(le32(b, 4)), int32(le32(b, 8))} },
 }
 
-// curved is a node that is kept, with its place along the Hilbert curve and the position of its first reference.
+// curved is a node that is kept, with its place along the Hilbert curve, the position of its first reference and its
+// degree: carried here, the degrees are not in memory while the ranks are given.
 type curved struct {
 	key         uint64
 	first, node uint32
 	lat, lon    int32
 	elev        int32
+	deg         uint32
 }
 
 var curvedCodec = codec[curved]{
-	size: 28,
+	size: 32,
 	put: func(b []byte, r curved) {
 		binary.LittleEndian.PutUint64(b, r.key)
 		put32(b, 8, r.first)
@@ -143,9 +145,10 @@ var curvedCodec = codec[curved]{
 		put32(b, 16, uint32(r.lat))
 		put32(b, 20, uint32(r.lon))
 		put32(b, 24, uint32(r.elev))
+		put32(b, 28, r.deg)
 	},
 	get: func(b []byte) curved {
-		return curved{binary.LittleEndian.Uint64(b), le32(b, 8), le32(b, 12), int32(le32(b, 16)), int32(le32(b, 20)), int32(le32(b, 24))}
+		return curved{binary.LittleEndian.Uint64(b), le32(b, 8), le32(b, 12), int32(le32(b, 16)), int32(le32(b, 20)), int32(le32(b, 24)), le32(b, 28)}
 	},
 	cmp: func(a, b curved) int {
 		return cmp.Or(cmp.Compare(a.key, b.key), cmp.Compare(a.first, b.first))
@@ -561,13 +564,14 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		}
 		if d > 0 {
 			cells[cellOf(s.lat, s.lon)+1]++
-			if err := byCurve.push(curved{cv.key(s.lat, s.lon), s.first, uint32(u), s.lat, s.lon, e.elev}); err != nil {
+			if err := byCurve.push(curved{cv.key(s.lat, s.lon), s.first, uint32(u), s.lat, s.lon, e.elev, d}); err != nil {
 				return rep, err
 			}
 		}
 	}
 	all.close()
 	byNode.finish(&tot)
+	deg = nil
 	for c := 1; c < len(cells); c++ {
 		cells[c] += cells[c-1]
 	}
@@ -602,7 +606,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 			return err
 		}
 		nextEdge[rank] = cum
-		cum += deg[c.node]
+		cum += c.deg
 		cell := cellOf(c.lat, c.lon)
 		at := nextInCell[cell]
 		nextInCell[cell]++
@@ -616,7 +620,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if rank != kept || uint64(cum) != edges {
 		return rep, fmt.Errorf("%d nodes and %d edges out, %d and %d in", rank, cum, kept, edges)
 	}
-	deg, nextInCell = nil, nil
+	nextInCell = nil
 	// The offsets are where the edges of each node start, before the edges move them on.
 	for _, o := range nextEdge {
 		if err := graph.Offset(o); err != nil {
