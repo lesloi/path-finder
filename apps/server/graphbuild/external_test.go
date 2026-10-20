@@ -89,7 +89,7 @@ func newFixture(t *testing.T) fixture {
 		ways = append(ways, pbfWay{id: int64(2000 + i), refs: cols[i], tags: [][2]string{{"highway", "path"}, {"sac_scale", "demanding_mountain_hiking"}}})
 	}
 	ways = append(ways,
-		pbfWay{id: 3000, refs: []int64{at(2, 2), at(2, 2), at(3, 2), 999_999, at(4, 2)}, tags: [][2]string{{"highway", "track"}}},
+		pbfWay{id: 3000, refs: []int64{at(5, 5), at(5, 5), at(6, 5), 999_999, at(7, 5)}, tags: [][2]string{{"highway", "track"}}},
 		pbfWay{id: 3001, refs: []int64{at(5, 5), at(6, 6)}, tags: [][2]string{{"waterway", "river"}}},
 		pbfWay{id: 3002, refs: []int64{at(7, 7), at(8, 8), at(7, 7)}, tags: [][2]string{{"highway", "footway"}}})
 	pbf := filepath.Join(dir, "a.osm.pbf")

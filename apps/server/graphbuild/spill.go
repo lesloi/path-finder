@@ -37,7 +37,7 @@ func newSpill[R any](dir, name string, c codec[R], chunk int) *spill[R] {
 
 func (s *spill[R]) push(r R) error {
 	if s.buf == nil {
-		s.buf = make([]R, 0, min(s.chunk, 1<<20))
+		s.buf = make([]R, 0, s.chunk) // the whole chunk at once: growing it by appends would hold twice as much for a while
 	}
 	s.buf = append(s.buf, r)
 	if len(s.buf) >= s.chunk {

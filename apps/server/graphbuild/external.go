@@ -324,7 +324,7 @@ type Options struct {
 }
 
 const (
-	// DefaultChunk is about 100 MB of records per sort.
+	// DefaultChunk is about 256 MB of records per sort, the biggest being 32 bytes in memory.
 	DefaultChunk = 8_000_000
 	DefaultCache = 128
 )
@@ -476,6 +476,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 	if err != nil {
 		return rep, err
 	}
+	defer tiles.close()
 	for {
 		t, ok, err := tiles.next()
 		if err != nil {
@@ -555,6 +556,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 	if err != nil {
 		return rep, err
 	}
+	defer elevs.close()
 	for u, d := range deg {
 		s, err := all.next()
 		if err != nil {
@@ -571,6 +573,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 		}
 	}
 	all.close()
+	elevs.close()
 	byNode.finish(&tot)
 
 	// Ranks: the nodes and their offsets are written in rank order, and the grid of the spatial index is counted.
@@ -594,6 +597,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 	if err != nil {
 		return rep, err
 	}
+	defer ordered.close()
 	for {
 		c, ok, err := ordered.next()
 		if err != nil {
@@ -624,7 +628,6 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 		return rep, fmt.Errorf("%d nodes and %d edges out, %d and %d in", rank, cum, kept, edges)
 	}
 	deg = nil
-	_ = seenTab.finish()
 
 	// The edges, in the order of the rank of their source, then of the way steps.
 	byEdge := newSpill(dir, "edge", outEdgeCodec, chunk)
@@ -653,6 +656,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 	if err != nil {
 		return rep, err
 	}
+	defer ordered2.close()
 	for {
 		e, ok, err := ordered2.next()
 		if err != nil {
@@ -693,6 +697,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 	if err != nil {
 		return rep, err
 	}
+	defer ordered3.close()
 	for {
 		c, ok, err := ordered3.next()
 		if err != nil {
