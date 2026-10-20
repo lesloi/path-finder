@@ -18,6 +18,17 @@ func WriteGraph(path string, nodes []Node, off []uint32, edges []Edge) error {
 	return writeAtomic(path, func(tmp string) error { return writeGraph(tmp, nodes, off, edges) })
 }
 
+// WriteGraphFromParts writes a graph from the files of its sections: see GraphParts.
+func WriteGraphFromParts(path string, parts GraphParts) error {
+	return writeAtomic(path, func(tmp string) error { return writeGraphFromParts(tmp, parts) })
+}
+
+// Grid cell sizes of the spatial index, in 1e-7 degrees (about 220 m).
+const (
+	CellLat = cellLat
+	CellLon = cellLon
+)
+
 // writeAtomic has write fill a temporary file beside path, then moves it into place, so a server that
 // starts, or a job that copies the directory, never sees a half-written file.
 func writeAtomic(path string, write func(tmp string) error) error {

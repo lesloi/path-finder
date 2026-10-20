@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"hash/crc64"
+	"io"
 	"math"
 	"os"
 	"unsafe"
@@ -188,14 +189,107 @@ func writeGraph(path string, nodes []node, off []uint32, edges []edge) error {
 	})
 }
 
+// GraphParts are the files that hold the sections of a graph, each as the bytes the graph file holds, for a graph
+// too big to be in memory.
+type GraphParts struct {
+	Nodes, Off, Edges string
+	// GridCells holds the nx*ny+1 cell starts of the spatial index, GridNodes its node numbers sorted by cell.
+	GridCells, GridNodes string
+	NodeCount, EdgeCount uint32
+	// Bounds are the least latitude, least longitude, greatest latitude and greatest longitude of the nodes, in 1e-7
+	// degrees (zeros for no node).
+	Bounds [4]int32
+}
+
+// GridSize is the number of cells of the spatial index over a box (min latitude, min longitude, max latitude, max
+// longitude), along longitude then along latitude.
+func GridSize(b [4]int32) (nx, ny int) { return gridSize(b[0], b[1], b[2], b[3]) }
+
+// writeGraphFromParts writes the graph file from the files of its sections, which it reads once each and in order:
+// the file is the one writeGraph writes for the same sections.
+func writeGraphFromParts(path string, p GraphParts) (err error) {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}()
+	w := bufio.NewWriterSize(f, 1<<20)
+	// The header holds the fingerprint of what follows: it is written as zeros first and set at the end.
+	if _, err := w.Write(make([]byte, graphHeaderSize)); err != nil {
+		return err
+	}
+	sum, pos := uint64(0), int64(graphHeaderSize)
+	for _, s := range []struct {
+		file          string
+		fingerprinted bool
+	}{{p.Nodes, true}, {p.Off, true}, {p.Edges, true}, {p.GridCells, false}, {p.GridNodes, false}} {
+		n, crc, err := copySection(w, s.file, s.fingerprinted, sum)
+		if err != nil {
+			return err
+		}
+		sum, pos = crc, pos+n
+		pad := pad16(pos)
+		if _, err := w.Write(make([]byte, pad)); err != nil {
+			return err
+		}
+		pos += pad
+	}
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	head := graphHead{nodes: p.NodeCount, edges: p.EdgeCount, fingerprint: sum, bounds: bounds{p.Bounds[0], p.Bounds[1], p.Bounds[2], p.Bounds[3]}}
+	if _, err := f.WriteAt(head.encode(), 0); err != nil {
+		return err
+	}
+	return f.Sync()
+}
+
+// copySection appends the file to w, and folds its bytes into the checksum sum when it is part of the fingerprint.
+func copySection(w io.Writer, file string, fingerprinted bool, sum uint64) (n int64, crc uint64, err error) {
+	in, err := os.Open(file)
+	if err != nil {
+		return 0, sum, err
+	}
+	defer in.Close()
+	buf := make([]byte, 1<<20)
+	for {
+		k, rerr := in.Read(buf)
+		if fingerprinted {
+			sum = crc64.Update(sum, fingerprintTable, buf[:k])
+		}
+		if _, err := w.Write(buf[:k]); err != nil {
+			return n, sum, err
+		}
+		n += int64(k)
+		if rerr == io.EOF {
+			return n, sum, nil
+		}
+		if rerr != nil {
+			return n, sum, rerr
+		}
+	}
+}
+
 // writeLandmarks writes landmark rows in the format above, for the graph with the given fingerprint.
 func writeLandmarks(path string, landmarks int, nodes uint32, graphFingerprint uint64, climb float32, rows []uint16) error {
+	return writeLandmarksWith(path, landmarks, nodes, graphFingerprint, climb, func(w *bufio.Writer) error {
+		_, err := w.Write(bytesOf(rows))
+		return err
+	})
+}
+
+// writeLandmarksWith is writeLandmarks for rows that fill writes as it makes them, so that they need not be in
+// memory all at once.
+func writeLandmarksWith(path string, landmarks int, nodes uint32, graphFingerprint uint64, climb float32, fill func(w *bufio.Writer) error) error {
 	return writeFile(path, func(w *bufio.Writer) error {
 		head := altHead{landmarks: uint32(landmarks), nodes: nodes, climb: climb, unit: altUnitMeters, fingerprint: graphFingerprint}
 		if _, err := w.Write(head.encode()); err != nil {
 			return err
 		}
-		_, err := w.Write(bytesOf(rows))
-		return err
+		return fill(w)
 	})
 }
