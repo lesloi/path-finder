@@ -1,6 +1,7 @@
 package graphbuild
 
 import (
+	"cmp"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -30,30 +31,11 @@ import (
 // Hilbert curve, which gives their rank; the edges are sorted by the rank of their source; the sections are then put in
 // one file. The tie of the curve is the order a node was first met in, as in Build.
 
-const none = math.MaxUint32 // the number of a node the extract does not hold
-
-type i32 = int32
+const none uint32 = math.MaxUint32 // the number of a node the extract does not hold
 
 func le32(b []byte, at int) uint32 { return binary.LittleEndian.Uint32(b[at:]) }
 func put32(b []byte, at int, v uint32) {
 	binary.LittleEndian.PutUint32(b[at:], v)
-}
-
-func cmpU[T uint32 | uint64 | int64](a, b T) int {
-	switch {
-	case a < b:
-		return -1
-	case a > b:
-		return 1
-	}
-	return 0
-}
-
-func cmpThen(first int, then func() int) int {
-	if first != 0 {
-		return first
-	}
-	return then()
 }
 
 // idRef is a reference of a way to a node, and its position among all the references.
@@ -70,14 +52,14 @@ var idRefCodec = codec[idRef]{
 		put32(b, 8, r.seq)
 	},
 	get: func(b []byte) idRef { return idRef{int64(binary.LittleEndian.Uint64(b)), le32(b, 8)} },
-	cmp: func(a, b idRef) int { return cmpThen(cmpU(a.id, b.id), func() int { return cmpU(a.seq, b.seq) }) },
+	cmp: func(a, b idRef) int { return cmp.Or(cmp.Compare(a.id, b.id), cmp.Compare(a.seq, b.seq)) },
 }
 
 // ref is a reference once its node is known: the position among the references, the number of its node (none when the
 // extract does not hold it) and the node's position.
 type ref struct {
 	seq, node uint32
-	lat, lon  i32
+	lat, lon  int32
 }
 
 var refCodec = codec[ref]{
@@ -88,15 +70,15 @@ var refCodec = codec[ref]{
 		put32(b, 8, uint32(r.lat))
 		put32(b, 12, uint32(r.lon))
 	},
-	get: func(b []byte) ref { return ref{le32(b, 0), le32(b, 4), i32(le32(b, 8)), i32(le32(b, 12))} },
-	cmp: func(a, b ref) int { return cmpU(a.seq, b.seq) },
+	get: func(b []byte) ref { return ref{le32(b, 0), le32(b, 4), int32(le32(b, 8)), int32(le32(b, 12))} },
+	cmp: func(a, b ref) int { return cmp.Compare(a.seq, b.seq) },
 }
 
 // tileNode is a node and the DEM tile it falls in; the nodes of a tile are sorted by number, which is the order they
 // were met in.
 type tileNode struct {
 	tile, node uint32
-	lat, lon   i32
+	lat, lon   int32
 }
 
 var tileNodeCodec = codec[tileNode]{
@@ -107,42 +89,44 @@ var tileNodeCodec = codec[tileNode]{
 		put32(b, 8, uint32(r.lat))
 		put32(b, 12, uint32(r.lon))
 	},
-	get: func(b []byte) tileNode { return tileNode{le32(b, 0), le32(b, 4), i32(le32(b, 8)), i32(le32(b, 12))} },
+	get: func(b []byte) tileNode {
+		return tileNode{le32(b, 0), le32(b, 4), int32(le32(b, 8)), int32(le32(b, 12))}
+	},
 	cmp: func(a, b tileNode) int {
-		return cmpThen(cmpU(a.tile, b.tile), func() int { return cmpU(a.node, b.node) })
+		return cmp.Or(cmp.Compare(a.tile, b.tile), cmp.Compare(a.node, b.node))
 	},
 }
 
 type nodeElev struct {
 	node uint32
-	elev i32
+	elev int32
 }
 
 var nodeElevCodec = codec[nodeElev]{
 	size: 8,
 	put:  func(b []byte, r nodeElev) { put32(b, 0, r.node); put32(b, 4, uint32(r.elev)) },
-	get:  func(b []byte) nodeElev { return nodeElev{le32(b, 0), i32(le32(b, 4))} },
-	cmp:  func(a, b nodeElev) int { return cmpU(a.node, b.node) },
+	get:  func(b []byte) nodeElev { return nodeElev{le32(b, 0), int32(le32(b, 4))} },
+	cmp:  func(a, b nodeElev) int { return cmp.Compare(a.node, b.node) },
 }
 
 // seen is what the table of nodes holds: the position of the first reference to a node, and where the node is.
 type seen struct {
 	first    uint32
-	lat, lon i32
+	lat, lon int32
 }
 
 var seenCodec = codec[seen]{
 	size: 12,
 	put:  func(b []byte, r seen) { put32(b, 0, r.first); put32(b, 4, uint32(r.lat)); put32(b, 8, uint32(r.lon)) },
-	get:  func(b []byte) seen { return seen{le32(b, 0), i32(le32(b, 4)), i32(le32(b, 8))} },
+	get:  func(b []byte) seen { return seen{le32(b, 0), int32(le32(b, 4)), int32(le32(b, 8))} },
 }
 
 // curved is a node that is kept, with its place along the Hilbert curve and the position of its first reference.
 type curved struct {
 	key         uint64
 	first, node uint32
-	lat, lon    i32
-	elev        i32
+	lat, lon    int32
+	elev        int32
 }
 
 var curvedCodec = codec[curved]{
@@ -156,10 +140,10 @@ var curvedCodec = codec[curved]{
 		put32(b, 24, uint32(r.elev))
 	},
 	get: func(b []byte) curved {
-		return curved{binary.LittleEndian.Uint64(b), le32(b, 8), le32(b, 12), i32(le32(b, 16)), i32(le32(b, 20)), i32(le32(b, 24))}
+		return curved{binary.LittleEndian.Uint64(b), le32(b, 8), le32(b, 12), int32(le32(b, 16)), int32(le32(b, 20)), int32(le32(b, 24))}
 	},
 	cmp: func(a, b curved) int {
-		return cmpThen(cmpU(a.key, b.key), func() int { return cmpU(a.first, b.first) })
+		return cmp.Or(cmp.Compare(a.key, b.key), cmp.Compare(a.first, b.first))
 	},
 }
 
@@ -171,7 +155,7 @@ var cellNodeCodec = codec[cellNode]{
 	put:  func(b []byte, r cellNode) { put32(b, 0, r.cell); put32(b, 4, r.rank) },
 	get:  func(b []byte) cellNode { return cellNode{le32(b, 0), le32(b, 4)} },
 	cmp: func(a, b cellNode) int {
-		return cmpThen(cmpU(a.cell, b.cell), func() int { return cmpU(a.rank, b.rank) })
+		return cmp.Or(cmp.Compare(a.cell, b.cell), cmp.Compare(a.rank, b.rank))
 	},
 }
 
@@ -191,7 +175,7 @@ var outEdgeCodec = codec[outEdge]{
 		put32(b, 16, r.attrs)
 	},
 	get: func(b []byte) outEdge { return outEdge{le32(b, 0), le32(b, 4), le32(b, 8), le32(b, 12), le32(b, 16)} },
-	cmp: func(a, b outEdge) int { return cmpThen(cmpU(a.src, b.src), func() int { return cmpU(a.step, b.step) }) },
+	cmp: func(a, b outEdge) int { return cmp.Or(cmp.Compare(a.src, b.src), cmp.Compare(a.step, b.step)) },
 }
 
 // edgeWordCodec is an edge of the graph file: the target, the length, then the kind, the surface, the flags and a
@@ -268,7 +252,7 @@ func spillRefs(pbf, dir string, chunk int) (*refs, error) {
 
 // joinNodes joins the references with the nodes of the extract in one merge, and calls found(reference, position, first)
 // for each: the position is nil for a node that is not in the extract, and first is true for the first reference to a node.
-func joinNodes(pbf string, r *refs, found func(h idRef, at *[2]i32, first bool) error) error {
+func joinNodes(pbf string, r *refs, found func(h idRef, at *[2]int32, first bool) error) error {
 	ids, err := r.byID.merge()
 	if err != nil {
 		return err
@@ -279,7 +263,7 @@ func joinNodes(pbf string, r *refs, found func(h idRef, at *[2]i32, first bool) 
 		return err
 	}
 	last, lastFound := int64(math.MinInt64), int64(math.MinInt64)
-	step := func(at *[2]i32) error {
+	step := func(at *[2]int32) error {
 		first := head.id != lastFound
 		lastFound = head.id
 		if err := found(head, at, first); err != nil {
@@ -298,9 +282,9 @@ func joinNodes(pbf string, r *refs, found func(h idRef, at *[2]i32, first bool) 
 			return errors.New("the extract is not sorted by node id")
 		}
 		last = id
-		at := [2]i32{i32(math.Round(n.Lat * 1e7)), i32(math.Round(n.Lon * 1e7))}
+		at := [2]int32{int32(math.Round(n.Lat * 1e7)), int32(math.Round(n.Lon * 1e7))}
 		for more && head.id <= id {
-			var p *[2]i32
+			var p *[2]int32
 			if head.id == id {
 				p = &at
 			}
@@ -437,9 +421,9 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 	byTile := newSpill(dir, "tile", tileNodeCodec, chunk)
 	bySeq := newSpill(dir, "seq", refCodec, chunk)
 	var nodes uint32
-	current := uint32(none)
-	err = joinNodes(pbf, r, func(h idRef, at *[2]i32, first bool) error {
-		lat, lon := i32(math.MinInt32), i32(0)
+	current := none
+	err = joinNodes(pbf, r, func(h idRef, at *[2]int32, first bool) error {
+		lat, lon := int32(math.MinInt32), int32(0)
 		if at != nil {
 			lat, lon = at[0], at[1]
 		}
@@ -456,7 +440,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 				return err
 			}
 		}
-		u := uint32(none)
+		u := none
 		if at != nil {
 			u = current
 		}
@@ -525,7 +509,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 	if edges > math.MaxUint32 {
 		return rep, errors.New("more than 2^32 - 1 edges")
 	}
-	minLat, minLon, maxLat, maxLon := i32(math.MaxInt32), i32(math.MaxInt32), i32(math.MinInt32), i32(math.MinInt32)
+	minLat, minLon, maxLat, maxLon := int32(math.MaxInt32), int32(math.MaxInt32), int32(math.MinInt32), int32(math.MinInt32)
 	var kept uint32
 	all, err := seenTab.reader()
 	if err != nil {
@@ -577,7 +561,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 	byNode.finish(&tot)
 
 	// Ranks: the nodes and their offsets are written in rank order, and the grid of the spatial index is counted.
-	nx, ny := engine.GridSize([4]i32{minLat, minLon, maxLat, maxLon})
+	nx, ny := engine.GridSize([4]int32{minLat, minLon, maxLat, maxLon})
 	counts := make([]uint32, nx*ny+1)
 	byCell := newSpill(dir, "cell", cellNodeCodec, chunk)
 	nodesOut, err := createTable(dir, "nodes.sec", wordCodec)
@@ -718,7 +702,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp str
 	}
 	err = engine.WriteGraphFromParts(outPath, engine.GraphParts{
 		Nodes: nodesOut.path, Off: offOut.path, Edges: edgesOut.path, GridCells: cellsOut.path, GridNodes: gridOut.path,
-		NodeCount: kept, EdgeCount: uint32(edges), Bounds: [4]i32{minLat, minLon, maxLat, maxLon},
+		NodeCount: kept, EdgeCount: uint32(edges), Bounds: [4]int32{minLat, minLon, maxLat, maxLon},
 	})
 	if err != nil {
 		return rep, err
