@@ -1,5 +1,5 @@
 import { ArrowLeft, X } from 'lucide-react';
-import { useEffect, useId, useLayoutEffect, useRef, type MouseEvent, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useRef, type MouseEvent, type ReactNode } from 'react';
 
 import { commonText, type Language } from '../i18n/index.ts';
 import { ICON_BUTTON, tip } from './styles.ts';
@@ -44,8 +44,9 @@ export function SubPage({
     return () => element.close();
   }, []);
 
-  // Screen reader and keyboard users start from the page they just opened.
-  useEffect(() => heading.current?.focus(), [title]);
+  // Screen reader and keyboard users start from the page they just opened. In the commit itself: a later effect could
+  // take the focus from a control the user already clicked, and close its popup on blur.
+  useLayoutEffect(() => heading.current?.focus(), [title]);
 
   // The links keep their href for a middle click; a plain click leaves the way `navigate` does.
   const follow = (hash: string) => (event: MouseEvent) => {
