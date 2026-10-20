@@ -2,7 +2,6 @@ package graphbuild
 
 import (
 	"bufio"
-	"container/heap"
 	"fmt"
 	"io"
 	"os"
@@ -98,7 +97,7 @@ func (s *spill[R]) merge() (*merger[R], error) {
 		}
 		m.files = append(m.files, f)
 		m.readers = append(m.readers, bufio.NewReaderSize(f, 1<<20))
-		if err := m.refill(i, -1); err != nil {
+		if err := m.refill(i, false); err != nil {
 			m.close()
 			return nil, err
 		}
@@ -135,12 +134,6 @@ type merger[R any] struct {
 	b       []byte
 }
 
-func (m *merger[R]) Len() int           { return len(m.items) }
-func (m *merger[R]) Swap(i, j int)      { m.items[i], m.items[j] = m.items[j], m.items[i] }
-func (m *merger[R]) Less(i, j int) bool { return m.less(m.items[i], m.items[j]) }
-func (m *merger[R]) Push(any)           { panic("the merger is filled by refill") }
-func (m *merger[R]) Pop() any           { panic("the merger is emptied by next") }
-
 func (m *merger[R]) less(a, b headItem[R]) bool {
 	if c := m.c.cmp(a.rec, b.rec); c != 0 {
 		return c < 0
@@ -148,9 +141,29 @@ func (m *merger[R]) less(a, b headItem[R]) bool {
 	return a.run < b.run
 }
 
-// refill reads the next record of run i. A replaced is the position in the heap of the record that was taken from the
-// run, or -1 at the start, when the heap does not hold it yet.
-func (m *merger[R]) refill(i, replaced int) error {
+// down moves the record at the top of the heap down to its place. It is written for the records, not through
+// container/heap, whose interface calls cost more than the comparison: this runs once per record.
+func (m *merger[R]) down() {
+	items, k := m.items, 0
+	for {
+		c := 2*k + 1
+		if c >= len(items) {
+			return
+		}
+		if c+1 < len(items) && m.less(items[c+1], items[c]) {
+			c++
+		}
+		if !m.less(items[c], items[k]) {
+			return
+		}
+		items[k], items[c] = items[c], items[k]
+		k = c
+	}
+}
+
+// refill reads the next record of run i, whose last record was the top of the heap; top is false at the start, when the
+// heap does not hold one of its records yet.
+func (m *merger[R]) refill(i int, top bool) error {
 	if m.b == nil {
 		m.b = make([]byte, m.c.size)
 	}
@@ -158,9 +171,8 @@ func (m *merger[R]) refill(i, replaced int) error {
 	switch {
 	case err == nil:
 		it := headItem[R]{m.c.get(m.b), i}
-		if replaced < 0 {
+		if !top {
 			m.items = append(m.items, it)
-			// Sifting up by hand keeps the records out of an interface: this runs once per record.
 			for k := len(m.items) - 1; k > 0; {
 				p := (k - 1) / 2
 				if !m.less(m.items[k], m.items[p]) {
@@ -170,17 +182,15 @@ func (m *merger[R]) refill(i, replaced int) error {
 				k = p
 			}
 		} else {
-			m.items[replaced] = it
-			heap.Fix(m, replaced)
+			m.items[0] = it
+			m.down()
 		}
 	case err == io.EOF:
-		if replaced >= 0 {
+		if top {
 			last := len(m.items) - 1
-			m.items[replaced] = m.items[last]
+			m.items[0] = m.items[last]
 			m.items = m.items[:last]
-			if replaced < last {
-				heap.Fix(m, replaced)
-			}
+			m.down()
 		}
 	default:
 		return err
@@ -194,7 +204,7 @@ func (m *merger[R]) next() (r R, ok bool, err error) {
 		return r, false, nil
 	}
 	top := m.items[0]
-	if err := m.refill(top.run, 0); err != nil {
+	if err := m.refill(top.run, true); err != nil {
 		m.close()
 		return r, false, err
 	}
