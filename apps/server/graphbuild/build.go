@@ -4,6 +4,7 @@ package graphbuild
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -221,7 +222,7 @@ func finish(p progress, demDir string, ways []rawWay, lat, lon []int32, elev []i
 	nodes, off, edges := assemble(ways, lat, lon, elev)
 	p.step("graph: %d nodes, %d directed edges", len(nodes), len(edges))
 	if len(edges) == 0 {
-		return fmt.Errorf("no walkable way has elevation: check that %s holds the BD ALTI tiles of the area the extracts cover, and that -dem-crs names their projection (lambert93 by default)", demDir)
+		return errors.New(noEdges(demDir))
 	}
 
 	if err := engine.WriteGraph(outPath, nodes, off, edges); err != nil {
@@ -230,6 +231,12 @@ func finish(p progress, demDir string, ways []rawWay, lat, lon []int32, elev []i
 	st, _ := os.Stat(outPath)
 	p.step("written %s (%d MB)", outPath, st.Size()>>20)
 	return nil
+}
+
+// noEdges is what a build says when no way has elevation, which is nearly always tiles of another area or in another
+// projection.
+func noEdges(demDir string) string {
+	return fmt.Sprintf("no walkable way has elevation: check that %s holds the BD ALTI tiles of the area the extracts cover, and that -dem-crs names their projection (lambert93 by default)", demDir)
 }
 
 // assemble builds the graph from the ways, each a run of candidate nodes, their coordinates in 1e-7
@@ -297,9 +304,7 @@ func spatialOrder(deg []uint32, lat, lon []int32) (remap []uint32, kept uint32) 
 			minLon, maxLon = min(minLon, lon[i]), max(maxLon, lon[i])
 		}
 	}
-	// One square cell size for both axes, so that the curve does not stretch along one of them.
-	span := max(int64(maxLat)-int64(minLat), int64(maxLon)-int64(minLon))
-	cell := span>>hilbertOrder + 1
+	cv := newCurve(minLat, minLon, maxLat, maxLon)
 
 	type keyed struct {
 		key  uint64
@@ -308,8 +313,7 @@ func spatialOrder(deg []uint32, lat, lon []int32) (remap []uint32, kept uint32) 
 	order := make([]keyed, 0, len(deg))
 	for i, d := range deg {
 		if d > 0 {
-			x, y := uint32((int64(lon[i])-int64(minLon))/cell), uint32((int64(lat[i])-int64(minLat))/cell)
-			order = append(order, keyed{hilbertKey(x, y, hilbertOrder), uint32(i)})
+			order = append(order, keyed{cv.key(lat[i], lon[i]), uint32(i)})
 		}
 	}
 	sort.Slice(order, func(a, b int) bool {
@@ -326,6 +330,23 @@ func spatialOrder(deg []uint32, lat, lon []int32) (remap []uint32, kept uint32) 
 		remap[k.node] = uint32(r)
 	}
 	return remap, uint32(len(order))
+}
+
+// curve is the Hilbert curve laid over the bounding box of the nodes that are kept.
+type curve struct {
+	minLat, minLon int32
+	cell           int64
+}
+
+func newCurve(minLat, minLon, maxLat, maxLon int32) curve {
+	// One square cell size for both axes, so that the curve does not stretch along one of them.
+	span := max(int64(maxLat)-int64(minLat), int64(maxLon)-int64(minLon))
+	return curve{minLat, minLon, span>>hilbertOrder + 1}
+}
+
+func (c curve) key(lat, lon int32) uint64 {
+	x, y := uint32((int64(lon)-int64(c.minLon))/c.cell), uint32((int64(lat)-int64(c.minLat))/c.cell)
+	return hilbertKey(x, y, hilbertOrder)
 }
 
 // hilbertKey is the position of cell (x, y) along the Hilbert curve that fills a square of 2^order cells

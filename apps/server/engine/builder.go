@@ -18,6 +18,18 @@ func WriteGraph(path string, nodes []Node, off []uint32, edges []Edge) error {
 	return writeAtomic(path, func(tmp string) error { return writeGraph(tmp, nodes, off, edges) })
 }
 
+// WriteGraphFromParts writes a graph from the files of its sections: see GraphParts.
+func WriteGraphFromParts(path string, parts GraphParts) error {
+	return writeAtomic(path, func(tmp string) error { return writeGraphFromParts(tmp, parts) })
+}
+
+// Cells gives the cell of the spatial index that holds a point, for a graph whose nodes lie in the box b (least
+// latitude, least longitude, greatest latitude, greatest longitude). The grid is worked out once, not at each point.
+func Cells(b [4]int32) func(lat, lon int32) uint32 {
+	nx, _ := GridSize(b)
+	return func(lat, lon int32) uint32 { return uint32(cellIndex(lat, lon, b[0], b[1], nx)) }
+}
+
 // writeAtomic has write fill a temporary file beside path, then moves it into place, so a server that
 // starts, or a job that copies the directory, never sees a half-written file.
 func writeAtomic(path string, write func(tmp string) error) error {
@@ -80,24 +92,33 @@ func (b *Builder) WriteGraph(path string) error {
 // WriteLandmarks computes the landmarks of a graph file for an activity profile and writes them to
 // path, for Open to map with the same profile.
 func WriteLandmarks(graphPath, path, profile string, count int) error {
-	p := profiles[profile]
-	if p == nil {
-		return os.ErrInvalid
-	}
-	g, err := openGraph(graphPath)
+	p, g, _, err := openForLandmarks(graphPath, profile, count)
 	if err != nil {
 		return err
 	}
 	defer g.file.unmap()
-	perNode := 1 // landmark distances a node keeps per landmark: twice with climb, for both directions
-	if p.UpPerMeter > 0 {
-		perNode = 2
-	}
-	if most := maxLandmarkValues / perNode; count < 1 || count > most {
-		return fmt.Errorf("engine: %d landmarks is out of range for the %s profile (1 to %d)", count, profile, most)
-	}
 	rows := buildLandmarks(g, g.sp, p, count, p.UpPerMeter)
 	return writeAtomic(path, func(tmp string) error {
 		return writeLandmarks(tmp, count, uint32(g.n), g.fingerprint, p.UpPerMeter, rows)
 	})
+}
+
+// openForLandmarks finds the profile, maps the graph and checks that the count fits a search. perNode is how many
+// landmark distances a node keeps per landmark: twice with climb, for both directions. The caller unmaps the graph.
+func openForLandmarks(graphPath, profile string, count int) (p *Profile, g *graph, perNode int, err error) {
+	p = profiles[profile]
+	if p == nil {
+		return nil, nil, 0, os.ErrInvalid
+	}
+	perNode = 1
+	if p.UpPerMeter > 0 {
+		perNode = 2
+	}
+	if most := maxLandmarkValues / perNode; count < 1 || count > most {
+		return nil, nil, 0, fmt.Errorf("engine: %d landmarks is out of range for the %s profile (1 to %d)", count, profile, most)
+	}
+	if g, err = openGraph(graphPath); err != nil {
+		return nil, nil, 0, err
+	}
+	return p, g, perNode, nil
 }

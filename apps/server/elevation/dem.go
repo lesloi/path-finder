@@ -291,17 +291,22 @@ func load(dir string, proj Projection, keep func(ascHeader) bool) (*DEM, error) 
 	for _, f := range files {
 		key := [2]int{int(math.Round((f.xll - d.x0) / d.tileW)), int(math.Round((f.yll - d.y0) / d.tileH))}
 		if prev := d.tiles[key]; prev != nil {
-			// Border tiles come with each neighbouring département, empty outside it: merge them.
-			for i, v := range f.tile.v {
-				if math.IsNaN(float64(prev.v[i])) {
-					prev.v[i] = v
-				}
-			}
+			prev.mergeFrom(f.tile)
 			continue
 		}
 		d.tiles[key] = f.tile
 	}
 	return d, nil
+}
+
+// mergeFrom fills the empty cells of t from another file of the same tile: border tiles come with each neighbouring
+// département, empty outside it. The loaded and the lazy DEM both use it, so that they merge alike.
+func (t *demTile) mergeFrom(other *demTile) {
+	for i, v := range other.v {
+		if math.IsNaN(float64(t.v[i])) {
+			t.v[i] = v
+		}
+	}
 }
 
 func (d *DEM) cell(gi, gj int) float32 {
@@ -315,15 +320,25 @@ func (d *DEM) cell(gi, gj int) float32 {
 	return t.v[(d.nrows-1-rowFromBottom)*d.ncols+c]
 }
 
-// elevationAt samples the elevation in metres at a point of the grid of the tiles, NaN outside the tiles.
-func (d *DEM) elevationAt(x, y float64) float32 {
-	fx, fy := (x-d.x0)/d.cs-0.5, (y-d.y0)/d.cs-0.5
-	i, j := int(math.Floor(fx)), int(math.Floor(fy))
-	tx, ty := float32(fx-float64(i)), float32(fy-float64(j))
-	a, b := d.cell(i, j), d.cell(i+1, j)
-	c, e := d.cell(i, j+1), d.cell(i+1, j+1)
+// gridPoint is where a point of the grid of the tiles falls: the cell below and left of it, and how far the
+// point is from the centre of that cell, as a share of a cell.
+func gridPoint(x, y, x0, y0, cs float64) (i, j int, tx, ty float32) {
+	fx, fy := (x-x0)/cs-0.5, (y-y0)/cs-0.5
+	i, j = int(math.Floor(fx)), int(math.Floor(fy))
+	return i, j, float32(fx - float64(i)), float32(fy - float64(j))
+}
+
+// blend is the bilinear mix of the four cells round a point: a at (i, j), b east of it, c north, e north-east. The
+// loaded and the lazy DEM both use it, so that they give the same heights to the last bit.
+func blend(a, b, c, e, tx, ty float32) float32 {
 	bottom, top := a+(b-a)*tx, c+(e-c)*tx
 	return bottom + (top-bottom)*ty
+}
+
+// elevationAt samples the elevation in metres at a point of the grid of the tiles, NaN outside the tiles.
+func (d *DEM) elevationAt(x, y float64) float32 {
+	i, j, tx, ty := gridPoint(x, y, d.x0, d.y0, d.cs)
+	return blend(d.cell(i, j), d.cell(i+1, j), d.cell(i, j+1), d.cell(i+1, j+1), tx, ty)
 }
 
 // At samples the elevation in metres at a WGS84 point, NaN outside the tiles.
@@ -379,4 +394,18 @@ func headerKept(path string, keep func(ascHeader) bool) (bool, error) {
 		return false, fmt.Errorf("%s: %w", path, err)
 	}
 	return keep(h), nil
+}
+
+// headerOf reads the header of a tile.
+func headerOf(path string) (ascHeader, error) {
+	f, err := openTile(path)
+	if err != nil {
+		return ascHeader{}, err
+	}
+	defer f.Close()
+	h, err := readHeader(bufio.NewReader(f))
+	if err != nil {
+		return ascHeader{}, fmt.Errorf("%s: %w", path, err)
+	}
+	return h, nil
 }

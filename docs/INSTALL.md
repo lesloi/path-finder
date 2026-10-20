@@ -59,6 +59,11 @@ export DATA_DIR=$PWD/../../data
 ./path-finder build-alt -profile unpaved
 ```
 
+`build-graph` from one `-pbf` sorted by node id (the Geofabrik extracts are) works on disk: its memory does not grow with
+the extract. Its temporary files go beside the graph, or to `-tmp` (never a memory-backed `/tmp`: they are as big as the
+extract), and `-chunk` and `-cache` size the sorts and the tiles kept. Several `-pbf` are joined in memory. `build-alt`
+also works on disk, `-workers` landmarks at a time (2 by default), with `-tmp` for its files.
+
 A graph of a format before `PFGRAPH7` (the current one) is refused when the server starts, and the log says to run
 `build-graph` again, then `build-alt` for each profile. A server that is running keeps the zones it serves when
 replaced files cannot be served, and says why in its log.

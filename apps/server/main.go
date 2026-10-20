@@ -44,13 +44,17 @@ func run(command string, args []string) error {
 		out := fs.String("out", filepath.Join(dataDir(), engine.GraphFileName), "graph file to write")
 		crs := fs.String("dem-crs", "lambert93", "projection of the BD ALTI tiles: lambert93 (metropolitan France), or utmZZn / utmZZs for an overseas territory, see docs/INSTALL.md")
 		bbox := fs.String("bbox", "", "keep only this zone, as minLon,minLat,maxLon,maxLat: the memory then follows the zone, not the extract (one sorted -pbf)")
+		tmp := fs.String("tmp", "", "directory for the temporary files of a build from one extract (default: the directory of -out, never a memory-backed /tmp)")
+		chunk := fs.Int("chunk", graphbuild.DefaultChunk, "records one sort holds in memory, for a build from one extract")
+		cache := fs.Int("cache", graphbuild.DefaultCache, "BD ALTI tiles kept in memory, for a build from one extract")
 		_ = fs.Parse(args)
 		proj, err := elevation.ParseProjection(*crs)
 		if err != nil {
 			return err
 		}
 		if *bbox == "" {
-			return graphbuild.Build(pbfs, *dem, proj, *out, os.Stderr)
+			// One extract is built on disk, whose memory does not grow with the country; several are joined in memory.
+			return graphbuild.BuildGraph(pbfs, *dem, proj, *out, graphbuild.Options{Tmp: *tmp, Chunk: *chunk, Cache: *cache}, os.Stderr)
 		}
 		box, err := graphbuild.ParseBox(*bbox)
 		if err != nil {
@@ -95,11 +99,14 @@ func run(command string, args []string) error {
 		out := fs.String("out", "", "landmark file to write (default: the profile's file in the data directory)")
 		profile := fs.String("profile", "any", "surface-preference profile: any, paved or unpaved")
 		count := fs.Int("landmarks", 8, "number of landmarks")
+		tmp := fs.String("tmp", "", "directory for the files of the build (default: the directory of -out, never a memory-backed /tmp)")
+		workers := fs.Int("workers", 2, "landmarks computed at a time, each worker holding one distance per node")
 		_ = fs.Parse(args)
 		if *out == "" {
 			*out = filepath.Join(dataDir(), engine.LandmarksFileName(*profile))
 		}
-		return engine.WriteLandmarks(*graph, *out, *profile, *count)
+		// The distances go to disk as they are made, so that the memory follows the workers, not the number of nodes.
+		return engine.WriteLandmarksOnDisk(*graph, *out, *profile, *count, *tmp, *workers)
 	}
 	return fmt.Errorf("unknown command %q: use build-graph, build-alt, build-pois, plan-zones, or none to serve", command)
 }
