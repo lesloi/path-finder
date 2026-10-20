@@ -22,22 +22,11 @@ func WriteLandmarksOnDisk(graphPath, path, profile string, count int, tmp string
 
 func writeLandmarksOnDisk(graphPath, path, profile string, count int, tmp string, workers, rowsAt int) error {
 	t0 := time.Now()
-	p := profiles[profile]
-	if p == nil {
-		return os.ErrInvalid
-	}
-	g, err := openGraph(graphPath)
+	p, g, perNode, err := openForLandmarks(graphPath, profile, count)
 	if err != nil {
 		return err
 	}
 	defer g.file.unmap()
-	perNode := 1
-	if p.UpPerMeter > 0 {
-		perNode = 2
-	}
-	if most := maxLandmarkValues / perNode; count < 1 || count > most {
-		return fmt.Errorf("engine: %d landmarks is out of range for the %s profile (1 to %d)", count, profile, most)
-	}
 	if tmp == "" {
 		tmp = filepath.Dir(path) // never a memory-backed /tmp: the columns are as big as the rows
 	}
