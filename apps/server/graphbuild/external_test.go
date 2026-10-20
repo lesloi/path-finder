@@ -2,6 +2,7 @@ package graphbuild
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
@@ -147,6 +148,72 @@ func TestBuildOnDiskWritesTheGraphBuildWrites(t *testing.T) {
 	// only the extract, the tiles and the two graphs are left
 	if n := entries(t, f.dir); n != 4 {
 		t.Errorf("%d entries left in the directory, want 4", n)
+	}
+}
+
+// chainLongWayAndIsland writes an extract of a chain of 1,100 nodes (a component that can hold a loop), a way of 600 m
+// from its end, and an island of three nodes, on a row of eight tiles.
+func chainLongWayAndIsland(t *testing.T) fixture {
+	t.Helper()
+	dir := t.TempDir()
+	dem := filepath.Join(dir, "dem")
+	if err := os.Mkdir(dem, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	x, y := elevation.Lambert93Grid.Forward(48.85, 2.35)
+	xll, yll := math.Floor(x/200)*200, math.Floor(y/200)*200
+	for k := 0; k < 8; k++ {
+		writeSquare(t, dem, fmt.Sprintf("t%d.asc", k), xll+200*float64(k), yll, false)
+	}
+	var nodes []pbfNode
+	add := func(id int64, dx float64) {
+		lat, lon := parisPoint(xll+dx, yll+100)
+		nodes = append(nodes, pbfNode{id, lat, lon})
+	}
+	chain := make([]int64, 1_100)
+	for i := range chain {
+		chain[i] = int64(1 + i)
+		add(chain[i], 20+float64(i)*0.3)
+	}
+	add(2_000, 950) // 600 m from the end of the chain
+	for k := int64(0); k < 3; k++ {
+		add(3_000+k, 1_200+float64(k)*20)
+	}
+	road := [][2]string{{"highway", "residential"}}
+	pbf := filepath.Join(dir, "c.osm.pbf")
+	writePBF(t, pbf, nodes, []pbfWay{
+		{id: 10, refs: chain, tags: road},
+		{id: 11, refs: []int64{1_100, 2_000}, tags: road},
+		{id: 12, refs: []int64{3_000, 3_001, 3_002}, tags: road},
+	})
+	return fixture{dir, pbf, dem}
+}
+
+func TestBuildOnDiskStoresTheSmallComponentsAndLongWaysBuildStores(t *testing.T) {
+	// Arrange
+	f := chainLongWayAndIsland(t)
+	want := filepath.Join(f.dir, "want.bin")
+	if err := Build([]string{f.pbf}, f.dem, elevation.Lambert93Grid, want, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	got := filepath.Join(f.dir, "got.bin")
+
+	// Act: a chunk and a cache so small that the edges, the components and the lists are streamed in many pieces
+	_, err := BuildOnDisk(f.pbf, f.dem, elevation.Lambert93Grid, got, Options{Tmp: f.dir, Chunk: 40, Cache: 1}, &bytes.Buffer{})
+
+	// Assert: the same bytes, and sections that are not empty, or the comparison would prove nothing
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b := readAll(t, got), readAll(t, want)
+	if !bytes.Equal(a, b) {
+		t.Fatalf("the graphs differ (%d and %d bytes)", len(a), len(b))
+	}
+	if long := binary.LittleEndian.Uint32(a[48:]); long != 1 {
+		t.Errorf("%d long ways stored, want the one of 600 m", long)
+	}
+	if nodes := binary.LittleEndian.Uint32(a[8:]); nodes != 1_104 {
+		t.Errorf("%d nodes, want 1,104", nodes)
 	}
 }
 

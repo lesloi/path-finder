@@ -16,8 +16,10 @@ import (
 // node or an edge touches one cache line instead of four arrays. Landmark distances are
 // quantized to 16 bits.
 //
-//	graph:     "PFGRAPH7" | N u32 | E u32 | fingerprint u64 | bounds 4*i32 | pad16 | nodes N*12 | pad16 |
-//	           offsets (N+1)*4 | pad16 | edges E*12 | pad16 | grid cells (nx*ny+1)*4 | pad16 | grid nodes N*4
+//	graph:     "PFGRAPH8" | N u32 | E u32 | fingerprint u64 | bounds 4*i32 | small-component size u32 | long-way
+//	           length f32 | long ways L u32 | pad16 | nodes N*12 | pad16 | offsets (N+1)*4 | pad16 | edges E*12 | pad16 |
+//	           grid cells (nx*ny+1)*4 | pad16 | grid nodes N*4 | pad16 | small components ceil(N/64)*8 | pad16 |
+//	           long ways L*8
 //	landmarks: "PFALT003" | L u32 | N u32 | climb f32 | unit f32 | fingerprint u64 | rows N*rowLen u16
 //
 // The bounds are the least and greatest latitude and longitude of the nodes, in the order min latitude, min
@@ -26,12 +28,18 @@ import (
 // The fingerprint is a CRC-64 of the graph's nodes, offsets and edges. The landmarks hold the one of the
 // graph they were built for, so that a graph built again, even with as many nodes, refuses the old ones.
 //
+// The last two sections are what the build knows when it writes the edges and a search would otherwise read the
+// whole graph to find: the nodes of the components of fewer than smallComponentNodes nodes as a bitmap (all zero
+// when no component reaches that size), and the ways longer than longEdgeMeters as pairs of nodes, the lower
+// number first, in the order of the graph. The header holds the two parameters they were made with, so that a
+// change is refused, not served wrong.
+//
 // A landmark row holds L distances from the landmarks, then L towards them when the metric
 // includes climbing. A distance is floor(cost / unit); 0xFFFF means unreachable or too far.
 const (
-	graphMagic      = "PFGRAPH7"
+	graphMagic      = "PFGRAPH8"
 	altMagic        = "PFALT003"
-	graphHeaderSize = 48 // magic, counts, fingerprint, bounds, padding: the nodes start on a 16-byte boundary
+	graphHeaderSize = 64 // magic, counts, fingerprint, bounds, the sections' parameters, padding: the nodes start on a 16-byte boundary
 	altHeaderSize   = 32
 	altUnitMeters   = 16
 	altUnreachable  = 0xFFFF
@@ -73,6 +81,11 @@ type graphHead struct {
 	nodes, edges uint32
 	fingerprint  uint64
 	bounds
+	// What the stored sections were made with.
+	smallLimit uint32
+	longMeters float32
+	// longEdges is how many ways the list of long ones holds.
+	longEdges uint32
 }
 
 type altHead struct {
@@ -91,6 +104,9 @@ func (h graphHead) encode() []byte {
 	le.PutUint32(b[28:], uint32(h.minLon))
 	le.PutUint32(b[32:], uint32(h.maxLat))
 	le.PutUint32(b[36:], uint32(h.maxLon))
+	le.PutUint32(b[40:], h.smallLimit)
+	le.PutUint32(b[44:], math.Float32bits(h.longMeters))
+	le.PutUint32(b[48:], h.longEdges)
 	return b
 }
 
@@ -108,6 +124,7 @@ func readGraphHead(data []byte) (h graphHead, ok bool) {
 	h.nodes, h.edges, h.fingerprint = le.Uint32(data[8:]), le.Uint32(data[12:]), le.Uint64(data[16:])
 	h.minLat, h.minLon = int32(le.Uint32(data[24:])), int32(le.Uint32(data[28:]))
 	h.maxLat, h.maxLon = int32(le.Uint32(data[32:])), int32(le.Uint32(data[36:]))
+	h.smallLimit, h.longMeters, h.longEdges = le.Uint32(data[40:]), math.Float32frombits(le.Uint32(data[44:])), le.Uint32(data[48:])
 	return h, true
 }
 
@@ -170,12 +187,14 @@ func writeFile(path string, fill func(w *bufio.Writer) error) (err error) {
 func writeGraph(path string, nodes []node, off []uint32, edges []edge) error {
 	return writeFile(path, func(w *bufio.Writer) error {
 		sp := computeSpatial(nodes)
-		head := graphHead{nodes: uint32(len(nodes)), edges: uint32(len(edges)), fingerprint: fingerprint(nodes, off, edges), bounds: sp.bounds}
+		small, long := smallBitmap(len(nodes), off, edges, smallComponentNodes), longEdgeList(off, edges, len(nodes))
+		head := graphHead{nodes: uint32(len(nodes)), edges: uint32(len(edges)), fingerprint: fingerprint(nodes, off, edges), bounds: sp.bounds,
+			smallLimit: smallComponentNodes, longMeters: longEdgeMeters, longEdges: uint32(len(long))}
 		if _, err := w.Write(head.encode()); err != nil {
 			return err
 		}
 		pos := int64(graphHeaderSize)
-		for _, b := range [][]byte{bytesOf(nodes), bytesOf(off), bytesOf(edges), bytesOf(sp.start), bytesOf(sp.nodes)} {
+		for _, b := range [][]byte{bytesOf(nodes), bytesOf(off), bytesOf(edges), bytesOf(sp.start), bytesOf(sp.nodes), bytesOf(small), bytesOf(long)} {
 			if _, err := w.Write(b); err != nil {
 				return err
 			}
@@ -196,6 +215,10 @@ type GraphParts struct {
 	Nodes, Off, Edges string
 	// GridCells holds the nx*ny+1 cell starts of the spatial index, GridNodes its node numbers sorted by cell.
 	GridCells, GridNodes string
+	// Small holds the bitmap of the nodes of small components (ceil(NodeCount/64) little-endian words), Long the list
+	// of long ways as pairs of node numbers, LongCount of them: a build finds both while it writes the edges.
+	Small, Long          string
+	LongCount            uint32
 	NodeCount, EdgeCount uint32
 	// Bounds are the least latitude, least longitude, greatest latitude and greatest longitude of the nodes, in 1e-7
 	// degrees (zeros for no node).
@@ -227,7 +250,7 @@ func writeGraphFromParts(path string, p GraphParts) (err error) {
 	for _, s := range []struct {
 		file          string
 		fingerprinted bool
-	}{{p.Nodes, true}, {p.Off, true}, {p.Edges, true}, {p.GridCells, false}, {p.GridNodes, false}} {
+	}{{p.Nodes, true}, {p.Off, true}, {p.Edges, true}, {p.GridCells, false}, {p.GridNodes, false}, {p.Small, false}, {p.Long, false}} {
 		n, err := copySection(w, crc, s.file, s.fingerprinted)
 		if err != nil {
 			return err
@@ -242,7 +265,8 @@ func writeGraphFromParts(path string, p GraphParts) (err error) {
 	if err := w.Flush(); err != nil {
 		return err
 	}
-	head := graphHead{nodes: p.NodeCount, edges: p.EdgeCount, fingerprint: crc.Sum64(), bounds: bounds{p.Bounds[0], p.Bounds[1], p.Bounds[2], p.Bounds[3]}}
+	head := graphHead{nodes: p.NodeCount, edges: p.EdgeCount, fingerprint: crc.Sum64(), bounds: bounds{p.Bounds[0], p.Bounds[1], p.Bounds[2], p.Bounds[3]},
+		smallLimit: smallComponentNodes, longMeters: longEdgeMeters, longEdges: p.LongCount}
 	if _, err := f.WriteAt(head.encode(), 0); err != nil {
 		return err
 	}

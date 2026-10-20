@@ -52,26 +52,16 @@ type graph struct {
 	off         []uint32
 	edges       []edge
 	sp          *spatial
-	// smallOnce guards smallSet: the pass reads the whole graph, which route-only traffic and startup never need.
-	smallOnce sync.Once
-	smallSet  nodeSet
-	// longOnce guards long, the ways too long for a scan of the nodes around an area to find: only requests with
-	// avoided areas need them.
-	longOnce sync.Once
-	long     [][2]uint32
+	// small holds the nodes of components too small to hold a loop (control points keep off them), and long the ways
+	// too long for a scan of the nodes around an area to find: the build found both, so that no search reads the
+	// whole graph to.
+	small nodeSet
+	long  [][2]uint32
 	// forbiddenMu guards lastForbidden, the set of the last areas asked for: a request asks twice, for its
 	// direct loop and for its loops, and the set is read only once built.
 	forbiddenMu   sync.Mutex
 	lastForbidden *forbidden
 	file          mapped
-}
-
-// small holds the nodes of components too small to hold a loop: control points keep off them. It is computed
-// on first use and kept for the life of the graph; a caller that leaves does not stop it, since later searches
-// reuse the result.
-func (g *graph) small() nodeSet {
-	g.smallOnce.Do(func() { g.smallSet = smallComponents(g, smallComponentNodes) })
-	return g.smallSet
 }
 
 func align16(n int) int { return (n + 15) &^ 15 }
@@ -175,6 +165,10 @@ func openGraph(path string) (_ *graph, err error) {
 	nodesAt := graphHeaderSize
 	offAt := align16(nodesAt + 12*n)
 	edgesAt := align16(offAt + 4*(n+1))
+	if head.smallLimit != smallComponentNodes || head.longMeters != longEdgeMeters {
+		return nil, fmt.Errorf("%s was built with other parameters (small components under %d nodes, long ways over %g m, where this server reads %d and %d): build it again with build-graph",
+			path, head.smallLimit, head.longMeters, smallComponentNodes, longEdgeMeters)
+	}
 	g := &graph{n: n, e: e, fingerprint: head.fingerprint, file: m}
 	if g.nodes, err = view[node](data, nodesAt, n); err != nil {
 		return nil, fmt.Errorf("%s: nodes: %w", path, err)
@@ -194,6 +188,14 @@ func openGraph(path string) (_ *graph, err error) {
 	}
 	if g.sp.nodes, err = view[uint32](data, listAt, n); err != nil {
 		return nil, fmt.Errorf("%s: index nodes: %w", path, err)
+	}
+	smallAt := align16(listAt + 4*n)
+	longAt := align16(smallAt + 8*((n+63)/64))
+	if g.small, err = view[uint64](data, smallAt, (n+63)/64); err != nil {
+		return nil, fmt.Errorf("%s: small components: %w", path, err)
+	}
+	if g.long, err = view[[2]uint32](data, longAt, int(head.longEdges)); err != nil {
+		return nil, fmt.Errorf("%s: long ways: %w", path, err)
 	}
 	return g, nil
 }
@@ -935,7 +937,7 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64, f *for
 	if lift < 0 {
 		sign = -1
 	}
-	best, small := base, g.small()
+	best, small := base, g.small
 	for k := 0; k < 8; k++ {
 		a := float64(k) * math.Pi / 4
 		n, d, ok := sp.nearest(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl))
@@ -958,7 +960,7 @@ func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter [
 	cosl := math.Cos(slat * rad)
 	cxm, cym := rc*math.Cos(theta), rc*math.Sin(theta)
 	nodes := make([]uint32, 0, len(jitter))
-	small := g.small()
+	small := g.small
 	for j := range jitter {
 		phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(len(jitter)+1)
 		x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)

@@ -111,45 +111,68 @@ type nodeSet []uint64
 
 func (s nodeSet) has(n uint32) bool { return s[n>>6]&(1<<(n&63)) != 0 }
 
-// smallComponents is the nodes of the connected components of fewer than limit nodes, in a graph that holds a
-// component of limit nodes or more.
-func smallComponents(g *graph, limit int) nodeSet {
-	parent := make([]uint32, g.n)
-	for i := range parent {
-		parent[i] = uint32(i)
+// Components are the connected components of a graph as its edges are met, one by one: a build that cannot hold the
+// graph in memory joins the nodes of each edge as it writes it.
+type Components struct{ parent []uint32 }
+
+// NewComponents starts with every one of n nodes alone.
+func NewComponents(n int) *Components {
+	c := &Components{parent: make([]uint32, n)}
+	for i := range c.parent {
+		c.parent[i] = uint32(i)
 	}
-	find := func(x uint32) uint32 {
-		for parent[x] != x {
-			parent[x] = parent[parent[x]]
-			x = parent[x]
-		}
-		return x
+	return c
+}
+
+func (c *Components) find(x uint32) uint32 {
+	for c.parent[x] != x {
+		c.parent[x] = c.parent[c.parent[x]]
+		x = c.parent[x]
 	}
-	for u := uint32(0); int(u) < g.n; u++ {
-		for e := g.off[u]; e < g.off[u+1]; e++ {
-			if v := g.edges[e].To; v > u { // every edge is stored both ways
-				if a, b := find(u), find(v); a != b {
-					parent[a] = b
-				}
-			}
-		}
+	return x
+}
+
+// Join joins the components of two nodes.
+func (c *Components) Join(a, b uint32) {
+	if a, b = c.find(a), c.find(b); a != b {
+		c.parent[a] = b
 	}
-	size := make([]uint32, g.n)
+}
+
+// SmallBitmap is the nodes of the components of fewer than limit nodes, as the bitmap of a graph file, in a graph that
+// holds a component of limit nodes or more.
+func (c *Components) SmallBitmap(limit int) []uint64 {
+	n := len(c.parent)
+	size := make([]uint32, n)
 	large := false
 	for i := range size {
-		r := find(uint32(i))
+		r := c.find(uint32(i))
 		size[r]++
 		large = large || int(size[r]) >= limit
 	}
-	small := make(nodeSet, (g.n+63)/64)
+	small := make([]uint64, (n+63)/64)
 	// A graph with no component of limit nodes is a small zone, where every component is all there is.
 	if !large {
 		return small
 	}
 	for i := range size {
-		if int(size[find(uint32(i))]) < limit {
+		if int(size[c.find(uint32(i))]) < limit {
 			small[i>>6] |= 1 << (uint(i) & 63)
 		}
 	}
 	return small
+}
+
+// smallBitmap is the small components of a graph held in memory: what a graph file stores, and, in the tests, the
+// oracle of the one a build streams.
+func smallBitmap(n int, off []uint32, edges []edge, limit int) []uint64 {
+	c := NewComponents(n)
+	for u := uint32(0); int(u) < n; u++ {
+		for _, e := range edges[off[u]:off[u+1]] {
+			if e.To > u { // every edge is stored both ways
+				c.Join(u, e.To)
+			}
+		}
+	}
+	return c.SmallBitmap(limit)
 }

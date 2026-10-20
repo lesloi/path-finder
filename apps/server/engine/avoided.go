@@ -55,19 +55,18 @@ func (f *forbidden) skip() func(uint32) bool {
 // read a large part of the graph for the few ways that long.
 const longEdgeMeters = 500
 
-// longEdges are the ways longer than longEdgeMeters, once each, as their two end nodes. It reads every edge on
-// the first request that has areas, and is kept for the life of the graph.
-func (g *graph) longEdges() [][2]uint32 {
-	g.longOnce.Do(func() {
-		for u := uint32(0); int(u) < g.n; u++ {
-			for e := g.off[u]; e < g.off[u+1]; e++ {
-				if v := g.edges[e].To; v > u && g.edges[e].Len > longEdgeMeters {
-					g.long = append(g.long, [2]uint32{u, v})
-				}
+// longEdgeList is the ways longer than longEdgeMeters, once each, as their two end nodes (the lower number first), in
+// the order of the graph. A graph file stores them: a build finds them when it writes the edges.
+func longEdgeList(off []uint32, edges []edge, n int) [][2]uint32 {
+	var long [][2]uint32
+	for u := uint32(0); int(u) < n; u++ {
+		for _, e := range edges[off[u]:off[u+1]] {
+			if e.To > u && e.Len > longEdgeMeters {
+				long = append(long, [2]uint32{u, e.To})
 			}
 		}
-	})
-	return g.long
+	}
+	return long
 }
 
 // forbiddenFor is newForbidden, kept for the next call with the same areas: a request asks for its direct loop
@@ -96,7 +95,7 @@ func newForbidden(g *graph, circles []Circle) *forbidden {
 		return nil
 	}
 	f := &forbidden{g: g, circles: slices.Clone(circles), cosLat: make([]float64, len(circles)), edges: newAvoidSet()}
-	long := g.longEdges()
+	long := g.long
 	for i, c := range circles {
 		cosl := math.Cos(c.Center.Lat * rad)
 		f.cosLat[i] = cosl
