@@ -4,9 +4,9 @@ import "testing"
 
 func TestSpillGivesBackItsBufferOnceMerged(t *testing.T) {
 	// Arrange
-	s := newSpill(t.TempDir(), "n", nodeElevCodec, 1000)
+	s := newSpill(t.TempDir(), "n", idRefCodec, 1000)
 	for _, n := range []uint32{3, 1, 2} {
-		if err := s.push(nodeElev{n, 0}); err != nil {
+		if err := s.push(idRef{int64(n), 0}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -16,8 +16,8 @@ func TestSpillGivesBackItsBufferOnceMerged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var got []uint32
-	err = m.each(func(r nodeElev) error { got = append(got, r.node); return nil })
+	var got []int64
+	err = m.each(func(r idRef) error { got = append(got, r.id); return nil })
 
 	// Assert: the buffer of a sort that is only read from now on is memory held for nothing
 	if err != nil || len(got) != 3 || got[0] != 1 || got[2] != 3 {
