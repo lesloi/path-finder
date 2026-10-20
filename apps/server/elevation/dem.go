@@ -206,6 +206,19 @@ func within(proj Projection, minLat, minLon, maxLat, maxLon float64) func(ascHea
 	}
 }
 
+// CountTiles is how many tiles are below dir, without reading any: a build can fail at once when it has none,
+// and read them later, when the memory of its other steps is free.
+func CountTiles(dir string) (int, error) {
+	n := 0
+	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && isTile(p) {
+			n++
+		}
+		return err
+	})
+	return n, err
+}
+
 // CountWithin is how many tiles below dir meet the box: it reads only their headers, so a job can tell at
 // once that it has not been given the tiles of its zone.
 func CountWithin(dir string, proj Projection, minLat, minLon, maxLat, maxLon float64) (int, error) {

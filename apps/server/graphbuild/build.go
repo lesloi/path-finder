@@ -146,11 +146,13 @@ func (p progress) step(format string, args ...any) {
 // on every node, and reports its steps to log. The tiles are written in the projection proj.
 func Build(pbfPaths []string, demDir string, proj elevation.Projection, outPath string, log io.Writer) error {
 	p := progress{log, time.Now()}
-	dem, err := elevation.Load(demDir, proj)
-	if err != nil {
+	// The tiles are read after the extract, when the memory of the nodes' index is free: the two never sit in
+	// memory together. That there are tiles is checked first, so that a job without them fails at once.
+	if n, err := elevation.CountTiles(demDir); err != nil {
 		return err
+	} else if n == 0 {
+		return fmt.Errorf("no .asc or .asc.gz file in %s", demDir)
 	}
-	p.step("BD ALTI: %d tiles", dem.Tiles())
 
 	var ways []rawWay
 	for _, path := range pbfPaths {
@@ -192,12 +194,21 @@ func Build(pbfPaths []string, demDir string, proj elevation.Projection, outPath 
 	runtime.GC()
 	p.step("pass 2: node coordinates read")
 
+	dem, err := elevation.Load(demDir, proj)
+	if err != nil {
+		return err
+	}
+	p.step("BD ALTI: %d tiles", dem.Tiles())
 	return finish(p, dem, demDir, ways, lat, lon, outPath)
 }
 
 // finish samples the elevation of the candidate nodes, assembles the graph from the ways and writes it.
 func finish(p progress, dem *elevation.DEM, demDir string, ways []rawWay, lat, lon []int32, outPath string) error {
 	elev := dem.Sample(lat, lon)
+	// The heights are on the nodes now: the tiles are the biggest thing in memory, and the graph is about to be
+	// assembled. Go gives memory back at the next collection, so it is asked for.
+	dem = nil
+	runtime.GC()
 	p.step("elevation sampled")
 
 	nodes, off, edges := assemble(ways, lat, lon, elev)
