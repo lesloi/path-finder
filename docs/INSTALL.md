@@ -64,7 +64,7 @@ the extract. Its temporary files go beside the graph, or to `-tmp` (never a memo
 extract), and `-chunk` and `-cache` size the sorts and the tiles kept. Several `-pbf` are joined in memory. `build-alt`
 also works on disk, `-workers` landmarks at a time (2 by default), with `-tmp` for its files.
 
-A graph of a format before `PFGRAPH7` (the current one) is refused when the server starts, and the log says to run
+A graph of a format before `PFGRAPH8` (the current one), or built with other parameters, is refused when the server starts, and the log says to run
 `build-graph` again, then `build-alt` for each profile. A server that is running keeps the zones it serves when
 replaced files cannot be served, and says why in its log.
 
