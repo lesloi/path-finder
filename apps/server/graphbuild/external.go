@@ -313,6 +313,21 @@ const (
 	DefaultCache = 128
 )
 
+// withDefaults fills what a caller left out: the temporary files go beside the graph (never a memory-backed /tmp: the runs
+// are as big as the extract), and a sort and a cache have the size of the command's defaults, not one record or one tile.
+func (o Options) withDefaults(outPath string) Options {
+	if o.Tmp == "" {
+		o.Tmp = filepath.Dir(outPath)
+	}
+	if o.Chunk <= 0 {
+		o.Chunk = DefaultChunk
+	}
+	if o.Cache <= 0 {
+		o.Cache = DefaultCache
+	}
+	return o
+}
+
 // Report says what a build on disk counted.
 type Report struct {
 	Nodes, Edges uint64
@@ -328,11 +343,8 @@ func BuildGraph(pbfPaths []string, demDir string, proj elevation.Projection, out
 		fmt.Fprintf(log, "%d extracts: built in memory\n", len(pbfPaths))
 		return Build(pbfPaths, demDir, proj, outPath, log)
 	}
-	if opts.Tmp == "" {
-		opts.Tmp = filepath.Dir(outPath) // never a memory-backed /tmp: the runs are as big as the extract
-	}
 	start := time.Now()
-	r, err := BuildOnDisk(pbfPaths[0], demDir, proj, outPath, opts.Tmp, opts, log)
+	r, err := BuildOnDisk(pbfPaths[0], demDir, proj, outPath, opts, log)
 	if err != nil {
 		return err
 	}
@@ -343,8 +355,11 @@ func BuildGraph(pbfPaths []string, demDir string, proj elevation.Projection, out
 
 // scratch makes the directory of the runs below tmp, and returns a function that removes it.
 func scratch(tmp string) (string, func(), error) {
-	dir := filepath.Join(tmp, fmt.Sprintf("pf-external-%d", os.Getpid()))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(tmp, 0o755); err != nil {
+		return "", nil, err
+	}
+	dir, err := os.MkdirTemp(tmp, "pf-external-*")
+	if err != nil {
 		return "", nil, err
 	}
 	return dir, func() { os.RemoveAll(dir) }, nil
@@ -387,20 +402,16 @@ func forEachStep(refs *spill[ref], ways []wayInfo, f func(a, b ref, attrs uint32
 }
 
 // BuildOnDisk writes the graph of one extract (sorted by node id) and the tiles below demDir to outPath, as Build does,
-// with the memory of a few sorts, a few tiles and a few numbers per node, and the rest on disk below tmp.
-func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath, tmp string, opts Options, log io.Writer) (Report, error) {
+// with the memory of a few sorts, a few tiles and a few numbers per node, and the rest on disk below opts.Tmp.
+func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, opts Options, log io.Writer) (Report, error) {
 	var rep Report
+	opts = opts.withDefaults(outPath)
 	p := progress{log, time.Now()}
-	if n, err := elevation.CountTiles(demDir); err != nil {
-		return rep, err
-	} else if n == 0 {
-		return rep, fmt.Errorf("%w in %s", elevation.ErrNoTile, demDir)
-	}
 	dem, err := elevation.OpenLazy(demDir, proj, opts.Cache)
 	if err != nil {
 		return rep, err
 	}
-	dir, cleanup, err := scratch(tmp)
+	dir, cleanup, err := scratch(opts.Tmp)
 	if err != nil {
 		return rep, err
 	}

@@ -105,9 +105,6 @@ func run(command string, args []string) error {
 		if *out == "" {
 			*out = filepath.Join(dataDir(), engine.LandmarksFileName(*profile))
 		}
-		if *tmp == "" {
-			*tmp = filepath.Dir(*out)
-		}
 		// The distances go to disk as they are made, so that the memory follows the workers, not the number of nodes.
 		return engine.WriteLandmarksOnDisk(*graph, *out, *profile, *count, *tmp, *workers)
 	}

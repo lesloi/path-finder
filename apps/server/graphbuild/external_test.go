@@ -123,11 +123,11 @@ func TestBuildOnDiskWritesTheGraphBuildWrites(t *testing.T) {
 	if err := Build([]string{f.pbf}, f.dem, proj, want, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	for _, o := range []Options{{Chunk: 1 << 20, Cache: 16}, {Chunk: 9, Cache: 1}, {Chunk: 50, Cache: 2}} {
+	for _, o := range []Options{{Tmp: f.dir, Chunk: 1 << 20, Cache: 16}, {Tmp: f.dir, Chunk: 9, Cache: 1}, {Tmp: f.dir, Chunk: 50, Cache: 2}} {
 		got := filepath.Join(f.dir, "got.bin")
 
 		// Act
-		report, err := BuildOnDisk(f.pbf, f.dem, proj, got, f.dir, o, &bytes.Buffer{})
+		report, err := BuildOnDisk(f.pbf, f.dem, proj, got, o, &bytes.Buffer{})
 
 		// Assert
 		if err != nil {
@@ -157,7 +157,7 @@ func TestBuildOnDiskFailsWithoutElevationAsBuildDoes(t *testing.T) {
 	}
 	writeSquare(t, far, "t.asc", 0, 0, false)
 
-	_, err := BuildOnDisk(f.pbf, far, elevation.Lambert93Grid, filepath.Join(f.dir, "o.bin"), f.dir, Options{Chunk: 100, Cache: 2}, &bytes.Buffer{})
+	_, err := BuildOnDisk(f.pbf, far, elevation.Lambert93Grid, filepath.Join(f.dir, "o.bin"), Options{Chunk: 100, Cache: 2}, &bytes.Buffer{})
 
 	if err == nil || !strings.Contains(err.Error(), "no walkable way has elevation") {
 		t.Errorf("error %v", err)
@@ -172,7 +172,7 @@ func TestBuildOnDiskRefusesAnExtractThatIsNotSortedById(t *testing.T) {
 	nodes := []pbfNode{{5, 48.85, 2.35}, {3, 48.85, 2.3501}}
 	writePBF(t, f.pbf, nodes, []pbfWay{{id: 1, refs: []int64{5, 3}, tags: [][2]string{{"highway", "path"}}}})
 
-	_, err := BuildOnDisk(f.pbf, f.dem, elevation.Lambert93Grid, filepath.Join(f.dir, "o.bin"), f.dir, Options{Chunk: 100, Cache: 2}, &bytes.Buffer{})
+	_, err := BuildOnDisk(f.pbf, f.dem, elevation.Lambert93Grid, filepath.Join(f.dir, "o.bin"), Options{Chunk: 100, Cache: 2}, &bytes.Buffer{})
 
 	if err == nil || !strings.Contains(err.Error(), "not sorted") {
 		t.Errorf("error %v", err)

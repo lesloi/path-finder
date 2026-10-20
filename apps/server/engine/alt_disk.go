@@ -38,8 +38,14 @@ func writeLandmarksOnDisk(graphPath, path, profile string, count int, tmp string
 	if most := maxLandmarkValues / perNode; count < 1 || count > most {
 		return fmt.Errorf("engine: %d landmarks is out of range for the %s profile (1 to %d)", count, profile, most)
 	}
-	dir := filepath.Join(tmp, fmt.Sprintf("pf-landmarks-%d", os.Getpid()))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if tmp == "" {
+		tmp = filepath.Dir(path) // never a memory-backed /tmp: the columns are as big as the rows
+	}
+	if err := os.MkdirAll(tmp, 0o755); err != nil {
+		return err
+	}
+	dir, err := os.MkdirTemp(tmp, "pf-landmarks-*")
+	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(dir)
