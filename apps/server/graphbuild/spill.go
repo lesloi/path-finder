@@ -20,49 +20,94 @@ type codec[R any] struct {
 }
 
 // spill gathers records up to a chunk, sorts them and writes them as a run: the memory of a sort is a chunk, whatever
-// the number of records. merge reads every run back in order.
+// the number of records. merge reads every run back in order. The chunk is two buffers: one is sorted and written in the
+// background while the other fills, so that the step that makes the records does not wait for the disk.
 type spill[R any] struct {
-	dir, name string
-	c         codec[R]
-	chunk     int
-	buf       []R
-	runs      []string
-	bytes     int64
+	dir, name  string
+	c          codec[R]
+	half       int
+	buf, spare []R
+	writing    chan error // the run being written, nil when none is
+	runs       []string
+	bytes      int64
 }
 
 func newSpill[R any](dir, name string, c codec[R], chunk int) *spill[R] {
-	return &spill[R]{dir: dir, name: name, c: c, chunk: max(chunk, 1)}
+	return &spill[R]{dir: dir, name: name, c: c, half: max(chunk/2, 1)}
 }
 
 func (s *spill[R]) push(r R) error {
-	if len(s.buf) == cap(s.buf) && cap(s.buf) < s.chunk {
-		// It grows by doubling up to the chunk and never past it: a small input holds a small buffer, and a big one
-		// does not hold the room that append would leave beyond the chunk.
-		grown := make([]R, len(s.buf), min(max(2*cap(s.buf), 1<<10), s.chunk))
+	if len(s.buf) == cap(s.buf) && cap(s.buf) < s.half {
+		// It grows by doubling up to its half of the chunk and never past it: a small input holds a small buffer, and a
+		// big one does not hold the room that append would leave beyond it.
+		grown := make([]R, len(s.buf), min(max(2*cap(s.buf), 1<<10), s.half))
 		copy(grown, s.buf)
 		s.buf = grown
 	}
 	s.buf = append(s.buf, r)
-	if len(s.buf) >= s.chunk {
-		return s.flush()
+	if len(s.buf) >= s.half {
+		return s.flushInBackground()
 	}
 	return nil
 }
 
+// wait waits for the run being written, and says how its writing went.
+func (s *spill[R]) wait() error {
+	if s.writing == nil {
+		return nil
+	}
+	err := <-s.writing
+	s.writing = nil
+	return err
+}
+
+// nextRun names the next run and counts what it holds.
+func (s *spill[R]) nextRun(records []R) string {
+	path := filepath.Join(s.dir, fmt.Sprintf("%s-%d.run", s.name, len(s.runs)))
+	s.runs = append(s.runs, path)
+	s.bytes += int64(len(records) * s.c.size)
+	return path
+}
+
+// flushInBackground writes the full buffer as a run while the other one fills; a run that fails says so at the next
+// flush, or at the merge.
+func (s *spill[R]) flushInBackground() error {
+	if err := s.wait(); err != nil {
+		return err
+	}
+	full := s.buf
+	s.buf, s.spare = s.spare[:0], full
+	path, c, done := s.nextRun(full), s.c, make(chan error, 1)
+	s.writing = done
+	go func() { done <- writeRun(path, c, full) }()
+	return nil
+}
+
+// flush writes what the buffer holds, once the run being written is done.
 func (s *spill[R]) flush() error {
+	if err := s.wait(); err != nil {
+		return err
+	}
 	if len(s.buf) == 0 {
 		return nil
 	}
-	slices.SortFunc(s.buf, s.c.cmp)
-	path := filepath.Join(s.dir, fmt.Sprintf("%s-%d.run", s.name, len(s.runs)))
+	if err := writeRun(s.nextRun(s.buf), s.c, s.buf); err != nil {
+		return err
+	}
+	s.buf = s.buf[:0]
+	return nil
+}
+
+func writeRun[R any](path string, c codec[R], records []R) error {
+	slices.SortFunc(records, c.cmp)
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
 	w := bufio.NewWriterSize(f, 1<<20)
-	b := make([]byte, s.c.size)
-	for _, r := range s.buf {
-		s.c.put(b, r)
+	b := make([]byte, c.size)
+	for _, r := range records {
+		c.put(b, r)
 		if _, err := w.Write(b); err != nil {
 			f.Close()
 			return err
@@ -72,13 +117,7 @@ func (s *spill[R]) flush() error {
 		f.Close()
 		return err
 	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	s.bytes += int64(len(s.buf) * s.c.size)
-	s.buf = s.buf[:0]
-	s.runs = append(s.runs, path)
-	return nil
+	return f.Close()
 }
 
 // merge reads everything back in order, once the last record is in. It can be called again to read the records again.
@@ -86,8 +125,8 @@ func (s *spill[R]) merge() (*merger[R], error) {
 	if err := s.flush(); err != nil {
 		return nil, err
 	}
-	// The records are all on disk now, and the buffer would stay until finish, beside the buffers of the sorts that follow.
-	s.buf = nil
+	// The records are all on disk now, and the buffers would stay until finish, beside the buffers of the sorts that follow.
+	s.buf, s.spare = nil, nil
 	m := &merger[R]{c: s.c}
 	for i, p := range s.runs {
 		f, err := os.Open(p)
@@ -107,12 +146,13 @@ func (s *spill[R]) merge() (*merger[R], error) {
 
 // finish adds what was written to the totals and removes the runs: the disk of a step is freed as soon as it is read.
 func (s *spill[R]) finish(t *totals) {
+	s.wait() // a build that failed may leave a run being written: it is removed with the others
 	t.runs += len(s.runs)
 	t.bytes += s.bytes
 	for _, p := range s.runs {
 		os.Remove(p)
 	}
-	s.runs, s.buf = nil, nil
+	s.runs, s.buf, s.spare = nil, nil, nil
 }
 
 type totals struct {
