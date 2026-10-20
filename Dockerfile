@@ -1,6 +1,6 @@
 # The server, serving the built web app on the same origin. It needs the graph and landmark files built
 # ahead of serving: mount the directory that holds them (graph.bin, any.alt, paved.alt, unpaved.alt, or one such
-# subdirectory per zone) on /data.
+# subdirectory per territory) on /data.
 
 FROM node:26-slim AS web
 RUN npm install --global pnpm@12.6.0
