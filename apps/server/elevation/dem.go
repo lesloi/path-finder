@@ -206,38 +206,15 @@ func within(proj Projection, minLat, minLon, maxLat, maxLon float64) func(ascHea
 	}
 }
 
-// CountWithin is how many tiles below dir meet the box: it reads only their headers, so a job can tell at
-// once that it has not been given the tiles of its zone.
-func CountWithin(dir string, proj Projection, minLat, minLon, maxLat, maxLon float64) (int, error) {
-	keep, n := within(proj, minLat, minLon, maxLat, maxLon), 0
-	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !isTile(p) {
-			return err
-		}
-		ok, herr := headerKept(p, keep)
-		if ok {
-			n++
-		}
-		return herr
-	})
-	return n, err
+// CountTiles is how many tiles are below dir, without reading any: a build can fail at once when it has none,
+// and read them later, when the memory of its other steps is free.
+func CountTiles(dir string) (int, error) {
+	paths, err := tilePaths(dir, nil)
+	return len(paths), err
 }
 
-// LoadWithin reads the tiles below dir that meet the box: the memory of a build is then that of the
-// tiles of its zone, not of the whole country. It reads only the header of the others.
-func LoadWithin(dir string, proj Projection, minLat, minLon, maxLat, maxLon float64) (*DEM, error) {
-	d, err := load(dir, proj, within(proj, minLat, minLon, maxLat, maxLon))
-	if errors.Is(err, errNoTile) {
-		return nil, fmt.Errorf("no tile of %s meets the box %.3f,%.3f,%.3f,%.3f", dir, minLon, minLat, maxLon, maxLat)
-	}
-	return d, err
-}
-
-// errNoTile is what loading says when no tile is left to read.
-var errNoTile = errors.New("no .asc or .asc.gz file")
-
-// load reads the tiles below dir that keep accepts (all of them when it is nil).
-func load(dir string, proj Projection, keep func(ascHeader) bool) (*DEM, error) {
+// tilePaths lists the tiles below dir that keep accepts (all of them when it is nil), reading only headers.
+func tilePaths(dir string, keep func(ascHeader) bool) ([]string, error) {
 	var paths []string
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() && isTile(p) {
@@ -254,6 +231,32 @@ func load(dir string, proj Projection, keep func(ascHeader) bool) (*DEM, error) 
 		}
 		return err
 	})
+	return paths, err
+}
+
+// CountWithin is how many tiles below dir meet the box: it reads only their headers, so a job can tell at
+// once that it has not been given the tiles of its zone.
+func CountWithin(dir string, proj Projection, minLat, minLon, maxLat, maxLon float64) (int, error) {
+	paths, err := tilePaths(dir, within(proj, minLat, minLon, maxLat, maxLon))
+	return len(paths), err
+}
+
+// LoadWithin reads the tiles below dir that meet the box: the memory of a build is then that of the
+// tiles of its zone, not of the whole country. It reads only the header of the others.
+func LoadWithin(dir string, proj Projection, minLat, minLon, maxLat, maxLon float64) (*DEM, error) {
+	d, err := load(dir, proj, within(proj, minLat, minLon, maxLat, maxLon))
+	if errors.Is(err, ErrNoTile) {
+		return nil, fmt.Errorf("no tile of %s meets the box %.3f,%.3f,%.3f,%.3f", dir, minLon, minLat, maxLon, maxLat)
+	}
+	return d, err
+}
+
+// ErrNoTile is what loading says when no tile is left to read.
+var ErrNoTile = errors.New("no .asc or .asc.gz file")
+
+// load reads the tiles below dir that keep accepts (all of them when it is nil).
+func load(dir string, proj Projection, keep func(ascHeader) bool) (*DEM, error) {
+	paths, err := tilePaths(dir, keep)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +280,7 @@ func load(dir string, proj Projection, keep func(ascHeader) bool) (*DEM, error) 
 		}
 	}
 	if len(files) == 0 {
-		return nil, fmt.Errorf("%w in %s", errNoTile, dir)
+		return nil, fmt.Errorf("%w in %s", ErrNoTile, dir)
 	}
 	d := &DEM{proj: proj, tiles: map[[2]int]*demTile{}, x0: math.Inf(1), y0: math.Inf(1), cs: files[0].cs}
 	d.ncols, d.nrows = files[0].tile.ncols, files[0].tile.nrows

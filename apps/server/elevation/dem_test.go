@@ -309,3 +309,26 @@ func TestDEMReadsTilesInTheProjectionItIsGiven(t *testing.T) {
 		}
 	}
 }
+
+func TestCountTilesReadsNoTile(t *testing.T) {
+	// Arrange
+	dir := t.TempDir()
+	x, y := Lambert93Grid.Forward(48.85, 2.35)
+	writeTile(t, dir, "a.asc", math.Floor(x/100)*100-50, math.Floor(y/100)*100-50, func(c, r int) float64 { return 100 })
+	writeTile(t, dir, "b.asc.gz", math.Floor(x/100)*100+1000, math.Floor(y/100)*100-50, func(c, r int) float64 { return 100 })
+	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	n, err := CountTiles(dir)
+	empty, emptyErr := CountTiles(t.TempDir())
+
+	// Assert
+	if err != nil || n != 2 {
+		t.Errorf("CountTiles = %d, %v; want 2", n, err)
+	}
+	if emptyErr != nil || empty != 0 {
+		t.Errorf("CountTiles of an empty directory = %d, %v; want 0", empty, emptyErr)
+	}
+}
