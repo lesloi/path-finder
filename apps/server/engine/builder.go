@@ -13,7 +13,7 @@ type (
 	Edge = edge
 )
 
-// The parameters of the sections a graph file stores (see GraphParts): a build computes them with these, and a server
+// The parameters of the sections a graph file stores (see GraphWriter): a build computes them with these, and a server
 // refuses a graph made with others.
 const (
 	SmallComponentNodes = smallComponentNodes
@@ -23,11 +23,6 @@ const (
 // WriteGraph writes a graph in CSR form to path: node i has the edges off[i] to off[i+1] of edges.
 func WriteGraph(path string, nodes []Node, off []uint32, edges []Edge) error {
 	return writeAtomic(path, func(tmp string) error { return writeGraph(tmp, nodes, off, edges) })
-}
-
-// WriteGraphFromParts writes a graph from the files of its sections: see GraphParts.
-func WriteGraphFromParts(path string, parts GraphParts) error {
-	return writeAtomic(path, func(tmp string) error { return writeGraphFromParts(tmp, parts) })
 }
 
 // Cells gives the cell of the spatial index that holds a point, for a graph whose nodes lie in the box b (least
