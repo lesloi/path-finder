@@ -13,6 +13,13 @@ type (
 	Edge = edge
 )
 
+// The parameters of the sections a graph file stores (see GraphParts): a build computes them with these, and a server
+// refuses a graph made with others.
+const (
+	SmallComponentNodes = smallComponentNodes
+	LongEdgeMeters      = longEdgeMeters
+)
+
 // WriteGraph writes a graph in CSR form to path: node i has the edges off[i] to off[i+1] of edges.
 func WriteGraph(path string, nodes []Node, off []uint32, edges []Edge) error {
 	return writeAtomic(path, func(tmp string) error { return writeGraph(tmp, nodes, off, edges) })

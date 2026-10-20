@@ -251,7 +251,7 @@ func (e *Engine) snapWaypoints(waypoints []Point, leaveSmall bool, f *forbidden)
 		if !ok || d > maxWaypointSnapMeters {
 			return nil, &WaypointError{Index: i + 1}
 		}
-		if leaveSmall && e.g.small().has(n) {
+		if leaveSmall && e.g.small.has(n) {
 			if n, ok = e.nearestLarge(w, maxWaypointSnapMeters, f); !ok {
 				return nil, ErrNoRoute
 			}
@@ -275,7 +275,7 @@ func (e *Engine) snapStart(p Point, f *forbidden) (uint32, error) {
 // spends its budget on legs that cannot reach the rest of the graph.
 func (e *Engine) snapLoopStart(p Point, f *forbidden) (uint32, error) {
 	n, err := e.snapStart(p, f)
-	if err != nil || !e.g.small().has(n) {
+	if err != nil || !e.g.small.has(n) {
 		return n, err
 	}
 	if n, ok := e.nearestLarge(p, maxSnapMeters, f); ok {
@@ -286,7 +286,7 @@ func (e *Engine) snapLoopStart(p Point, f *forbidden) (uint32, error) {
 
 // nearestLarge is the node nearest to p within reachM that is outside the small components.
 func (e *Engine) nearestLarge(p Point, reachM float64, f *forbidden) (uint32, bool) {
-	small := e.g.small()
+	small := e.g.small
 	n, d, ok := e.sp.nearestWhere(e.g, p.Lat, p.Lon, func(n uint32) bool { return small != nil && small.has(n) || f.has(n) }, reachM)
 	return n, ok && d <= reachM
 }

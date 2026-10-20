@@ -193,6 +193,20 @@ var wordCodec = codec[uint32]{
 	get:  func(b []byte) uint32 { return le32(b, 0) },
 }
 
+// bitsCodec is one 64-bit word of the bitmap of small components in the graph file.
+var bitsCodec = codec[uint64]{
+	size: 8,
+	put:  func(b []byte, v uint64) { binary.LittleEndian.PutUint64(b, v) },
+	get:  func(b []byte) uint64 { return binary.LittleEndian.Uint64(b) },
+}
+
+// pairCodec is two 32-bit numbers: the two end nodes of a long way in a section of the graph file.
+var pairCodec = codec[[2]uint32]{
+	size: 8,
+	put:  func(b []byte, r [2]uint32) { put32(b, 0, r[0]); put32(b, 4, r[1]) },
+	get:  func(b []byte) [2]uint32 { return [2]uint32{le32(b, 0), le32(b, 4)} },
+}
+
 // wayInfo is what the build needs to know of a way once its references are in order: how many, and what kind of way it is.
 type wayInfo struct{ length, attrs uint32 }
 
@@ -646,13 +660,31 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		return rep, err
 	}
 	defer edgesOut.finish()
+	// The edges leave in the order of the graph, so the two sections that depend on them are found as they go: the
+	// ways too long for a scan of the nodes around an area, and the components, joined by each way once.
+	longOut, err := createTable(dir, "long.sec", pairCodec)
+	if err != nil {
+		return rep, err
+	}
+	defer longOut.finish()
+	components := engine.NewComponents(int(kept))
 	var written uint64
+	var longCount uint32
 	ordered2, err := byEdge.merge()
 	if err != nil {
 		return rep, err
 	}
 	err = ordered2.each(func(e outEdge) error {
 		written++
+		if e.dst > e.src { // every edge is stored both ways
+			components.Join(e.src, e.dst)
+			if math.Float32frombits(e.length) > engine.LongEdgeMeters {
+				longCount++
+				if err := longOut.put([2]uint32{e.src, e.dst}); err != nil {
+					return err
+				}
+			}
+		}
 		return edgesOut.put([3]uint32{e.dst, e.length, e.attrs & 0xFFFFFF})
 	})
 	if err != nil {
@@ -662,6 +694,18 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if written != edges {
 		return rep, fmt.Errorf("%d edges out, %d in", written, edges)
 	}
+
+	smallOut, err := createTable(dir, "small.sec", bitsCodec)
+	if err != nil {
+		return rep, err
+	}
+	defer smallOut.finish()
+	for _, word := range components.SmallBitmap(engine.SmallComponentNodes) {
+		if err := smallOut.put(word); err != nil {
+			return rep, err
+		}
+	}
+	components = nil
 
 	// The spatial index: where each cell starts, and the nodes sorted by cell.
 	for c := 1; c < len(counts); c++ {
@@ -692,13 +736,14 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		return rep, err
 	}
 	byCell.finish(&tot)
-	for _, t := range []interface{ finish() error }{nodesOut, offOut, edgesOut, cellsOut, gridOut} {
+	for _, t := range []interface{ finish() error }{nodesOut, offOut, edgesOut, cellsOut, gridOut, smallOut, longOut} {
 		if err := t.finish(); err != nil {
 			return rep, err
 		}
 	}
 	err = engine.WriteGraphFromParts(outPath, engine.GraphParts{
 		Nodes: nodesOut.path, Off: offOut.path, Edges: edgesOut.path, GridCells: cellsOut.path, GridNodes: gridOut.path,
+		Small: smallOut.path, Long: longOut.path, LongCount: longCount,
 		NodeCount: kept, EdgeCount: uint32(edges), Bounds: box,
 	})
 	if err != nil {

@@ -22,19 +22,26 @@ func TestGraphFromPartsIsTheGraphFromMemory(t *testing.T) {
 	// Arrange: five nodes whose cells differ, and a few edges, so that no section is empty or aligned by luck
 	nodes := []node{{450_000_000, 60_000_000, 1000}, {450_030_000, 60_050_000, 1100}, {450_100_000, 60_020_000, -50}, {450_120_000, 60_200_000, 3000}, {450_130_000, 60_210_000, 0}}
 	off := []uint32{0, 1, 3, 4, 5, 6}
-	edges := []edge{{To: 1, Len: 10, Kind: 2, Surf: 1}, {To: 0, Len: 10, Kind: 2, Surf: 1}, {To: 3, Len: 7.5, Kind: 4, Flags: EdgeTechnical}, {To: 2, Len: 7.5, Kind: 4, Flags: EdgeTechnical}, {To: 3, Len: 1}, {To: 4, Len: 1}}
+	edges := []edge{{To: 1, Len: 600, Kind: 2, Surf: 1}, {To: 0, Len: 600, Kind: 2, Surf: 1}, {To: 3, Len: 7.5, Kind: 4, Flags: EdgeTechnical}, {To: 2, Len: 7.5, Kind: 4, Flags: EdgeTechnical}, {To: 3, Len: 1}, {To: 4, Len: 1}}
 	dir := t.TempDir()
 	want := filepath.Join(dir, "want.bin")
 	if err := WriteGraph(want, nodes, off, edges); err != nil {
 		t.Fatal(err)
 	}
 	sp := computeSpatial(nodes)
+	small, long := smallBitmap(len(nodes), off, edges, smallComponentNodes), longEdgeList(off, edges, len(nodes))
+	if len(long) != 1 {
+		t.Fatalf("the fixture must hold one long way, holds %d", len(long))
+	}
 	parts := GraphParts{
 		Nodes:     sectionFile(t, dir, "nodes", bytesOf(nodes)),
 		Off:       sectionFile(t, dir, "off", bytesOf(off)),
 		Edges:     sectionFile(t, dir, "edges", bytesOf(edges)),
 		GridCells: sectionFile(t, dir, "cells", bytesOf(sp.start)),
 		GridNodes: sectionFile(t, dir, "grid", bytesOf(sp.nodes)),
+		Small:     sectionFile(t, dir, "small", bytesOf(small)),
+		Long:      sectionFile(t, dir, "long", bytesOf(long)),
+		LongCount: uint32(len(long)),
 		NodeCount: uint32(len(nodes)), EdgeCount: uint32(len(edges)),
 		Bounds: [4]int32{sp.minLat, sp.minLon, sp.maxLat, sp.maxLon},
 	}

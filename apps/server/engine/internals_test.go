@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"unsafe"
 )
@@ -365,7 +364,7 @@ func TestLandmarksStayALowerBoundWhenTheSearchClimbsLessThanTheyDo(t *testing.T)
 }
 
 func TestHeadersRoundTripAndRefuseAnotherVersion(t *testing.T) {
-	graph := graphHead{nodes: 7, edges: 11, fingerprint: 0xDEADBEEFCAFE, bounds: bounds{minLat: -5, minLon: 6, maxLat: 7, maxLon: -8}}
+	graph := graphHead{nodes: 7, edges: 11, fingerprint: 0xDEADBEEFCAFE, bounds: bounds{minLat: -5, minLon: 6, maxLat: 7, maxLon: -8}, smallLimit: 1_000, longMeters: 500, longEdges: 3}
 	if got, ok := readGraphHead(graph.encode()); !ok || got != graph {
 		t.Errorf("graph header: got %+v, %v, want %+v", got, ok, graph)
 	}
@@ -525,24 +524,6 @@ func TestAControlCircleGivesUpWhenNoTurnReachesTheWays(t *testing.T) {
 	}
 }
 
-func TestSmallComponentsAreTheOnesTooSmallToHoldARoute(t *testing.T) {
-	// Arrange
-	g := &testGraph{}
-	at := g.grid(30, 40, flat) // 1,200 nodes
-	island := g.addNode(9_000, 0, 100)
-	g.connect(island, g.addNode(9_100, 0, 100), KindPath)
-	e := openTest(t, g, false)
-	// Act
-	small := smallComponents(e.g, 1_000)
-	// Assert
-	if !small.has(uint32(island)) || !small.has(uint32(island+1)) {
-		t.Error("the two-node island is not small")
-	}
-	if small.has(uint32(at(0, 0))) || small.has(uint32(at(29, 39))) {
-		t.Error("the lattice is small")
-	}
-}
-
 func TestAControlPointDoesNotLandOnAnIsland(t *testing.T) {
 	// Arrange: the nodes nearest to the first circle's points form two islands, in a valley of 1,771 nodes
 	g := &testGraph{}
@@ -560,7 +541,7 @@ func TestAControlPointDoesNotLandOnAnIsland(t *testing.T) {
 		t.Fatalf("ok = %v, turn = %v: the first circle lands on the islands and should have been turned", ok, used)
 	}
 	for _, n := range nodes {
-		if e.g.small().has(n) {
+		if e.g.small.has(n) {
 			t.Errorf("node %d is on an island", n)
 		}
 	}
@@ -573,52 +554,13 @@ func TestALiftedControlPointDoesNotLandOnAnIsland(t *testing.T) {
 	hi := g.addNode(250, 0, 900)
 	g.connect(hi, g.addNode(300, 0, 900), KindPath)
 	e := openTest(t, g, false)
-	if !e.g.small().has(uint32(hi)) {
+	if !e.g.small.has(uint32(hi)) {
 		t.Fatal("the island is not small")
 	}
 	// Act
 	got := liftedNode(e.g, e.sp, uint32(start), 250, 1, nil)
 	// Assert
-	if e.g.small().has(got) {
+	if e.g.small.has(got) {
 		t.Errorf("the control point was lifted onto the island, node %d", got)
-	}
-}
-
-func TestSmallComponentsAreComputedOnFirstUseOnly(t *testing.T) {
-	// Arrange
-	g := &testGraph{}
-	g.grid(30, 40, flat)
-	island := g.addNode(9_000, 0, 100)
-	g.connect(island, g.addNode(9_100, 0, 100), KindPath)
-	e := openTest(t, g, false)
-	if e.g.smallSet != nil {
-		t.Fatal("the set was computed when the graph was opened")
-	}
-	// Act
-	var wg sync.WaitGroup
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() { defer wg.Done(); e.g.small() }()
-	}
-	wg.Wait()
-	// Assert
-	if !e.g.small().has(uint32(island)) {
-		t.Error("the island is not small")
-	}
-}
-
-func TestARouteDoesNotComputeTheSmallComponents(t *testing.T) {
-	// Arrange
-	g := &testGraph{}
-	at := g.grid(10, 10, flat)
-	e := openTest(t, g, false)
-	// Act
-	_, err := e.Route(context.Background(), pointOf(g, at(0, 0)), pointOf(g, at(5, 5)))
-	// Assert
-	if err != nil {
-		t.Fatal(err)
-	}
-	if e.g.smallSet != nil {
-		t.Error("a route computed the small components")
 	}
 }
