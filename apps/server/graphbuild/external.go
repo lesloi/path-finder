@@ -214,6 +214,7 @@ type refs struct {
 // spillRefs writes the references of the walkable ways of the extract as runs sorted by node id.
 func spillRefs(pbf, dir string, chunk int) (*refs, error) {
 	r := &refs{byID: newSpill(dir, "id", idRefCodec, chunk)}
+	defer r.byID.wait()
 	err := scanPBF(pbf, true, false, func(o osm.Object) error {
 		w, ok := o.(*osm.Way)
 		if !ok {
@@ -437,7 +438,9 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		return rep, err
 	}
 	defer seenTab.finish()
+	defer r.byID.wait()
 	byTile := newSpill(dir, "tile", tileNodeCodec, chunk)
+	defer byTile.wait()
 	bySeq := newPlaced(dir, "seq", refCodec, refSeq, r.count, chunk)
 	var nodes uint32
 	current := none
@@ -550,6 +553,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	cellOf := engine.Cells(box)
 	cells := make([]uint32, nx*ny+1)
 	byCurve := newSpill(dir, "curve", curvedCodec, chunk)
+	defer byCurve.wait()
 	all, err = seenTab.reader()
 	if err != nil {
 		return rep, err

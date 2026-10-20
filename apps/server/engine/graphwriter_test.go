@@ -167,6 +167,36 @@ func TestGraphWriterTakesTheFingerprintedSectionsInOrder(t *testing.T) {
 	}
 }
 
+func TestGraphWriterAbortAfterCloseLeavesTheFilesAlone(t *testing.T) {
+	// Arrange: a graph written, then another build that starts its own temporary file at the same place
+	nodes, off, edges := graphFixture(t)
+	sp := computeSpatial(nodes)
+	path := filepath.Join(t.TempDir(), "g.bin")
+	w, err := CreateGraph(path, uint32(len(nodes)), uint32(len(edges)), [4]int32{sp.minLat, sp.minLon, sp.maxLat, sp.maxLon})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSections(w, nodes, off, edges); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+".tmp", []byte("another build"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	w.Abort()
+
+	// Assert
+	for _, p := range []string{path, path + ".tmp"} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("%s: %v", p, err)
+		}
+	}
+}
+
 func TestGridSizeExportsTheGridOfTheIndex(t *testing.T) {
 	nx, ny := GridSize([4]int32{0, 0, 2*cellLat + 5, 3*cellLon + 5})
 

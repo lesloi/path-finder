@@ -142,9 +142,13 @@ func (r *placedReader[R]) load() error {
 			return err
 		}
 		rec := p.c.get(b)
-		i := p.index(rec) - base
-		if i >= size || filled[i/64]>>(i%64)&1 == 1 {
-			return fmt.Errorf("%s: record %d came twice", p.name, i+base)
+		at := p.index(rec)
+		if at < base || at-base >= size {
+			return fmt.Errorf("%s: record %d found in partition %d, of records %d to %d", p.name, at, r.part, base, base+size-1)
+		}
+		i := at - base
+		if filled[i/64]>>(i%64)&1 == 1 {
+			return fmt.Errorf("%s: record %d came twice", p.name, at)
 		}
 		filled[i/64] |= 1 << (i % 64)
 		r.buf[i] = rec

@@ -247,6 +247,32 @@ func TestBuildOnDiskRefusesAnExtractThatIsNotSortedById(t *testing.T) {
 	}
 }
 
+func TestBuildOnDiskLeavesNoTemporaryFileWhenItFails(t *testing.T) {
+	// Arrange: a long run of sorted nodes, so that runs are being written when the join meets the one out of order, and a
+	// chunk of two records, so that there are many of them
+	f := newFixture(t)
+	var nodes []pbfNode
+	var refs []int64
+	for i := int64(1); i <= 300; i++ {
+		nodes = append(nodes, pbfNode{i, 48.85 + float64(i)*1e-6, 2.35})
+		refs = append(refs, i)
+	}
+	nodes = append(nodes, pbfNode{150, 48.85, 2.3501})
+	writePBF(t, f.pbf, nodes, []pbfWay{{id: 1, refs: refs, tags: [][2]string{{"highway", "path"}}}})
+	tmp := t.TempDir()
+
+	// Act
+	_, err := BuildOnDisk(f.pbf, f.dem, elevation.Lambert93Grid, filepath.Join(f.dir, "o.bin"), Options{Tmp: tmp, Chunk: 2, Cache: 2}, &bytes.Buffer{})
+
+	// Assert
+	if !errors.Is(err, ErrNotSorted) {
+		t.Fatalf("error %v", err)
+	}
+	if n := entries(t, tmp); n != 0 {
+		t.Errorf("%d entries left in the temporary directory", n)
+	}
+}
+
 func TestBuildGraphFallsBackToMemoryForAnExtractThatIsNotSorted(t *testing.T) {
 	// Arrange: the nodes are out of order, which Build accepts
 	f := newFixture(t)

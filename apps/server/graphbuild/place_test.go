@@ -2,6 +2,9 @@ package graphbuild
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -134,5 +137,32 @@ func TestPlacedLeavesNoFileOnceFinished(t *testing.T) {
 	}
 	if tot.runs != 2 || tot.bytes != 4*int64(nodeElevCodec.size) {
 		t.Errorf("totals %+v, want 2 partitions of %d bytes in all", tot, 4*nodeElevCodec.size)
+	}
+}
+
+func TestPlacedNamesARecordFoundInAnotherPartition(t *testing.T) {
+	// Arrange: the record of index 0 also written in the file of the second partition
+	p := newPlaced(t.TempDir(), "n", nodeElevCodec, nodeElevNode, 4, 2)
+	pushAll(t, p, []uint32{0, 1, 2, 3})
+	if err := p.close(); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(filepath.Join(p.dir, p.path(1)), os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := make([]byte, nodeElevCodec.size)
+	nodeElevCodec.put(b, nodeElev{0, 0})
+	if _, err := f.Write(b); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	// Act
+	_, err = readPlaced(p)
+
+	// Assert: it is a record in the wrong place, not one that came twice
+	if err == nil || !strings.Contains(err.Error(), "partition") {
+		t.Fatalf("error %v", err)
 	}
 }

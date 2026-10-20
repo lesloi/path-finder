@@ -66,12 +66,15 @@ func CreateGraph(path string, nodes, edges uint32, box [4]int32) (*GraphWriter, 
 	}}
 	nx, ny := GridSize(box)
 	pos := int64(graphHeaderSize)
-	add := func(name string, want uint64, size int, fingerprinted bool) *section {
+	open := func(name string, want uint64, fingerprinted bool) *section {
 		var out io.Writer = io.NewOffsetWriter(f, pos)
 		if fingerprinted {
 			out = io.MultiWriter(out, w.crc)
 		}
-		s := &section{name: name, w: bufio.NewWriterSize(out, 1<<20), start: pos, want: want}
+		return &section{name: name, w: bufio.NewWriterSize(out, 1<<20), start: pos, want: want}
+	}
+	add := func(name string, want uint64, size int, fingerprinted bool) *section {
+		s := open(name, want, fingerprinted)
 		pos += int64(want) * int64(size)
 		pos += pad16(pos)
 		return s
@@ -83,7 +86,7 @@ func CreateGraph(path string, nodes, edges uint32, box [4]int32) (*GraphWriter, 
 	w.cells = add("grid cells", uint64(nx*ny+1), 4, false)
 	w.grid = add("grid nodes", n, 4, false)
 	w.small = add("small component words", (n+63)/64, 8, false)
-	w.long = add("long ways", math.MaxUint64, 8, false) // the last section: how many is known at the end
+	w.long = open("long ways", math.MaxUint64, false) // the last section: how many is known at the end
 	return w, nil
 }
 
@@ -156,7 +159,13 @@ func (w *GraphWriter) Close() error {
 		w.Abort()
 		return err
 	}
-	return os.Rename(w.tmp, w.path)
+	if err := os.Rename(w.tmp, w.path); err != nil {
+		w.Abort()
+		return err
+	}
+	// The temporary name is free again: an Abort deferred by the caller must not take the file of the next build.
+	w.tmp = ""
+	return nil
 }
 
 func (w *GraphWriter) finish() error {
@@ -186,11 +195,14 @@ func (w *GraphWriter) finish() error {
 	return f.Close()
 }
 
-// Abort removes the file of a graph that is not to be written.
+// Abort removes the file of a graph that is not to be written; after a Close that succeeded, it does nothing.
 func (w *GraphWriter) Abort() {
 	if w.f != nil {
 		w.f.Close()
 		w.f = nil
 	}
-	os.Remove(w.tmp)
+	if w.tmp != "" {
+		os.Remove(w.tmp)
+		w.tmp = ""
+	}
 }

@@ -51,7 +51,8 @@ func (s *spill[R]) push(r R) error {
 	return nil
 }
 
-// wait waits for the run being written, and says how its writing went.
+// wait waits for the run being written, and says how its writing went. A step that may stop early defers it, so that no
+// run is still being written when the scratch directory is removed.
 func (s *spill[R]) wait() error {
 	if s.writing == nil {
 		return nil
