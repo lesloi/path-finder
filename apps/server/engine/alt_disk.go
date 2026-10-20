@@ -115,7 +115,7 @@ func transpose(w io.Writer, n, columns, rowsAt int, column func(int) string) err
 	for c := range chunk {
 		chunk[c] = make([]byte, 2*rowsAt)
 	}
-	rows := make([]byte, 0, 2*columns*rowsAt)
+	rows := make([]byte, 2*columns*rowsAt)
 	for done := 0; done < n; {
 		length := min(rowsAt, n-done)
 		for c, r := range readers {
@@ -123,13 +123,12 @@ func transpose(w io.Writer, n, columns, rowsAt int, column func(int) string) err
 				return err
 			}
 		}
-		rows = rows[:0]
 		for i := 0; i < length; i++ {
 			for c := range chunk {
-				rows = append(rows, chunk[c][2*i], chunk[c][2*i+1])
+				copy(rows[2*(i*columns+c):], chunk[c][2*i:2*i+2])
 			}
 		}
-		if _, err := w.Write(rows); err != nil {
+		if _, err := w.Write(rows[:2*columns*length]); err != nil {
 			return err
 		}
 		done += length

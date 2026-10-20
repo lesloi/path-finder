@@ -196,6 +196,20 @@ func (m *merger[R]) next() (r R, ok bool, err error) {
 	return top.rec, true, nil
 }
 
+// each calls f with every record in order, and closes the merge, whatever way it ends.
+func (m *merger[R]) each(f func(R) error) error {
+	defer m.close()
+	for {
+		r, ok, err := m.next()
+		if err != nil || !ok {
+			return err
+		}
+		if err := f(r); err != nil {
+			return err
+		}
+	}
+}
+
 func (m *merger[R]) close() {
 	for _, f := range m.files {
 		f.Close()

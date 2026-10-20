@@ -178,9 +178,9 @@ var outEdgeCodec = codec[outEdge]{
 	cmp: func(a, b outEdge) int { return cmp.Or(cmp.Compare(a.src, b.src), cmp.Compare(a.step, b.step)) },
 }
 
-// edgeWordCodec is an edge of the graph file: the target, the length, then the kind, the surface, the flags and a
-// padding byte.
-var edgeWordCodec = codec[[3]uint32]{
+// tripleCodec is three 32-bit numbers of a section of the graph file: a node (latitude, longitude, elevation), or an
+// edge (the target, the length, then the kind, the surface, the flags and a padding byte).
+var tripleCodec = codec[[3]uint32]{
 	size: 12,
 	put:  func(b []byte, r [3]uint32) { put32(b, 0, r[0]); put32(b, 4, r[1]); put32(b, 8, r[2]) },
 	get:  func(b []byte) [3]uint32 { return [3]uint32{le32(b, 0), le32(b, 4), le32(b, 8)} },
@@ -471,26 +471,18 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if err != nil {
 		return rep, err
 	}
-	defer tiles.close()
-	for {
-		t, ok, err := tiles.next()
-		if err != nil {
-			return rep, err
-		}
-		if !ok {
-			break
-		}
+	err = tiles.each(func(t tileNode) error {
 		elev, err := dem.Sample(t.lat, t.lon)
 		if err != nil {
-			tiles.close()
-			return rep, err
+			return err
 		}
 		if elev != elevation.Unknown {
 			known[t.node/64] |= 1 << (t.node % 64)
 		}
-		if err := byNode.push(nodeElev{t.node, elev}); err != nil {
-			return rep, err
-		}
+		return byNode.push(nodeElev{t.node, elev})
+	})
+	if err != nil {
+		return rep, err
 	}
 	byTile.finish(&tot)
 	rep.TileLoads = dem.Loads()
@@ -576,7 +568,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	nx, ny := engine.GridSize(box)
 	counts := make([]uint32, nx*ny+1)
 	byCell := newSpill(dir, "cell", cellNodeCodec, chunk)
-	nodesOut, err := createTable(dir, "nodes.sec", wordCodec)
+	nodesOut, err := createTable(dir, "nodes.sec", tripleCodec)
 	if err != nil {
 		return rep, err
 	}
@@ -593,31 +585,22 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if err != nil {
 		return rep, err
 	}
-	defer ordered.close()
-	for {
-		c, ok, err := ordered.next()
-		if err != nil {
-			return rep, err
-		}
-		if !ok {
-			break
-		}
+	err = ordered.each(func(c curved) error {
 		remap[c.node] = rank
-		for _, v := range []uint32{uint32(c.lat), uint32(c.lon), uint32(c.elev)} {
-			if err := nodesOut.put(v); err != nil {
-				return rep, err
-			}
+		if err := nodesOut.put([3]uint32{uint32(c.lat), uint32(c.lon), uint32(c.elev)}); err != nil {
+			return err
 		}
 		cum += deg[c.node]
 		if err := offOut.put(cum); err != nil {
-			return rep, err
+			return err
 		}
 		cell := engine.CellOf(box, c.lat, c.lon)
 		counts[cell+1]++
-		if err := byCell.push(cellNode{cell, rank}); err != nil {
-			return rep, err
-		}
 		rank++
+		return byCell.push(cellNode{cell, rank - 1})
+	})
+	if err != nil {
+		return rep, err
 	}
 	byCurve.finish(&tot)
 	if rank != kept || uint64(cum) != edges {
@@ -643,7 +626,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	}
 	bySeq.finish(&tot)
 	remap = nil
-	edgesOut, err := createTable(dir, "edges.sec", edgeWordCodec)
+	edgesOut, err := createTable(dir, "edges.sec", tripleCodec)
 	if err != nil {
 		return rep, err
 	}
@@ -652,19 +635,12 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if err != nil {
 		return rep, err
 	}
-	defer ordered2.close()
-	for {
-		e, ok, err := ordered2.next()
-		if err != nil {
-			return rep, err
-		}
-		if !ok {
-			break
-		}
-		if err := edgesOut.put([3]uint32{e.dst, e.length, e.attrs & 0xFFFFFF}); err != nil {
-			return rep, err
-		}
+	err = ordered2.each(func(e outEdge) error {
 		written++
+		return edgesOut.put([3]uint32{e.dst, e.length, e.attrs & 0xFFFFFF})
+	})
+	if err != nil {
+		return rep, err
 	}
 	byEdge.finish(&tot)
 	if written != edges {
@@ -693,18 +669,9 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if err != nil {
 		return rep, err
 	}
-	defer ordered3.close()
-	for {
-		c, ok, err := ordered3.next()
-		if err != nil {
-			return rep, err
-		}
-		if !ok {
-			break
-		}
-		if err := gridOut.put(c.rank); err != nil {
-			return rep, err
-		}
+	err = ordered3.each(func(c cellNode) error { return gridOut.put(c.rank) })
+	if err != nil {
+		return rep, err
 	}
 	byCell.finish(&tot)
 	for _, t := range []interface{ finish() error }{nodesOut, offOut, edgesOut, cellsOut, gridOut} {
