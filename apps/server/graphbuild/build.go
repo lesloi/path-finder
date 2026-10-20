@@ -151,7 +151,7 @@ func Build(pbfPaths []string, demDir string, proj elevation.Projection, outPath 
 	if n, err := elevation.CountTiles(demDir); err != nil {
 		return err
 	} else if n == 0 {
-		return fmt.Errorf("no .asc or .asc.gz file in %s", demDir)
+		return fmt.Errorf("%w in %s", elevation.ErrNoTile, demDir)
 	}
 
 	var ways []rawWay
@@ -194,20 +194,27 @@ func Build(pbfPaths []string, demDir string, proj elevation.Projection, outPath 
 	runtime.GC()
 	p.step("pass 2: node coordinates read")
 
-	dem, err := elevation.Load(demDir, proj)
+	elev, err := sample(p, func() (*elevation.DEM, error) { return elevation.Load(demDir, proj) }, lat, lon)
 	if err != nil {
 		return err
 	}
-	p.step("BD ALTI: %d tiles", dem.Tiles())
-	return finish(p, dem, demDir, ways, lat, lon, outPath)
+	return finish(p, demDir, ways, lat, lon, elev, outPath)
 }
 
-// finish samples the elevation of the candidate nodes, assembles the graph from the ways and writes it.
-func finish(p progress, dem *elevation.DEM, demDir string, ways []rawWay, lat, lon []int32, outPath string) error {
-	elev := dem.Sample(lat, lon)
-	// The heights are on the nodes now: the tiles are the biggest thing in memory, and the graph is about to be
-	// assembled. Go gives memory back at the next collection, so it is asked for.
-	dem = nil
+// sample reads the tiles that load gives and returns the elevation of the candidate nodes. The tiles are
+// local to it: they are the biggest thing in memory, and they are out of reach once it returns.
+func sample(p progress, load func() (*elevation.DEM, error), lat, lon []int32) ([]int32, error) {
+	dem, err := load()
+	if err != nil {
+		return nil, err
+	}
+	p.step("BD ALTI: %d tiles", dem.Tiles())
+	return dem.Sample(lat, lon), nil
+}
+
+// finish assembles the graph from the ways and the elevation of the candidate nodes, and writes it.
+func finish(p progress, demDir string, ways []rawWay, lat, lon []int32, elev []int32, outPath string) error {
+	// Go gives the tiles back at the next collection: it is asked for before the graph takes its memory.
 	runtime.GC()
 	p.step("elevation sampled")
 

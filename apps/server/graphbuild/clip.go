@@ -49,11 +49,13 @@ func BuildClipped(pbfPath, demDir string, proj elevation.Projection, outPath str
 	}
 	runtime.GC()
 	p.step("read the box: %d walkable ways, %d candidate nodes", len(ways), len(lat))
-	dem, err := elevation.LoadWithin(demDir, proj, box.MinLat, box.MinLon, box.MaxLat, box.MaxLon)
+	elev, err := sample(p, func() (*elevation.DEM, error) {
+		return elevation.LoadWithin(demDir, proj, box.MinLat, box.MinLon, box.MaxLat, box.MaxLon)
+	}, lat, lon)
 	if err != nil {
 		return err
 	}
-	return finish(p, dem, demDir, ways, lat, lon, outPath)
+	return finish(p, demDir, ways, lat, lon, elev, outPath)
 }
 
 func readClipped(path string, box Box) (ways []rawWay, lat, lon []int32, err error) {

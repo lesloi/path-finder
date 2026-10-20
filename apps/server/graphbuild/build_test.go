@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -299,6 +300,19 @@ func TestBuildFailsOnMissingInput(t *testing.T) {
 	}
 	if err := Build([]string{filepath.Join(dir, "broken.pbf")}, dir, elevation.Lambert93Grid, filepath.Join(dir, "g.bin"), os.Stderr); err == nil {
 		t.Error("a file that is no PBF: err = nil")
+	}
+}
+
+func TestBuildFailsAtOnceWithoutTiles(t *testing.T) {
+	// Arrange
+	dir := t.TempDir()
+
+	// Act
+	err := Build([]string{filepath.Join(dir, "missing.pbf")}, dir, elevation.Lambert93Grid, filepath.Join(dir, "g.bin"), os.Stderr)
+
+	// Assert
+	if !errors.Is(err, elevation.ErrNoTile) {
+		t.Errorf("err = %v, want it to say that there is no tile, before any PBF is read", err)
 	}
 }
 
