@@ -264,13 +264,14 @@ func TestDEMReadsTilesInTheProjectionItIsGiven(t *testing.T) {
 		}
 		dir := t.TempDir()
 		x, y := proj.Forward(c.lat, c.lon)
-		writeTile(t, dir, "a.asc", math.Floor(x/100)*100-50, math.Floor(y/100)*100-50, func(c, r int) float64 { return 250 })
+		// The 100 m tile is centred on the point, which a floor-based origin can leave outside.
+		writeTile(t, dir, "a.asc", x-50, y-50, func(c, r int) float64 { return 250 })
 
 		dem, err := Load(dir, proj)
 		if err != nil || dem.Tiles() != 1 {
 			t.Fatalf("%s: load: %v tiles, %v", c.name, dem, err)
 		}
-		if z := dem.At(c.lat, c.lon); math.Abs(float64(z)-250) > 0.01 {
+		if z := dem.At(c.lat, c.lon); math.IsNaN(float64(z)) || math.Abs(float64(z)-250) > 0.01 {
 			t.Errorf("%s: At = %v, want 250", c.name, z)
 		}
 		if z := dem.At(c.lat+1, c.lon); !math.IsNaN(float64(z)) {
