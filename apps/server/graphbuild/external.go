@@ -279,7 +279,7 @@ func joinNodes(pbf string, r *refs, found func(h idRef, at *[2]int32, first bool
 		}
 		id := int64(n.ID)
 		if id < last {
-			return errors.New("the extract is not sorted by node id")
+			return ErrNotSorted
 		}
 		last = id
 		at := [2]int32{int32(math.Round(n.Lat * 1e7)), int32(math.Round(n.Lon * 1e7))}
@@ -299,6 +299,10 @@ func joinNodes(pbf string, r *refs, found func(h idRef, at *[2]int32, first bool
 	}
 	return err
 }
+
+// ErrNotSorted is what a build on disk says of an extract whose nodes are not in the order of their ids, which the join
+// of the references with the nodes needs.
+var ErrNotSorted = errors.New("the extract is not sorted by node id")
 
 // Options say how a build runs on disk: where the temporary files go (beside the graph by default), how many records one
 // sort holds in memory, and how many DEM tiles the elevation keeps.
@@ -345,6 +349,11 @@ func BuildGraph(pbfPaths []string, demDir string, proj elevation.Projection, out
 	}
 	start := time.Now()
 	r, err := BuildOnDisk(pbfPaths[0], demDir, proj, outPath, opts, log)
+	if errors.Is(err, ErrNotSorted) {
+		// Only the join knows, after the pass over the ways: the in-memory build reads any extract, as it always did.
+		fmt.Fprintf(log, "%v: built in memory\n", err)
+		return Build(pbfPaths, demDir, proj, outPath, log)
+	}
 	if err != nil {
 		return err
 	}
@@ -429,6 +438,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if err != nil {
 		return rep, err
 	}
+	defer seenTab.finish()
 	byTile := newSpill(dir, "tile", tileNodeCodec, chunk)
 	bySeq := newSpill(dir, "seq", refCodec, chunk)
 	var nodes uint32
@@ -518,6 +528,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if err != nil {
 		return rep, err
 	}
+	defer all.close()
 	for _, d := range deg {
 		s, err := all.next()
 		if err != nil {
@@ -539,6 +550,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if err != nil {
 		return rep, err
 	}
+	defer all.close()
 	elevs, err := byNode.merge()
 	if err != nil {
 		return rep, err
@@ -566,16 +578,19 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	// Ranks: the nodes and their offsets are written in rank order, and the grid of the spatial index is counted.
 	box := [4]int32{minLat, minLon, maxLat, maxLon}
 	nx, ny := engine.GridSize(box)
+	cellOf := engine.Cells(box)
 	counts := make([]uint32, nx*ny+1)
 	byCell := newSpill(dir, "cell", cellNodeCodec, chunk)
 	nodesOut, err := createTable(dir, "nodes.sec", tripleCodec)
 	if err != nil {
 		return rep, err
 	}
+	defer nodesOut.finish()
 	offOut, err := createTable(dir, "off.sec", wordCodec)
 	if err != nil {
 		return rep, err
 	}
+	defer offOut.finish()
 	if err := offOut.put(0); err != nil {
 		return rep, err
 	}
@@ -594,7 +609,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		if err := offOut.put(cum); err != nil {
 			return err
 		}
-		cell := engine.CellOf(box, c.lat, c.lon)
+		cell := cellOf(c.lat, c.lon)
 		counts[cell+1]++
 		rank++
 		return byCell.push(cellNode{cell, rank - 1})
@@ -630,6 +645,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if err != nil {
 		return rep, err
 	}
+	defer edgesOut.finish()
 	var written uint64
 	ordered2, err := byEdge.merge()
 	if err != nil {
@@ -655,6 +671,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if err != nil {
 		return rep, err
 	}
+	defer cellsOut.finish()
 	for _, c := range counts {
 		if err := cellsOut.put(c); err != nil {
 			return rep, err
@@ -665,6 +682,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	if err != nil {
 		return rep, err
 	}
+	defer gridOut.finish()
 	ordered3, err := byCell.merge()
 	if err != nil {
 		return rep, err

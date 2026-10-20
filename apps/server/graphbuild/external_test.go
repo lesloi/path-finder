@@ -2,6 +2,7 @@ package graphbuild
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -174,8 +175,33 @@ func TestBuildOnDiskRefusesAnExtractThatIsNotSortedById(t *testing.T) {
 
 	_, err := BuildOnDisk(f.pbf, f.dem, elevation.Lambert93Grid, filepath.Join(f.dir, "o.bin"), Options{Chunk: 100, Cache: 2}, &bytes.Buffer{})
 
-	if err == nil || !strings.Contains(err.Error(), "not sorted") {
+	if !errors.Is(err, ErrNotSorted) {
 		t.Errorf("error %v", err)
+	}
+}
+
+func TestBuildGraphFallsBackToMemoryForAnExtractThatIsNotSorted(t *testing.T) {
+	// Arrange: the nodes are out of order, which Build accepts
+	f := newFixture(t)
+	nodes := []pbfNode{{5, 48.85, 2.35}, {3, 48.8501, 2.3501}}
+	writePBF(t, f.pbf, nodes, []pbfWay{{id: 1, refs: []int64{5, 3}, tags: [][2]string{{"highway", "path"}}}})
+	want := filepath.Join(f.dir, "want.bin")
+	wantErr := Build([]string{f.pbf}, f.dem, elevation.Lambert93Grid, want, &bytes.Buffer{})
+	var log bytes.Buffer
+	got := filepath.Join(f.dir, "got.bin")
+
+	// Act
+	err := BuildGraph([]string{f.pbf}, f.dem, elevation.Lambert93Grid, got, Options{}, &log)
+
+	// Assert: whatever Build says of this extract, BuildGraph says the same, after telling it was not sorted
+	if (err == nil) != (wantErr == nil) {
+		t.Fatalf("BuildGraph: %v, Build: %v", err, wantErr)
+	}
+	if err == nil && !bytes.Equal(readAll(t, got), readAll(t, want)) {
+		t.Error("the graphs differ")
+	}
+	if !strings.Contains(log.String(), "not sorted") || !strings.Contains(log.String(), "in memory") {
+		t.Errorf("the log does not say why the build fell back:\n%s", &log)
 	}
 }
 

@@ -36,8 +36,12 @@ func newSpill[R any](dir, name string, c codec[R], chunk int) *spill[R] {
 }
 
 func (s *spill[R]) push(r R) error {
-	if s.buf == nil {
-		s.buf = make([]R, 0, s.chunk) // the whole chunk at once: growing it by appends would hold twice as much for a while
+	if len(s.buf) == cap(s.buf) && cap(s.buf) < s.chunk {
+		// It grows by doubling up to the chunk and never past it: a small input holds a small buffer, and a big one
+		// does not hold the room that append would leave beyond the chunk.
+		grown := make([]R, len(s.buf), min(max(2*cap(s.buf), 1<<10), s.chunk))
+		copy(grown, s.buf)
+		s.buf = grown
 	}
 	s.buf = append(s.buf, r)
 	if len(s.buf) >= s.chunk {
@@ -182,7 +186,6 @@ func (m *merger[R]) refill(i, replaced int) error {
 	return nil
 }
 
-// next is the next record in order, and false once every run is read.
 func (m *merger[R]) next() (r R, ok bool, err error) {
 	if len(m.items) == 0 {
 		m.close()
@@ -196,7 +199,7 @@ func (m *merger[R]) next() (r R, ok bool, err error) {
 	return top.rec, true, nil
 }
 
-// each calls f with every record in order, and closes the merge, whatever way it ends.
+// each closes the merge whatever way f or the reading ends, so that a caller cannot leave the runs open.
 func (m *merger[R]) each(f func(R) error) error {
 	defer m.close()
 	for {
@@ -241,7 +244,7 @@ func (t *table[R]) put(r R) error {
 	return err
 }
 
-// finish ends the writing.
+// finish is safe to defer after a later finish: the error paths of a build close their tables this way.
 func (t *table[R]) finish() error {
 	if t.f == nil {
 		return nil
@@ -254,7 +257,6 @@ func (t *table[R]) finish() error {
 	return err
 }
 
-// reader ends the writing if it is not ended, and reads the file back: the same records in the same order.
 func (t *table[R]) reader() (*tableReader[R], error) {
 	if err := t.finish(); err != nil {
 		return nil, err

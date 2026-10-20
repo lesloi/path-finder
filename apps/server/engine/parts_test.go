@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -61,5 +62,18 @@ func TestGridSizeExportsTheGridOfTheIndex(t *testing.T) {
 
 	if nx != 4 || ny != 3 {
 		t.Errorf("grid %d by %d, want 4 by 3", nx, ny)
+	}
+}
+
+func TestCellsAreThoseOfTheSpatialIndex(t *testing.T) {
+	nodes := []node{{450_000_000, 60_000_000, 0}, {450_030_000, 60_050_000, 0}, {450_100_000, 60_020_000, 0}, {450_130_000, 60_210_000, 0}}
+	sp := computeSpatial(nodes)
+	cells := Cells([4]int32{sp.minLat, sp.minLon, sp.maxLat, sp.maxLon})
+
+	for i, n := range nodes {
+		c := cells(n.Lat, n.Lon)
+		if !slices.Contains(sp.nodes[sp.start[c]:sp.start[c+1]], uint32(i)) {
+			t.Errorf("node %d is not in cell %d of the index", i, c)
+		}
 	}
 }

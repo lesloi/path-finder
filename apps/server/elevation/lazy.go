@@ -9,6 +9,7 @@ import (
 // LazyDEM reads the tiles of a directory when a point needs them and drops them when its cache is full: the
 // memory is that of a few tiles, not of the country. It gives the heights DEM gives: the same grid, the same merge of
 // the border tiles and the same arithmetic. Points taken tile by tile (see TileKey) read each tile about once.
+// Unlike DEM, which is only read once loaded, it changes its cache at every sample: use it from one goroutine.
 type LazyDEM struct {
 	proj         Projection
 	files        map[[2]int][]string // the files of each tile, in the order Load merges them

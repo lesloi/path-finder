@@ -23,11 +23,11 @@ func WriteGraphFromParts(path string, parts GraphParts) error {
 	return writeAtomic(path, func(tmp string) error { return writeGraphFromParts(tmp, parts) })
 }
 
-// CellOf is the cell of the spatial index that holds a point, for a graph whose nodes lie in the box b (least latitude,
-// least longitude, greatest latitude, greatest longitude).
-func CellOf(b [4]int32, lat, lon int32) uint32 {
+// Cells gives the cell of the spatial index that holds a point, for a graph whose nodes lie in the box b (least
+// latitude, least longitude, greatest latitude, greatest longitude). The grid is worked out once, not at each point.
+func Cells(b [4]int32) func(lat, lon int32) uint32 {
 	nx, _ := GridSize(b)
-	return uint32(cellIndex(lat, lon, b[0], b[1], nx))
+	return func(lat, lon int32) uint32 { return uint32(cellIndex(lat, lon, b[0], b[1], nx)) }
 }
 
 // writeAtomic has write fill a temporary file beside path, then moves it into place, so a server that
