@@ -94,11 +94,9 @@ func quantize(x float32) uint16 {
 	return uint16(q)
 }
 
-// buildLandmarks picks landmarks around the edge of the covered area and computes their distances,
-// as the landmark rows of the v2 file.
-func buildLandmarks(g *graph, sp *spatial, p *Profile, count int, up float32) []uint16 {
-	t0 := time.Now()
-	// Reachable set from the middle of the area, to keep landmarks off disconnected islands.
+// pickMarks picks the landmarks: on an ellipse inscribed in the bounding box of the graph, each snapped to the nearest
+// node that can be reached from the middle of the area, so that none sits on a disconnected island.
+func pickMarks(g *graph, sp *spatial, p *Profile, count int) []uint32 {
 	minLat, maxLat, minLon, maxLon := int32(math.MaxInt32), int32(math.MinInt32), int32(math.MaxInt32), int32(math.MinInt32)
 	for _, n := range g.nodes {
 		minLat, maxLat = min(minLat, n.Lat), max(maxLat, n.Lat)
@@ -128,6 +126,14 @@ func buildLandmarks(g *graph, sp *spatial, p *Profile, count int, up float32) []
 		}
 		marks = append(marks, best)
 	}
+	return marks
+}
+
+// buildLandmarks picks landmarks around the edge of the covered area and computes their distances,
+// as the landmark rows of the v2 file.
+func buildLandmarks(g *graph, sp *spatial, p *Profile, count int, up float32) []uint16 {
+	t0 := time.Now()
+	marks := pickMarks(g, sp, p, count)
 
 	rowLen := count
 	if up > 0 {
