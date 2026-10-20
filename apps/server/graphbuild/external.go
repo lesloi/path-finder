@@ -75,22 +75,23 @@ var refCodec = codec[ref]{
 }
 
 // tileNode is a node and the DEM tile it falls in; the nodes of a tile are sorted by number, which is the order they
-// were met in.
+// were met in. The node's place is already projected onto the grid of the tiles: the projection is the dearest part of
+// finding a height after reading the tiles, and it is done once, for the tile and for the height.
 type tileNode struct {
 	tile, node uint32
-	lat, lon   int32
+	x, y       float64
 }
 
 var tileNodeCodec = codec[tileNode]{
-	size: 16,
+	size: 24,
 	put: func(b []byte, r tileNode) {
 		put32(b, 0, r.tile)
 		put32(b, 4, r.node)
-		put32(b, 8, uint32(r.lat))
-		put32(b, 12, uint32(r.lon))
+		binary.LittleEndian.PutUint64(b[8:], math.Float64bits(r.x))
+		binary.LittleEndian.PutUint64(b[16:], math.Float64bits(r.y))
 	},
 	get: func(b []byte) tileNode {
-		return tileNode{le32(b, 0), le32(b, 4), int32(le32(b, 8)), int32(le32(b, 12))}
+		return tileNode{le32(b, 0), le32(b, 4), math.Float64frombits(binary.LittleEndian.Uint64(b[8:])), math.Float64frombits(binary.LittleEndian.Uint64(b[16:]))}
 	},
 	cmp: func(a, b tileNode) int {
 		return cmp.Or(cmp.Compare(a.tile, b.tile), cmp.Compare(a.node, b.node))
@@ -326,7 +327,8 @@ type Options struct {
 }
 
 const (
-	// DefaultChunk is about 256 MB of records per sort, the biggest being 32 bytes in memory.
+	// DefaultChunk is about 256 MB of records per sort, the biggest being 32 bytes in memory; the buffers of the sorts
+	// being filled at once add up.
 	DefaultChunk = 8_000_000
 	DefaultCache = 128
 )
@@ -471,7 +473,8 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 			if err := seenTab.put(seen{h.seq, lat, lon}); err != nil {
 				return err
 			}
-			if err := byTile.push(tileNode{dem.TileKey(lat, lon), current, lat, lon}); err != nil {
+			x, y := dem.Project(lat, lon)
+			if err := byTile.push(tileNode{dem.TileKeyAt(x, y), current, x, y}); err != nil {
 				return err
 			}
 		}
@@ -496,7 +499,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		return rep, err
 	}
 	err = tiles.each(func(t tileNode) error {
-		elev, err := dem.Sample(t.lat, t.lon)
+		elev, err := dem.SampleAt(t.x, t.y)
 		if err != nil {
 			return err
 		}

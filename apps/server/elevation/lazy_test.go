@@ -133,3 +133,28 @@ func sortBy(idx []int, key func(int) uint32) {
 		}
 	}
 }
+
+func TestLazyDEMSamplesAProjectedPointAsAPositionOfDegrees(t *testing.T) {
+	// Arrange
+	dir, xll, yll := lazyFixture(t)
+	lat, lon := pointsAround(xll, yll)
+	lazy, err := OpenLazy(dir, Lambert93Grid, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range lat {
+		want, werr := lazy.Sample(lat[i], lon[i])
+		wantKey := lazy.TileKey(lat[i], lon[i])
+
+		// Act
+		x, y := lazy.Project(lat[i], lon[i])
+		key := lazy.TileKeyAt(x, y)
+		got, err := lazy.SampleAt(x, y)
+
+		// Assert
+		if err != nil || werr != nil || got != want || key != wantKey {
+			t.Fatalf("point %d: got %d (%v), want %d (%v)", i, got, err, want, werr)
+		}
+	}
+}
