@@ -59,6 +59,19 @@ export DATA_DIR=$PWD/../../data
 ./path-finder build-alt -profile unpaved
 ```
 
+A graph of a format before `PFGRAPH8` (the current one), or built with other parameters, is refused when the server starts, and the log says to run
+`build-graph` again, then `build-alt` for each profile. A server that is running keeps the graphs it serves when
+replaced files cannot be served, and says why in its log.
+
+A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
+a half-written one. A running server looks at the directory every 30 seconds and serves the files that replace
+the ones it maps, with no restart. Replace a file by renaming a new one over it, never by writing into it.
+
+`-landmarks` sets how many landmarks to compute (8 by
+default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
+it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one surface-preference
+profile and to one graph: build them again after each graph; the server refuses those of another graph.
+
 ### Metropolitan France
 
 Metropolitan France is one `build-graph` from the France extract and three `build-alt`, as above, with `-pbf` the
@@ -69,19 +82,6 @@ about 9 GB of landmark files. `-chunk` and `-cache` size the sorts and the BD AL
 on disk, `-workers` landmarks at a time (2 by default, each worker holds one distance per node), with `-tmp` for its files.
 
 Several `-pbf` are joined in memory, which suits a territory made of two extracts, not a country.
-
-A graph of a format before `PFGRAPH8` (the current one), or built with other parameters, is refused when the server starts, and the log says to run
-`build-graph` again, then `build-alt` for each profile. A server that is running keeps the graphs it serves when
-replaced files cannot be served, and says why in its log.
-
-A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
-a half-written one. A running server looks at the directory every 30 seconds and serves the files that replace
-the ones it maps, with no restart. Replace a file by renaming a new one over it, never by writing into it.
-
-Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (8 by
-default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
-it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one surface-preference
-profile and to one graph: build them again after each graph; the server refuses those of another graph.
 
 ### Overseas France
 
@@ -200,11 +200,13 @@ is about `LOOP_LIMIT × CPUs × 50 MB`.
 The `Dockerfile` builds one image with the server and the web app, and no data. Build it with
 `docker build -t path-finder .`, or use the one CI publishes as `ghcr.io/lesloi/path-finder:latest`.
 
-To update the data from a job, replace the graphs one at a time: two full copies (some 21 GiB each for France) rarely fit on a
-volume. Serve a directory of links, one per graph, and build each graph in a directory outside it. Then replace the graph's
-link by renaming a new link over it, made beside the served directory at the same depth (`mv -T ../swap/guadeloupe guadeloupe`):
-the four files change together, the pods follow within 30 seconds, and none sees a new `graph.bin` with old landmarks. Remove
-the old graph afterwards.
+To update the data from a job, build the new files beside the served ones and put them in service by renaming: a
+graph and its landmarks change together, and the pods follow within 30 seconds. Metropolitan France is one graph, so
+a rebuild needs room for both copies at once, about 13 GB each (a 4.2 GB graph and about 9 GB of landmarks), on top of the
+temporary disk of the build (about 9 GB, freed afterwards). Serve a directory of links, one per graph, and build each
+graph in a directory outside it. Then replace the graph's link by renaming a new link over it, made beside the served
+directory at the same depth (`mv -T ../swap/guadeloupe guadeloupe`): none sees a new `graph.bin` with old landmarks.
+Remove the old graph afterwards. Territories are small, and are replaced one at a time.
 
 The data is a volume: mount the directory holding `graph.bin`, `any.alt`, `paved.alt` and `unpaved.alt`, or one such
 subdirectory per territory, on `/data` (the image sets `DATA_DIR=/data`), read-only. The server only reads it, and
