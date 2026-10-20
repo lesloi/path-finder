@@ -43,7 +43,6 @@ func run(command string, args []string) error {
 		dem := fs.String("dem", "", "directory holding the BD ALTI .asc tiles, plain or gzipped (.asc.gz)")
 		out := fs.String("out", filepath.Join(dataDir(), engine.GraphFileName), "graph file to write")
 		crs := fs.String("dem-crs", "lambert93", "projection of the BD ALTI tiles: lambert93 (metropolitan France), or utmZZn / utmZZs for an overseas territory, see docs/INSTALL.md")
-		bbox := fs.String("bbox", "", "keep only this zone, as minLon,minLat,maxLon,maxLat: the memory then follows the zone, not the extract (one sorted -pbf)")
 		tmp := fs.String("tmp", "", "directory for the temporary files of a build from one extract (default: the directory of -out, never a memory-backed /tmp)")
 		chunk := fs.Int("chunk", graphbuild.DefaultChunk, "records one sort holds in memory, for a build from one extract")
 		cache := fs.Int("cache", graphbuild.DefaultCache, "BD ALTI tiles kept in memory, for a build from one extract")
@@ -52,40 +51,8 @@ func run(command string, args []string) error {
 		if err != nil {
 			return err
 		}
-		if *bbox == "" {
-			// One extract is built on disk, whose memory does not grow with the country; several are joined in memory.
-			return graphbuild.BuildGraph(pbfs, *dem, proj, *out, graphbuild.Options{Tmp: *tmp, Chunk: *chunk, Cache: *cache}, os.Stderr)
-		}
-		box, err := graphbuild.ParseBox(*bbox)
-		if err != nil {
-			return err
-		}
-		if len(pbfs) != 1 {
-			return fmt.Errorf("build-graph -bbox reads exactly one -pbf, got %d", len(pbfs))
-		}
-		return graphbuild.BuildClipped(pbfs[0], *dem, proj, *out, box, os.Stderr)
-	case "plan-zones":
-		fs := flag.NewFlagSet(command, flag.ExitOnError)
-		pbf := fs.String("pbf", "", "sorted OSM PBF file of the country")
-		extent := fs.String("extent", "-5.3,41.3,9.7,51.2", "area to cover, as minLon,minLat,maxLon,maxLat (default: metropolitan France)")
-		maxNodes := fs.Int("max-nodes", 40_000_000, "most nodes of the extract a zone should hold, margin included")
-		margin := fs.Float64("margin-km", 20, "how far a zone reaches beyond its part (at least the radius of the longest loop)")
-		cell := fs.Float64("cell", 0.02, "size in degrees of the cells that nodes are counted in")
-		_ = fs.Parse(args)
-		// The list of zones goes to the standard output, what is said of each to the standard error.
-		box, err := graphbuild.ParseBox(*extent)
-		if err != nil {
-			return err
-		}
-		zones, err := graphbuild.PlanZones(*pbf, graphbuild.PlanOptions{Extent: box, MaxNodes: *maxNodes, MarginKm: *margin, CellDeg: *cell}, os.Stderr)
-		if err != nil {
-			return err
-		}
-		for _, z := range zones {
-			fmt.Println(z.Line())
-			fmt.Fprintf(os.Stderr, "%s: %d nodes\n", z.Name, z.Nodes)
-		}
-		return nil
+		// One extract is built on disk, whose memory does not grow with the country; several are joined in memory.
+		return graphbuild.BuildGraph(pbfs, *dem, proj, *out, graphbuild.Options{Tmp: *tmp, Chunk: *chunk, Cache: *cache}, os.Stderr)
 	case "build-pois":
 		fs := flag.NewFlagSet(command, flag.ExitOnError)
 		var pbfs stringList
@@ -108,7 +75,7 @@ func run(command string, args []string) error {
 		// The distances go to disk as they are made, so that the memory follows the workers, not the number of nodes.
 		return engine.WriteLandmarksOnDisk(*graph, *out, *profile, *count, *tmp, *workers)
 	}
-	return fmt.Errorf("unknown command %q: use build-graph, build-alt, build-pois, plan-zones, or none to serve", command)
+	return fmt.Errorf("unknown command %q: use build-graph, build-alt, build-pois, or none to serve", command)
 }
 
 type stringList []string

@@ -45,7 +45,7 @@ Run them ahead of serving, never while it serves. They write into the **data dir
 `DATA_DIR` (`data` by default): `graph.bin`, then `any.alt`, `paved.alt` and `unpaved.alt`, one per surface preference.
 
 The area where routes can start is that of the extracts you build the graph from, and of the BD ALTI tiles under them. The server
-finds it by itself from the graph (and from each zone of `DATA_DIR`), with nothing to configure: the web app greys out the rest
+finds it by itself from the graph (and from each territory of `DATA_DIR`), with nothing to configure: the web app greys out the rest
 of the map, and disables the search from a start point there.
 
 ```sh
@@ -59,23 +59,29 @@ export DATA_DIR=$PWD/../../data
 ./path-finder build-alt -profile unpaved
 ```
 
-`build-graph` from one `-pbf` sorted by node id (the Geofabrik extracts are) works on disk: its memory does not grow with
-the extract. Its temporary files go beside the graph, or to `-tmp` (never a memory-backed `/tmp`: they are as big as the
-extract), and `-chunk` and `-cache` size the sorts and the tiles kept. Several `-pbf` are joined in memory. `build-alt`
-also works on disk, `-workers` landmarks at a time (2 by default), with `-tmp` for its files.
-
 A graph of a format before `PFGRAPH8` (the current one), or built with other parameters, is refused when the server starts, and the log says to run
-`build-graph` again, then `build-alt` for each profile. A server that is running keeps the zones it serves when
+`build-graph` again, then `build-alt` for each profile. A server that is running keeps the graphs it serves when
 replaced files cannot be served, and says why in its log.
 
 A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
 a half-written one. A running server looks at the directory every 30 seconds and serves the files that replace
 the ones it maps, with no restart. Replace a file by renaming a new one over it, never by writing into it.
 
-Repeat `-pbf` to join several extracts. `-landmarks` sets how many landmarks to compute (8 by
+`-landmarks` sets how many landmarks to compute (8 by
 default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
 it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one surface-preference
 profile and to one graph: build them again after each graph; the server refuses those of another graph.
+
+### Metropolitan France
+
+Metropolitan France is one `build-graph` from the France extract and three `build-alt`, as above, with `-pbf` the
+Geofabrik `france-latest.osm.pbf` and `-dem` the BD ALTI of every department. The build works on disk, and its memory does
+not grow with the extract (it needs a sorted one, as Geofabrik's are). Its temporary files go beside the graph, or to `-tmp`:
+never a memory-backed `/tmp`, they are as big as the extract. Count about 9 GB of temporary disk beside the 4.2 GB graph, and
+about 9 GB of landmark files. `-chunk` and `-cache` size the sorts and the BD ALTI tiles kept in memory. `build-alt` also works
+on disk, `-workers` landmarks at a time (2 by default, each worker holds one distance per node), with `-tmp` for its files.
+
+Several `-pbf` are joined in memory, which suits a territory made of two extracts, not a country.
 
 ### Overseas France
 
@@ -93,16 +99,17 @@ in UTM: name its projection with `-dem-crs`.
 | Saint-Barthélemy         | `D977`  | `utm20n`   | [OSM France](https://download.openstreetmap.fr/extracts/central-america/) `saint_barthelemy`       |
 | Saint-Martin             | `D978`  | `utm20n`   | [OSM France](https://download.openstreetmap.fr/extracts/central-america/) `saint_martin`           |
 
-A territory is one zone: skip `plan-zones`, and build it without `-bbox` into its own subdirectory of
-`DATA_DIR`. From two graphs on, every graph lives in a subdirectory (the server refuses a `graph.bin` with zones
-beside it): move one built at the root into one first. Without `-bbox` the build reads every tile below `-dem`,
-so keep the archive of each territory in a directory of its own:
+A territory is a graph of its own, in its own subdirectory of `DATA_DIR`: its tiles come in another projection and
+its extract is far from the others. From two graphs on, every graph lives in a subdirectory (the server refuses a
+`graph.bin` with other graphs beside it): move one built at the root into one first. The build reads every tile below
+`-dem`, so keep the archive of each territory in a directory of its own. A territory made of two extracts takes both
+as `-pbf`; they are joined in memory.
 
 ```sh
-zone=$DATA_DIR/guadeloupe && mkdir -p "$zone"
-./path-finder build-graph -pbf $DATA_DIR/osm/guadeloupe-latest.osm.pbf -dem $DATA_DIR/bdalti-d971 -dem-crs utm20n -out "$zone/graph.bin"
+dir=$DATA_DIR/guadeloupe && mkdir -p "$dir"
+./path-finder build-graph -pbf $DATA_DIR/osm/guadeloupe-latest.osm.pbf -dem $DATA_DIR/bdalti-d971 -dem-crs utm20n -out "$dir/graph.bin"
 for profile in any paved unpaved; do
-  ./path-finder build-alt -graph "$zone/graph.bin" -out "$zone/$profile.alt" -profile "$profile"
+  ./path-finder build-alt -graph "$dir/graph.bin" -out "$dir/$profile.alt" -profile "$profile"
 done
 ```
 
@@ -114,7 +121,7 @@ The default `-dem-crs` is `lambert93`. Tiles read in the wrong projection give n
 `drinking_water=yes` on any node or way, never `drinking_water=no`; `seasonal` and the `name` are kept) and of the viewpoints
 (`tourism=viewpoint`). A tile is a JSON file `pois/{x}/{y}.json` of the zoom-10 grid, about 27 km wide, written only
 when it holds any point. A way stands for the mean of its nodes; relations are left out. Several extracts can
-overlap. A whole country needs no zones.
+overlap.
 
 ```sh
 ./path-finder build-pois -pbf $DATA_DIR/osm/france.osm.pbf -out $DATA_DIR/pois
@@ -122,50 +129,15 @@ overlap. A whole country needs no zones.
 
 The server reads the tiles on each request, so a new build needs no restart. It only writes into an empty or new
 directory: build into `pois.<stamp>` and put it in service by renaming a link `pois` over the previous one, the way the
-zones are, rather than writing into the directory that is served. Without `pois/`, or for a tile with no point, the
+graphs are, rather than writing into the directory that is served. Without `pois/`, or for a tile with no point, the
 answer is an empty tile and the map shows no point of interest. The tile requests are never logged, not even in
 development.
 
-### A country, by zones
+### Serving several graphs
 
-The graph of a country does not build in a couple of gigabytes of memory, so build it by zone, each into its
-own subdirectory of the data directory. `build-graph -bbox minLon,minLat,maxLon,maxLat` reads one sorted
-extract (Geofabrik's are) once and keeps the ways inside the box: its memory follows the zone, not the
-extract. A way that leaves the box is cut there, so give each zone a margin and overlap its neighbours.
-Without `-bbox` the build keeps every walkable way in memory: fine for a region, not for a country. `-dem`
-can hold the tiles of the whole country: a build reads only those that meet its box. Under a memory limit set
-`GOMEMLIMIT` to about 80 % of it (`1600MiB` for 2 GiB).
-
-`plan-zones` cuts a country into zones from its extract, in one pass (two minutes for France). It splits the
-area where the nodes are shared in half until the box of a part, margin included, holds at most `-max-nodes`
-nodes of the extract, which a build keeps in memory: 37 million held 0.9 GB live and peaked at 1.62 GB, so 40
-million is the budget of a 2 GB job. `-margin-km` is how far a zone reaches beyond its part, so that loops near
-its edge close: those of 50 km, the longest, went up to 16 km from their start in a test, so keep 20. Plan
-again with each extract, since the zones follow the nodes:
-
-```sh
-./path-finder plan-zones -pbf france.osm.pbf -max-nodes 40000000 -margin-km 20 > zones.txt
-```
-
-Each line is a name and a box (31 zones for the France extract of 6 October 2026):
-
-```sh
-set -e # stop at the first zone that fails: a zone left out is a hole in the map
-while read -r name box _; do
-  zone=$DATA_DIR/$name && mkdir -p "$zone"
-  GOMEMLIMIT=1600MiB ./path-finder build-graph -pbf france.osm.pbf -dem "$dem" -bbox "$box" -out "$zone/graph.bin"
-  for profile in any paved unpaved; do
-    ./path-finder build-alt -graph "$zone/graph.bin" -out "$zone/$profile.alt" -profile "$profile"
-  done
-done < zones.txt
-```
-
-The log of `build-graph` gives the candidate nodes and the nodes kept: a zone built without the tiles of a
-neighbouring département keeps far fewer, and has holes.
-
-The server maps every zone when it starts and answers from the zone that holds the start point with the most
+The server maps every graph when it starts and answers from the one that holds the start point with the most
 room round it, or from the next one if that has no way near it. A directory that holds a `graph.bin` is one
-zone, and the server refuses one that also has zones beside that graph. In a directory of zones each needs its `any.alt`, `paved.alt` and `unpaved.alt`, and a subdirectory with landmarks or a
+graph, and the server refuses one that also has graphs beside it. In a directory of graphs each needs its `any.alt`, `paved.alt` and `unpaved.alt`, and a subdirectory with landmarks or a
 temporary file but no `graph.bin` (a build that failed) stops the server.
 
 ## 4. Run it locally
@@ -191,18 +163,18 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable             | Required | Default       | Description                                                                                                                                           |
-| -------------------- | -------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                                                                              |
-| `PORT`               | no       | `3000`        | Port the server listens on                                                                                                                            |
-| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                                                                                     |
-| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin` and the optional `any.alt`, `paved.alt` and `unpaved.alt`, or one such subdirectory per zone, and the optional `pois/` |
-| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                                                                            |
-| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))                                                            |
-| `SEARCH_SEED`        | no       | random        | A whole number that fixes the seed of every search, so that the same criteria bring the same loops (for tests)                                        |
-| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none                                                                    |
-| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                                                                          |
-| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                                                                           |
+| Variable             | Required | Default       | Description                                                                                                                                                |
+| -------------------- | -------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                                                                                   |
+| `PORT`               | no       | `3000`        | Port the server listens on                                                                                                                                 |
+| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                                                                                          |
+| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin` and the optional `any.alt`, `paved.alt` and `unpaved.alt`, or one such subdirectory per territory, and the optional `pois/` |
+| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                                                                                 |
+| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))                                                                 |
+| `SEARCH_SEED`        | no       | random        | A whole number that fixes the seed of every search, so that the same criteria bring the same loops (for tests)                                             |
+| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none                                                                         |
+| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                                                                               |
+| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                                                                                |
 
 ### How many at once
 
@@ -228,14 +200,16 @@ is about `LOOP_LIMIT × CPUs × 50 MB`.
 The `Dockerfile` builds one image with the server and the web app, and no data. Build it with
 `docker build -t path-finder .`, or use the one CI publishes as `ghcr.io/lesloi/path-finder:latest`.
 
-To update the data from a job, replace the zones one at a time: two full copies (some 21 GiB each for France) rarely fit on a
-volume. Plan the zones once and keep the plan, or a zone dropped by planning again would still be served. Serve a directory of
-links, one per zone, and build each zone in a directory outside it. Then replace the zone's link by renaming a new link over it,
-made beside the served directory at the same depth (`mv -T ../swap/zNN zNN`): the four files change together, the pods follow
-within 30 seconds, and none sees a new `graph.bin` with old landmarks. Remove the old zone afterwards.
+To update the data from a job, build the new files beside the served ones and put them in service by renaming: a
+graph and its landmarks change together, and the pods follow within 30 seconds. Metropolitan France is one graph, so
+a rebuild needs room for both copies at once, about 13 GB each (a 4.2 GB graph and about 9 GB of landmarks), on top of the
+temporary disk of the build (about 9 GB, freed afterwards). Serve a directory of links, one per graph, and build each
+graph in a directory outside it. Then replace the graph's link by renaming a new link over it, made beside the served
+directory at the same depth (`mv -T ../swap/guadeloupe guadeloupe`): none sees a new `graph.bin` with old landmarks.
+Remove the old graph afterwards. Territories are small, and are replaced one at a time.
 
 The data is a volume: mount the directory holding `graph.bin`, `any.alt`, `paved.alt` and `unpaved.alt`, or one such
-subdirectory per zone, on `/data` (the image sets `DATA_DIR=/data`), read-only. The server only reads it, and
+subdirectory per territory, on `/data` (the image sets `DATA_DIR=/data`), read-only. The server only reads it, and
 maps the files rather than copying them, so servers that share the directory share its page cache. They pick
 up a rebuild by themselves.
 

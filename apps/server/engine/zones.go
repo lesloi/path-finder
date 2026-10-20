@@ -15,10 +15,9 @@ import (
 	"time"
 )
 
-// Zones are the parts of a country, each with its own graph and landmarks, that one server answers for: the
-// graph of a whole country does not build in the memory of a job, so it is built by zone (see
-// graphbuild.BuildClipped) and every server maps all of them. Mapping costs no memory: a zone is a few files
-// and a header each, and a search reads only the pages of its own area.
+// Zones are the territories, each with its own graph and landmarks, that one server answers for: a country is
+// one graph, and each overseas territory has one of its own, so every server maps all of them. Mapping costs no
+// memory: a zone is a few files and a header each, and a search reads only the pages of its own area.
 //
 // A data directory is one zone when it holds a graph, else each of its subdirectories that does is a zone.
 type Zones struct {

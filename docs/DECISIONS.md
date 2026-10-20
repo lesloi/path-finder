@@ -32,14 +32,20 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   holds the bounds and error codes, and the cases of the tests that both sides run. The server alone
   decides what is valid; the web app checks early to name the wrong field. Two languages, one
   vocabulary, and a test fails on the side left behind.
-- **The graph is built by zone, and every server maps all the zones (`DATA_DIR`).** A country's build keeps
-  every candidate node and its whole output in memory, which does not fit in 2 GB; a zone does
-  (`build-graph -bbox`, one pass over the country's extract). No routing sits in front of the servers:
-  opening a zone costs no memory, since its spatial index is in `graph.bin`, and a start point is answered by
-  the zone holding it with the most room. Fixed file names (`graph.bin`, and `any.alt`, `paved.alt`, `unpaved.alt`, one landmark file per surface
-  preference), written atomically, so a server only needs the
-  directory read-only. Revisit if a country's graph builds in one go: zones would
-  then only cost borders.
+- **A country's graph is built in one go, on disk; a server maps one graph per territory (`DATA_DIR`).** The build sorts its
+  records on disk and reads them back in order, instead of keeping every node in memory: metropolitan France takes
+  225 s and 1.4 GB at its peak (11.6 GB in memory), its landmarks 158 s and 0.4 GB of heap (9.9 GB in memory), and the files
+  are the same byte for byte. It costs 2.5 to 3.3 times the time and about 9 GB of temporary disk, put beside the output,
+  never on a memory-backed `/tmp`. Served as one 4.2 GB file, France answers as fast as a zone did and with the same routes
+  (the heap stays near 35 MB; the page cache fills). An overseas territory stays a graph of its own in a subdirectory: its
+  tiles come in another projection and its extract is far from the others. No routing sits in front of the servers:
+  opening a graph costs no memory, since its spatial index is in `graph.bin`, and a start point is answered by the graph
+  holding it with the most room. Fixed file names (`graph.bin`, and `any.alt`, `paved.alt`, `unpaved.alt`, one landmark
+  file per surface preference), written atomically, so a server only needs the directory read-only. The components too
+  small to hold a loop and the long edges are found by the build and stored in `graph.bin`, with the two parameters in its
+  header, so that the first search reads no more of the file than the ones after it (France: 127 ms cold, 0.15 GB at
+  most in memory instead of 3.2 GB). Before, a country was cut into zones (`plan-zones`, `build-graph -bbox`) because
+  its build did not fit in 2 GB; loops near the edge of a zone could not close beyond it.
 - **A rebuild is served without a restart, and a file is replaced by renaming over it, never written
   in place.** A restart drops the searches in flight and closes the port for as long as it takes. The
   files are mapped, so a swap is a new set of mappings: each set counts its searches, and the last one out

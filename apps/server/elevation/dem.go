@@ -185,48 +185,18 @@ func readASC(path string) (*ascFile, error) {
 	return &ascFile{xll: h.xll, yll: h.yll, cs: h.cs, tile: t}, nil
 }
 
-// Load reads every .asc and .asc.gz file below dir, written in the projection proj.
-func Load(dir string, proj Projection) (*DEM, error) { return load(dir, proj, nil) }
-
-// within is the test of a tile header that holds when the tile meets the box, given by its latitudes and
-// longitudes in degrees.
-func within(proj Projection, minLat, minLon, maxLat, maxLon float64) func(ascHeader) bool {
-	// A box is not a rectangle in the grid of the tiles: the rectangle through points all along its edges holds it.
-	x0, y0, x1, y1 := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
-	const steps = 8
-	for i := 0; i <= steps; i++ {
-		for j := 0; j <= steps; j++ {
-			x, y := proj.Forward(minLat+(maxLat-minLat)*float64(i)/steps, minLon+(maxLon-minLon)*float64(j)/steps)
-			x0, y0, x1, y1 = min(x0, x), min(y0, y), max(x1, x), max(y1, y)
-		}
-	}
-	return func(h ascHeader) bool {
-		tx0, ty0, tx1, ty1 := h.extent()
-		return tx0 < x1 && tx1 > x0 && ty0 < y1 && ty1 > y0
-	}
-}
-
 // CountTiles is how many tiles are below dir, without reading any: a build can fail at once when it has none,
 // and read them later, when the memory of its other steps is free.
 func CountTiles(dir string) (int, error) {
-	paths, err := tilePaths(dir, nil)
+	paths, err := tilePaths(dir)
 	return len(paths), err
 }
 
-// tilePaths lists the tiles below dir that keep accepts (all of them when it is nil), reading only headers.
-func tilePaths(dir string, keep func(ascHeader) bool) ([]string, error) {
+// tilePaths lists the tiles below dir.
+func tilePaths(dir string) ([]string, error) {
 	var paths []string
 	err := filepath.WalkDir(dir, func(p string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() && isTile(p) {
-			if keep != nil {
-				ok, herr := headerKept(p, keep)
-				if herr != nil {
-					return herr
-				}
-				if !ok {
-					return nil
-				}
-			}
 			paths = append(paths, p)
 		}
 		return err
@@ -234,29 +204,12 @@ func tilePaths(dir string, keep func(ascHeader) bool) ([]string, error) {
 	return paths, err
 }
 
-// CountWithin is how many tiles below dir meet the box: it reads only their headers, so a job can tell at
-// once that it has not been given the tiles of its zone.
-func CountWithin(dir string, proj Projection, minLat, minLon, maxLat, maxLon float64) (int, error) {
-	paths, err := tilePaths(dir, within(proj, minLat, minLon, maxLat, maxLon))
-	return len(paths), err
-}
-
-// LoadWithin reads the tiles below dir that meet the box: the memory of a build is then that of the
-// tiles of its zone, not of the whole country. It reads only the header of the others.
-func LoadWithin(dir string, proj Projection, minLat, minLon, maxLat, maxLon float64) (*DEM, error) {
-	d, err := load(dir, proj, within(proj, minLat, minLon, maxLat, maxLon))
-	if errors.Is(err, ErrNoTile) {
-		return nil, fmt.Errorf("no tile of %s meets the box %.3f,%.3f,%.3f,%.3f", dir, minLon, minLat, maxLon, maxLat)
-	}
-	return d, err
-}
-
 // ErrNoTile is what loading says when no tile is left to read.
 var ErrNoTile = errors.New("no .asc or .asc.gz file")
 
-// load reads the tiles below dir that keep accepts (all of them when it is nil).
-func load(dir string, proj Projection, keep func(ascHeader) bool) (*DEM, error) {
-	paths, err := tilePaths(dir, keep)
+// Load reads every .asc and .asc.gz file below dir, written in the projection proj.
+func Load(dir string, proj Projection) (*DEM, error) {
+	paths, err := tilePaths(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -380,20 +333,6 @@ func (d *DEM) Sample(lat, lon []int32) []int32 {
 	}
 	wg.Wait()
 	return elev
-}
-
-// headerKept reads only the header of a tile, to tell whether keep wants it.
-func headerKept(path string, keep func(ascHeader) bool) (bool, error) {
-	f, err := openTile(path)
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-	h, err := readHeader(bufio.NewReader(f))
-	if err != nil {
-		return false, fmt.Errorf("%s: %w", path, err)
-	}
-	return keep(h), nil
 }
 
 // headerOf reads the header of a tile.

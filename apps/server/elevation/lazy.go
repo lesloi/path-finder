@@ -29,7 +29,7 @@ type cachedTile struct {
 // OpenLazy reads the header of every tile below dir, so that the grid is the one Load builds, and keeps at most
 // cache tiles in memory.
 func OpenLazy(dir string, proj Projection, cache int) (*LazyDEM, error) {
-	paths, err := tilePaths(dir, nil)
+	paths, err := tilePaths(dir)
 	if err != nil {
 		return nil, err
 	}

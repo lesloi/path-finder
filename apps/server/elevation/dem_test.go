@@ -164,54 +164,15 @@ func lambertToWGS(t *testing.T, x, y float64) (lat, lon float64) {
 	return
 }
 
-func TestLoadWithinReadsOnlyTheTilesOfTheBox(t *testing.T) {
-	dir := t.TempDir()
-	paris := [2]float64{48.85, 2.35}
-	lyon := [2]float64{45.76, 4.84}
-	for name, at := range map[string][2]float64{"paris.asc.gz": paris, "lyon.asc": lyon} {
-		x, y := Lambert93Grid.Forward(at[0], at[1])
-		writeTile(t, dir, name, math.Floor(x/100)*100-50, math.Floor(y/100)*100-50, func(c, r int) float64 { return 100 })
-	}
-	box := func(c [2]float64) [4]float64 { return [4]float64{c[0] - 0.01, c[1] - 0.01, c[0] + 0.01, c[1] + 0.01} } // minLat, minLon, maxLat, maxLon
-
-	b := box(paris)
-	dem, err := LoadWithin(dir, Lambert93Grid, b[0], b[1], b[2], b[3])
-	if err != nil || dem.Tiles() != 1 {
-		t.Fatalf("a box round Paris: %v tiles, %v", dem, err)
-	}
-	if z := dem.At(paris[0], paris[1]); math.IsNaN(float64(z)) {
-		t.Error("the tile of Paris does not cover Paris")
-	}
-	if n, err := CountWithin(dir, Lambert93Grid, b[0], b[1], b[2], b[3]); err != nil || n != 1 {
-		t.Errorf("CountWithin round Paris = %d, %v; want 1", n, err)
-	}
-	if n, err := CountWithin(dir, Lambert93Grid, 43.0, -1.0, 43.1, -0.9); err != nil || n != 0 {
-		t.Errorf("CountWithin in an empty area = %d, %v; want 0", n, err)
-	}
-	whole, err := LoadWithin(dir, Lambert93Grid, 45, 2, 49, 5)
-	if err != nil || whole.Tiles() != 2 {
-		t.Fatalf("a box round both: %v tiles, %v", whole, err)
-	}
-	if _, err := LoadWithin(dir, Lambert93Grid, 43.0, -1.0, 43.1, -0.9); err == nil || !strings.Contains(err.Error(), "no tile") {
-		t.Errorf("a box with no tile: err = %v", err)
-	}
-	if _, err := LoadWithin(t.TempDir(), Lambert93Grid, 45, 2, 49, 5); err == nil {
-		t.Error("an empty directory: err = nil")
-	}
-}
-
 func TestATileHeaderMustSayWhereItIs(t *testing.T) {
 	dir := t.TempDir()
-	// A header with a centre instead of a corner would put the tile in the wrong place, or out of every box.
+	// A header with a centre instead of a corner would put the tile in the wrong place.
 	bad := "ncols 4\nnrows 4\nxllcenter 800000\nyllcenter 6500000\ncellsize 25\nNODATA_value -99999\n"
 	if err := os.WriteFile(filepath.Join(dir, "centre.asc"), []byte(bad), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CountWithin(dir, Lambert93Grid, 45, 2, 49, 5); err == nil || !strings.Contains(err.Error(), "xllcorner") {
-		t.Errorf("CountWithin: err = %v, want it to name the missing xllcorner", err)
-	}
-	if _, err := LoadWithin(dir, Lambert93Grid, 45, 2, 49, 5); err == nil {
-		t.Error("LoadWithin: err = nil")
+	if _, err := Load(dir, Lambert93Grid); err == nil || !strings.Contains(err.Error(), "xllcorner") {
+		t.Errorf("Load: err = %v, want it to name the missing xllcorner", err)
 	}
 }
 
@@ -268,13 +229,21 @@ func TestADamagedGzippedTileNamesItsFile(t *testing.T) {
 			t.Errorf("%s: Load err = %v, want it to name the file", name, err)
 		}
 	}
-	// The header is all CountWithin reads: it fails on a file that is not gzip, and not on a tile that is cut or damaged further in.
+}
+
+func TestOpenLazyNamesATileWhoseHeaderIsNotGzip(t *testing.T) {
+	// Arrange
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "header.asc.gz"), []byte("this is not gzip"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := CountWithin(dir, Lambert93Grid, 45, 2, 49, 5); err == nil || !strings.Contains(err.Error(), "header.asc.gz") {
-		t.Errorf("CountWithin err = %v, want it to name the file", err)
+
+	// Act
+	_, err := OpenLazy(dir, Lambert93Grid, 1)
+
+	// Assert
+	if err == nil || !strings.Contains(err.Error(), "header.asc.gz") {
+		t.Errorf("OpenLazy err = %v, want it to name the file", err)
 	}
 }
 
@@ -297,9 +266,9 @@ func TestDEMReadsTilesInTheProjectionItIsGiven(t *testing.T) {
 		x, y := proj.Forward(c.lat, c.lon)
 		writeTile(t, dir, "a.asc", math.Floor(x/100)*100-50, math.Floor(y/100)*100-50, func(c, r int) float64 { return 250 })
 
-		dem, err := LoadWithin(dir, proj, c.lat-0.01, c.lon-0.01, c.lat+0.01, c.lon+0.01)
+		dem, err := Load(dir, proj)
 		if err != nil || dem.Tiles() != 1 {
-			t.Fatalf("%s: a box round the point: %v tiles, %v", c.name, dem, err)
+			t.Fatalf("%s: load: %v tiles, %v", c.name, dem, err)
 		}
 		if z := dem.At(c.lat, c.lon); math.Abs(float64(z)-250) > 0.01 {
 			t.Errorf("%s: At = %v, want 250", c.name, z)
