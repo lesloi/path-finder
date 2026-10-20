@@ -166,7 +166,7 @@ func lambertToWGS(t *testing.T, x, y float64) (lat, lon float64) {
 
 func TestATileHeaderMustSayWhereItIs(t *testing.T) {
 	dir := t.TempDir()
-	// A header with a centre instead of a corner would put the tile in the wrong place, or out of every box.
+	// A header with a centre instead of a corner would put the tile in the wrong place.
 	bad := "ncols 4\nnrows 4\nxllcenter 800000\nyllcenter 6500000\ncellsize 25\nNODATA_value -99999\n"
 	if err := os.WriteFile(filepath.Join(dir, "centre.asc"), []byte(bad), 0o644); err != nil {
 		t.Fatal(err)

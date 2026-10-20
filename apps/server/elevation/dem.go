@@ -185,9 +185,6 @@ func readASC(path string) (*ascFile, error) {
 	return &ascFile{xll: h.xll, yll: h.yll, cs: h.cs, tile: t}, nil
 }
 
-// Load reads every .asc and .asc.gz file below dir, written in the projection proj.
-func Load(dir string, proj Projection) (*DEM, error) { return load(dir, proj) }
-
 // CountTiles is how many tiles are below dir, without reading any: a build can fail at once when it has none,
 // and read them later, when the memory of its other steps is free.
 func CountTiles(dir string) (int, error) {
@@ -210,8 +207,8 @@ func tilePaths(dir string) ([]string, error) {
 // ErrNoTile is what loading says when no tile is left to read.
 var ErrNoTile = errors.New("no .asc or .asc.gz file")
 
-// load reads every tile below dir.
-func load(dir string, proj Projection) (*DEM, error) {
+// Load reads every .asc and .asc.gz file below dir, written in the projection proj.
+func Load(dir string, proj Projection) (*DEM, error) {
 	paths, err := tilePaths(dir)
 	if err != nil {
 		return nil, err
