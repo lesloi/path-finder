@@ -231,6 +231,22 @@ func TestADamagedGzippedTileNamesItsFile(t *testing.T) {
 	}
 }
 
+func TestOpenLazyNamesATileWhoseHeaderIsNotGzip(t *testing.T) {
+	// Arrange
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "header.asc.gz"), []byte("this is not gzip"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	_, err := OpenLazy(dir, Lambert93Grid, 1)
+
+	// Assert
+	if err == nil || !strings.Contains(err.Error(), "header.asc.gz") {
+		t.Errorf("OpenLazy err = %v, want it to name the file", err)
+	}
+}
+
 func TestDEMReadsTilesInTheProjectionItIsGiven(t *testing.T) {
 	// Saint-Denis (Réunion) and Pointe-à-Pitre (Guadeloupe) in their own UTM zone: each tile only holds its point
 	// when the DEM projects with the right zone.
