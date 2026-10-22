@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
-import { expect, openCriteria, test } from './test.ts';
+import { expect, openCriteria, setStart, test } from './test.ts';
 
 // Annecy: the stand-in graph (`apps/server/internal/standin`) covers it, with rolling hills for the elevation gain.
 const START = '45.8992, 6.1294';
@@ -71,6 +71,7 @@ test.describe('the route set', () => {
     const badge = page.locator('[data-testid^="routes-row-"][data-testid$="-technical"]');
     await page.goto('/');
     await openCriteria(page);
+    await setStart(page, START);
     await page.locator('label', { has: page.getByTestId('criteria-surface-unpaved') }).click();
 
     // The stand-in graph tags the tracks 1.2 km east of the start as technical.

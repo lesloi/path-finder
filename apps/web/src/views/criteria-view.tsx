@@ -533,6 +533,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const criteriaFields = (
     <CriteriaFields
       start={start}
+      // Nothing to set on a desktop before there is a start point to route from.
+      criteriaShown={!desktop || Boolean(start)}
       startUncovered={startUncovered}
       language={language}
       picking={picking}
@@ -900,6 +902,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 // The start point and the criteria, in the left column of a desktop or in the layer of a phone.
 function CriteriaFields({
   start,
+  criteriaShown,
   startUncovered,
   language,
   picking,
@@ -917,6 +920,7 @@ function CriteriaFields({
   onSubmit,
 }: {
   start?: Position | undefined;
+  criteriaShown: boolean;
   startUncovered: boolean;
   language: Language;
   picking: boolean;
@@ -964,18 +968,24 @@ function CriteriaFields({
           <LocateIcon locating={locating} />
         </button>
       </StartPointField>
-      <CriteriaForm
-        language={language}
-        start={start}
-        startUncovered={startUncovered}
-        waypoints={waypoints}
-        avoidedAreas={avoidedAreas}
-        draft={draft}
-        searched={searched}
-        waypointList={waypointList}
-        avoidedList={avoidedList}
-        onSubmit={onSubmit}
-      />
+      {criteriaShown ? (
+        <CriteriaForm
+          language={language}
+          start={start}
+          startUncovered={startUncovered}
+          waypoints={waypoints}
+          avoidedAreas={avoidedAreas}
+          draft={draft}
+          searched={searched}
+          waypointList={waypointList}
+          avoidedList={avoidedList}
+          onSubmit={onSubmit}
+        />
+      ) : (
+        <p data-testid="criteria-long-press" className="text-sm text-ink-2">
+          {t.longPress}
+        </p>
+      )}
     </>
   );
 }
