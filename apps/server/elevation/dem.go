@@ -75,8 +75,8 @@ func floorDiv(a, b int) int {
 }
 
 type ascFile struct {
-	xll, yll, cs float64
-	tile         *demTile
+	ascHeader
+	tile *demTile
 }
 
 // ascHeader is the six lines that open an ASC tile: its size, its lower-left corner and its cell size.
@@ -166,7 +166,16 @@ func readASC(path string) (*ascFile, error) {
 	if len(t.v) != nc*nr {
 		return nil, fmt.Errorf("%s: got %d values, want %d", path, len(t.v), nc*nr)
 	}
-	return &ascFile{xll: h.xll, yll: h.yll, cs: h.cs, tile: t}, nil
+	return &ascFile{h, t}, nil
+}
+
+// sameGrid fails for a tile whose cells are not those of the first one: the grid is worked out from the first tile alone, so
+// a tile of another size or resolution would be placed and read wrongly, with no error to show for it.
+func (h ascHeader) sameGrid(path string, first ascHeader) error {
+	if h.ncols != first.ncols || h.nrows != first.nrows || h.cs != first.cs {
+		return fmt.Errorf("%s: %d by %d cells of %v m, but the first tile has %d by %d cells of %v m", path, h.ncols, h.nrows, h.cs, first.ncols, first.nrows, first.cs)
+	}
+	return nil
 }
 
 // CountTiles is how many tiles are below dir, without reading any: a build can fail at once when it has none,
@@ -218,6 +227,11 @@ func Load(dir string, proj Projection) (*DEM, error) {
 	}
 	if len(files) == 0 {
 		return nil, fmt.Errorf("%w in %s", ErrNoTile, dir)
+	}
+	for i, f := range files[1:] {
+		if err := f.sameGrid(paths[i+1], files[0].ascHeader); err != nil {
+			return nil, err
+		}
 	}
 	d := &DEM{proj: proj, tiles: map[[2]int]*demTile{}, x0: math.Inf(1), y0: math.Inf(1), cs: files[0].cs}
 	d.ncols, d.nrows = files[0].tile.ncols, files[0].tile.nrows

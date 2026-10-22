@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // islandGraph writes a graph of a wide grid and of an island that nothing joins to it, so that the landmarks must be
@@ -85,5 +86,40 @@ func TestLandmarksOnDiskRefuseWhatInMemoryRefuses(t *testing.T) {
 	}
 	if list, _ := os.ReadDir(dir); len(list) != 1 {
 		t.Errorf("%d entries left, want only the graph", len(list))
+	}
+}
+
+func TestLandmarksOnDiskSweepTheScratchOfAKilledBuild(t *testing.T) {
+	// Arrange: the scratch of a build killed long ago, and of one that still writes to a file it made long ago
+	dir := t.TempDir()
+	graph := islandGraph(t, dir)
+	stale, writing := filepath.Join(dir, "pf-landmarks-old"), filepath.Join(dir, "pf-landmarks-writing")
+	for _, d := range []string{stale, writing} {
+		if err := os.Mkdir(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(writing, "column-0.u16"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * StaleScratch)
+	for _, d := range []string{stale, writing} { // after the file: creating it moved the directory's time
+		if err := os.Chtimes(d, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Act
+	err := WriteLandmarksOnDisk(graph, filepath.Join(dir, "any.alt"), "any", 4, dir, 2)
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("the stale scratch directory is still there: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(writing, "column-0.u16")); err != nil {
+		t.Errorf("the scratch of a build that still writes was removed: %v", err)
 	}
 }

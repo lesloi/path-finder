@@ -302,3 +302,43 @@ func TestCountTilesReadsNoTile(t *testing.T) {
 		t.Errorf("CountTiles of an empty directory = %d, %v; want 0", empty, emptyErr)
 	}
 }
+
+// writeSizedTile writes a tile of n by n cells of the given size, all at 100 m.
+func writeSizedTile(t *testing.T, dir, name string, n int, xll, cellsize float64) {
+	t.Helper()
+	var b strings.Builder
+	fmt.Fprintf(&b, "ncols %d\nnrows %d\nxllcorner %v\nyllcorner 6500000\ncellsize %v\nNODATA_value -99999.00\n", n, n, xll, cellsize)
+	for range n * n {
+		b.WriteString("100 ")
+	}
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(b.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTilesOfAnotherGridAreRefused(t *testing.T) {
+	cases := []struct {
+		name     string
+		n        int
+		cellsize float64
+	}{
+		{"another cell size", 4, 5},
+		{"another number of cells", 6, 25},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeSizedTile(t, dir, "a.asc", 4, 800000, 25)
+			writeSizedTile(t, dir, "b.asc", tc.n, 800100, tc.cellsize)
+
+			_, errLoad := Load(dir, Lambert93Grid)
+			_, errLazy := OpenLazy(dir, Lambert93Grid, 2)
+
+			for name, err := range map[string]error{"Load": errLoad, "OpenLazy": errLazy} {
+				if err == nil || !strings.Contains(err.Error(), "b.asc") {
+					t.Errorf("%s: err = %v, want it to name b.asc", name, err)
+				}
+			}
+		})
+	}
+}

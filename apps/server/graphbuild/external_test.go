@@ -10,8 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lesloi/path-finder/apps/server/elevation"
+	"github.com/lesloi/path-finder/apps/server/engine"
 )
 
 // writeSquare writes a tile of 8 by 8 cells of 25 m whose lower-left corner is (xll, yll), rising to the north and the
@@ -342,5 +344,86 @@ func TestBuildGraphBuildsSeveralExtractsInMemory(t *testing.T) {
 	}
 	if !strings.Contains(log.String(), "in memory") {
 		t.Errorf("the log does not say the build was in memory:\n%s", &log)
+	}
+}
+
+func TestBuildGraphNamesAMissingArgument(t *testing.T) {
+	f := newFixture(t)
+	out := filepath.Join(f.dir, "g.bin")
+	cases := []struct {
+		name string
+		pbfs []string
+		dem  string
+		want string
+	}{
+		{"no extract", nil, f.dem, "-pbf"},
+		{"no tiles directory", []string{f.pbf}, "", "-dem"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := BuildGraph(tc.pbfs, tc.dem, elevation.Lambert93Grid, out, Options{}, &bytes.Buffer{})
+
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error %v, want it to name %s", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestBuildOnDiskKeepsTheScratchOfABuildThatStillWrites(t *testing.T) {
+	// Arrange: a directory nothing has been created in for days, whose run was written to a moment ago
+	f := newFixture(t)
+	tmp := t.TempDir()
+	quiet := filepath.Join(tmp, "pf-external-quiet")
+	if err := os.Mkdir(quiet, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(quiet, "elev-0.part"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * engine.StaleScratch)
+	if err := os.Chtimes(quiet, old, old); err != nil { // after the file: creating it moved the directory's time
+		t.Fatal(err)
+	}
+
+	// Act
+	_, err := BuildOnDisk(f.pbf, f.dem, elevation.Lambert93Grid, filepath.Join(f.dir, "o.bin"), Options{Tmp: tmp, Chunk: 100, Cache: 2}, &bytes.Buffer{})
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(quiet, "elev-0.part")); err != nil {
+		t.Errorf("the scratch of a build that still writes was removed: %v", err)
+	}
+}
+
+func TestBuildOnDiskSweepsTheScratchOfAKilledBuild(t *testing.T) {
+	// Arrange: the scratch directories of a build killed long ago, and of one that is running
+	f := newFixture(t)
+	tmp := t.TempDir()
+	stale, running := filepath.Join(tmp, "pf-external-old"), filepath.Join(tmp, "pf-external-new")
+	for _, dir := range []string{stale, running} {
+		if err := os.Mkdir(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-2 * engine.StaleScratch)
+	if err := os.Chtimes(stale, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	_, err := BuildOnDisk(f.pbf, f.dem, elevation.Lambert93Grid, filepath.Join(f.dir, "o.bin"), Options{Tmp: tmp, Chunk: 100, Cache: 2}, &bytes.Buffer{})
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Errorf("the stale scratch directory is still there: %v", err)
+	}
+	if _, err := os.Stat(running); err != nil {
+		t.Errorf("the recent scratch directory was removed: %v", err)
 	}
 }

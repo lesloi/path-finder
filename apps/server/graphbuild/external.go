@@ -336,6 +336,12 @@ type Report struct {
 // BuildGraph builds the graph file of the extracts, on disk when there is one extract: its memory then does not grow
 // with the country. Several extracts, which are the small territories, are joined in memory.
 func BuildGraph(pbfPaths []string, demDir string, proj elevation.Projection, outPath string, opts Options, log io.Writer) error {
+	if len(pbfPaths) == 0 {
+		return errors.New("build-graph needs at least one -pbf")
+	}
+	if demDir == "" {
+		return errors.New("build-graph needs -dem, the directory of the BD ALTI tiles")
+	}
 	if len(pbfPaths) != 1 {
 		fmt.Fprintf(log, "%d extracts: built in memory\n", len(pbfPaths))
 		return Build(pbfPaths, demDir, proj, outPath, log)
@@ -355,12 +361,16 @@ func BuildGraph(pbfPaths []string, demDir string, proj elevation.Projection, out
 	return nil
 }
 
+// scratchPattern names the scratch directories: MkdirTemp puts a random string where the star is.
+const scratchPattern = "pf-external-*"
+
 // scratch makes the directory of the runs below tmp, and returns a function that removes it.
 func scratch(tmp string) (string, func(), error) {
 	if err := os.MkdirAll(tmp, 0o755); err != nil {
 		return "", nil, err
 	}
-	dir, err := os.MkdirTemp(tmp, "pf-external-*")
+	engine.SweepScratch(tmp, scratchPattern)
+	dir, err := os.MkdirTemp(tmp, scratchPattern)
 	if err != nil {
 		return "", nil, err
 	}
