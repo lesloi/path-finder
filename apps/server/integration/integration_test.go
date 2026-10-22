@@ -332,9 +332,9 @@ func TestRouteSetsThroughWaypoints(t *testing.T) {
 func TestWaypointRefusalsNameAFieldOrANumberNeverAPosition(t *testing.T) {
 	h := newServer(t)
 	cases := map[string]struct{ criteria, want string }{
-		"waypoints beyond the target": {criteria(`{"distance":5}`, `,"waypoints":[[6.30,45.99]]`), `{"error":"invalid-criteria","field":"waypoints"}`},
-		"a waypoint off the ways":     {criteria(`{"distance":10}`, `,"waypoints":[[6.1380,45.9030],[6.1916,45.8992]]`), `{"error":"invalid-criteria","field":"waypoints","waypoint":2}`},
-		"too many waypoints":          {criteria(`{"distance":10}`, `,"waypoints":[[6.1,45.9],[6.1,45.9],[6.1,45.9],[6.1,45.9],[6.1,45.9],[6.1,45.9]]`), `{"error":"invalid-criteria","field":"waypoints"}`},
+		"waypoints beyond the longest route": {criteria(`{"distance":5}`, `,"waypoints":[[9.0,48.0]]`), `{"error":"invalid-criteria","field":"waypoints"}`},
+		"a waypoint off the ways":            {criteria(`{"distance":10}`, `,"waypoints":[[6.1380,45.9030],[6.1916,45.8992]]`), `{"error":"invalid-criteria","field":"waypoints","waypoint":2}`},
+		"too many waypoints":                 {criteria(`{"distance":10}`, `,"waypoints":[[6.1,45.9],[6.1,45.9],[6.1,45.9],[6.1,45.9],[6.1,45.9],[6.1,45.9]]`), `{"error":"invalid-criteria","field":"waypoints"}`},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

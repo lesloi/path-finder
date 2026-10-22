@@ -336,6 +336,16 @@ describe('criteriaRequest and avoided areas', () => {
     expect(request).not.toHaveProperty('avoidedAreas');
   });
 
+  it('reaches as far as the longest route when there are waypoints, as the loop through them can pass the target', () => {
+    // 50 km north of the start point: beyond a target of 10 km, within the longest route.
+    const fifty: AvoidedArea = { center: [6.1294, 46.3487], radius: 400 };
+
+    expect(criteriaRequest(draft, { pace: 6, start: START, avoidedAreas: [fifty] })).not.toHaveProperty('avoidedAreas');
+    expect(
+      criteriaRequest(draft, { pace: 6, start: START, waypoints: [[6.1294, 46.3]], avoidedAreas: [fifty] }),
+    ).toHaveProperty('avoidedAreas');
+  });
+
   it('reaches as far as a duration allows at the pace of the user', () => {
     // 20 min at 4 min/km is 5 km at most; the area is 11 km north, less its radius.
     const eleven: AvoidedArea = { center: [6.1294, 45.9992], radius: 400 };
