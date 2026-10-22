@@ -92,9 +92,13 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   component of fewer than 1,000 nodes, which no leg reaches from the rest of the graph.
   With waypoints, the circle's points are only detours: each goes into the leg between two
   fixed points that it is nearest to, and only the detour is resized. The loop straight through
-  the waypoints is a candidate too. Criteria whose waypoints alone exceed the target are refused, by
-  the straight lines first and by the loop through them then. A waypoint is moved to the nearest way
-  within 250 m, beyond which the criteria are refused, naming the waypoint by its number.
+  the waypoints is a candidate too, and it is offered even when it is beyond the target, as a suggestion: a summit
+  with a single access is where the loop goes back over its steps, farther than the target says, and nothing resizes a
+  route the waypoints fix. It is not ranked down for retracing (the other loops are, and stay so), and the
+  ranking keeps a place for it, which matches would otherwise fill. Beyond the target by more than a wide suggestion,
+  it is offered alone, as no loop through the waypoints is nearer. Only waypoints that make a route longer than the
+  longest a request may ask for are refused, by the straight lines first and by the loop through them then. A waypoint is
+  moved to the nearest way within 250 m, beyond which the criteria are refused, naming the waypoint by its number.
 - **Avoided areas are circles that forbid the ways they touch, up to three per set of criteria.** A penalty, as the
   loop legs get for the ways of the earlier ones, would not keep a route out of a closed trail, which is what the
   user asks for. A way is forbidden when its straight line between nodes comes within the radius, so a long way
@@ -103,7 +107,7 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   engine snaps (start, waypoints, control points) skip the nodes inside, so no candidate dies unseen. Polygons
   and picking one way wait: a way has no stable identifier across graph builds.
 - **A route set sends what it has when time is up.** Loops are searched in parallel and the search
-  stops at eight matches, after 60 loops in a row that add no match, or at the timeout; the routes found by
+  stops at eight matches (seven with the direct loop through the waypoints, which keeps a place), after 60 loops in a row that add no match, or at the timeout; the routes found by
   then are ranked and sent, and `504` is for none at all. Asking for more would only make the user wait
   longer for what they can already pick. The budget is 100 candidates: the production pod has one CPU
   and one search at a time, where a budget of 400 doubled the median time of the hardest criteria (1.8 to

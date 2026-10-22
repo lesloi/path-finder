@@ -2,6 +2,7 @@ package generator
 
 import (
 	"math"
+	"slices"
 	"sort"
 
 	"github.com/lesloi/path-finder/apps/server/contract"
@@ -74,6 +75,9 @@ type candidate struct {
 	surfaces      []contract.SurfaceStretch
 	// technicalStretches is never nil: the contract sends [] and not null for a route with none.
 	technicalStretches []contract.TechnicalStretch
+	// direct marks the loop straight through the waypoints. Its length is set by them, not by the target, and it
+	// goes back over its steps where the graph offers no other way: it is not held to either.
+	direct bool
 }
 
 // effortDistance is the distance weighted by the slope of each stretch, in kilometres.
@@ -163,25 +167,37 @@ func surfaceMismatch(surface string, unpavedShare float64) float64 {
 }
 
 type ranked struct {
-	route contract.Route
-	score float64
-	tier  tier
-	cells map[cell]struct{}
+	route  contract.Route
+	score  float64
+	tier   tier
+	cells  map[cell]struct{}
+	direct bool
 }
 
 func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, bool) {
 	estimated := cand.effortDistance() * c.Pace
 	results := checks(c, cand, estimated)
 	score, worst := 0.0, tierMatch
+	// The direct loop is offered beyond the target: the waypoints set its length, and no detour shortens it, so
+	// nothing can do better on any criterion. Short of the target the loops through the waypoints, with their
+	// detours, make up for it. Generate decides on the same test whether to search loops at all.
+	beyond := cand.direct && overshoots(c, cand)
 	for _, r := range results {
 		if r.tier == tierOut {
-			return ranked{}, false
+			if !beyond {
+				return ranked{}, false
+			}
+			r.tier = tierWide
 		}
 		worst = max(worst, r.tier)
 		score += r.relative
 	}
 	visits := cellsAlong(cand.geometry, c.Start, radius)
-	score += surfaceMismatch(c.Surface, cand.unpavedShare) + retraceShare(visits)
+	score += surfaceMismatch(c.Surface, cand.unpavedShare)
+	// Going back over its steps is what a single access leaves the direct loop, not a flaw to rank it down for.
+	if !cand.direct {
+		score += retraceShare(visits)
+	}
 	kind := "match"
 	if worst != tierMatch {
 		kind = "suggestion"
@@ -190,12 +206,12 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	for _, v := range visits {
 		cells[v.cell] = struct{}{}
 	}
-	return ranked{contract.Route{
+	return ranked{route: contract.Route{
 		Geometry: cand.geometry, Distance: cand.distance, ElevationGain: cand.elevationGain,
 		ElevationLoss: cand.elevationLoss, EstimatedDuration: estimated, Kind: kind,
 		UnpavedShare: cand.unpavedShare, Surfaces: cand.surfaces, Technical: cand.technical,
 		TechnicalStretches: cand.technicalStretches,
-	}, score, worst, cells}, true
+	}, score: score, tier: worst, cells: cells, direct: cand.direct}, true
 }
 
 // ranking holds the candidates that fit the criteria, the best first. Each is classified once as it is added,
@@ -221,11 +237,31 @@ func (r *ranking) add(candidates ...*candidate) {
 	sort.SliceStable(r.all, func(i, j int) bool { return r.all[i].score < r.all[j].score })
 }
 
+// holdsADirectSuggestion tells whether the direct loop is in the ranking without being a match: the matches then
+// fill the set one short.
+func (r *ranking) holdsADirectSuggestion() bool {
+	return slices.ContainsFunc(r.all, func(e ranked) bool { return e.direct && e.tier != tierMatch })
+}
+
+// sharing is how much of a route another one covers, for the ranking to leave out a duplicate. The direct loop
+// that goes back over its steps covers few cells, so against it the share of the larger route counts: the loops that
+// go through the same waypoint are not duplicates of it.
+func sharing(a, b ranked) float64 {
+	if a.direct || b.direct {
+		return coveredShare(a.cells, b.cells)
+	}
+	return sharedShare(a.cells, b.cells)
+}
+
 // routes keeps the best up to limit matches, then suggestions only to fill the set up to minRoutes, then wide
 // suggestions for what is still missing, none sharing most of its geometry with a better one. Fewer is fine,
-// and none is possible.
+// and none is possible. The direct loop through the waypoints, if it is no duplicate, always has a place, taken from
+// the worst route: matches that fill the set would leave it out, and it is what the user asked for.
 func (r *ranking) routes(limit int) []contract.Route {
 	var picked []ranked
+	shares := func(entry ranked) bool {
+		return slices.ContainsFunc(picked, func(p ranked) bool { return sharing(p, entry) > maxShared })
+	}
 	pick := func(t tier, size int) {
 		for _, entry := range r.all {
 			if len(picked) >= size {
@@ -234,14 +270,7 @@ func (r *ranking) routes(limit int) []contract.Route {
 			if entry.tier != t {
 				continue
 			}
-			shares := false
-			for _, p := range picked {
-				if sharedShare(p.cells, entry.cells) > maxShared {
-					shares = true
-					break
-				}
-			}
-			if !shares {
+			if !shares(entry) {
 				picked = append(picked, entry)
 			}
 		}
@@ -249,6 +278,19 @@ func (r *ranking) routes(limit int) []contract.Route {
 	pick(tierMatch, limit)
 	pick(tierSuggestion, minRoutes)
 	pick(tierWide, minRoutes)
+	// There is at most one direct loop. The sort restores the order the picks above give: by tier, then by score.
+	if i := slices.IndexFunc(r.all, func(e ranked) bool { return e.direct }); i >= 0 {
+		entry := r.all[i]
+		if !slices.ContainsFunc(picked, func(p ranked) bool { return p.direct }) && !shares(entry) {
+			if len(picked) >= limit {
+				picked = picked[:limit-1]
+			}
+			picked = append(picked, entry)
+			sort.SliceStable(picked, func(i, j int) bool {
+				return picked[i].tier < picked[j].tier || picked[i].tier == picked[j].tier && picked[i].score < picked[j].score
+			})
+		}
+	}
 	routes := make([]contract.Route, len(picked))
 	for i, p := range picked {
 		routes[i] = p.route
