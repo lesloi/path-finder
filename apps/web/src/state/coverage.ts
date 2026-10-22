@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { parseCoverage, type CoverageCell } from '../core/index.ts';
-import { buildIdHeader } from './api.ts';
+import { apiVersionHeader } from './api.ts';
 
 /**
  * Asks our own API where it can route: the cells of a grid that hold a way. Nothing about the user is sent.
@@ -10,7 +10,7 @@ import { buildIdHeader } from './api.ts';
  */
 export async function requestCoverage(signal?: AbortSignal): Promise<CoverageCell[] | undefined> {
   try {
-    const response = await fetch('/api/v1/coverage', { headers: buildIdHeader(), ...(signal && { signal }) });
+    const response = await fetch('/api/v1/coverage', { headers: apiVersionHeader(), ...(signal && { signal }) });
     return response.ok ? parseCoverage(await response.json()) : undefined;
   } catch {
     return undefined;

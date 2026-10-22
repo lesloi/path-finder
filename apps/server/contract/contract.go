@@ -15,6 +15,7 @@ import (
 var contractJSON []byte
 
 type limits struct {
+	APIVersion       int                        `json:"apiVersion"`
 	MaxDistanceKm    float64                    `json:"maxDistanceKm"`
 	MinDistanceKm    float64                    `json:"minDistanceKm"`
 	DurationMinutes  struct{ Min, Max float64 } `json:"durationMinutes"`
@@ -37,6 +38,10 @@ var bounds = func() limits {
 	}
 	return l
 }()
+
+// APIVersion is raised when a tab built for the previous one can no longer use the API; the server then answers it
+// with a refusal that asks to reload. A change that leaves such a tab working must not raise it.
+var APIVersion = bounds.APIVersion
 
 // Error codes of a refusal, sent as {"error": code}: the server sends no text, the web app words each code.
 const (

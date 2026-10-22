@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
+import { API_VERSION } from '../contract/index.ts';
 import type { Route, RouteSetRequest } from '../core/index.ts';
 import { requestRouteSet, retryDelay, useRouteSet } from './route-set.ts';
 
@@ -45,23 +46,23 @@ describe('requestRouteSet', () => {
     );
   });
 
-  it('sends the build id of the app', async () => {
+  it('sends the version of the API the app is built for', async () => {
     vi.stubEnv('VITE_BUILD_ID', 'build-1');
     const fetchMock = answer(Response.json({ routes: [] }));
 
     await requestRouteSet(request);
 
     const [, { headers }] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(new Headers(headers).get('X-Build-Id')).toBe('build-1');
+    expect(new Headers(headers).get('X-Api-Version')).toBe(String(API_VERSION));
   });
 
-  it('sends no build id outside a build', async () => {
+  it('sends no API version outside a build', async () => {
     const fetchMock = answer(Response.json({ routes: [] }));
 
     await requestRouteSet(request);
 
     const [, { headers }] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(new Headers(headers).has('X-Build-Id')).toBe(false);
+    expect(new Headers(headers).has('X-Api-Version')).toBe(false);
   });
 
   it('returns how long the API asks to wait', async () => {

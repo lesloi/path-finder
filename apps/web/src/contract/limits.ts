@@ -2,6 +2,7 @@ import contract from '../../../server/contract/contract.json' with { type: 'json
 import type { Criteria } from './criteria.ts';
 
 // The bounds the server enforces, from the file its own tests read too.
+export const API_VERSION = contract.apiVersion;
 export const MIN_TARGET_DISTANCE = contract.minDistanceKm;
 export const MAX_TARGET_DISTANCE = contract.maxDistanceKm;
 export const TARGET_DURATION = { min: contract.durationMinutes.min, max: contract.durationMinutes.max };
