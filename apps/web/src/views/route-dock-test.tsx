@@ -41,6 +41,12 @@ function dock(language: 'en' | 'fr' = 'en', props: Partial<Parameters<typeof Rou
 }
 
 describe('RouteDock', () => {
+  it('offers no reversal for a route that is the same both ways', () => {
+    dock('en', { onReverse: undefined });
+
+    expect(screen.queryByTestId('route-reverse')).toBeNull();
+  });
+
   it('names the route, with its figures', () => {
     dock();
 

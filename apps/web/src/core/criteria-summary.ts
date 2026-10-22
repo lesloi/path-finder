@@ -8,9 +8,10 @@ export function criteriaSummary(
   language: Language,
 ): string {
   const t = criteriaText[language];
-  const parts = [
-    'distance' in target ? formatDistance(target.distance, language) : formatDuration(target.duration, language),
-  ];
+  // The destination sets the distance of an out-and-back route: there is none to say.
+  const parts = !target
+    ? [t.outAndBack]
+    : ['distance' in target ? formatDistance(target.distance, language) : formatDuration(target.duration, language)];
   if (elevationGain !== undefined) {
     parts.push(
       elevationGain === 'flat' ? t.flat : elevationGain === 'hilly' ? t.hilly : formatHeight(elevationGain, language),

@@ -22,6 +22,15 @@ type fakeLooper struct {
 	directErr   error
 	directCalls int
 	loopCalls   int
+	// outAndBack are the routes there and back, and outAndBackErr why there are none.
+	outAndBack    []*engine.Route
+	outAndBackErr error
+	outAndBackGot engine.OutAndBackRequest
+}
+
+func (f *fakeLooper) OutAndBack(_ context.Context, req engine.OutAndBackRequest) ([]*engine.Route, error) {
+	f.outAndBackGot = req
+	return f.outAndBack, f.outAndBackErr
 }
 
 func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.DirectLoopRequest) (*engine.Route, error) {
@@ -572,5 +581,109 @@ func TestGeneratePassesTheAvoidedAreasToTheEngine(t *testing.T) {
 	}
 	if !reflect.DeepEqual(looper.got.Avoided, want) {
 		t.Errorf("avoided = %+v, want %+v", looper.got.Avoided, want)
+	}
+}
+
+// outAndBackBody is a route of about 2 km out, and as much back, from the start point to a summit.
+const outAndBackBody = `{"start":[6.1294,45.8992],"shape":"outAndBack","destination":[6.1294,45.9092],"surface":"any","pace":6}`
+
+func TestGenerateAsksTheEngineForARouteToTheDestinationAndBack(t *testing.T) {
+	// Arrange
+	looper := &fakeLooper{outAndBack: []*engine.Route{engineLoop(0)}}
+
+	// Act
+	routes, err := generate(t, looper, context.Background(), outAndBackBody)
+
+	// Assert
+	if err != nil || len(routes) != 1 {
+		t.Fatalf("routes = %d, err = %v, want 1 route", len(routes), err)
+	}
+	got := looper.outAndBackGot
+	// The destination comes last among the points the engine is asked to go through.
+	if got.Start != (engine.Point{Lat: 45.8992, Lon: 6.1294}) || len(got.Waypoints) != 1 || got.Waypoints[0] != (engine.Point{Lat: 45.9092, Lon: 6.1294}) {
+		t.Errorf("asked %+v", got)
+	}
+	if looper.loopCalls != 0 || looper.directCalls != 0 {
+		t.Errorf("%d loop searches and %d direct loops for an out-and-back route", looper.loopCalls, looper.directCalls)
+	}
+	if routes[0].Kind != "match" || routes[0].EstimatedDuration == 0 {
+		t.Errorf("route = %+v, want a match with a duration", routes[0])
+	}
+}
+
+func TestGenerateRanksOutAndBackRoutesOnTheSurfacePreferenceAlone(t *testing.T) {
+	// Arrange: two routes that do not overlap, the first one mostly unpaved
+	unpaved, paved := engineLoop(0), engineLoop(180)
+	unpaved.Stretches = []engine.Stretch{{Unpaved: true, Meters: 10_000}}
+	paved.Stretches = []engine.Stretch{{Unpaved: false, Meters: 10_000}}
+	looper := &fakeLooper{outAndBack: []*engine.Route{unpaved, paved}}
+	request := strings.Replace(outAndBackBody, `"any"`, `"paved"`, 1)
+
+	// Act
+	g := &Generator{Engines: map[string]Looper{"paved": looper}, Seed: func() uint64 { return 42 }}
+	out, err := g.Generate(context.Background(), json.RawMessage(request))
+
+	// Assert
+	routes, _ := out.([]contract.Route)
+	if err != nil || len(routes) != 2 {
+		t.Fatalf("routes = %d, err = %v, want 2", len(routes), err)
+	}
+	if routes[0].UnpavedShare != 0 || routes[1].Kind != "match" {
+		t.Errorf("shares %v then %v, kinds %s then %s: want the paved one first and both matches", routes[0].UnpavedShare, routes[1].UnpavedShare, routes[0].Kind, routes[1].Kind)
+	}
+}
+
+func TestGenerateRefusesAnOutAndBackRouteTooLongToFindBeforeSearching(t *testing.T) {
+	// Arrange: a destination about 40 km away, 80 km there and back, over the 50 km bound
+	looper := &fakeLooper{outAndBack: []*engine.Route{engineLoop(0)}}
+	request := strings.Replace(outAndBackBody, `[6.1294,45.9092]`, `[6.1294,46.2592]`, 1)
+
+	// Act
+	_, err := generate(t, looper, context.Background(), request)
+
+	// Assert
+	var ce *contract.CriteriaError
+	if !errors.As(err, &ce) || ce.Field != "destination" {
+		t.Errorf("err = %v, want a CriteriaError on destination", err)
+	}
+	if len(looper.outAndBackGot.Waypoints) != 0 {
+		t.Error("the engine was asked for a route too long to be offered")
+	}
+}
+
+func TestGenerateTellsWhichPointOfAnOutAndBackRouteIsOffTheWays(t *testing.T) {
+	cases := []struct {
+		name  string
+		err   error
+		field string
+		index int
+	}{
+		{"waypoint 1", &engine.WaypointError{Index: 1}, "waypoints", 1},
+		{"destination", &engine.WaypointError{Index: 2}, "destination", 0},
+		{"start point", engine.ErrOffGraph, "start", 0},
+		{"unreachable", engine.ErrNoRoute, "destination", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			via := strings.Replace(outAndBackBody, `"destination"`, `"waypoints":[[6.13,45.9]],"destination"`, 1)
+			_, err := generate(t, &fakeLooper{outAndBackErr: tc.err}, context.Background(), via)
+
+			var ce *contract.CriteriaError
+			if !errors.As(err, &ce) || ce.Field != tc.field || ce.Waypoint != tc.index {
+				t.Errorf("err = %v, want a CriteriaError on %s, index %d", err, tc.field, tc.index)
+			}
+		})
+	}
+}
+
+func TestGenerateKeepsTheOutAndBackRoutesFoundWhenTheContextEnds(t *testing.T) {
+	looper := &fakeLooper{outAndBack: []*engine.Route{engineLoop(0)}, outAndBackErr: context.Canceled}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	routes, err := generate(t, looper, ctx, outAndBackBody)
+
+	if err != nil || len(routes) != 1 {
+		t.Errorf("routes = %d, err = %v, want the route found", len(routes), err)
 	}
 }

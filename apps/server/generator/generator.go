@@ -8,6 +8,7 @@ import (
 	"errors"
 	"math"
 	"math/rand/v2"
+	"slices"
 
 	"github.com/lesloi/path-finder/apps/server/contract"
 	"github.com/lesloi/path-finder/apps/server/engine"
@@ -18,6 +19,8 @@ type Looper interface {
 	Loops(ctx context.Context, req engine.LoopRequest) ([]*engine.Route, error)
 	// DirectLoop is the cheapest loop through the waypoints, in order.
 	DirectLoop(ctx context.Context, req engine.DirectLoopRequest) (*engine.Route, error)
+	// OutAndBack is the routes through the waypoints to the last one and back by the same way.
+	OutAndBack(ctx context.Context, req engine.OutAndBackRequest) ([]*engine.Route, error)
 }
 
 // Generator builds route sets. It is safe for concurrent use.
@@ -54,6 +57,9 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	looper := g.Engines[criteria.Surface]
 	if looper == nil {
 		return nil, errors.New("generator: no engine for surface preference " + criteria.Surface)
+	}
+	if criteria.Shape == contract.ShapeOutAndBack {
+		return g.outAndBack(ctx, looper, criteria)
 	}
 	km, err := criteria.TargetDistanceKm()
 	if err != nil {
@@ -119,6 +125,56 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	}
 	addLoops(loops)
 	routes := set.routes(limit)
+	if ctx.Err() != nil && len(routes) == 0 {
+		return nil, ctx.Err()
+	}
+	return routes, nil
+}
+
+// outAndBackAlternatives is how many ways out to ask the engine for. The ranking keeps those that do not share most
+// of their geometry, so a destination with a single access gives one route.
+const outAndBackAlternatives = 5
+
+// outAndBack builds the route set of an out-and-back route: the destination sets the distance, so every route is a
+// match and only the surface preference ranks them.
+func (g *Generator) outAndBack(ctx context.Context, looper Looper, c contract.Criteria) (any, error) {
+	// The route is never shorter than twice the straight lines to the destination: no need to search a route that
+	// cannot be offered, which on a pod with one CPU would only take the place of another request.
+	stops := append(slices.Clone(c.Waypoints), *c.Destination)
+	km := 2 * crowFliesThrough(c.Start, stops) / 1000
+	if km > contract.MaxDistanceKm() {
+		return nil, &contract.CriteriaError{Field: "destination", Message: "the destination is too far for an out-and-back route"}
+	}
+	points := make([]engine.Point, len(stops))
+	for i, w := range stops {
+		points[i] = engine.Point{Lat: w[1], Lon: w[0]}
+	}
+	found, err := looper.OutAndBack(ctx, engine.OutAndBackRequest{
+		Start:        engine.Point{Lat: c.Start[1], Lon: c.Start[0]},
+		Waypoints:    points,
+		Avoided:      avoidedCircles(c.AvoidedAreas),
+		Alternatives: outAndBackAlternatives,
+	})
+	var waypoint *engine.WaypointError
+	switch {
+	case errors.As(err, &waypoint) && waypoint.Index > len(c.Waypoints):
+		return nil, &contract.CriteriaError{Field: "destination", Message: "destination is too far from a way"}
+	case errors.As(err, &waypoint):
+		return nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoint is too far from a way", Waypoint: waypoint.Index}
+	case errors.Is(err, engine.ErrOffGraph):
+		return nil, &contract.CriteriaError{Field: "start", Message: "start point is too far from a way"}
+	case errors.Is(err, engine.ErrNoRoute):
+		return nil, &contract.CriteriaError{Field: "destination", Message: "the destination is not joined to the start by a way"}
+	case err != nil && ctx.Err() == nil:
+		return nil, err
+	}
+	set := newRanking(c, km)
+	for _, r := range found {
+		if cand := toCandidate(r); cand != nil {
+			set.add(cand)
+		}
+	}
+	routes := set.routes(cmpOr(g.MaxRoutes, maxRoutes))
 	if ctx.Err() != nil && len(routes) == 0 {
 		return nil, ctx.Err()
 	}

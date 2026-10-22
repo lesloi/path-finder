@@ -11,7 +11,7 @@ import (
 // CriteriaError is a request body that is not valid criteria, with the field that failed.
 // Messages name the field, never its value: the server keeps no location.
 type CriteriaError struct {
-	Field   string // start, target, elevationGain, surface, pace, waypoints or avoidedAreas
+	Field   string // start, shape, destination, target, elevationGain, surface, pace, waypoints or avoidedAreas
 	Message string
 	// Waypoint is the waypoint at fault, counted from 1, or 0 when none is singled out.
 	Waypoint int
@@ -40,11 +40,20 @@ func (g ElevationGain) MarshalJSON() ([]byte, error) {
 	return json.Marshal(g.Metres)
 }
 
+// ShapeOutAndBack is a route to a destination that comes back by the same way. A loop has no shape of its own:
+// Criteria.Shape is empty for one.
+const ShapeOutAndBack = "outAndBack"
+
 // Criteria of a route set. Distances are in kilometres, durations in minutes, elevation gain in
 // metres, and pace in minutes per kilometre on flat ground.
 type Criteria struct {
-	Start         [2]float64     `json:"start"` // longitude, latitude
-	Target        Target         `json:"target"`
+	Start [2]float64 `json:"start"` // longitude, latitude
+	// Shape is ShapeOutAndBack, or empty for a loop. An out-and-back route has no target and no target elevation
+	// gain: its destination sets the distance.
+	Shape string `json:"shape,omitempty"`
+	// Destination is where an out-and-back route turns back, after the waypoints. A loop has none.
+	Destination   *[2]float64    `json:"destination,omitempty"`
+	Target        Target         `json:"target,omitzero"`
 	ElevationGain *ElevationGain `json:"elevationGain,omitempty"`
 	Surface       string         `json:"surface"`
 	Pace          float64        `json:"pace"`
@@ -123,22 +132,50 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 		return fail("start", "start must be a longitude and a latitude")
 	}
 
-	target, ok := obj["target"].(map[string]any)
-	if !ok || len(target) != 1 {
-		return fail("target", "target must be a distance or a duration")
+	switch shape, present := obj["shape"]; {
+	case !present || shape == "loop":
+	case shape == ShapeOutAndBack:
+		c.Shape = ShapeOutAndBack
+	default:
+		return fail("shape", "unknown route shape")
 	}
-	if v, isDistance := target["distance"]; isDistance {
-		d, ok := within(v, bounds.MinDistanceKm, bounds.MaxDistanceKm)
-		if !ok {
-			return fail("target", "target distance out of bounds")
+	outAndBack := c.Shape == ShapeOutAndBack
+	if raw, present := obj["destination"]; present {
+		d, ok := position(raw)
+		if !outAndBack || !ok {
+			return fail("destination", "a destination must be a longitude and a latitude, for an out-and-back route")
 		}
-		c.Target.Distance = d
+		c.Destination = &d
+	} else if outAndBack {
+		return fail("destination", "an out-and-back route needs a destination")
+	}
+
+	// The destination sets the distance of an out-and-back route, so neither a target nor an elevation gain applies.
+	if outAndBack {
+		if _, present := obj["target"]; present {
+			return fail("target", "an out-and-back route has no target")
+		}
+		if _, present := obj["elevationGain"]; present {
+			return fail("elevationGain", "an out-and-back route has no target elevation gain")
+		}
 	} else {
-		d, ok := within(target["duration"], bounds.DurationMinutes.Min, bounds.DurationMinutes.Max)
-		if !ok {
-			return fail("target", "target duration out of bounds")
+		target, ok := obj["target"].(map[string]any)
+		if !ok || len(target) != 1 {
+			return fail("target", "target must be a distance or a duration")
 		}
-		c.Target.Duration = d
+		if v, isDistance := target["distance"]; isDistance {
+			d, ok := within(v, bounds.MinDistanceKm, bounds.MaxDistanceKm)
+			if !ok {
+				return fail("target", "target distance out of bounds")
+			}
+			c.Target.Distance = d
+		} else {
+			d, ok := within(target["duration"], bounds.DurationMinutes.Min, bounds.DurationMinutes.Max)
+			if !ok {
+				return fail("target", "target duration out of bounds")
+			}
+			c.Target.Duration = d
+		}
 	}
 
 	var gain *ElevationGain
@@ -204,10 +241,16 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 					return Criteria{}, &CriteriaError{Field: "avoidedAreas", Message: "a waypoint is inside an avoided area", Area: i + 1}
 				}
 			}
+			if c.Destination != nil && area.contains(*c.Destination) {
+				return Criteria{}, &CriteriaError{Field: "avoidedAreas", Message: "the destination is inside an avoided area", Area: i + 1}
+			}
 			c.AvoidedAreas = append(c.AvoidedAreas, area)
 		}
 	}
 
+	if outAndBack {
+		return c, nil
+	}
 	if countElevationGain {
 		c.ElevationGain = gain
 	}
@@ -259,3 +302,6 @@ func ClimbPerEffortKm() float64 { return bounds.ClimbPerEffortKm }
 
 // HillyMatchPerKm is the metres of elevation gain per km from which a route is hilly.
 func HillyMatchPerKm() float64 { return bounds.HillyMatchPerKm }
+
+// MaxDistanceKm is the longest route a request may ask for, and the longest an out-and-back route may make.
+func MaxDistanceKm() float64 { return bounds.MaxDistanceKm }

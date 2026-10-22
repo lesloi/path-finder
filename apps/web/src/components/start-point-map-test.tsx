@@ -130,6 +130,65 @@ describe('StartPointMap', () => {
     expect(onStartChange).toHaveBeenCalledWith([6.2, 45.8]);
   });
 
+  it('sets the destination, not the start point, on a click while picking it', () => {
+    const [onStartChange, onDestinationChange] = [vi.fn(), vi.fn()];
+    render(
+      <StartPointMap pickDestinationOnClick onStartChange={onStartChange} onDestinationChange={onDestinationChange} />,
+    );
+
+    act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
+    act(() => {
+      map().fire('touchstart', { lngLat: { lng: 6.3, lat: 45.8 }, originalEvent: touch });
+      vi.advanceTimersByTime(800);
+    });
+
+    expect(onDestinationChange).toHaveBeenCalledExactlyOnceWith([6.2, 45.8]);
+    expect(onStartChange).not.toHaveBeenCalled();
+  });
+
+  it('sets the destination on a long press while it lacks one, and still ignores a click', () => {
+    const [onStartChange, onDestinationChange] = [vi.fn(), vi.fn()];
+    render(
+      <StartPointMap destinationOnLongPress onStartChange={onStartChange} onDestinationChange={onDestinationChange} />,
+    );
+
+    act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
+    act(() => {
+      map().fire('touchstart', { lngLat: { lng: 6.3, lat: 45.8 }, originalEvent: touch });
+      vi.advanceTimersByTime(800);
+    });
+
+    expect(onDestinationChange).toHaveBeenCalledExactlyOnceWith([6.3, 45.8]);
+    expect(onStartChange).not.toHaveBeenCalled();
+  });
+
+  it('refuses a destination where the server cannot route', () => {
+    const [onDestinationChange, onDestinationRefused] = [vi.fn(), vi.fn()];
+    const coverage: CoverageCell[] = [[6, 45.8, 6.1, 45.9]];
+    render(
+      <StartPointMap
+        pickDestinationOnClick
+        coverage={coverage}
+        onStartChange={vi.fn()}
+        onDestinationChange={onDestinationChange}
+        onDestinationRefused={onDestinationRefused}
+      />,
+    );
+
+    act(() => map().fire('click', { lngLat: { lng: 7.5, lat: 46.5 } }));
+
+    expect(onDestinationRefused).toHaveBeenCalledOnce();
+    expect(onDestinationChange).not.toHaveBeenCalled();
+  });
+
+  it('marks the destination', () => {
+    const before = markers.length;
+
+    render(<StartPointMap destination={[6.2, 45.95]} onStartChange={vi.fn()} />);
+
+    expect(markers.slice(before).map((marker) => marker.position)).toContainEqual([6.2, 45.95]);
+  });
+
   it('credits IGN and OpenStreetMap in a compact attribution', () => {
     render(<StartPointMap onStartChange={vi.fn()} />);
 

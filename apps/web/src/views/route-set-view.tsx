@@ -90,7 +90,7 @@ export function RouteSetView({
   onPaceChange?: (pace: number) => void;
   onClear: () => void;
   /** The user asks to run the route at this index the other way. */
-  onReverse: (index: number) => void;
+  onReverse?: ((index: number) => void) | undefined;
   onHover: (position: Position | undefined) => void;
   /** The points the routes were asked to go through, shown on the profile of a route and kept in its GPX file. */
   waypoints?: Position[] | undefined;
@@ -109,7 +109,7 @@ export function RouteSetView({
         selected={selected ?? 0}
         onSelect={onSelect}
         onBack={() => onDetailChange(false)}
-        onReverse={() => onReverse(selected ?? 0)}
+        {...(onReverse && { onReverse: () => onReverse(selected ?? 0) })}
         onHover={onHover}
         waypoints={waypoints}
         waypointPois={waypointPois}
@@ -303,7 +303,7 @@ function RouteDetail({
   selected: number;
   onSelect: (index: number) => void;
   onBack: () => void;
-  onReverse: () => void;
+  onReverse?: () => void;
   onHover: (position: Position | undefined) => void;
   waypoints?: Position[] | undefined;
   waypointPois?: WaypointPois | undefined;
@@ -347,10 +347,12 @@ function RouteDetail({
           <ArrowLeft size={18} aria-hidden />
           {t.routes}
         </button>
-        <button type="button" data-testid="route-reverse" className={TEXT_BUTTON} onClick={onReverse}>
-          <ArrowLeftRight size={18} aria-hidden />
-          {t.reverseRoute}
-        </button>
+        {onReverse && (
+          <button type="button" data-testid="route-reverse" className={TEXT_BUTTON} onClick={onReverse}>
+            <ArrowLeftRight size={18} aria-hidden />
+            {t.reverseRoute}
+          </button>
+        )}
         {!route.imported && (
           <strong data-testid="route-position" aria-label={routeTitle(route, language, selected, routes.length)}>
             {selected + 1}/{routes.length}

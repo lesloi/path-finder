@@ -324,3 +324,27 @@ func TestAWaypointOffTheWaysIsNotTakenForTheStartWhenAnotherZoneAnswersFirst(t *
 		t.Errorf("err = %v, want a *WaypointError for waypoint 1", err)
 	}
 }
+
+func TestZonesFindTheOutAndBackRoutesInTheZoneOfTheStart(t *testing.T) {
+	dir := t.TempDir()
+	west, westCentre := zoneGraph(0, 0)
+	east, eastCentre := zoneGraph(10_000, 0)
+	writeZone(t, filepath.Join(dir, "west"), west)
+	writeZone(t, filepath.Join(dir, "east"), east)
+	z, err := OpenZones(dir, "any")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile := z.Profile("any")
+	toward := func(p Point, northM float64) Point { return Point{p.Lat + northM/metersPerDegree, p.Lon} }
+
+	routes, err := profile.OutAndBack(context.Background(), OutAndBackRequest{Start: eastCentre, Waypoints: []Point{toward(eastCentre, 300)}, Alternatives: 1})
+
+	if err != nil || len(routes) == 0 {
+		t.Fatalf("routes = %d, err = %v", len(routes), err)
+	}
+	near(t, routes[0].Distance, 600, 101, "distance") // 300 m there and as much back
+	if _, err := profile.OutAndBack(context.Background(), OutAndBackRequest{Start: westCentre, Waypoints: []Point{toward(eastCentre, 300)}, Alternatives: 1}); !errors.Is(err, ErrOffGraph) {
+		t.Errorf("a destination in another zone: err = %v, want ErrOffGraph", err)
+	}
+}

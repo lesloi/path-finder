@@ -1,5 +1,6 @@
 import { effortFactor } from './effort.ts';
 import { estimatedDuration, routesAtPace } from './pace.ts';
+import type { LoopCriteria } from '../contract/index.ts';
 import type { Route, RouteSetRequest } from './route.ts';
 
 describe('estimatedDuration', () => {
@@ -30,10 +31,20 @@ describe('estimatedDuration', () => {
 
 describe('routesAtPace', () => {
   const routes = [{ distance: 10, elevationGain: 0, estimatedDuration: 60 }] as Route[];
-  const asked: Omit<RouteSetRequest, 'target'> = { start: [6, 45], surface: 'any', pace: 6 };
+  const asked: Omit<LoopCriteria, 'target' | 'elevationGain' | 'shape' | 'destination'> = {
+    start: [6, 45],
+    surface: 'any',
+    pace: 6,
+  };
 
   it('recomputes the durations at the pace by distance', () => {
     const request: RouteSetRequest = { ...asked, target: { distance: 10 } };
+
+    expect(routesAtPace(request, routes, 5)).toEqual({ routes: [{ ...routes[0], estimatedDuration: 50 }], pace: 5 });
+  });
+
+  it('recomputes the durations of an out-and-back route, which has no target', () => {
+    const request: RouteSetRequest = { ...asked, shape: 'outAndBack', destination: [6.1, 45.1] };
 
     expect(routesAtPace(request, routes, 5)).toEqual({ routes: [{ ...routes[0], estimatedDuration: 50 }], pace: 5 });
   });

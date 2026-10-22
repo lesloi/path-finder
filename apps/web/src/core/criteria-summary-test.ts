@@ -15,6 +15,21 @@ describe('criteriaSummary', () => {
     expect(criteriaSummary(request, metric)).toBe('10.0 km');
   });
 
+  it('names an out-and-back route, whose destination sets the distance', () => {
+    const outAndBack: RouteSetRequest = {
+      start: request.start,
+      shape: 'outAndBack',
+      surface: 'unpaved',
+      pace: 6,
+      destination: [6.2, 45.95],
+      waypoints: [[6.1, 45.9]],
+    };
+
+    expect(criteriaSummary(outAndBack, metric)).toBe(
+      `${criteriaText.en.outAndBack} · ${criteriaText.en.unpaved} · 1 waypoint`,
+    );
+  });
+
   it('gives the target duration instead of a distance', () => {
     expect(criteriaSummary({ ...request, target: { duration: 75 } }, metric)).toBe('1 h 15');
   });

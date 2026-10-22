@@ -803,5 +803,171 @@
     "expect": {
       "field": "avoidedAreas"
     }
+  },
+  {
+    "name": "accepts the loop shape by name",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "surface": "any",
+      "pace": 6,
+      "shape": "loop",
+      "target": {
+        "distance": 10
+      }
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "surface": "any",
+        "pace": 6,
+        "target": {
+          "distance": 10
+        }
+      }
+    }
+  },
+  {
+    "name": "refuses a shape it does not know",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "surface": "any",
+      "pace": 6,
+      "shape": "zigzag",
+      "target": {
+        "distance": 10
+      }
+    },
+    "expect": {
+      "field": "shape"
+    }
+  },
+  {
+    "name": "accepts an out-and-back route to a destination",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "surface": "any",
+      "pace": 6,
+      "shape": "outAndBack",
+      "destination": [6.2, 45.95]
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "surface": "any",
+        "pace": 6,
+        "shape": "outAndBack",
+        "destination": [6.2, 45.95]
+      }
+    }
+  },
+  {
+    "name": "accepts waypoints on the way to the destination",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "surface": "any",
+      "pace": 6,
+      "shape": "outAndBack",
+      "destination": [6.2, 45.95],
+      "waypoints": [[6.15, 45.92]]
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "surface": "any",
+        "pace": 6,
+        "shape": "outAndBack",
+        "destination": [6.2, 45.95],
+        "waypoints": [[6.15, 45.92]]
+      }
+    }
+  },
+  {
+    "name": "refuses an out-and-back route without a destination",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "surface": "any",
+      "pace": 6,
+      "shape": "outAndBack"
+    },
+    "expect": {
+      "field": "destination"
+    }
+  },
+  {
+    "name": "refuses a destination that is not a position",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "surface": "any",
+      "pace": 6,
+      "shape": "outAndBack",
+      "destination": [200, 45]
+    },
+    "expect": {
+      "field": "destination"
+    }
+  },
+  {
+    "name": "refuses a destination for a loop",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "surface": "any",
+      "pace": 6,
+      "target": {
+        "distance": 10
+      },
+      "destination": [6.2, 45.95]
+    },
+    "expect": {
+      "field": "destination"
+    }
+  },
+  {
+    "name": "refuses a target for an out-and-back route",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "surface": "any",
+      "pace": 6,
+      "shape": "outAndBack",
+      "destination": [6.2, 45.95],
+      "target": {
+        "distance": 10
+      }
+    },
+    "expect": {
+      "field": "target"
+    }
+  },
+  {
+    "name": "refuses an elevation gain for an out-and-back route",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "surface": "any",
+      "pace": 6,
+      "shape": "outAndBack",
+      "destination": [6.2, 45.95],
+      "elevationGain": 300
+    },
+    "expect": {
+      "field": "elevationGain"
+    }
+  },
+  {
+    "name": "refuses a destination inside an avoided area",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "surface": "any",
+      "pace": 6,
+      "shape": "outAndBack",
+      "destination": [6.2, 45.95],
+      "avoidedAreas": [
+        {
+          "center": [6.2, 45.95],
+          "radius": 200
+        }
+      ]
+    },
+    "expect": {
+      "field": "avoidedAreas"
+    }
   }
 ]

@@ -350,6 +350,11 @@ func (a *ProfileZones) DirectLoop(ctx context.Context, req DirectLoopRequest) (*
 	return inZones(a, req.Start, func(e *Engine) (*Route, error) { return e.DirectLoop(ctx, req) })
 }
 
+// OutAndBack asks the zones as Loops does, for the routes to the last waypoint and back.
+func (a *ProfileZones) OutAndBack(ctx context.Context, req OutAndBackRequest) ([]*Route, error) {
+	return inZones(a, req.Start, func(e *Engine) ([]*Route, error) { return e.OutAndBack(ctx, req) })
+}
+
 // inZones runs search on the engine of each zone whose box holds start, as Loops describes, until one
 // does not answer ErrOffGraph.
 func inZones[T any](a *ProfileZones, start Point, search func(*Engine) (T, error)) (T, error) {

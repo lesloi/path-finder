@@ -11,6 +11,7 @@ const DEFAULTS = {
   basemap: 'minimal',
   poiLayers: { water: true, viewpoint: false, toilets: false, shelter: false, seasonal: true },
   lastCriteria: {
+    shape: 'loop',
     target: 'distance',
     distance: 10,
     duration: 60,
@@ -37,6 +38,7 @@ describe('useSettings', () => {
       basemap: 'aerial',
       poiLayers: { water: false, viewpoint: true, toilets: false, shelter: false, seasonal: false },
       lastCriteria: {
+        shape: 'outAndBack',
         target: 'duration',
         distance: 21.1,
         duration: 95,
@@ -51,7 +53,7 @@ describe('useSettings', () => {
 
     const { result } = renderHook(() => useSettings());
 
-    expect(result.current[0]).toEqual(kept);
+    expect(result.current[0]).toEqual({ ...kept, lastCriteria: { ...kept.lastCriteria, shape: 'loop' } });
   });
 
   it('shares a change with every component', () => {

@@ -29,6 +29,8 @@ export type ElevationLevel = 'any' | 'flat' | 'hilly' | 'target';
 
 /** The criteria the form starts from: what the user asked for last. */
 export type LastCriteria = {
+  /** A loop, or an out-and-back route to a destination, which has no target and no elevation gain. */
+  shape: 'loop' | 'outAndBack';
   /** What the length is set by. */
   target: 'distance' | 'duration';
   /** The target distance, in kilometres. */
@@ -60,6 +62,7 @@ const KEY = 'path-finder.settings';
 const LEVELS: ElevationLevel[] = ['any', 'flat', 'hilly', 'target'];
 
 export const DEFAULT_CRITERIA: LastCriteria = {
+  shape: 'loop',
   target: 'distance',
   distance: 10,
   duration: 60,
@@ -93,6 +96,8 @@ function parsePoiLayers(stored: unknown): PoiLayers {
 function parseLastCriteria(stored: unknown): LastCriteria {
   const { target, distance, duration, surface, level, gain } = isObject(stored) ? stored : {};
   return {
+    // Never restored: a new visit starts with a loop, whatever the last search was.
+    shape: DEFAULT_CRITERIA.shape,
     target: isTarget(target) ? target : DEFAULT_CRITERIA.target,
     distance: isDistance(distance) ? distance : DEFAULT_CRITERIA.distance,
     duration: isDuration(duration) ? duration : DEFAULT_CRITERIA.duration,

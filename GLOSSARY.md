@@ -104,7 +104,7 @@ _Avoid_: Kilomètre-effort, adjusted distance
 ### Results
 
 **Route**:
-One generated loop, with its geometry, distance, elevation gain, surface breakdown, and estimated duration.
+One generated loop or out-and-back route, with its geometry, distance, elevation gain, surface breakdown, and estimated duration.
 _Avoid_: Trace, track, itinerary, path
 
 **Route name**:
@@ -112,9 +112,19 @@ The label of a route in its GPX export: a word and the distance, such as
 "Itinéraire · 12,3 km", in the user's language. It never names where the route starts.
 _Avoid_: Title
 
+**Route shape**:
+How a route relates its start point to where it ends: a loop, an out-and-back route, and later a point-to-point
+route.
+
 **Loop**:
-A route that ends at its start point. The only route shape for now.
+A route that ends at its start point, without a fixed way back. The default route shape.
 _Avoid_: Round trip, circuit
+
+**Out-and-back route**:
+A route to a destination the user picks, in a field of its own, that comes back by the same way. The destination sets its distance, so it has no
+target distance and no target elevation gain, and every one is a match. Its elevation gain counts both ways, which makes
+it equal to its loss.
+_Avoid_: Round trip
 
 **Point-to-point route**:
 A route that ends at a finish point other than its start point. Not offered yet.

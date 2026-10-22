@@ -824,7 +824,12 @@ func measure(g *graph, nodes, edges []uint32) (dist, trail, overlap float64) {
 // It returns CauseNone on success, otherwise why a leg failed. With diagnosing, which costs extra searches,
 // the cause is told apart as diagnose does; without, it is what the search itself saw.
 func chainLegs(ctx context.Context, cx *Engine, s *searcher, climb float32, lim searchLimits, diagnosing bool, points []uint32) (nodes, edges []uint32, cause LegCause) {
-	avoid := newAvoidSet()
+	return chainLegsAvoiding(ctx, cx, s, climb, lim, diagnosing, points, newAvoidSet())
+}
+
+// chainLegsAvoiding is chainLegs with the ways already in avoid counting as used, and the ways it takes added
+// to it.
+func chainLegsAvoiding(ctx context.Context, cx *Engine, s *searcher, climb float32, lim searchLimits, diagnosing bool, points []uint32, avoid *avoidSet) (nodes, edges []uint32, cause LegCause) {
 	for j := 1; j < len(points); j++ {
 		if points[j-1] == points[j] {
 			return nil, nil, CauseSameNode

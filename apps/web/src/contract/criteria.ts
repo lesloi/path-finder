@@ -14,20 +14,40 @@ import {
 /** Longitude and latitude, in degrees. */
 export type Position = [number, number];
 
-/** Distances in kilometres, durations in minutes, elevation gain in metres. */
-export type Criteria = {
+type CommonCriteria = {
   start: Position;
-  target: { distance: number } | { duration: number };
-  /** A target in metres, or the flat or hilly shortcut. Without one, elevation gain does not count. */
-  elevationGain?: number | 'flat' | 'hilly';
   surface: 'paved' | 'unpaved' | 'any';
   /** Minutes per kilometre on flat ground. */
   pace: number;
-  /** Points the route goes through, in this order. */
-  waypoints?: Position[];
   /** Circles no route goes through. */
   avoidedAreas?: AvoidedArea[];
 };
+
+/** A route that ends at its start point. Distances in kilometres, durations in minutes, elevation gain in metres. */
+export type LoopCriteria = CommonCriteria & {
+  shape?: undefined;
+  destination?: undefined;
+  target: { distance: number } | { duration: number };
+  /** A target in metres, or the flat or hilly shortcut. Without one, elevation gain does not count. */
+  elevationGain?: number | 'flat' | 'hilly';
+  /** Points the route goes through, in this order. */
+  waypoints?: Position[];
+};
+
+/**
+ * A route to a destination that comes back by the same way. The destination sets the distance: it has no target and
+ * no target elevation gain.
+ */
+export type OutAndBackCriteria = CommonCriteria & {
+  shape: 'outAndBack';
+  target?: undefined;
+  elevationGain?: undefined;
+  destination: Position;
+  /** Points the route goes through on the way to the destination, in this order. */
+  waypoints?: Position[];
+};
+
+export type Criteria = LoopCriteria | OutAndBackCriteria;
 
 /** A circle routes keep out of: its centre, and its radius in metres. */
 export type AvoidedArea = { center: Position; radius: number };
@@ -44,6 +64,8 @@ export function areaContains({ center, radius }: AvoidedArea, [lon, lat]: Positi
 /** The criteria fields `parseCriteria` checks, so a form can say which one is wrong. */
 export const CRITERIA_FIELDS = [
   'start',
+  'shape',
+  'destination',
   'target',
   'elevationGain',
   'surface',
@@ -83,7 +105,7 @@ const isPosition = (value: unknown): value is Position =>
  * The distance the criteria make, in kilometres. Throws a `RangeError` when a target duration is
  * too short for the target elevation gain.
  */
-function targetDistance(criteria: Criteria): number {
+function targetDistance(criteria: LoopCriteria): number {
   if ('distance' in criteria.target) return criteria.target.distance;
   const effort = criteria.target.duration / criteria.pace;
   const { elevationGain } = criteria;
@@ -106,18 +128,39 @@ function targetDistance(criteria: Criteria): number {
  */
 export function parseCriteria(body: unknown, { countElevationGain = true } = {}): Criteria {
   check(isObject(body), 'start', 'Criteria must be an object');
-  const { start, target, elevationGain, surface, pace, waypoints, avoidedAreas } = body;
+  const { start, shape, destination, target, elevationGain, surface, pace, waypoints, avoidedAreas } = body;
 
   check(isPosition(start), 'start', 'start must be a longitude and a latitude');
+  check(shape === undefined || shape === 'loop' || shape === 'outAndBack', 'shape', 'unknown route shape');
+  const outAndBack = shape === 'outAndBack';
 
-  check(isObject(target) && Object.keys(target).length === 1, 'target', 'target must be a distance or a duration');
-  let parsedTarget: Criteria['target'];
-  if ('distance' in target) {
-    check(within(target.distance, MIN_TARGET_DISTANCE, MAX_TARGET_DISTANCE), 'target', 'Target distance out of bounds');
-    parsedTarget = { distance: target.distance };
+  check(
+    outAndBack ? isPosition(destination) : destination === undefined,
+    'destination',
+    'a destination must be a longitude and a latitude, for an out-and-back route',
+  );
+
+  let parsedTarget: LoopCriteria['target'] | undefined;
+  if (outAndBack) {
+    check(target === undefined, 'target', 'an out-and-back route has no target');
+    check(elevationGain === undefined, 'elevationGain', 'an out-and-back route has no target elevation gain');
   } else {
-    check(within(target.duration, TARGET_DURATION.min, TARGET_DURATION.max), 'target', 'Target duration out of bounds');
-    parsedTarget = { duration: target.duration };
+    check(isObject(target) && Object.keys(target).length === 1, 'target', 'target must be a distance or a duration');
+    if ('distance' in target) {
+      check(
+        within(target.distance, MIN_TARGET_DISTANCE, MAX_TARGET_DISTANCE),
+        'target',
+        'Target distance out of bounds',
+      );
+      parsedTarget = { distance: target.distance };
+    } else {
+      check(
+        within(target.duration, TARGET_DURATION.min, TARGET_DURATION.max),
+        'target',
+        'Target duration out of bounds',
+      );
+      parsedTarget = { duration: target.duration };
+    }
   }
 
   check(
@@ -161,19 +204,32 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
       'avoidedAreas',
       'a waypoint is inside an avoided area',
     );
+    check(
+      !isPosition(destination) || !areaContains(parsed, destination),
+      'avoidedAreas',
+      'the destination is inside an avoided area',
+    );
     areas.push(parsed);
   }
 
-  const criteria: Criteria = {
+  const common: CommonCriteria = {
     start: [start[0], start[1]],
-    target: parsedTarget,
-    ...(countElevationGain &&
-      elevationGain !== undefined && { elevationGain: elevationGain as Criteria['elevationGain'] }),
     surface: surface as Criteria['surface'],
     pace,
-    ...(waypoints !== undefined &&
-      waypoints.length > 0 && { waypoints: (waypoints as Position[]).map(([lon, lat]): Position => [lon, lat]) }),
     ...(areas.length > 0 && { avoidedAreas: areas }),
+  };
+  const points = (waypoints as Position[] | undefined)?.map(([lon, lat]): Position => [lon, lat]) ?? [];
+  if (outAndBack) {
+    const [lon, lat] = destination as Position;
+    return { ...common, shape, destination: [lon, lat], ...(points.length > 0 && { waypoints: points }) };
+  }
+
+  const criteria: LoopCriteria = {
+    ...common,
+    target: parsedTarget!,
+    ...(countElevationGain &&
+      elevationGain !== undefined && { elevationGain: elevationGain as LoopCriteria['elevationGain'] }),
+    ...(points.length > 0 && { waypoints: points }),
   };
   let distance: number;
   try {

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { parseCriteria, type AvoidedArea } from '../contract/index.ts';
+import { parseCriteria, type AvoidedArea, type LoopCriteria } from '../contract/index.ts';
 import { expectNamedControls } from '../accessible-names.ts';
 import { criteriaText } from '../i18n/index.ts';
 import { CriteriaForm, criteriaChanged, criteriaRequest, invalidField } from './criteria-form.tsx';
@@ -13,7 +13,15 @@ const START: Position = [6.1294, 45.8992];
 
 const store = (settings: object) => localStorage.setItem('path-finder.settings', JSON.stringify(settings));
 
-function setup(props: { start?: Position; waypoints?: Position[]; language?: 'en' | 'fr'; searched?: boolean } = {}) {
+function setup(
+  props: {
+    start?: Position;
+    destination?: Position;
+    waypoints?: Position[];
+    language?: 'en' | 'fr';
+    searched?: boolean;
+  } = {},
+) {
   const onSubmit = vi.fn();
   render(<CriteriaForm language="en" start={START} onSubmit={onSubmit} {...props} />);
   const submit = () => fireEvent.click(screen.getByTestId('criteria-submit'));
@@ -21,7 +29,7 @@ function setup(props: { start?: Position; waypoints?: Position[]; language?: 'en
 }
 
 const slider = (name: 'distance' | 'duration' | 'gain') => screen.getByTestId(`criteria-${name}`);
-const choose = (group: 'target' | 'elevation' | 'surface', value: string) =>
+const choose = (group: 'shape' | 'target' | 'elevation' | 'surface', value: string) =>
   fireEvent.click(screen.getByTestId(`criteria-${group}-${value}`));
 
 beforeEach(() => {
@@ -301,9 +309,92 @@ describe('invalidField', () => {
   });
 });
 
+describe('CriteriaForm out and back', () => {
+  const DESTINATION: Position = [6.2, 45.95];
+
+  it('asks for a destination, and shows neither the target nor the elevation gain', () => {
+    setup();
+
+    choose('shape', 'outAndBack');
+
+    expect(screen.getByTestId('criteria-destination-hint')).toHaveTextContent(en.destinationHint);
+    expect(screen.queryByTestId('criteria-submit')).toBeNull();
+    expect(screen.queryByTestId('criteria-target')).toBeNull();
+    expect(screen.queryByTestId('criteria-elevation')).toBeNull();
+    expect(screen.getByTestId('criteria-surface')).toBeInTheDocument();
+  });
+
+  it('sends a route to the destination, without a target', () => {
+    const { onSubmit, submit } = setup({ destination: DESTINATION });
+    choose('shape', 'outAndBack');
+
+    submit();
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      start: START,
+      shape: 'outAndBack',
+      destination: DESTINATION,
+      surface: 'any',
+      pace: 6,
+    });
+  });
+});
+
 describe('criteriaRequest', () => {
+  it('sends an area to avoid to an out-and-back route only within the reach of the longest route', () => {
+    const draft = {
+      shape: 'outAndBack',
+      target: 'distance',
+      distance: 10,
+      duration: 60,
+      level: 'any',
+      gain: 0,
+      surface: 'any',
+    } as const;
+    const near: AvoidedArea = { center: [6.1294, 45.9992], radius: 400 };
+    const far: AvoidedArea = { center: [6.1294, 46.9992], radius: 400 };
+
+    const request = criteriaRequest(draft, {
+      pace: 6,
+      start: START,
+      destination: [6.2, 45.95],
+      avoidedAreas: [near, far],
+    });
+
+    expect(request).toMatchObject({ avoidedAreas: [near] });
+  });
+
+  it('asks for an out-and-back route only once it has a destination', () => {
+    const draft = {
+      shape: 'outAndBack',
+      target: 'distance',
+      distance: 10,
+      duration: 60,
+      level: 'target',
+      gain: 300,
+      surface: 'any',
+    } as const;
+
+    expect(criteriaRequest(draft, { pace: 6, start: START })).toBeUndefined();
+    expect(criteriaRequest(draft, { pace: 6, start: START, destination: [6.2, 45.95] })).toEqual({
+      start: START,
+      shape: 'outAndBack',
+      destination: [6.2, 45.95],
+      surface: 'any',
+      pace: 6,
+    });
+  });
+
   it('leaves out a start point-less request, and carries the waypoints of a complete one', () => {
-    const draft = { target: 'distance', distance: 10, duration: 60, level: 'any', gain: 0, surface: 'any' } as const;
+    const draft = {
+      shape: 'loop',
+      target: 'distance',
+      distance: 10,
+      duration: 60,
+      level: 'any',
+      gain: 0,
+      surface: 'any',
+    } as const;
 
     expect(criteriaRequest(draft, { pace: 6, waypoints: [[6.1, 45.9]] })).toBeUndefined();
     expect(criteriaRequest(draft, { pace: 6, start: START, waypoints: [[6.1, 45.9]] })).toMatchObject({
@@ -313,7 +404,15 @@ describe('criteriaRequest', () => {
 });
 
 describe('criteriaRequest and avoided areas', () => {
-  const draft = { target: 'distance', distance: 10, duration: 60, level: 'any', gain: 0, surface: 'any' } as const;
+  const draft = {
+    shape: 'loop',
+    target: 'distance',
+    distance: 10,
+    duration: 60,
+    level: 'any',
+    gain: 0,
+    surface: 'any',
+  } as const;
   const near: AvoidedArea = { center: [6.14, 45.9], radius: 400 };
   // About 111 km north of the start point.
   const far: AvoidedArea = { center: [6.1294, 46.9], radius: 400 };
@@ -351,14 +450,27 @@ describe('criteriaRequest and avoided areas', () => {
 });
 
 describe('criteriaChanged', () => {
-  const found: RouteSetRequest = {
+  const found: LoopCriteria = {
     start: [6.1, 45.8],
     target: { distance: 10 },
     elevationGain: 300,
     surface: 'any',
     pace: 6,
   };
-  const changed = (changes: Partial<RouteSetRequest>) => criteriaChanged({ ...found, ...changes }, found);
+  const changed = (changes: Partial<LoopCriteria>) => criteriaChanged({ ...found, ...changes }, found);
+
+  it('sees another shape as a change', () => {
+    const outAndBack: RouteSetRequest = {
+      start: found.start,
+      shape: 'outAndBack',
+      surface: 'any',
+      pace: 6,
+      destination: [6.2, 45.95],
+    };
+
+    expect(criteriaChanged(outAndBack, found)).toBe(true);
+    expect(criteriaChanged(outAndBack, outAndBack)).toBe(false);
+  });
 
   it('sees no change in the same request', () => {
     expect(changed({})).toBe(false);

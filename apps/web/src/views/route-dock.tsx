@@ -34,7 +34,8 @@ export function RouteDock({
   index: number;
   count: number;
   onClose: () => void;
-  onReverse: () => void;
+  /** Left out when the route has no other way: an out-and-back route is the same both ways. */
+  onReverse?: () => void;
   onHover: (position: Position | undefined) => void;
   /** The points the route was asked to go through, shown on its profile and kept in its GPX file. */
   waypoints?: Position[] | undefined;
@@ -62,15 +63,17 @@ export function RouteDock({
               {title}
             </strong>
           </span>
-          <button
-            type="button"
-            data-testid="route-reverse"
-            className={ICON_BUTTON}
-            {...tip(t.reverseRoute, 'bottom-end')}
-            onClick={onReverse}
-          >
-            <ArrowLeftRight size={18} aria-hidden />
-          </button>
+          {onReverse && (
+            <button
+              type="button"
+              data-testid="route-reverse"
+              className={ICON_BUTTON}
+              {...tip(t.reverseRoute, 'bottom-end')}
+              onClick={onReverse}
+            >
+              <ArrowLeftRight size={18} aria-hidden />
+            </button>
+          )}
         </div>
         <RouteFigures route={route} language={language} compact />
         {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" className="justify-center" />}

@@ -10,6 +10,8 @@ export {
   type AvoidedArea,
   type Criteria,
   type CriteriaField,
+  type LoopCriteria,
+  type OutAndBackCriteria,
   type Position,
 } from './criteria.ts';
 export type { ApiError, ErrorCode, SurfaceStretch, TechnicalStretch } from './errors.ts';

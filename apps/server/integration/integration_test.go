@@ -329,6 +329,46 @@ func TestRouteSetsThroughWaypoints(t *testing.T) {
 	}
 }
 
+func TestOutAndBackRoutesComeBackByTheWayTheyWent(t *testing.T) {
+	h := newServer(t)
+	body := `{"start":[6.1294,45.8992],"shape":"outAndBack","destination":[6.1380,45.9030],"surface":"any","pace":6}`
+
+	code, routes, out := routeSets(t, h, body)
+
+	if code != 200 || len(routes) == 0 {
+		t.Fatalf("status %d, %d routes: %s", code, len(routes), out[:min(len(out), 200)])
+	}
+	for i, r := range routes {
+		n := len(r.Geometry)
+		for j := range r.Geometry {
+			a, b := r.Geometry[j], r.Geometry[n-1-j]
+			if a[0] != b[0] || a[1] != b[1] {
+				t.Fatalf("route %d: point %d is not its mirror", i, j)
+			}
+		}
+		if r.Kind != "match" || *r.ElevationGain != *r.ElevationLoss {
+			t.Errorf("route %d: kind %s, gain %v, loss %v", i, r.Kind, *r.ElevationGain, *r.ElevationLoss)
+		}
+	}
+}
+
+func TestOutAndBackRefusalsNameAField(t *testing.T) {
+	h := newServer(t)
+	for name, tc := range map[string]struct{ body, want string }{
+		"no destination": {`{"start":[6.1294,45.8992],"shape":"outAndBack","surface":"any","pace":6}`, `{"error":"invalid-criteria","field":"destination"}`},
+		"a target":       {criteria(`{"distance":10}`, `,"shape":"outAndBack","destination":[6.1380,45.9030]`), `{"error":"invalid-criteria","field":"target"}`},
+		"too far":        {`{"start":[6.1294,45.8992],"shape":"outAndBack","destination":[6.60,46.5],"surface":"any","pace":6}`, `{"error":"invalid-criteria","field":"destination"}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			code, _, out := routeSets(t, h, tc.body)
+
+			if code != 400 || strings.TrimSpace(out) != tc.want {
+				t.Errorf("status %d, body %s, want 400 %s", code, out, tc.want)
+			}
+		})
+	}
+}
+
 func TestWaypointRefusalsNameAFieldOrANumberNeverAPosition(t *testing.T) {
 	h := newServer(t)
 	cases := map[string]struct{ criteria, want string }{

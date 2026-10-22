@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 )
 
 // maxSnapMeters is how far a requested point may be from the nearest graph node.
@@ -353,6 +354,72 @@ func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route,
 		return nil, err
 	}
 	return e.describe(nodes, edges), nil
+}
+
+// OutAndBackRequest asks for routes from Start through the Waypoints in order, to the last one, and back by the same
+// way, keeping out of the Avoided areas. Alternatives is how many routes at most.
+type OutAndBackRequest struct {
+	Start        Point
+	Waypoints    []Point
+	Avoided      []Circle
+	Alternatives int
+}
+
+// OutAndBack finds the cheapest way from start through the waypoints to the last one, and returns it walked
+// there and back. The way back is the way out reversed, not the cheapest way back: it is what a summit with a
+// single access asks for. Each further route avoids the ways of the earlier ones, and the search ends when it finds
+// a way already offered. It fails with ErrOffGraph for a start point off the ways, a *WaypointError for a waypoint
+// off them, and ErrNoRoute when they are not joined or are all the start point.
+func (e *Engine) OutAndBack(ctx context.Context, req OutAndBackRequest) ([]*Route, error) {
+	forbidden := e.g.forbiddenFor(req.Avoided)
+	src, err := e.snapStart(req.Start, forbidden)
+	if err != nil {
+		return nil, err
+	}
+	snapped, err := e.snapWaypoints(req.Waypoints, false, forbidden)
+	if err != nil {
+		return nil, err
+	}
+	anchors := collapse(append([]uint32{src}, snapped...))
+	if len(anchors) < 2 {
+		return nil, ErrNoRoute
+	}
+	s := searcherPool.Get().(*searcher)
+	defer searcherPool.Put(s)
+	avoid := newAvoidSet()
+	var routes []*Route
+	var offered [][]uint32
+	for len(routes) < max(req.Alternatives, 1) {
+		nodes, edges, cause := chainLegsAvoiding(ctx, e, s, e.prof.UpPerMeter, searchLimits{loopLegMaxSettled, forbidden}, false, anchors, avoid)
+		if err := ctx.Err(); err != nil {
+			return routes, err
+		}
+		if cause != CauseNone {
+			if len(routes) == 0 {
+				return nil, ErrNoRoute
+			}
+			break
+		}
+		if slices.ContainsFunc(offered, func(o []uint32) bool { return slices.Equal(o, nodes) }) {
+			break
+		}
+		offered = append(offered, nodes)
+		routes = append(routes, e.describe(mirrored(nodes, edges)))
+	}
+	return routes, nil
+}
+
+// mirrored is a path followed by itself reversed, turning once at its last node. The edges of the way out serve the
+// way back: a way has the same length, kind and surface in both directions.
+func mirrored(nodes, edges []uint32) (allNodes, allEdges []uint32) {
+	allNodes, allEdges = slices.Clone(nodes), slices.Clone(edges)
+	for i := len(nodes) - 2; i >= 0; i-- {
+		allNodes = append(allNodes, nodes[i])
+	}
+	for i := len(edges) - 1; i >= 0; i-- {
+		allEdges = append(allEdges, edges[i])
+	}
+	return allNodes, allEdges
 }
 
 // describe measures a path of nodes joined by edges.

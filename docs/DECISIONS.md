@@ -95,6 +95,12 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   the waypoints is a candidate too. Criteria whose waypoints alone exceed the target are refused, by
   the straight lines first and by the loop through them then. A waypoint is moved to the nearest way
   within 250 m, beyond which the criteria are refused, naming the waypoint by its number.
+- **An out-and-back route mirrors the way out, and has no target.** The user picks the destination, in a field of its own
+  like the start point (waypoints stay as stops on the way there), and it sets the distance, so the target distance and the target elevation gain do not apply and every route is a match.
+  The way back is the way out reversed, not the cheapest way back, which is what a summit with a single access
+  asks for; the search for a loop would avoid it. Further routes avoid the ways of the earlier ones, and the ranking drops
+  those that share most of their geometry, so one access gives one route. It shares the cap of the loops. The shape is a
+  `shape` field of the criteria, left out for a loop, so that point-to-point routes (#63) can join it.
 - **Avoided areas are circles that forbid the ways they touch, up to three per set of criteria.** A penalty, as the
   loop legs get for the ways of the earlier ones, would not keep a route out of a closed trail, which is what the
   user asks for. A way is forbidden when its straight line between nodes comes within the radius, so a long way

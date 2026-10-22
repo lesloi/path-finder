@@ -99,6 +99,18 @@ func metresFrom(start [2]float64) func(lon, lat float64) (x, y float64) {
 	}
 }
 
+// crowFliesThrough is the length in metres of the straight lines from start through the points, without coming back.
+func crowFliesThrough(start [2]float64, points [][2]float64) float64 {
+	toMetres := metresFrom(start)
+	var total, px, py float64
+	for _, p := range points {
+		x, y := toMetres(p[0], p[1])
+		total += math.Hypot(x-px, y-py)
+		px, py = x, y
+	}
+	return total
+}
+
 // crowFlies is the length in metres of the straight lines from start through the points and back.
 func crowFlies(start [2]float64, points [][2]float64) float64 {
 	toMetres := metresFrom(start)

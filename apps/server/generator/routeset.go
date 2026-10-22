@@ -171,17 +171,20 @@ type ranked struct {
 
 func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, bool) {
 	estimated := cand.effortDistance() * c.Pace
-	results := checks(c, cand, estimated)
 	score, worst := 0.0, tierMatch
-	for _, r := range results {
-		if r.tier == tierOut {
-			return ranked{}, false
-		}
-		worst = max(worst, r.tier)
-		score += r.relative
-	}
 	visits := cellsAlong(cand.geometry, c.Start, radius)
-	score += surfaceMismatch(c.Surface, cand.unpavedShare) + retraceShare(visits)
+	score += surfaceMismatch(c.Surface, cand.unpavedShare)
+	// An out-and-back route has no target to be near, and walks every stretch twice by design.
+	if c.Shape != contract.ShapeOutAndBack {
+		for _, r := range checks(c, cand, estimated) {
+			if r.tier == tierOut {
+				return ranked{}, false
+			}
+			worst = max(worst, r.tier)
+			score += r.relative
+		}
+		score += retraceShare(visits)
+	}
 	kind := "match"
 	if worst != tierMatch {
 		kind = "suggestion"

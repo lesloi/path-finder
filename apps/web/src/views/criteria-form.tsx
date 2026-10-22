@@ -16,7 +16,9 @@ import { formatDuration, kmBetween, samePositions, type Position, type RouteSetR
 import { commonText, criteriaText, type Language } from '../i18n/index.ts';
 import { useSettings, type LastCriteria } from '../state/index.ts';
 
-const CRITERIA = ['target', 'surface', 'elevation'] as const;
+const CRITERIA = ['shape', 'target', 'surface', 'elevation'] as const;
+// An out-and-back route has neither: its destination sets the distance, and the elevation gain follows.
+const LOOP_ONLY: Criterion[] = ['target', 'elevation'];
 
 const DURATION_STEP = 5; // minutes
 
@@ -72,11 +74,13 @@ export function criteriaRequest(
   {
     pace,
     start,
+    destination,
     waypoints,
     avoidedAreas,
   }: {
     pace: number;
     start?: Position | undefined;
+    destination?: Position | undefined;
     waypoints?: Position[] | undefined;
     avoidedAreas?: AvoidedArea[] | undefined;
   },
@@ -89,17 +93,35 @@ export function criteriaRequest(
   const reachKm = draft.target === 'distance' ? distance : draft.duration / pace;
   const reachable =
     start && avoidedAreas?.filter((area) => kmBetween(start, area.center) - area.radius / 1000 <= reachKm);
+  // An out-and-back route has no target to bound its reach, and its way can wind: the reach is the longest route
+  // there is, so that an area farther than any route can go stays on the device.
+  const outAndBackAreas =
+    start && avoidedAreas?.filter((area) => kmBetween(start, area.center) - area.radius / 1000 <= MAX_TARGET_DISTANCE);
   return (
-    start && {
-      start,
-      target: draft.target === 'distance' ? { distance } : { duration: draft.duration },
-      ...(level === 'target' && { elevationGain: gain }),
-      ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
-      surface: draft.surface,
-      pace,
-      ...(waypoints?.length && { waypoints }),
-      ...(reachable?.length && { avoidedAreas: reachable }),
-    }
+    start &&
+    (draft.shape === 'outAndBack'
+      ? // Without a destination there is nothing to ask for yet.
+        destination
+        ? {
+            start,
+            shape: 'outAndBack' as const,
+            destination,
+            surface: draft.surface,
+            pace,
+            ...(waypoints?.length && { waypoints }),
+            ...(outAndBackAreas?.length && { avoidedAreas: outAndBackAreas }),
+          }
+        : undefined
+      : {
+          start,
+          target: draft.target === 'distance' ? { distance } : { duration: draft.duration },
+          ...(level === 'target' && { elevationGain: gain }),
+          ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
+          surface: draft.surface,
+          pace,
+          ...(waypoints?.length && { waypoints }),
+          ...(reachable?.length && { avoidedAreas: reachable }),
+        })
   );
 }
 
@@ -119,9 +141,11 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
   const within = (a: number, b: number, tolerance: number) => Math.abs(a - b) <= tolerance;
   const [a, b] = [request.target, found.target];
   const sameTarget =
-    'distance' in a && 'distance' in b
-      ? within(a.distance, b.distance, 0.5)
-      : 'duration' in a && 'duration' in b && a.duration === b.duration;
+    !a || !b
+      ? a === b
+      : 'distance' in a && 'distance' in b
+        ? within(a.distance, b.distance, 0.5)
+        : 'duration' in a && 'duration' in b && a.duration === b.duration;
   const [gainA, gainB] = [request.elevationGain, found.elevationGain];
   const sameGain =
     typeof gainA === 'number' && typeof gainB === 'number' ? within(gainA, gainB, GAIN_STEP / 2) : gainA === gainB;
@@ -130,9 +154,11 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
     sameGain &&
     samePositions([request.start], [found.start]) &&
     request.surface === found.surface &&
+    request.shape === found.shape &&
+    samePositions(request.destination ? [request.destination] : [], found.destination ? [found.destination] : []) &&
     samePositions(request.waypoints ?? [], found.waypoints ?? []) &&
     sameAreas(request.avoidedAreas ?? [], found.avoidedAreas ?? []) &&
-    ('distance' in b || request.pace === found.pace)
+    (!b || 'distance' in b || request.pace === found.pace)
   );
 }
 
@@ -144,17 +170,21 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
 export function CriteriaForm({
   language,
   start,
+  destination,
   waypoints,
   avoidedAreas,
   startUncovered = false,
   draft: kept,
   searched = false,
+  destinationField,
   waypointList,
   avoidedList,
   onSubmit,
 }: {
   language: Language;
   start?: Position;
+  /** Where an out-and-back route turns back: set in its own field, above the criteria. */
+  destination?: Position | undefined;
   /** The points the routes go through, in order: they are placed on the map, not in the form. */
   waypoints?: Position[] | undefined;
   /** The areas routes keep out of: placed on the map, not in the form. */
@@ -165,6 +195,8 @@ export function CriteriaForm({
   draft?: ReturnType<typeof useCriteriaDraft>;
   /** Routes were already found: the button then runs the search again. */
   searched?: boolean;
+  /** The field of the destination, under the shape. */
+  destinationField?: ReactNode;
   /** The waypoints as a list, between the criteria and the button. */
   waypointList?: ReactNode;
   /** The list of the areas to avoid, under the waypoints. */
@@ -181,10 +213,34 @@ export function CriteriaForm({
   const level = draft.level;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
-  const request = criteriaRequest(draft, { pace: settings.pace, start, waypoints, avoidedAreas });
+  const request = criteriaRequest(draft, { pace: settings.pace, start, destination, waypoints, avoidedAreas });
   const field = request && invalidField(request);
+  const needsDestination = Boolean(start) && draft.shape === 'outAndBack' && !destination;
 
   const sections: Record<Criterion, { title: string; content: ReactNode }> = {
+    shape: {
+      title: t.shape,
+      content: (
+        <>
+          <SegmentedControl
+            testId="criteria-shape"
+            label={t.shape}
+            value={draft.shape}
+            options={[
+              { value: 'loop', label: t.loop },
+              { value: 'outAndBack', label: t.outAndBack },
+            ]}
+            onChange={(shape) => change({ shape })}
+          />
+          {draft.shape === 'outAndBack' && destinationField}
+          {needsDestination && (
+            <p role="status" data-testid="criteria-destination-hint" className="text-sm text-ink">
+              {t.destinationHint}
+            </p>
+          )}
+        </>
+      ),
+    },
     target: {
       title: t.target,
       content: (
@@ -315,7 +371,7 @@ export function CriteriaForm({
 
   return (
     <>
-      {CRITERIA.map((criterion) => (
+      {CRITERIA.filter((criterion) => draft.shape === 'loop' || !LOOP_ONLY.includes(criterion)).map((criterion) => (
         <section key={criterion} className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-ink-2">{sections[criterion].title}</h2>
           {sections[criterion].content}
@@ -355,6 +411,8 @@ function message(
   const t = criteriaText[language];
   const messages: Record<CriteriaField, string> = {
     start: t.startError,
+    shape: t.shapeError,
+    destination: t.destinationError,
     target: target === 'distance' ? t.distanceError(distance.min, distance.max, 'km') : t.durationError,
     elevationGain: t.elevationGainError(gain.max, 'm'),
     surface: t.surfaceError,

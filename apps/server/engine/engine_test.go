@@ -822,3 +822,100 @@ func shapes(loops []*Route) [][2]float64 {
 	sort.Slice(out, func(i, j int) bool { return out[i][0] < out[j][0] || out[i][0] == out[j][0] && out[i][1] < out[j][1] })
 	return out
 }
+
+func TestOutAndBackComesBackByTheSameWay(t *testing.T) {
+	// Arrange: a lattice that rises towards the north, so the way out climbs and the way back would too if it were free
+	g := &testGraph{}
+	at := g.grid(21, 21, func(x, y int) float64 { return float64(y) * 10 })
+	e := openTest(t, g, false)
+	start, summit := pointOf(g, at(10, 10)), pointOf(g, at(10, 14))
+
+	// Act
+	routes, err := e.OutAndBack(context.Background(), OutAndBackRequest{Start: start, Waypoints: []Point{summit}, Alternatives: 1})
+
+	// Assert
+	if err != nil || len(routes) != 1 {
+		t.Fatalf("routes = %d, err = %v, want 1 route", len(routes), err)
+	}
+	r := routes[0]
+	near(t, r.Distance, 2*4*stepM, 1, "distance")
+	for i, p := range r.Points {
+		if mirror := r.Points[len(r.Points)-1-i]; p.Point != mirror.Point {
+			t.Fatalf("point %d is %v and its mirror %v: the way back is not the way out", i, p.Point, mirror.Point)
+		}
+	}
+	if r.Points[len(r.Points)/2].Point != summit {
+		t.Errorf("the turn is at %v, want the destination %v", r.Points[len(r.Points)/2].Point, summit)
+	}
+	near(t, r.Ascent, r.Descent, 0.01, "ascent against descent")
+	near(t, r.Ascent, 40, 0.01, "ascent")
+}
+
+func TestOutAndBackGoesThroughTheWaypointsAndTurnsAtTheLast(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	start := pointOf(g, at(10, 10))
+	first, last := pointOf(g, at(14, 10)), pointOf(g, at(14, 13))
+
+	routes, err := e.OutAndBack(context.Background(), OutAndBackRequest{Start: start, Waypoints: []Point{first, last}, Alternatives: 1})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := routes[0]
+	near(t, r.Distance, 2*(400+300), 1, "distance")
+	if !visitOrder(r, first, last) || r.Points[len(r.Points)/2].Point != last {
+		t.Error("the route is not start, waypoints in order, a turn at the last, and back")
+	}
+}
+
+func TestOutAndBackOffersOtherWaysOutThatDifferFromTheFirst(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+
+	routes, err := e.OutAndBack(context.Background(), OutAndBackRequest{
+		Start: pointOf(g, at(10, 10)), Waypoints: []Point{pointOf(g, at(10, 14))}, Alternatives: 3,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routes) < 2 {
+		t.Fatalf("%d routes, want other ways than the cheapest", len(routes))
+	}
+	for i, a := range routes {
+		for _, b := range routes[i+1:] {
+			if reflect.DeepEqual(a.Points, b.Points) {
+				t.Error("two routes are the same")
+			}
+		}
+	}
+}
+
+func TestOutAndBackErrors(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	g.addNode(2100, 2100, 100) // a way of its own, joined to nothing
+	e := openTest(t, g, false)
+	start, w := pointOf(g, at(10, 10)), pointOf(g, at(12, 10))
+	run := func(start Point, waypoints ...Point) error {
+		_, err := e.OutAndBack(context.Background(), OutAndBackRequest{Start: start, Waypoints: waypoints, Alternatives: 1})
+		return err
+	}
+
+	var we *WaypointError
+	if err := run(start, w, offset(2300, 1000)); !errors.As(err, &we) || we.Index != 2 {
+		t.Errorf("waypoint off the graph: err = %v, want a *WaypointError for waypoint 2", err)
+	}
+	if err := run(Point{46, 7}, w); !errors.Is(err, ErrOffGraph) || errors.As(err, &we) {
+		t.Errorf("start off the graph: err = %v, want ErrOffGraph and no waypoint", err)
+	}
+	if err := run(start, offset(2100, 2100)); !errors.Is(err, ErrNoRoute) {
+		t.Errorf("unreachable destination: err = %v, want ErrNoRoute", err)
+	}
+	if err := run(start, start); !errors.Is(err, ErrNoRoute) {
+		t.Errorf("destination at the start: err = %v, want ErrNoRoute", err)
+	}
+}

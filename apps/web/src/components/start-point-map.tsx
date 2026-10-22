@@ -214,6 +214,9 @@ export function StartPointMap({
   start,
   focus,
   pickOnClick = false,
+  destination,
+  pickDestinationOnClick = false,
+  destinationOnLongPress = false,
   waypoints = NO_WAYPOINTS,
   placing = false,
   avoidedAreas = NO_AREAS,
@@ -235,6 +238,8 @@ export function StartPointMap({
   onBackgroundClick,
   onSnapshot,
   onStartChange,
+  onDestinationChange,
+  onDestinationRefused,
   onWaypointAdd,
   onAvoidedAreaAdd,
   onWaypointRefused,
@@ -295,6 +300,15 @@ export function StartPointMap({
   /** Desktops arm a click once the user asks to pick the start point. */
   pickOnClick?: boolean;
   onStartChange: (start: Position) => void;
+  /** Where an out-and-back route turns back. */
+  destination?: Position | undefined;
+  /** A click or a tap sets the destination, and a long press no longer sets the start point. */
+  pickDestinationOnClick?: boolean;
+  /** A long press sets the destination instead of the start point: an out-and-back route still lacks one. */
+  destinationOnLongPress?: boolean;
+  onDestinationChange?: (destination: Position) => void;
+  /** A tap fell on the veiled part of the map, where the server cannot route: no destination was set. */
+  onDestinationRefused?: () => void;
   /** The waypoints, numbered in this order. Tapping a marker offers to remove it. */
   waypoints?: Position[];
   /** A click or a tap places a waypoint, and a long press no longer sets the start point. */
@@ -336,7 +350,8 @@ export function StartPointMap({
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
-  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick && !(placing || avoiding);
+  const interactive =
+    Boolean(routes?.length) && routesInteractive && !pickOnClick && !pickDestinationOnClick && !(placing || avoiding);
   const view = useRef<MapView>({ bearing: 0, rotated: false, movedAway: false });
   // Tells the app what changed in the view, and only when something did: the map moves many times a second.
   const changeView = useEffectEvent((change: Partial<MapView>) => {
@@ -348,7 +363,7 @@ export function StartPointMap({
   // The veiled part of the map is where the server cannot route: a waypoint there would only be refused.
   const canPlace = useEffectEvent(([lng, lat]: Position) => !coverage || isCovered(coverage, [lng, lat]));
   // What the pointer looks like where nothing else sets it: a crosshair while placing, which says a tap places a waypoint.
-  const marking = placing || avoiding;
+  const marking = placing || avoiding || pickDestinationOnClick;
   const isPlacing = useEffectEvent(() => marking);
   const idleCursor = useEffectEvent(() => (marking ? 'crosshair' : ''));
   const pick = useEffectEvent(
@@ -359,6 +374,12 @@ export function StartPointMap({
     ) => {
       if (avoiding) {
         if (how === 'click') onAvoidedAreaAdd?.([lng, lat]);
+        return;
+      }
+      if (pickDestinationOnClick || (destinationOnLongPress && how === 'long-press')) {
+        if (how === 'click' || destinationOnLongPress) {
+          (canPlace([lng, lat]) ? onDestinationChange : onDestinationRefused)?.([lng, lat]);
+        }
         return;
       }
       if (placing) {
@@ -376,7 +397,7 @@ export function StartPointMap({
     },
   );
   const clickedBackground = useEffectEvent(() => {
-    if (!pickOnClick && !(placing || avoiding)) onBackgroundClick?.();
+    if (!pickOnClick && !pickDestinationOnClick && !(placing || avoiding)) onBackgroundClick?.();
   });
   const basemapFailed = useEffectEvent((previous: Basemap) => onBasemapFail?.(previous));
   const selectRoute = useEffectEvent((index: number) => {
@@ -712,18 +733,29 @@ export function StartPointMap({
     };
   }, [start]);
 
+  useEffect(() => {
+    if (!destination) return;
+    const element = document.createElement('div');
+    // Like the start point, in the colour of the accent: the route turns back here.
+    element.className = 'size-4 rounded-full border-4 border-accent bg-white shadow-float';
+    const marker = new Marker({ element }).setLngLat(destination).addTo(mapRef.current!);
+    return () => {
+      marker.remove();
+    };
+  }, [destination]);
+
   // A forbidden sign over the veiled part of the map, while placing.
   useEffect(() => {
     const map = mapRef.current!;
     map.getCanvas().style.cursor = idleCursor();
-    if (!placing) return;
+    if (!placing && !pickDestinationOnClick) return;
     const follow = ({ lngLat }: MapMouseEvent) => {
       const cursor = canPlace([lngLat.lng, lngLat.lat]) ? 'crosshair' : 'not-allowed';
       if (map.getCanvas().style.cursor !== cursor) map.getCanvas().style.cursor = cursor;
     };
     map.on('mousemove', follow);
     return () => void map.off('mousemove', follow);
-  }, [placing, avoiding]);
+  }, [placing, avoiding, pickDestinationOnClick]);
 
   // The waypoints' markers: a button each, which the pins (`WaypointPin`) are drawn into. Tapping one opens a bubble with a
   // button to remove it. The marker's own events stop here, as MapLibre would hear them as the map's: a click that

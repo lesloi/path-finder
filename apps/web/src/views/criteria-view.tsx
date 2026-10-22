@@ -210,12 +210,18 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
   // What a tap on the map is for: the start point (`pick`, from the crosshair) or a waypoint (`place`); one at a time.
-  const [mode, setMode] = useState<'pick' | 'place' | 'avoid'>();
+  const [mode, setMode] = useState<'pick' | 'destination' | 'place' | 'avoid'>();
   const picking = mode === 'pick';
+  const pickingDestination = mode === 'destination';
   const placing = mode === 'place';
   const avoiding = mode === 'avoid';
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
+  // Where an out-and-back route turns back: kept here too, for this visit only.
+  const [kept, setDestination] = useState<Position>();
+  // A loop has none: the one set is kept for when the shape comes back, but neither asked for nor shown.
+  const outAndBack = draft[0].shape === 'outAndBack';
+  const destination = outAndBack ? kept : undefined;
   // The circles routes keep out of: kept here too, for this visit only, as the waypoints are.
   const [drawnAreas, setAvoidedAreas] = useState<AvoidedArea[]>(NO_AREAS);
   // A phone has neither the button nor the list to edit them: the areas drawn on a desktop do not apply there.
@@ -268,7 +274,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const selected = desktop ? browser.selected : (browser.selected ?? 0);
   const dockRoute = desktop ? atPace?.routes[selected ?? -1] : undefined;
   const dockShown = Boolean(dockRoute);
-  const current = criteriaRequest(draft[0], { pace, start, waypoints, avoidedAreas });
+  const current = criteriaRequest(draft[0], { pace, start, destination, waypoints, avoidedAreas });
   // Every search keeps the criteria it was made with, whichever button asked for it.
   const search = (request: RouteSetRequest) => {
     setCleared(false);
@@ -345,7 +351,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const toggleAvoiding = () => toggleMode('avoid');
 
   // The points no area may hold or touch.
-  const points = [...(start ? [start] : []), ...waypoints];
+  const points = [...(start ? [start] : []), ...waypoints, ...(destination ? [destination] : [])];
 
   function addAvoidedArea(center: Position) {
     if (avoidedAreas.length >= MAX_AVOIDED_AREAS) return;
@@ -409,6 +415,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     if (start && (start[0] !== position[0] || start[1] !== position[1])) browser.drop();
     setStart(position);
     setMode((current) => (current === 'pick' ? undefined : current));
+  }
+
+  function changeDestination(position: Position) {
+    setDestination(position);
+    setMode((current) => (current === 'destination' ? undefined : current));
   }
 
   // The device location and typed coordinates move the map there; a pick on the map does not.
@@ -495,14 +506,18 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         onPreview={browser.setPreview}
         onDetailChange={browser.openDetail}
         // By duration, a new pace is another search, which the criteria ask for: the list only says the pace.
-        onPaceChange={'distance' in routeSet.request.target ? (value) => update({ pace: value }) : undefined}
+        onPaceChange={
+          !routeSet.request.target || 'distance' in routeSet.request.target
+            ? (value) => update({ pace: value })
+            : undefined
+        }
         onClear={() => {
           browser.drop();
           setCleared(true);
           // The button is gone: the focus goes on from the settings, as after a button that puts the map back.
           settingsLink.current?.focus();
         }}
-        onReverse={browser.toggleReversed}
+        onReverse={routeSet.request.shape ? undefined : browser.toggleReversed}
         onHover={browser.setHover}
         waypoints={routeSet.request.waypoints}
         waypointPois={waypointPois}
@@ -538,6 +553,16 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       startUncovered={startUncovered}
       language={language}
       picking={picking}
+      destination={destination}
+      pickingDestination={pickingDestination}
+      onDestinationChange={(position) => {
+        setFocus(position);
+        changeDestination(position);
+      }}
+      onDestinationPick={() => {
+        setMode(pickingDestination ? undefined : 'destination');
+        setLayerOpen(false);
+      }}
       waypoints={waypoints}
       avoidedAreas={avoidedAreas}
       draft={draft}
@@ -601,6 +626,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         focus={focus}
         // The start point field also arms a click, or a tap.
         pickOnClick={picking}
+        destination={destination}
+        pickDestinationOnClick={pickingDestination}
+        // Only once there is a start point: the last shape kept may be an out-and-back one, and the start point comes first.
+        destinationOnLongPress={desktop && Boolean(start) && outAndBack && !destination}
+        onDestinationChange={changeDestination}
+        onDestinationRefused={() => setRefused('uncovered')}
         routes={browser.geometries}
         summaries={summaries}
         directedRoutes={browser.directedGeometries}
@@ -749,7 +780,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           <CriteriaBar
             language={language}
             summary={criteriaSummary(
-              criteriaRequest(draft[0], { pace, start: start ?? NO_START, waypoints, avoidedAreas })!,
+              criteriaRequest(draft[0], {
+                pace,
+                start: start ?? NO_START,
+                destination: destination ?? NO_START,
+                waypoints,
+                avoidedAreas,
+              })!,
               language,
             )}
             start={start && formatPosition(start, language)}
@@ -816,15 +853,21 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           index={selected}
           count={atPace.routes.length}
           onClose={deselect}
-          onReverse={() => browser.toggleReversed(selected)}
+          {...(routeSet?.request.shape ? {} : { onReverse: () => browser.toggleReversed(selected) })}
           onHover={browser.setHover}
           waypoints={routeSet?.request.waypoints}
           waypointPois={waypointPois}
         />
       )}
-      {picking && (
+      {(picking || pickingDestination) && (
         <div data-testid="criteria-pick-bar" className={`${MAP_NOTICE} flex items-center gap-3 py-1 pr-1 pl-4`}>
-          {desktop ? t.pickStart : t.pickStartTouch}
+          {pickingDestination
+            ? desktop
+              ? t.pickDestination
+              : t.pickDestinationTouch
+            : desktop
+              ? t.pickStart
+              : t.pickStartTouch}
           <button
             type="button"
             data-testid="criteria-pick-cancel"
@@ -906,6 +949,8 @@ function CriteriaFields({
   startUncovered,
   language,
   picking,
+  destination,
+  pickingDestination,
   waypoints,
   avoidedAreas,
   draft,
@@ -913,6 +958,8 @@ function CriteriaFields({
   waypointList,
   avoidedList,
   onStartChange,
+  onDestinationChange,
+  onDestinationPick,
   onUnreadable,
   onPick,
   locating,
@@ -924,6 +971,8 @@ function CriteriaFields({
   startUncovered: boolean;
   language: Language;
   picking: boolean;
+  destination: Position | undefined;
+  pickingDestination: boolean;
   waypoints: Position[];
   avoidedAreas: AvoidedArea[];
   draft: ReturnType<typeof useCriteriaDraft>;
@@ -931,6 +980,8 @@ function CriteriaFields({
   waypointList: ReactNode;
   avoidedList: ReactNode;
   onStartChange: (start: Position) => void;
+  onDestinationChange: (destination: Position) => void;
+  onDestinationPick: () => void;
   onUnreadable: () => void;
   onPick: () => void;
   locating: boolean;
@@ -940,11 +991,14 @@ function CriteriaFields({
   const t = criteriaText[language];
   return (
     <>
-      <StartPointField
-        start={start}
+      <PositionField
+        value={start}
+        label={t.startPoint}
+        testId="criteria-start"
+        markerClass="border-start"
         language={language}
         picking={picking}
-        onStartChange={onStartChange}
+        onChange={onStartChange}
         onUnreadable={onUnreadable}
       >
         <button
@@ -967,16 +1021,40 @@ function CriteriaFields({
         >
           <LocateIcon locating={locating} />
         </button>
-      </StartPointField>
+      </PositionField>
       {criteriaShown ? (
         <CriteriaForm
           language={language}
           start={start}
+          destination={destination}
           startUncovered={startUncovered}
           waypoints={waypoints}
           avoidedAreas={avoidedAreas}
           draft={draft}
           searched={searched}
+          destinationField={
+            <PositionField
+              value={destination}
+              label={t.destination}
+              testId="criteria-destination"
+              markerClass="border-accent"
+              language={language}
+              picking={pickingDestination}
+              onChange={onDestinationChange}
+              onUnreadable={onUnreadable}
+            >
+              <button
+                type="button"
+                data-testid="criteria-destination-pick"
+                className={`${ICON_BUTTON} aria-pressed:text-accent`}
+                {...tip(t.chooseOnMap, 'bottom-end')}
+                aria-pressed={pickingDestination}
+                onClick={onDestinationPick}
+              >
+                <Crosshair size={20} aria-hidden />
+              </button>
+            </PositionField>
+          }
           waypointList={waypointList}
           avoidedList={avoidedList}
           onSubmit={onSubmit}
@@ -990,20 +1068,27 @@ function CriteriaFields({
   );
 }
 
-// The start point as coordinates, to copy, or to type or paste to set it. Only coordinates:
+// The start point or the destination as coordinates, to copy, or to type or paste to set it. Only coordinates:
 // naming the place would send it to a geocoding service.
-function StartPointField({
-  start,
+function PositionField({
+  value: start,
+  label,
+  testId,
+  markerClass,
   language,
   picking = false,
-  onStartChange,
+  onChange: onStartChange,
   onUnreadable,
   children,
 }: {
-  start?: Position;
+  value?: Position | undefined;
+  label: string;
+  testId: string;
+  /** The colour of the border of the dot, as on the map. */
+  markerClass: string;
   language: Language;
   picking?: boolean;
-  onStartChange: (start: Position) => void;
+  onChange: (position: Position) => void;
   /** Coordinates that cannot be read were typed: the view says so in a toast. */
   onUnreadable: () => void;
   /** Buttons at the end of the field. */
@@ -1050,14 +1135,14 @@ function StartPointField({
           `focus-within:ring-inset ${picking ? 'ring-2 ring-accent ring-inset' : ''}`
         }
       >
-        <span className="ml-3 size-4 flex-none rounded-full border-4 border-start bg-white" />
+        <span className={`ml-3 size-4 flex-none rounded-full border-4 bg-white ${markerClass}`} />
         <div className="flex min-h-14 min-w-0 flex-1 flex-col justify-center px-3 py-2">
           <label className="text-sm text-ink-2" htmlFor={inputId}>
-            {t.startPoint}
+            {label}
           </label>
           <input
             id={inputId}
-            data-testid="criteria-start"
+            data-testid={testId}
             className="w-full bg-transparent outline-none placeholder:text-ink-2"
             value={draft}
             placeholder={t.coordinates}

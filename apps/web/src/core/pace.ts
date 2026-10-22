@@ -29,6 +29,6 @@ export function routesAtPace(
   routes: Route[],
   pace: number,
 ): { routes: Route[]; pace: number } {
-  if ('duration' in request.target) return { routes, pace: request.pace };
+  if (request.target && 'duration' in request.target) return { routes, pace: request.pace };
   return { routes: routes.map((route) => ({ ...route, estimatedDuration: estimatedDuration(route, pace) })), pace };
 }
