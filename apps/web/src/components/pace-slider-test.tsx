@@ -8,7 +8,7 @@ function setup(props: { pace?: number; paceUnit?: PaceUnit } = {}) {
   render(
     <PaceSlider label="Pace" pace={6} paceUnit="min/km" language="en" testId="pace" onChange={onChange} {...props} />,
   );
-  return { onChange, slider: screen.getByTestId('pace') };
+  return { onChange, slider: screen.getByTestId('pace'), plus: screen.getByTestId('pace-plus') };
 }
 
 describe('PaceSlider', () => {
@@ -28,6 +28,14 @@ describe('PaceSlider', () => {
     fireEvent.change(slider, { target: { value: '330' } });
 
     expect(onChange).toHaveBeenCalledExactlyOnceWith(5.5);
+  });
+
+  it('moves the pace by one step, in minutes per km, with the plus button', () => {
+    const { plus, onChange } = setup({ pace: 5.5 });
+
+    fireEvent.click(plus);
+
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(335 / 60);
   });
 
   it('shows the pace in km/h, within 5 and 20, when the user asks for it', () => {
