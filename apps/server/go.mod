@@ -3,7 +3,7 @@ module github.com/lesloi/path-finder/apps/server
 go 1.27.1
 
 require (
-	github.com/go-chi/chi/v5 v5.3.2
+	github.com/go-chi/chi/v5 v5.5.0
 	github.com/paulmach/osm v0.9.0
 )
 
