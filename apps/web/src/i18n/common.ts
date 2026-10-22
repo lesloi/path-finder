@@ -5,6 +5,8 @@ export const commonText = {
   en: {
     back: 'Back',
     close: 'Close',
+    decrease: 'Decrease',
+    increase: 'Increase',
     settings: 'Settings',
     credits: 'Credits',
     privacy: 'Privacy policy',
@@ -25,6 +27,8 @@ export const commonText = {
   fr: {
     back: 'Retour',
     close: 'Fermer',
+    decrease: 'Diminuer',
+    increase: 'Augmenter',
     settings: 'Réglages',
     credits: 'Crédits',
     privacy: 'Politique de confidentialité',

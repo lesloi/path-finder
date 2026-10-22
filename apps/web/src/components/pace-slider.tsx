@@ -41,6 +41,7 @@ export function PaceSlider({
       testId={testId}
       leading={leading}
       label={label}
+      language={language}
       value={value}
       shown={formatPace(toPace(value), paceUnit, language)}
       min={min}

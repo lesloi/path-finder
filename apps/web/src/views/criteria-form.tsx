@@ -206,6 +206,7 @@ export function CriteriaForm({
           />
           {draft.target === 'distance' ? (
             <Slider
+              language={language}
               testId="criteria-distance"
               label={t.distance}
               value={distance}
@@ -217,6 +218,7 @@ export function CriteriaForm({
             />
           ) : (
             <Slider
+              language={language}
               testId="criteria-duration"
               label={t.duration}
               value={draft.duration}
@@ -258,6 +260,7 @@ export function CriteriaForm({
           />
           {level === 'target' && (
             <Slider
+              language={language}
               testId="criteria-gain"
               label={t.elevationGain}
               value={gain}
