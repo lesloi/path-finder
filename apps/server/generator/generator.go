@@ -131,10 +131,6 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	return routes, nil
 }
 
-// outAndBackAlternatives is how many ways out to ask the engine for. The ranking keeps those that do not share most
-// of their geometry, so a destination with a single access gives one route.
-const outAndBackAlternatives = 5
-
 // outAndBack builds the route set of an out-and-back route: the destination sets the distance, so every route is a
 // match and only the surface preference ranks them.
 func (g *Generator) outAndBack(ctx context.Context, looper Looper, c contract.Criteria) (any, error) {
@@ -150,10 +146,12 @@ func (g *Generator) outAndBack(ctx context.Context, looper Looper, c contract.Cr
 		points[i] = engine.Point{Lat: w[1], Lon: w[0]}
 	}
 	found, err := looper.OutAndBack(ctx, engine.OutAndBackRequest{
-		Start:        engine.Point{Lat: c.Start[1], Lon: c.Start[0]},
-		Waypoints:    points,
-		Avoided:      avoidedCircles(c.AvoidedAreas),
-		Alternatives: outAndBackAlternatives,
+		Start:     engine.Point{Lat: c.Start[1], Lon: c.Start[0]},
+		Waypoints: points,
+		Avoided:   avoidedCircles(c.AvoidedAreas),
+		// As many ways out as routes a set may hold: the ranking keeps those that do not share most of their geometry,
+		// so a destination with a single access gives one route.
+		Alternatives: cmpOr(g.MaxRoutes, maxRoutes),
 	})
 	var waypoint *engine.WaypointError
 	switch {
