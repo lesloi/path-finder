@@ -12,7 +12,6 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -43,6 +42,7 @@ func webRoot(t *testing.T) string {
 		}
 	}
 	write("index.html", "<html>app</html>")
+	write("build-id", "build-2\n")
 	write("assets/app-abc123.js", "console.log(1)")
 	return dir
 }
@@ -152,19 +152,15 @@ func TestRouteSetsRefusals(t *testing.T) {
 	})
 }
 
-func TestAnOutdatedAPIVersionMustReload(t *testing.T) {
+func TestStaleBuildMustReload(t *testing.T) {
 	h := newServer(t, nil)
-	current := strconv.Itoa(contract.APIVersion)
 	cases := map[string]struct {
 		headers map[string]string
 		want    int
 	}{
-		"older version":                {map[string]string{"X-Api-Version": "0"}, 426},
-		"newer version":                {map[string]string{"X-Api-Version": "999"}, 426},
-		"tab from before the version":  {map[string]string{"X-Build-Id": "build-1"}, 426},
-		"current version":              {map[string]string{"X-Api-Version": current}, 200},
-		"current version, other build": {map[string]string{"X-Api-Version": current, "X-Build-Id": "any"}, 200},
-		"no header":                    {nil, 200},
+		"other build":   {map[string]string{"X-Api-Version": "build-1"}, 426},
+		"current build": {map[string]string{"X-Api-Version": "build-2"}, 200},
+		"no header":     {nil, 200},
 	}
 	for name, tc := range cases {
 		r := do(h, http.MethodPost, "/api/v1/route-sets", `{}`, "", tc.headers)
@@ -369,6 +365,7 @@ func TestStaticFilesAreCachedByKind(t *testing.T) {
 	for path, want := range map[string]string{
 		"/":                     "no-cache",
 		"/assets/app-abc123.js": immutable,
+		"/build-id":             "no-cache",
 		"/assets/missing.js":    "",
 	} {
 		r := do(h, http.MethodGet, path, "", "", nil)
@@ -384,6 +381,14 @@ func TestStaticFilesAreCachedByKind(t *testing.T) {
 	}
 	if r := do(h, http.MethodPost, "/", "", "", nil); r.Code != 404 {
 		t.Errorf("POST to a static path: got %d", r.Code)
+	}
+}
+
+func TestWithoutABuiltWebAppAnyBuildIsAccepted(t *testing.T) {
+	h := New(Config{WebRoot: t.TempDir(), Generator: generatorFunc(okGenerator)})
+	r := do(h, http.MethodPost, "/api/v1/route-sets", `{}`, "", map[string]string{"X-Api-Version": "build-0"})
+	if r.Code != 200 {
+		t.Errorf("no build-id file: got %d", r.Code)
 	}
 }
 

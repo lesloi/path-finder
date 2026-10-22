@@ -12,7 +12,7 @@ describe('strategyFor', () => {
 
   it('leaves other pages alone, so they never replace the cached shell', () => {
     expect(strategy('/healthz', 'GET', 'navigate')).toBe('ignore');
-    expect(strategy('/healthz', 'GET', 'navigate')).toBe('ignore');
+    expect(strategy('/build-id', 'GET', 'navigate')).toBe('ignore');
     expect(strategy('/api', 'GET', 'navigate')).toBe('ignore');
   });
 
@@ -33,6 +33,6 @@ describe('strategyFor', () => {
   });
 
   it('ignores what it does not know', () => {
-    expect(strategy('/healthz')).toBe('ignore');
+    expect(strategy('/build-id')).toBe('ignore');
   });
 });

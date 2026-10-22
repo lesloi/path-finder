@@ -1,6 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
 
-import { API_VERSION } from '../contract/index.ts';
 import { requestCoverage, useCoverage } from './coverage.ts';
 
 const cells = [[6, 45.8, 6.1, 45.9]];
@@ -14,13 +13,13 @@ function answer(response: Response | Promise<Response>) {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('requestCoverage', () => {
-  it('asks the API with its version, and nothing else', async () => {
+  it('asks the API with the build id, and nothing else', async () => {
     vi.stubEnv('VITE_BUILD_ID', 'build-1');
     const fetchMock = answer(Response.json({ cells }));
 
     expect(await requestCoverage()).toEqual(cells);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/coverage', { headers: { 'X-Api-Version': String(API_VERSION) } });
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/coverage', { headers: { 'X-Api-Version': 'build-1' } });
   });
 
   it('says nothing when the API cannot be reached', async () => {

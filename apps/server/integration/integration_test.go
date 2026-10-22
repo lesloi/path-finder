@@ -41,8 +41,12 @@ func serverOn(t *testing.T, dir string) http.Handler {
 	for _, name := range engine.ProfileNames {
 		engines[name] = zones.Profile(name)
 	}
+	web := t.TempDir()
+	if err := os.WriteFile(filepath.Join(web, "build-id"), []byte("build-1"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	return server.New(server.Config{
-		WebRoot:  t.TempDir(),
+		WebRoot:  web,
 		Coverage: zones,
 		// A fixed seed: what the tests assert on the routes found does not depend on chance.
 		Generator: &generator.Generator{Engines: engines, Seed: func() uint64 { return 7 }},
@@ -141,7 +145,7 @@ func TestRefusals(t *testing.T) {
 		t.Errorf("broken JSON: %d %s", code, out)
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/route-sets", strings.NewReader(criteria(`{"distance":10}`, "")))
-	req.Header.Set("X-Api-Version", "0")
+	req.Header.Set("X-Api-Version", "build-0")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != 426 {
@@ -295,7 +299,7 @@ func TestCoverageIsTheSampleAnswer(t *testing.T) {
 func TestCoverageRefusesAStaleBuild(t *testing.T) {
 	h := newServer(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/coverage", nil)
-	req.Header.Set("X-Api-Version", "0")
+	req.Header.Set("X-Api-Version", "build-0")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUpgradeRequired {

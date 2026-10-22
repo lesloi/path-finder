@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { isCriteriaField, type CriteriaField, type ErrorCode } from '../contract/index.ts';
 import { parseRoutes, type Route, type RouteSetRequest } from '../core/index.ts';
-import { apiVersionHeader } from './api.ts';
+import { buildIdHeader } from './api.ts';
 
 /**
  * Why there is no route set: an error code of the API, the API cannot be reached, or it answered
@@ -59,7 +59,7 @@ export async function requestRouteSet(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...apiVersionHeader(),
+        ...buildIdHeader(),
       },
       body: JSON.stringify(request),
       ...(signal && { signal }),

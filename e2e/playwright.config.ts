@@ -22,7 +22,7 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'] } },
   ],
   webServer: {
-    // The binary with the built web app, rather than the Vite dev server, so headers and static serving
+    // The binary with the built web app, rather than the Vite dev server, so headers, static serving and `build-id`
     // are the real ones. Not `pnpm start` itself: pnpm puts the server in its own process group, which outlives
     // Playwright's stop and holds CI open.
     command: `pnpm build && cd apps/server && CGO_ENABLED=0 go run ./cmd/standin "${GRAPH_DIR}" && CGO_ENABLED=0 go build -o "${GRAPH_DIR}/server" . && exec "${GRAPH_DIR}/server"`,
