@@ -11,7 +11,7 @@ import {
   type SymbolLayerSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 
 import type { AvoidedArea } from '../contract/index.ts';
@@ -192,6 +192,19 @@ export type MapHandle = {
 export type RouteSummary = { distance: number; elevationGain?: number };
 
 // The south-west and north-east corners around some positions.
+// A white dot with a coloured ring, like the start of the logo's trail: the start point, or the destination.
+function useDotMarker(map: RefObject<Map | null>, position: Position | undefined, ringClass: string) {
+  useEffect(() => {
+    if (!position) return;
+    const element = document.createElement('div');
+    element.className = `size-4 rounded-full border-4 bg-white shadow-float ${ringClass}`;
+    const marker = new Marker({ element }).setLngLat(position).addTo(map.current!);
+    return () => {
+      marker.remove();
+    };
+  }, [map, position, ringClass]);
+}
+
 function boundsOf(geometries: Position[][]): [Position, Position] {
   const points = geometries.flat();
   const lons = points.map(([lon]) => lon);
@@ -376,12 +389,12 @@ export function StartPointMap({
         if (how === 'click') onAvoidedAreaAdd?.([lng, lat]);
         return;
       }
-      if (pickDestinationOnClick || (destinationOnLongPress && how === 'long-press')) {
-        if (how === 'click' || destinationOnLongPress) {
-          (canPlace([lng, lat]) ? onDestinationChange : onDestinationRefused)?.([lng, lat]);
-        }
+      if (how === 'click' ? pickDestinationOnClick : destinationOnLongPress) {
+        (canPlace([lng, lat]) ? onDestinationChange : onDestinationRefused)?.([lng, lat]);
         return;
       }
+      // Picking the destination by click: a long press must not move the start point meanwhile.
+      if (pickDestinationOnClick) return;
       if (placing) {
         if (how === 'click') {
           const position = poi?.position ?? [lng, lat];
@@ -722,27 +735,9 @@ export function StartPointMap({
     mapRef.current!.setStyle(basemapStyle(basemap), { diff: false });
   }, [basemap]);
 
-  useEffect(() => {
-    if (!start) return;
-    const element = document.createElement('div');
-    // A white dot with a brown ring, like the start of the logo's trail.
-    element.className = 'size-4 rounded-full border-4 border-start bg-white shadow-float';
-    const marker = new Marker({ element }).setLngLat(start).addTo(mapRef.current!);
-    return () => {
-      marker.remove();
-    };
-  }, [start]);
-
-  useEffect(() => {
-    if (!destination) return;
-    const element = document.createElement('div');
-    // Like the start point, in the colour of the accent: the route turns back here.
-    element.className = 'size-4 rounded-full border-4 border-accent bg-white shadow-float';
-    const marker = new Marker({ element }).setLngLat(destination).addTo(mapRef.current!);
-    return () => {
-      marker.remove();
-    };
-  }, [destination]);
+  useDotMarker(mapRef, start, 'border-start');
+  // In the colour of the accent: the route turns back here.
+  useDotMarker(mapRef, destination, 'border-accent');
 
   // A forbidden sign over the veiled part of the map, while placing.
   useEffect(() => {

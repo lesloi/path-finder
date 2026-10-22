@@ -1,3 +1,4 @@
+import { byDuration } from '../contract/index.ts';
 import { effortFactor } from './effort.ts';
 import type { Route, RouteSetRequest } from './route.ts';
 import type { PaceUnit } from './units.ts';
@@ -29,6 +30,6 @@ export function routesAtPace(
   routes: Route[],
   pace: number,
 ): { routes: Route[]; pace: number } {
-  if (request.target && 'duration' in request.target) return { routes, pace: request.pace };
+  if (byDuration(request)) return { routes, pace: request.pace };
   return { routes: routes.map((route) => ({ ...route, estimatedDuration: estimatedDuration(route, pace) })), pace };
 }

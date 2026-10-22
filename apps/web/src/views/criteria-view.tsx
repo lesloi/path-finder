@@ -25,6 +25,7 @@ import {
 import {
   areaContains,
   AVOIDED_AREA_RADIUS,
+  byDuration,
   MAX_AVOIDED_AREAS,
   MAX_WAYPOINTS,
   type AvoidedArea,
@@ -218,10 +219,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
   // Where an out-and-back route turns back: kept here too, for this visit only.
-  const [kept, setDestination] = useState<Position>();
+  const [keptDestination, setDestination] = useState<Position>();
   // A loop has none: the one set is kept for when the shape comes back, but neither asked for nor shown.
   const outAndBack = draft[0].shape === 'outAndBack';
-  const destination = outAndBack ? kept : undefined;
+  const destination = outAndBack ? keptDestination : undefined;
   // The circles routes keep out of: kept here too, for this visit only, as the waypoints are.
   const [drawnAreas, setAvoidedAreas] = useState<AvoidedArea[]>(NO_AREAS);
   // A phone has neither the button nor the list to edit them: the areas drawn on a desktop do not apply there.
@@ -269,6 +270,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     [directed],
   );
   const routesShown = Boolean(routeSet);
+  // An out-and-back route is the same both ways.
+  const reversible = !routeSet?.request.shape;
   const listShown = desktop && (loading || Boolean(routeSet));
   // Nothing is selected until the user picks a route; a phone opens the first one's detail from its list.
   const selected = desktop ? browser.selected : (browser.selected ?? 0);
@@ -422,6 +425,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     setMode((current) => (current === 'destination' ? undefined : current));
   }
 
+  function moveDestination(position: Position) {
+    setFocus(position);
+    changeDestination(position);
+  }
+
   // The device location and typed coordinates move the map there; a pick on the map does not.
   function moveStart(position: Position) {
     setFocus(position);
@@ -506,18 +514,14 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         onPreview={browser.setPreview}
         onDetailChange={browser.openDetail}
         // By duration, a new pace is another search, which the criteria ask for: the list only says the pace.
-        onPaceChange={
-          !routeSet.request.target || 'distance' in routeSet.request.target
-            ? (value) => update({ pace: value })
-            : undefined
-        }
+        onPaceChange={byDuration(routeSet.request) ? undefined : (value) => update({ pace: value })}
         onClear={() => {
           browser.drop();
           setCleared(true);
           // The button is gone: the focus goes on from the settings, as after a button that puts the map back.
           settingsLink.current?.focus();
         }}
-        onReverse={routeSet.request.shape ? undefined : browser.toggleReversed}
+        onReverse={reversible ? browser.toggleReversed : undefined}
         onHover={browser.setHover}
         waypoints={routeSet.request.waypoints}
         waypointPois={waypointPois}
@@ -540,6 +544,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     </button>
   );
   // A phone has the button over the map, and no pointer to highlight a pin with.
+  const pickPrompt = pickingDestination
+    ? desktop
+      ? t.pickDestination
+      : t.pickDestinationTouch
+    : desktop
+      ? t.pickStart
+      : t.pickStartTouch;
   const waypointTools = desktop && {
     add: { placing, full: waypoints.length >= MAX_WAYPOINTS, onToggle: togglePlacing },
     onCenter: (index: number) => map.current?.centerOn(waypoints[index]!),
@@ -555,10 +566,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       picking={picking}
       destination={destination}
       pickingDestination={pickingDestination}
-      onDestinationChange={(position) => {
-        setFocus(position);
-        changeDestination(position);
-      }}
+      onDestinationChange={moveDestination}
       onDestinationPick={() => {
         setMode(pickingDestination ? undefined : 'destination');
         setLayerOpen(false);
@@ -853,7 +861,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           index={selected}
           count={atPace.routes.length}
           onClose={deselect}
-          {...(routeSet?.request.shape ? {} : { onReverse: () => browser.toggleReversed(selected) })}
+          onReverse={reversible ? () => browser.toggleReversed(selected) : undefined}
           onHover={browser.setHover}
           waypoints={routeSet?.request.waypoints}
           waypointPois={waypointPois}
@@ -861,13 +869,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       )}
       {(picking || pickingDestination) && (
         <div data-testid="criteria-pick-bar" className={`${MAP_NOTICE} flex items-center gap-3 py-1 pr-1 pl-4`}>
-          {pickingDestination
-            ? desktop
-              ? t.pickDestination
-              : t.pickDestinationTouch
-            : desktop
-              ? t.pickStart
-              : t.pickStartTouch}
+          {pickPrompt}
           <button
             type="button"
             data-testid="criteria-pick-cancel"
@@ -1071,13 +1073,13 @@ function CriteriaFields({
 // The start point or the destination as coordinates, to copy, or to type or paste to set it. Only coordinates:
 // naming the place would send it to a geocoding service.
 function PositionField({
-  value: start,
+  value,
   label,
   testId,
   markerClass,
   language,
   picking = false,
-  onChange: onStartChange,
+  onChange,
   onUnreadable,
   children,
 }: {
@@ -1095,11 +1097,11 @@ function PositionField({
   children?: ReactNode;
 }) {
   const t = criteriaText[language];
-  const shown = start ? formatPosition(start, language) : '';
+  const shown = value ? formatPosition(value, language) : '';
   const [draft, setDraft] = useState(shown);
   const [unreadable, setUnreadable] = useState(false);
   const [shownBefore, setShownBefore] = useState(shown);
-  // A new start point, from the map or the location, replaces what is typed.
+  // A new position, from the map or the location, replaces what is typed.
   if (shown !== shownBefore) {
     setShownBefore(shown);
     setDraft(shown);
@@ -1122,9 +1124,9 @@ function PositionField({
       setUnreadable(true);
       return onUnreadable();
     }
-    // Written back the usual way, even when it is the start point already.
+    // Written back the usual way, even when it is the position already.
     setDraft(formatPosition(position, language));
-    onStartChange(position);
+    onChange(position);
   }
 
   return (

@@ -109,7 +109,7 @@ export function RouteSetView({
         selected={selected ?? 0}
         onSelect={onSelect}
         onBack={() => onDetailChange(false)}
-        {...(onReverse && { onReverse: () => onReverse(selected ?? 0) })}
+        onReverse={onReverse && (() => onReverse(selected ?? 0))}
         onHover={onHover}
         waypoints={waypoints}
         waypointPois={waypointPois}

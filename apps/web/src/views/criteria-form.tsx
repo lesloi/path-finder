@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 
 import {
+  byDuration,
   CriteriaError,
   MAX_TARGET_DISTANCE,
   MAX_TARGET_ELEVATION_GAIN,
@@ -88,41 +89,31 @@ export function criteriaRequest(
   const distance = clamp(draft.distance, BOUNDS.distance.min, BOUNDS.distance.max);
   const gain = clamp(draft.gain, 0, BOUNDS.gain.max);
   const level = draft.level;
+  const outAndBack = draft.shape === 'outAndBack';
   // A route is no longer than its target, and no point of it is farther from the start than that: an area beyond
-  // stays on the device, as a route cannot need it.
-  const reachKm = draft.target === 'distance' ? distance : draft.duration / pace;
+  // stays on the device, as a route cannot need it. An out-and-back route has no target to bound its reach, and its
+  // way can wind: its reach is the longest route there is.
+  const reachKm = outAndBack ? MAX_TARGET_DISTANCE : draft.target === 'distance' ? distance : draft.duration / pace;
   const reachable =
     start && avoidedAreas?.filter((area) => kmBetween(start, area.center) - area.radius / 1000 <= reachKm);
-  // An out-and-back route has no target to bound its reach, and its way can wind: the reach is the longest route
-  // there is, so that an area farther than any route can go stays on the device.
-  const outAndBackAreas =
-    start && avoidedAreas?.filter((area) => kmBetween(start, area.center) - area.radius / 1000 <= MAX_TARGET_DISTANCE);
-  return (
-    start &&
-    (draft.shape === 'outAndBack'
-      ? // Without a destination there is nothing to ask for yet.
-        destination
-        ? {
-            start,
-            shape: 'outAndBack' as const,
-            destination,
-            surface: draft.surface,
-            pace,
-            ...(waypoints?.length && { waypoints }),
-            ...(outAndBackAreas?.length && { avoidedAreas: outAndBackAreas }),
-          }
-        : undefined
-      : {
-          start,
-          target: draft.target === 'distance' ? { distance } : { duration: draft.duration },
-          ...(level === 'target' && { elevationGain: gain }),
-          ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
-          surface: draft.surface,
-          pace,
-          ...(waypoints?.length && { waypoints }),
-          ...(reachable?.length && { avoidedAreas: reachable }),
-        })
-  );
+  if (!start) return undefined;
+  const common = {
+    start,
+    surface: draft.surface,
+    pace,
+    ...(waypoints?.length && { waypoints }),
+    ...(reachable?.length && { avoidedAreas: reachable }),
+  };
+  if (outAndBack) {
+    // Without a destination there is nothing to ask for yet.
+    return destination && { ...common, shape: 'outAndBack', destination };
+  }
+  return {
+    ...common,
+    target: draft.target === 'distance' ? { distance } : { duration: draft.duration },
+    ...(level === 'target' && { elevationGain: gain }),
+    ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
+  };
 }
 
 const sameAreas = (a: AvoidedArea[], b: AvoidedArea[]) =>
@@ -158,7 +149,7 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
     samePositions(request.destination ? [request.destination] : [], found.destination ? [found.destination] : []) &&
     samePositions(request.waypoints ?? [], found.waypoints ?? []) &&
     sameAreas(request.avoidedAreas ?? [], found.avoidedAreas ?? []) &&
-    (!b || 'distance' in b || request.pace === found.pace)
+    (!byDuration(found) || request.pace === found.pace)
   );
 }
 

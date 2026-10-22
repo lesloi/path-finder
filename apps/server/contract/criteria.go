@@ -159,23 +159,11 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 			return fail("elevationGain", "an out-and-back route has no target elevation gain")
 		}
 	} else {
-		target, ok := obj["target"].(map[string]any)
-		if !ok || len(target) != 1 {
-			return fail("target", "target must be a distance or a duration")
+		target, message := parseTarget(obj["target"])
+		if message != "" {
+			return fail("target", message)
 		}
-		if v, isDistance := target["distance"]; isDistance {
-			d, ok := within(v, bounds.MinDistanceKm, bounds.MaxDistanceKm)
-			if !ok {
-				return fail("target", "target distance out of bounds")
-			}
-			c.Target.Distance = d
-		} else {
-			d, ok := within(target["duration"], bounds.DurationMinutes.Min, bounds.DurationMinutes.Max)
-			if !ok {
-				return fail("target", "target duration out of bounds")
-			}
-			c.Target.Duration = d
-		}
+		c.Target = target
 	}
 
 	var gain *ElevationGain
@@ -263,6 +251,24 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 		return fail("target", "target duration makes too long a route at this pace")
 	}
 	return c, nil
+}
+
+// parseTarget reads a distance or a duration, or says what is wrong with it.
+func parseTarget(v any) (t Target, message string) {
+	obj, ok := v.(map[string]any)
+	if !ok || len(obj) != 1 {
+		return t, "target must be a distance or a duration"
+	}
+	if raw, isDistance := obj["distance"]; isDistance {
+		if t.Distance, ok = within(raw, bounds.MinDistanceKm, bounds.MaxDistanceKm); !ok {
+			return Target{}, "target distance out of bounds"
+		}
+		return t, ""
+	}
+	if t.Duration, ok = within(obj["duration"], bounds.DurationMinutes.Min, bounds.DurationMinutes.Max); !ok {
+		return Target{}, "target duration out of bounds"
+	}
+	return t, ""
 }
 
 // avoidedArea reads a centre and a radius.

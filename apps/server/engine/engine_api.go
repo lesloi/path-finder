@@ -412,7 +412,8 @@ func (e *Engine) OutAndBack(ctx context.Context, req OutAndBackRequest) ([]*Rout
 // mirrored is a path followed by itself reversed, turning once at its last node. The edges of the way out serve the
 // way back: a way has the same length, kind and surface in both directions.
 func mirrored(nodes, edges []uint32) (allNodes, allEdges []uint32) {
-	allNodes, allEdges = slices.Clone(nodes), slices.Clone(edges)
+	allNodes = append(make([]uint32, 0, 2*len(nodes)), nodes...)
+	allEdges = append(make([]uint32, 0, 2*len(edges)), edges...)
 	for i := len(nodes) - 2; i >= 0; i-- {
 		allNodes = append(allNodes, nodes[i])
 	}

@@ -61,6 +61,9 @@ export function areaContains({ center, radius }: AvoidedArea, [lon, lat]: Positi
   return Math.hypot(dx, dy) <= radius;
 }
 
+/** Whether the length of the routes is asked for as a duration, which the pace then decides. */
+export const byDuration = ({ target }: Criteria): boolean => target !== undefined && 'duration' in target;
+
 /** The criteria fields `parseCriteria` checks, so a form can say which one is wrong. */
 export const CRITERIA_FIELDS = [
   'start',
@@ -121,6 +124,16 @@ function targetDistance(criteria: LoopCriteria): number {
   return distance;
 }
 
+function parseTarget(target: unknown): LoopCriteria['target'] {
+  check(isObject(target) && Object.keys(target).length === 1, 'target', 'target must be a distance or a duration');
+  if ('distance' in target) {
+    check(within(target.distance, MIN_TARGET_DISTANCE, MAX_TARGET_DISTANCE), 'target', 'Target distance out of bounds');
+    return { distance: target.distance };
+  }
+  check(within(target.duration, TARGET_DURATION.min, TARGET_DURATION.max), 'target', 'Target duration out of bounds');
+  return { duration: target.duration };
+}
+
 /**
  * Checks criteria as the server does, to tell the user early which field is wrong. The server
  * checks them again and has the last word: it shares the bounds and the cases of its tests with
@@ -140,28 +153,11 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
     'a destination must be a longitude and a latitude, for an out-and-back route',
   );
 
-  let parsedTarget: LoopCriteria['target'] | undefined;
   if (outAndBack) {
     check(target === undefined, 'target', 'an out-and-back route has no target');
     check(elevationGain === undefined, 'elevationGain', 'an out-and-back route has no target elevation gain');
-  } else {
-    check(isObject(target) && Object.keys(target).length === 1, 'target', 'target must be a distance or a duration');
-    if ('distance' in target) {
-      check(
-        within(target.distance, MIN_TARGET_DISTANCE, MAX_TARGET_DISTANCE),
-        'target',
-        'Target distance out of bounds',
-      );
-      parsedTarget = { distance: target.distance };
-    } else {
-      check(
-        within(target.duration, TARGET_DURATION.min, TARGET_DURATION.max),
-        'target',
-        'Target duration out of bounds',
-      );
-      parsedTarget = { duration: target.duration };
-    }
   }
+  const parsedTarget = outAndBack ? undefined : parseTarget(target);
 
   check(
     elevationGain === undefined ||
@@ -219,14 +215,14 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
     ...(areas.length > 0 && { avoidedAreas: areas }),
   };
   const points = (waypoints as Position[] | undefined)?.map(([lon, lat]): Position => [lon, lat]) ?? [];
-  if (outAndBack) {
+  if (!parsedTarget) {
     const [lon, lat] = destination as Position;
-    return { ...common, shape, destination: [lon, lat], ...(points.length > 0 && { waypoints: points }) };
+    return { ...common, shape: 'outAndBack', destination: [lon, lat], ...(points.length > 0 && { waypoints: points }) };
   }
 
   const criteria: LoopCriteria = {
     ...common,
-    target: parsedTarget!,
+    target: parsedTarget,
     ...(countElevationGain &&
       elevationGain !== undefined && { elevationGain: elevationGain as LoopCriteria['elevationGain'] }),
     ...(points.length > 0 && { waypoints: points }),

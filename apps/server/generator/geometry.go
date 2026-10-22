@@ -1,6 +1,9 @@
 package generator
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 const (
 	// gridCell is the side of the grid cells used to compare routes, in metres.
@@ -113,12 +116,5 @@ func crowFliesThrough(start [2]float64, points [][2]float64) float64 {
 
 // crowFlies is the length in metres of the straight lines from start through the points and back.
 func crowFlies(start [2]float64, points [][2]float64) float64 {
-	toMetres := metresFrom(start)
-	var total, px, py float64
-	for _, p := range append(append([][2]float64{}, points...), start) {
-		x, y := toMetres(p[0], p[1])
-		total += math.Hypot(x-px, y-py)
-		px, py = x, y
-	}
-	return total
+	return crowFliesThrough(start, append(slices.Clone(points), start))
 }
