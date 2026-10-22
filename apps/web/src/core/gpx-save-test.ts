@@ -1,4 +1,4 @@
-import { saveGpx } from './gpx-save.ts';
+import { canShareGpx, saveGpx } from './gpx-save.ts';
 
 const gpx = { fileName: 'Course-2809-12km.gpx', content: '<gpx/>' };
 
@@ -73,5 +73,25 @@ describe('saveGpx', () => {
     void saveGpx(gpx);
 
     expect(share).toHaveBeenCalled();
+  });
+});
+
+describe('canShareGpx', () => {
+  it('is true when the browser can share a GPX file', () => {
+    stubShare(() => Promise.resolve());
+
+    expect(canShareGpx()).toBe(true);
+  });
+
+  it('is false when the browser cannot share files', () => {
+    stubShare(() => Promise.resolve(), false);
+
+    expect(canShareGpx()).toBe(false);
+  });
+
+  it('is false when the browser has no share sheet', () => {
+    vi.stubGlobal('navigator', { ...navigator, canShare: undefined, share: undefined });
+
+    expect(canShareGpx()).toBe(false);
   });
 });
