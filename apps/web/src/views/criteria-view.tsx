@@ -94,6 +94,10 @@ const STACKED =
   'right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--slot)*(var(--spacing-touch)+--spacing(2)))] ' +
   'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--slot)*(var(--spacing-touch)+--spacing(2)))] ' +
   'desktop:bottom-(--edge-bottom) transition-[bottom] duration-250 ease-[ease] motion-reduce:transition-none';
+// The corner under the settings link on phones, where the criteria bar takes the rest of the top; beside it on desktops.
+const BESIDE_SETTINGS =
+  'right-safe-3 top-[calc(env(safe-area-inset-top)+--spacing(3)+var(--spacing-touch)+--spacing(2))] ' +
+  'desktop:top-safe-3 desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--spacing-touch)+--spacing(2))]';
 const slotStyle = (slot: number) => ({ '--slot': slot }) as CSSProperties;
 
 // A folded desktop panel is gone from the map but for its tab, against the edge of the screen; an unfolded one carries
@@ -295,6 +299,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   // The button of a phone goes away with the route set, and with the search; a desktop has the list of the criteria.
   const waypointButtonShown = Boolean(start) && !routesShown && !loading && !desktop;
+
+  // A track is one tap away until a search is under way or a route is shown.
+  const importShown = !routesShown && !loading && !detailOpen;
 
   // The place of each button in the stack: the location (or reframe) button keeps the corner, within reach of the
   // thumb, then the waypoint one, then the layers, then the north.
@@ -645,6 +652,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       >
         <Settings size={20} aria-hidden />
       </a>
+      {/* Never disabled: a track needs neither a start point nor the server. */}
+      {importShown && <GpxImportButton language={language} onFile={importTrack} className={BESIDE_SETTINGS} />}
       {!detailOpen && (
         <>
           <LayersControl
@@ -722,10 +731,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
               Path finder
             </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-              {criteriaFields}
-              <GpxImportButton language={language} onFile={importTrack} />
-            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">{criteriaFields}</div>
           </FoldablePanel>
           {listShown && (
             <FoldablePanel
@@ -794,8 +800,6 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
                 >
                   {t.setCriteria}
                 </button>
-                {/* Never disabled: a track needs neither a start point nor the server. */}
-                <GpxImportButton language={language} onFile={importTrack} />
               </>
             )}
             {cancelButton}
