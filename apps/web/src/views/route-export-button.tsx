@@ -1,7 +1,14 @@
-import { Download } from 'lucide-react';
+import { Download, Share2 } from 'lucide-react';
 
 import { PRIMARY_BUTTON } from '../components/index.ts';
-import { exportRoute, type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
+import {
+  canShareGpx,
+  exportRoute,
+  type PaceUnit,
+  type Position,
+  type Route,
+  type WaypointPois,
+} from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
 import { useRoutePois } from './use-route-pois.ts';
 
@@ -29,6 +36,8 @@ export function RouteExportButton({
   waypointPois?: WaypointPois | undefined;
 }) {
   const { pois, load } = useRoutePois(route.geometry);
+  const share = canShareGpx();
+  const Icon = share ? Share2 : Download;
   return (
     <button
       type="button"
@@ -40,8 +49,8 @@ export function RouteExportButton({
       // Nothing awaited before the share sheet: it needs the tap that opened it.
       onClick={() => void exportRoute(route, { language, paceUnit, waypoints, waypointPois, pois }, pace)}
     >
-      <Download size={18} aria-hidden />
-      {routesText[language].exportGpx}
+      <Icon size={18} aria-hidden />
+      {routesText[language][share ? 'shareGpx' : 'exportGpx']}
     </button>
   );
 }
