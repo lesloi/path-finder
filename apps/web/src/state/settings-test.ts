@@ -8,7 +8,7 @@ const DEFAULTS = {
   pace: 6,
   paceUnit: 'min/km',
   theme: 'system',
-  basemap: 'plan',
+  basemap: 'minimal',
   poiLayers: { water: true, viewpoint: false, seasonal: true },
   lastCriteria: {
     target: 'distance',
