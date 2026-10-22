@@ -72,16 +72,17 @@ test.describe('the app', () => {
     await openMap(page);
 
     await page.getByTestId('criteria-settings').click();
-    await selectOption(page, 'settings-basemap', 'minimal');
+    await selectOption(page, 'settings-basemap', 'aerial');
     await page.reload();
 
-    await expect(page.getByTestId('settings-basemap')).toHaveText(settingsText.en.minimal);
+    await expect(page.getByTestId('settings-basemap')).toHaveText(settingsText.en.aerial);
   });
 
   test('goes back to the previous map background when the style of the new one fails to load', async ({
     page,
     context,
   }) => {
+    await page.addInitScript(() => localStorage.setItem('path-finder.settings', JSON.stringify({ basemap: 'plan' })));
     await openMap(page);
     // Registered last, so it answers first: the IGN style of the minimal background is down.
     await context.route('**/PLAN.IGN/epure.json', (route) => route.abort('failed'));

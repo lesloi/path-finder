@@ -73,7 +73,7 @@ describe('SettingsView', () => {
   it('shows the saved map background, and saves the one the user picks', () => {
     renderView();
     expect(screen.getByTestId('settings-basemap')).toHaveAccessibleName(en.basemap);
-    expect(screen.getByTestId('settings-basemap')).toHaveTextContent(en.plan);
+    expect(screen.getByTestId('settings-basemap')).toHaveTextContent(en.minimal);
 
     pick('basemap', 'aerial');
 
@@ -82,6 +82,7 @@ describe('SettingsView', () => {
   });
 
   it('says so when the map background picked could not be loaded, until the next pick', () => {
+    localStorage.setItem('path-finder.settings', JSON.stringify({ basemap: 'plan' }));
     renderView();
     const settings = renderHook(() => useSettings());
     pick('basemap', 'minimal');
