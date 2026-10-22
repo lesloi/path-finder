@@ -148,7 +148,7 @@ func avoidedCircles(areas []contract.AvoidedArea) []engine.Circle {
 // a candidate, or nil when it goes nowhere. A loop beyond the target is no refusal: a summit with a single access
 // is farther than the target allows, and the loop is offered with the distance it has.
 func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, points []engine.Point, avoided []engine.Circle) (*candidate, error) {
-	tooLong := &contract.CriteriaError{Field: "waypoints", Message: "waypoints make too long a route for the target"}
+	tooLong := &contract.CriteriaError{Field: "waypoints", Message: "waypoints make too long a route"}
 	// A loop is never shorter than the straight lines through its points: no need to search.
 	if crowFlies(c.Start, c.Waypoints)/1000 > contract.MaxDistanceKm() {
 		return nil, tooLong
