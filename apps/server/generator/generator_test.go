@@ -22,6 +22,9 @@ type fakeLooper struct {
 	directErr   error
 	directCalls int
 	loopCalls   int
+	// enoughAt is the number of loops after which Enough said to stop, when the loops are given to it one by one; 0 if never.
+	enoughAt  int
+	askEnough bool
 }
 
 func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.DirectLoopRequest) (*engine.Route, error) {
@@ -32,6 +35,14 @@ func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.DirectLoopRequest) (
 func (f *fakeLooper) Loops(_ context.Context, req engine.LoopRequest) ([]*engine.Route, error) {
 	f.got = req
 	f.loopCalls++
+	if f.askEnough {
+		for i := range f.loops {
+			if req.Enough(f.loops[:i+1]) {
+				f.enoughAt = i + 1
+				return f.loops[:i+1], f.err
+			}
+		}
+	}
 	return f.loops, f.err
 }
 
@@ -363,10 +374,10 @@ func TestGenerateAsksNothingOfTheEngineWithoutWaypoints(t *testing.T) {
 	}
 }
 
-func TestGenerateRefusesWaypointsBeyondTheTargetBeforeSearching(t *testing.T) {
+func TestGenerateRefusesWaypointsBeyondTheLongestRouteBeforeSearching(t *testing.T) {
 	looper := &fakeLooper{direct: engineLoop(0)}
-	// 30 km away and back, for a target of 10 km.
-	far := `[[6.5,46.1]]`
+	// 120 km away and back, for a target of 10 km.
+	far := `[[7.7,46.9]]`
 
 	_, err := generate(t, looper, context.Background(), withWaypoints(far))
 
@@ -379,9 +390,9 @@ func TestGenerateRefusesWaypointsBeyondTheTargetBeforeSearching(t *testing.T) {
 	}
 }
 
-func TestGenerateRefusesADirectLoopBeyondTheTarget(t *testing.T) {
+func TestGenerateRefusesADirectLoopBeyondTheLongestRoute(t *testing.T) {
 	long := engineLoop(0)
-	long.Distance = 14_000 // 40 % over a target of 10 km: beyond what a wide suggestion allows
+	long.Distance = contract.MaxDistanceKm()*1000 + 1
 	looper := &fakeLooper{direct: long}
 
 	_, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints))
@@ -390,8 +401,22 @@ func TestGenerateRefusesADirectLoopBeyondTheTarget(t *testing.T) {
 	if !errors.As(err, &ce) || ce.Field != "waypoints" || ce.Waypoint != 0 {
 		t.Fatalf("err = %v, want a CriteriaError on waypoints, with no index", err)
 	}
+}
+
+func TestGenerateServesTheDirectLoopAloneWhenWaypointsAreBeyondTheTarget(t *testing.T) {
+	long := engineLoop(0)
+	long.Distance = 30_000 // out and back to a summit 15 km away, for a target of 10 km
+	looper := &fakeLooper{direct: long, loops: []*engine.Route{engineLoop(120)}}
+	// 15 km north and back.
+	far := `[[6.1294,46.0342]]`
+
+	routes, err := generate(t, looper, context.Background(), withWaypoints(far))
+
+	if err != nil || len(routes) != 1 || routes[0].Kind != "suggestion" || routes[0].Distance != 30 {
+		t.Errorf("routes = %+v, err = %v, want the direct loop as the only suggestion", routes, err)
+	}
 	if looper.loopCalls != 0 {
-		t.Error("loops were searched for waypoints that cannot meet the target")
+		t.Error("loops were searched for waypoints that no loop can meet the target through")
 	}
 }
 
@@ -439,16 +464,19 @@ func TestGenerateJudgesTheDirectLoopOnTheDurationForADurationTarget(t *testing.T
 	duration := `{"start":[6.1294,45.8992],"target":{"duration":60},"surface":"any","pace":6,"waypoints":` + twoWaypoints + `}`
 	long := engineLoop(0)
 	long.Distance, long.Ascent = 14_000, 0 // 84 min at 6 min/km, over 60 min plus a quarter
-	_, err := generate(t, &fakeLooper{direct: long}, context.Background(), duration)
-	var ce *contract.CriteriaError
-	if !errors.As(err, &ce) {
-		t.Fatalf("err = %v, want a CriteriaError", err)
-	}
-
+	over := &fakeLooper{direct: long}
 	fine := engineLoop(0)
 	fine.Distance, fine.Ascent = 9_000, 0
-	if _, err := generate(t, &fakeLooper{direct: fine, err: engine.ErrNoLoop}, context.Background(), duration); err != nil {
-		t.Errorf("a direct loop of 54 min for 60: err = %v", err)
+	under := &fakeLooper{direct: fine, err: engine.ErrNoLoop}
+
+	overRoutes, overErr := generate(t, over, context.Background(), duration)
+	_, underErr := generate(t, under, context.Background(), duration)
+
+	if overErr != nil || len(overRoutes) != 1 || over.loopCalls != 0 {
+		t.Errorf("84 min for 60: %d routes, err = %v, %d searches, want the direct loop alone", len(overRoutes), overErr, over.loopCalls)
+	}
+	if underErr != nil || under.loopCalls != 1 {
+		t.Errorf("54 min for 60: err = %v, %d searches, want loops searched", underErr, under.loopCalls)
 	}
 }
 
@@ -572,5 +600,58 @@ func TestGeneratePassesTheAvoidedAreasToTheEngine(t *testing.T) {
 	}
 	if !reflect.DeepEqual(looper.got.Avoided, want) {
 		t.Errorf("avoided = %+v, want %+v", looper.got.Avoided, want)
+	}
+}
+
+func TestGenerateStopsSearchingOnceTheSetIsFullWithTheDirectLoopAsASuggestion(t *testing.T) {
+	long := engineLoop(0)
+	long.Distance = 12_800 // 28 % over the target of 10 km: a suggestion, which takes a place of the set
+	// Out to the waypoint and back by the same way, so that no loop of the set duplicates it.
+	long.Points = nil
+	for _, p := range [][]float64{startPoint(), at(6400, 0), startPoint()} {
+		long.Points = append(long.Points, engine.Position{Point: engine.Point{Lat: p[1], Lon: p[0]}, Elevation: 450})
+	}
+	var loops []*engine.Route
+	for h := 0.0; h < 360; h += 45 {
+		loops = append(loops, engineLoop(h))
+	}
+	looper := &fakeLooper{direct: long, loops: loops, askEnough: true}
+	east := `[[6.2120,45.8992]]`
+
+	if _, err := generate(t, looper, context.Background(), withWaypoints(east)); err != nil {
+		t.Fatal(err)
+	}
+
+	if looper.enoughAt == 0 || looper.enoughAt > maxRoutes {
+		t.Errorf("Enough said to stop after %d loops, want at most %d", looper.enoughAt, maxRoutes)
+	}
+}
+
+func TestGenerateServesTheDirectLoopBeyondTheTargetWhateverItsGain(t *testing.T) {
+	long := engineLoop(0)
+	long.Distance, long.Ascent = 30_000, 20 // 3 times the target, flat for a gain target of 300 m
+	looper := &fakeLooper{direct: long, loops: []*engine.Route{engineLoop(120)}}
+	withGain := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":300,"surface":"any","pace":6,"waypoints":[[6.1294,46.0342]]}`
+
+	routes, err := generate(t, looper, context.Background(), withGain)
+
+	if err != nil || len(routes) != 1 || looper.loopCalls != 0 {
+		t.Errorf("%d routes, err = %v, %d searches, want the direct loop alone", len(routes), err, looper.loopCalls)
+	}
+}
+
+func TestGenerateKeepsEightMatchesWhenTheDirectLoopIsLeftOut(t *testing.T) {
+	short := engineLoop(0)
+	short.Distance = 3_000 // much shorter than the target: left out of the set
+	var loops []*engine.Route
+	for h := 0.0; h < 360; h += 40 {
+		loops = append(loops, engineLoop(h))
+	}
+	looper := &fakeLooper{direct: short, loops: loops, askEnough: true}
+
+	routes, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints))
+
+	if err != nil || looper.enoughAt != maxRoutes || len(routes) != maxRoutes {
+		t.Errorf("Enough at %d loops, %d routes, err = %v, want %d of each", looper.enoughAt, len(routes), err, maxRoutes)
 	}
 }
