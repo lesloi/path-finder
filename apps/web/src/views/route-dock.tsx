@@ -47,7 +47,6 @@ export function RouteDock({
     <RouteStepStrip
       route={route}
       language={language}
-      pace={pace}
       waypoints={waypoints}
       waypointPois={waypointPois}
       linked={hasProfile}

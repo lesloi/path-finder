@@ -382,7 +382,7 @@ function RouteDetail({
         waypointPois={waypointPois}
       />
       <SurfaceShare route={route} language={language} />
-      <RouteTimeline route={route} language={language} pace={pace} waypoints={waypoints} waypointPois={waypointPois} />
+      <RouteTimeline route={route} language={language} waypoints={waypoints} waypointPois={waypointPois} />
       {/* Pinned to the bottom of the sheet's scroll area: on a short phone the profile pushes it under the fold. The top padding masks what scrolls under it; the negative margin takes back the flex gap it replaces. */}
       {canExport(route) && (
         <div className="sticky bottom-0 -mt-3 bg-surface pt-3">

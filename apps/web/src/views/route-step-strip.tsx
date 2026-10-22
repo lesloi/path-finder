@@ -30,22 +30,19 @@ const LINK_GAP = 4;
 export const RouteStepStrip = memo(function RouteStepStrip({
   route,
   language,
-  pace,
   waypoints = NO_POINTS,
   waypointPois = NO_POIS,
   linked = true,
 }: {
   route: Route;
   language: Language;
-  /** Minutes per km, the pace of the route's duration. */
-  pace: number;
   waypoints?: Position[] | undefined;
   waypointPois?: WaypointPois | undefined;
   /** Whether a profile is over the strip, for the cards to be joined to. */
   linked?: boolean;
 }) {
   const t = routesText[language];
-  const steps = useMemo(() => routeTimeline(route, waypoints, pace), [route, waypoints, pace]);
+  const steps = useMemo(() => routeTimeline(route, waypoints), [route, waypoints]);
   const list = useRef<HTMLOListElement>(null);
   const [placed, setPlaced] = useState<{ centers: number[]; halfGaps: number[]; legWidths: number[] }>();
   // The cards are as wide as their content, so where they stand is measured: the links join their centres to the

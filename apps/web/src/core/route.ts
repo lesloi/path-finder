@@ -1,5 +1,7 @@
 import { METRES_PER_DEGREE, type Criteria, type SurfaceStretch, type TechnicalStretch } from '../contract/index.ts';
 import type { Position } from './coordinates.ts';
+import { distancesAlong, kmBetween } from './distance.ts';
+import { effortAlong } from './effort.ts';
 import { estimatedDuration } from './pace.ts';
 
 /** The body of a route set request: the criteria, as `parseCriteria` accepts them. */
@@ -101,12 +103,6 @@ export function parseRoutes(body: unknown): Route[] | undefined {
   return routes.every((route) => route !== undefined) ? routes : undefined;
 }
 
-// Kilometres between two positions, on a local equirectangular projection: close enough along a route.
-export function kmBetween([lonA, latA]: number[], [lonB, latB]: number[]): number {
-  const cos = Math.cos((((latA + latB) / 2) * Math.PI) / 180);
-  return Math.hypot((lonB - lonA) * cos, latB - latA) * 111.195;
-}
-
 /**
  * How far a position is from the route, in metres, and where along it the nearest spot is, as the index of a
  * point plus how far towards the next (so it sorts along the route). Measured to the segments, since a leg of a
@@ -153,13 +149,6 @@ export function boundsAround(geometry: number[][], margin: number): [number, num
   const dLat = margin / METRES_PER_DEGREE;
   const dLon = dLat / Math.cos((Math.max(Math.abs(south), Math.abs(north)) * Math.PI) / 180);
   return [west - dLon, south - dLat, east + dLon, north + dLat];
-}
-
-// Kilometres from the start to each point.
-function distancesAlong(geometry: number[][]): number[] {
-  const distances = [0];
-  for (let k = 1; k < geometry.length; k++) distances.push(distances[k - 1] + kmBetween(geometry[k - 1], geometry[k]));
-  return distances;
 }
 
 // Where `distance` falls between two points: the index of the first one, and how far towards the next (0 to 1).
@@ -286,7 +275,7 @@ export type TimelineStep = {
   distance: number;
   /** Metres, when the route has heights. */
   height?: number;
-  /** Minutes since the start, at `pace` and with the effort of the climb, as the estimated duration is. */
+  /** Minutes since the start: the estimated duration shared out by the effort so far. */
   elapsed: number;
   /** The stretch from the previous stop to this one. The start has none. The legs add up to the route's figures. */
   leg?: { distance: number; /** Minutes. */ duration: number; climb?: number; descent?: number };
@@ -356,7 +345,7 @@ function extremeIndex(points: number[][], sign: 1 | -1): number | undefined {
  * start, and the leg that ends there. The highest and lowest points of the route join them when they stand out
  * from the start and the finish.
  */
-export function routeTimeline(route: Route, waypoints: Position[], pace: number): TimelineStep[] {
+export function routeTimeline(route: Route, waypoints: Position[]): TimelineStep[] {
   const { geometry } = route;
   if (geometry.length === 0) return [];
   const distances = distancesAlong(geometry);
@@ -389,20 +378,18 @@ export function routeTimeline(route: Route, waypoints: Position[], pace: number)
     : undefined;
   const climbs = counted && endedOn(counted.climbs, route.elevationGain);
   const descents = counted && endedOn(counted.descents, route.elevationLoss);
-  // The time is scaled in the same way, so that no leg takes less than nothing.
-  const elapsedAt = indexes.map(([, k], i) =>
-    estimatedDuration({ distance: distances[k], elevationGain: climbs?.[i] }, pace),
-  );
-  const timeScale = elapsedAt.at(-1)! > 0 ? route.estimatedDuration / elapsedAt.at(-1)! : 1;
+  const effort = effortAlong(geometry, distances);
+  const total = effort.at(-1)!;
 
-  const stops = indexes.map(([kind, k, number], i): TimelineStep => {
+  const stops = indexes.map(([kind, k, number]): TimelineStep => {
     const height = (geometry[k] as [number, number, number?])[2];
     return {
       kind,
       ...(number !== undefined && { number }),
       distance: distances[k],
       ...(height !== undefined && { height }),
-      elapsed: elapsedAt[i]! * timeScale,
+      // The share first, so that the finish is exactly the estimated duration.
+      elapsed: total > 0 ? (effort[k]! / total) * route.estimatedDuration : 0,
     };
   });
   return stops.map((stop, i) => {

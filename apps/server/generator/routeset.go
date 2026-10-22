@@ -76,12 +76,9 @@ type candidate struct {
 	technicalStretches []contract.TechnicalStretch
 }
 
-// effortDistance is the distance plus the climb, in kilometres.
-func effortDistance(distance float64, elevationGain *float64) float64 {
-	if elevationGain == nil {
-		return distance
-	}
-	return distance + *elevationGain/contract.ClimbPerEffortKm()
+// effortDistance is the distance weighted by the slope of each stretch, in kilometres.
+func (c *candidate) effortDistance() float64 {
+	return c.distance * contract.EffortFactor(c.geometry)
 }
 
 // check is how a route fares against one criterion. relative is its gap relative to the
@@ -173,7 +170,7 @@ type ranked struct {
 }
 
 func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, bool) {
-	estimated := effortDistance(cand.distance, cand.elevationGain) * c.Pace
+	estimated := cand.effortDistance() * c.Pace
 	results := checks(c, cand, estimated)
 	score, worst := 0.0, tierMatch
 	for _, r := range results {

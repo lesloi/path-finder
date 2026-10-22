@@ -103,12 +103,12 @@ func TestTargetDistanceFromADuration(t *testing.T) {
 		t.Errorf("distance = %v, %v", d, err)
 	}
 	c.ElevationGain = &ElevationGain{Metres: 300}
-	if d, _ := c.TargetDistanceKm(); d != 7 {
-		t.Errorf("with 300 m of gain, distance = %v, want 7", d)
+	if d, _ := c.TargetDistanceKm(); d != 9.25 {
+		t.Errorf("with 300 m of gain, distance = %v, want 9.25", d)
 	}
 	c.ElevationGain = &ElevationGain{Shortcut: "hilly"}
-	if d, _ := c.TargetDistanceKm(); d < 9.09 || d > 9.1 {
-		t.Errorf("hilly distance = %v, want about 9.09", d)
+	if d, _ := c.TargetDistanceKm(); d < 9.75 || d > 9.76 {
+		t.Errorf("hilly distance = %v, want about 9.76", d)
 	}
 	c.Target.Duration = 12
 	if _, err := c.TargetDistanceKm(); err == nil {

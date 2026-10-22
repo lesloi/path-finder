@@ -180,25 +180,40 @@ func TestFlatShortcut(t *testing.T) {
 }
 
 func TestEstimatedDuration(t *testing.T) {
-	// 10 km + 300 m of gain = 13 km of effort distance, at 6 min/km.
-	if r := build(criteria(nil), compose()); r[0].EstimatedDuration != 78 {
+	// Without heights the route is flat: 10 km at 6 min/km.
+	if r := build(criteria(nil), compose()); r[0].EstimatedDuration != 60 {
 		t.Errorf("duration = %v", r[0].EstimatedDuration)
 	}
-	if r := build(criteria(nil), compose(withGain(nil))); r[0].EstimatedDuration != 60 {
-		t.Errorf("duration without gain = %v", r[0].EstimatedDuration)
+}
+
+func TestEstimatedDurationFollowsTheSlope(t *testing.T) {
+	climbing := compose(func(c *candidate) {
+		c.geometry = [][]float64{
+			append(startPoint(), 0), append(at(0, 2000), 200), append(at(0, 4000), 0), append(startPoint(), 0),
+		}
+	})
+	weight := contract.EffortFactor(climbing.geometry)
+	if weight <= 1 {
+		t.Fatalf("the fixture does not climb: factor = %v", weight)
+	}
+
+	r := build(criteria(nil), climbing)
+
+	if want := 10 * weight * 6; math.Abs(r[0].EstimatedDuration-want) > 1e-9 {
+		t.Errorf("duration = %v, want %v", r[0].EstimatedDuration, want)
 	}
 }
 
 func TestTargetDuration(t *testing.T) {
 	byDuration := criteria(func(c *contract.Criteria) { c.Target = contract.Target{Duration: 67} })
-	if r := build(byDuration, compose(withDistance(8.5))); len(r) != 1 || r[0].Kind != "match" {
+	if r := build(byDuration, compose(withDistance(11.5))); len(r) != 1 || r[0].Kind != "match" {
 		t.Errorf("69 min: %+v", r)
 	}
-	r := build(byDuration, compose(withDistance(10)))
+	r := build(byDuration, compose(withDistance(13)))
 	if len(r) != 1 || r[0].Kind != "suggestion" {
 		t.Errorf("78 min: %+v", r)
 	}
-	if r := build(byDuration, compose(withDistance(12.2))); len(r) != 0 {
+	if r := build(byDuration, compose(withDistance(15.2))); len(r) != 0 {
 		t.Errorf("91 min kept: %+v", r)
 	}
 }
@@ -400,7 +415,7 @@ func TestWideElevationGainFloor(t *testing.T) {
 func TestWideDurationTarget(t *testing.T) {
 	c := criteria(func(c *contract.Criteria) { c.Target = contract.Target{Duration: 74} })
 
-	r := build(c, compose(withDistance(13)))
+	r := build(c, compose(withDistance(16)))
 
 	if len(r) != 1 || r[0].Kind != "suggestion" {
 		t.Errorf("routes = %+v", r)

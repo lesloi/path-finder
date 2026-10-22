@@ -1,18 +1,30 @@
-import { CLIMB_PER_EFFORT_KM } from '../contract/index.ts';
+import { effortFactor } from './effort.ts';
 import { estimatedDuration, routesAtPace } from './pace.ts';
 import type { Route, RouteSetRequest } from './route.ts';
 
 describe('estimatedDuration', () => {
+  const northward = (heights: number[]): [number, number, number][] =>
+    heights.map((height, k) => [6, 45 + (k * 10) / 111_195, height]);
+
   it('is the distance at the pace on flat ground', () => {
     expect(estimatedDuration({ distance: 10 }, 6)).toBe(60);
   });
 
-  it('counts the climb as effort kilometres, as the server does', () => {
-    expect(estimatedDuration({ distance: 10, elevationGain: CLIMB_PER_EFFORT_KM }, 6)).toBe(66);
+  it('counts the slope of each stretch as effort, as the server does', () => {
+    const geometry = northward(Array.from({ length: 101 }, (_, k) => k));
+
+    expect(estimatedDuration({ distance: 10, geometry }, 6)).toBeCloseTo(10 * effortFactor(geometry) * 6, 9);
+    expect(estimatedDuration({ distance: 10, geometry }, 6)).toBeGreaterThan(60);
+  });
+
+  it('is the distance at the pace when the route has no heights', () => {
+    const geometry = northward([0, 0, 0]).map(([lon, lat]): [number, number] => [lon, lat]);
+
+    expect(estimatedDuration({ distance: 10, geometry }, 6)).toBe(60);
   });
 
   it('follows the pace', () => {
-    expect(estimatedDuration({ distance: 10, elevationGain: 0 }, 7.5)).toBe(75);
+    expect(estimatedDuration({ distance: 10 }, 7.5)).toBe(75);
   });
 });
 

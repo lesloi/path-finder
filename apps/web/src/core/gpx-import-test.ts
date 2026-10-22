@@ -1,6 +1,7 @@
+import { kmBetween } from './distance.ts';
 import { gpxExport } from './gpx.ts';
 import { importGpx, MAX_IMPORT_FILE_BYTES } from './gpx-import.ts';
-import { elevationProfile, kmBetween, reverseRoute } from './route.ts';
+import { elevationProfile, reverseRoute } from './route.ts';
 
 const PACE = 6;
 

@@ -1,4 +1,4 @@
-import { CLIMB_PER_EFFORT_KM } from '../contract/index.ts';
+import { effortFactor } from './effort.ts';
 import type { Route, RouteSetRequest } from './route.ts';
 import type { PaceUnit } from './units.ts';
 
@@ -9,14 +9,14 @@ export const DEFAULT_PACE = 6;
 export const DEFAULT_PACE_UNIT: PaceUnit = 'min/km';
 
 /**
- * The minutes a route takes at a pace: its distance plus its climb as effort kilometres, as the
- * server counts them. A route without elevation data has no climb.
+ * The minutes a route takes at a pace: its distance weighted by the slope of each stretch, as the server counts it. A
+ * route without heights is flat.
  */
 export function estimatedDuration(
-  { distance, elevationGain }: { distance: number; elevationGain?: number },
+  { distance, geometry }: { distance: number; geometry?: number[][] },
   pace: number,
 ): number {
-  return (distance + (elevationGain ?? 0) / CLIMB_PER_EFFORT_KM) * pace;
+  return distance * (geometry ? effortFactor(geometry) : 1) * pace;
 }
 
 /**
