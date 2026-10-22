@@ -420,7 +420,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // The track is read here, in the browser: the file goes nowhere. It is shown as a route set of one, whose request
   // only holds what the figures need (its start and length, and the pace the durations follow).
   async function importTrack(file: File) {
-    const route = file.size <= MAX_IMPORT_FILE_BYTES ? importGpx(await file.text(), pace, file.name) : undefined;
+    // A file the device cannot read, such as one in the cloud that is gone, is no track either.
+    const text = file.size <= MAX_IMPORT_FILE_BYTES ? await file.text().catch(() => undefined) : undefined;
+    const route = text === undefined ? undefined : importGpx(text, pace, file.name);
     if (!route) return setImportFailed(true);
     setImportFailed(false);
     setLayerOpen(false);

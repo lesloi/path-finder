@@ -58,9 +58,10 @@ export function importGpx(text: string, pace: number, fileName?: string): Route 
   // Measured on every point, then simplified for what is drawn: a recording holds tens of thousands.
   let distance = 0;
   for (let k = 1; k < geometry.length; k++) distance += kmBetween(geometry[k - 1]!, geometry[k]!);
-  const drawn = simplify(geometry, MAX_GPX_POINTS) as Route['geometry'];
+  const drawn = simplify(geometry, MAX_GPX_POINTS, true) as Route['geometry'];
 
-  const profile = elevationProfile(drawn);
+  // On every point: the simplified ones can be too few to tell a climb from a ramp.
+  const profile = elevationProfile(geometry);
   const stats = profile && climbAndDescent(profile);
   const name = trackName(document, fileName);
   const route: Route = {

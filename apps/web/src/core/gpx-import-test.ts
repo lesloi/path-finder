@@ -1,6 +1,6 @@
 import { gpxExport } from './gpx.ts';
 import { importGpx, MAX_IMPORT_FILE_BYTES } from './gpx-import.ts';
-import { kmBetween } from './route.ts';
+import { elevationProfile, kmBetween, reverseRoute } from './route.ts';
 
 const PACE = 6;
 
@@ -169,6 +169,31 @@ describe('importGpx', () => {
 
       expect(importGpx(text, PACE)!.imported!.name).toHaveLength(100);
     });
+  });
+
+  it('counts the climb of a long recording on all its points, and keeps its summit on the profile', () => {
+    // 3000 points on a straight line, rising to 200 m then back down: simplified on positions alone, only its ends stay.
+    const heights = (k: number) => 200 - Math.abs(200 - (k * 400) / 2999);
+    const points = Array.from({ length: 3_000 }, (_, k) => trkpt(6.1, 45.9 + k * 0.00005, heights(k))).join('');
+
+    const route = importGpx(gpx(`<trk><trkseg>${points}</trkseg></trk>`), PACE)!;
+
+    expect(route.elevationGain).toBeGreaterThan(190);
+    expect(route.elevationGain).toBeLessThan(210);
+    const summit = Math.max(...elevationProfile(route.geometry)!.map(({ height }) => height));
+    expect(summit).toBeGreaterThan(190);
+  });
+
+  it('keeps its name and swaps climb and descent when run the other way', () => {
+    const text = gpx(`<trk><name>Loop</name><trkseg>${trkpt(6.1, 45.9, 100)}${trkpt(6.1, 45.95, 400)}</trkseg></trk>`);
+    const route = importGpx(text, PACE)!;
+
+    const turned = reverseRoute(route, PACE);
+
+    expect(turned.imported).toEqual({ name: 'Loop' });
+    expect(turned.elevationGain).toBe(route.elevationLoss);
+    expect(turned.elevationLoss).toBe(route.elevationGain);
+    expect(turned.reversed).toBe(true);
   });
 
   it.each([
