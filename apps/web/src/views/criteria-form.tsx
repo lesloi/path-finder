@@ -85,8 +85,13 @@ export function criteriaRequest(
   const gain = clamp(draft.gain, 0, BOUNDS.gain.max);
   const level = draft.level;
   // A route is no longer than its target, and no point of it is farther from the start than that: an area beyond
-  // stays on the device, as a route cannot need it.
-  const reachKm = draft.target === 'distance' ? distance : draft.duration / pace;
+  // stays on the device, as a route cannot need it. Except with waypoints: the loop through them is offered whatever
+  // its length, up to the longest route.
+  const reachKm = waypoints?.length
+    ? MAX_TARGET_DISTANCE
+    : draft.target === 'distance'
+      ? distance
+      : draft.duration / pace;
   const reachable =
     start && avoidedAreas?.filter((area) => kmBetween(start, area.center) - area.radius / 1000 <= reachKm);
   return (

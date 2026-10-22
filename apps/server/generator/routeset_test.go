@@ -421,3 +421,82 @@ func TestWideDurationTarget(t *testing.T) {
 		t.Errorf("routes = %+v", r)
 	}
 }
+
+// stick goes to a summit 2.5 km north and back by the same way, as the only access to it does.
+func stick(distance float64) *candidate {
+	return compose(withDistance(distance), func(c *candidate) {
+		c.geometry = [][]float64{startPoint(), at(0, 1250), at(0, 2500), at(0, 1250), startPoint()}
+		c.direct = true
+	})
+}
+
+func TestADirectLoopIsNotPenalisedForRetracingItsWay(t *testing.T) {
+	cr := criteria(nil)
+	walked := stick(10)
+	other := *walked
+	other.direct = false
+
+	direct, directOK := classify(cr, walked, 500)
+	loop, loopOK := classify(cr, &other, 500)
+
+	if !directOK || direct.score != 0 || direct.route.Kind != "match" {
+		t.Errorf("direct loop: ok = %v, score = %v, kind = %q, want a match with no penalty", directOK, direct.score, direct.route.Kind)
+	}
+	if !loopOK || loop.score < 0.9 {
+		t.Errorf("same route as a loop: ok = %v, score = %v, want the retrace penalty", loopOK, loop.score)
+	}
+}
+
+func TestADirectLoopFarFromTheTargetIsAlwaysAnEntryAsASuggestion(t *testing.T) {
+	for _, distance := range []float64{3, 40} {
+		entry, ok := classify(criteria(nil), stick(distance), 500)
+
+		if !ok || entry.route.Kind != "suggestion" || !entry.direct {
+			t.Errorf("%v km: ok = %v, kind = %q, direct = %v, want a suggestion", distance, ok, entry.route.Kind, entry.direct)
+		}
+	}
+}
+
+func TestADirectLoopKeepsAPlaceAmongEightMatches(t *testing.T) {
+	r := newRanking(criteria(nil), 10)
+	for h := 0.0; h < 360; h += 45 {
+		r.add(compose(withHeading(h)))
+	}
+	r.add(stick(5))
+
+	routes := r.routes(maxRoutes)
+
+	if len(routes) != maxRoutes {
+		t.Fatalf("%d routes, want %d", len(routes), maxRoutes)
+	}
+	if got := routes[maxRoutes-1]; got.Distance != 5 || got.Kind != "suggestion" {
+		t.Errorf("last route = %v km, %q, want the direct loop as a suggestion after the matches", got.Distance, got.Kind)
+	}
+}
+
+func TestADirectLoopDoesNotDropTheLoopsThatGoThroughItsWaypoint(t *testing.T) {
+	r := newRanking(criteria(nil), 10)
+	throughSummit := compose(func(c *candidate) {
+		c.geometry = [][]float64{startPoint(), at(-800, 1500), at(0, 2500), at(800, 1500), startPoint()}
+	})
+	r.add(throughSummit, stick(5))
+
+	routes := r.routes(maxRoutes)
+
+	if len(routes) != 2 {
+		t.Errorf("%d routes, want the loop through the summit and the direct loop", len(routes))
+	}
+}
+
+func TestADirectLoopThatDuplicatesABetterLoopIsLeftOut(t *testing.T) {
+	r := newRanking(criteria(nil), 10)
+	loopRoute := compose(withHeading(0))
+	same := compose(withHeading(0), func(c *candidate) { c.direct = true })
+	r.add(loopRoute, same)
+
+	routes := r.routes(maxRoutes)
+
+	if len(routes) != 1 {
+		t.Errorf("%d routes, want 1", len(routes))
+	}
+}

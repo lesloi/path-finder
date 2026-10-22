@@ -84,6 +84,10 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		}
 		if direct != nil {
 			set.add(direct)
+			if overshoots(criteria, direct) {
+				// Searching loops would only cost CPU: each is as far from the target, and the direct loop is offered.
+				return set.routes(limit), nil
+			}
 		}
 	}
 	// Stops searching once the route set cannot get any bigger, or no longer does: more loops would only cost CPU.
@@ -135,18 +139,13 @@ func avoidedCircles(areas []contract.AvoidedArea) []engine.Circle {
 }
 
 // throughWaypoints routes the direct loop through the waypoints and refuses criteria whose waypoints
-// make a loop too long for the target to be met even by a wide suggestion, or that the engine cannot match
-// to a way. It returns the direct loop as a candidate, or nil when it goes nowhere.
+// make a loop longer than any route may be, or that the engine cannot match to a way. It returns the direct loop as
+// a candidate, or nil when it goes nowhere. A loop beyond the target is no refusal: a summit with a single access
+// is farther than the target allows, and the loop is offered with the distance it has.
 func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, points []engine.Point, avoided []engine.Circle) (*candidate, error) {
 	tooLong := &contract.CriteriaError{Field: "waypoints", Message: "waypoints make too long a route for the target"}
-	// A loop is never shorter than the straight lines through its points: no need to search. Climb only
-	// adds to a duration, so a duration target is judged on the flat loop.
-	km := crowFlies(c.Start, c.Waypoints) / 1000
-	limit := c.Target.Distance
-	if c.Target.Distance == 0 {
-		km, limit = km*c.Pace, c.Target.Duration
-	}
-	if km > limit*(1+wideTolerance.distance) {
+	// A loop is never shorter than the straight lines through its points: no need to search.
+	if crowFlies(c.Start, c.Waypoints)/1000 > contract.MaxDistanceKm() {
 		return nil, tooLong
 	}
 	route, err := looper.DirectLoop(ctx, engine.DirectLoopRequest{Start: engine.Point{Lat: c.Start[1], Lon: c.Start[0]}, Waypoints: points, Avoided: avoided})
@@ -165,12 +164,18 @@ func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, p
 	if cand == nil {
 		return nil, nil
 	}
-	estimated := cand.effortDistance() * c.Pace
-	// Only a loop that is too long is refused: detours make up for one that is too short.
-	if tooFar := checks(c, cand, estimated)[0]; tooFar.gap > 0 && tooFar.tier == tierOut {
+	if cand.distance > contract.MaxDistanceKm() {
 		return nil, tooLong
 	}
+	cand.direct = true
 	return cand, nil
+}
+
+// overshoots tells whether the direct loop is longer than the target allows even a wide suggestion: no loop
+// through the waypoints is any nearer, as detours only add to it.
+func overshoots(c contract.Criteria, direct *candidate) bool {
+	tooFar := checks(c, direct, direct.effortDistance()*c.Pace)[0]
+	return tooFar.gap > 0 && tooFar.tier == tierOut
 }
 
 func (g *Generator) seed() uint64 {

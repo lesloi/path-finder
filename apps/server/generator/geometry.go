@@ -71,6 +71,24 @@ func sharedShare(a, b map[cell]struct{}) float64 {
 	return float64(shared) / float64(len(small))
 }
 
+// coveredShare is the share of the larger of two sets of cells that the other one also covers.
+func coveredShare(a, b map[cell]struct{}) float64 {
+	small, large := a, b
+	if len(a) > len(b) {
+		small, large = b, a
+	}
+	if len(large) == 0 {
+		return 0
+	}
+	shared := 0
+	for c := range small {
+		if _, ok := large[c]; ok {
+			shared++
+		}
+	}
+	return float64(shared) / float64(len(large))
+}
+
 // retraceShare is the share of a route walked twice, such as out-and-back stretches, from its
 // cells in order. Coming back to a cell only counts after retraceMinLoop metres, so weaving
 // along a cell edge does not.

@@ -259,3 +259,6 @@ func ClimbPerEffortKm() float64 { return bounds.ClimbPerEffortKm }
 
 // HillyMatchPerKm is the metres of elevation gain per km from which a route is hilly.
 func HillyMatchPerKm() float64 { return bounds.HillyMatchPerKm }
+
+// MaxDistanceKm is the longest route a request may ask for, and the longest the waypoints may make one.
+func MaxDistanceKm() float64 { return bounds.MaxDistanceKm }
