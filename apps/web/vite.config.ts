@@ -8,7 +8,8 @@ import { defineConfig, type Plugin } from 'vite';
 
 // The ID of a build is a hash of what it is built from, as `import.meta.env.VITE_BUILD_ID`: it names the service
 // worker's cache, which a deploy of docs, CI or the server alone then leaves as it is. A random ID would empty it on
-// every deploy. The sources are hashed, not the bundle, which does not see `public/`.
+// every deploy. The sources are hashed, not the bundle, which does not see `public/`; the tests are left out, as editing
+// one changes nothing the user gets.
 function buildId(): Plugin {
   const root = fileURLToPath(new URL('.', import.meta.url));
   const inputs = [
@@ -24,6 +25,7 @@ function buildId(): Plugin {
     statSync(path).isDirectory()
       ? readdirSync(path)
           .sort()
+          .filter((name) => !name.includes('-test.'))
           .flatMap((name) => files(join(path, name)))
       : [path];
   return {

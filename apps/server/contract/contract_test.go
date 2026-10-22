@@ -1,6 +1,7 @@
 package contract
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -184,8 +185,33 @@ func TestAvoidedAreaRefusalsNumberTheAreaAtFault(t *testing.T) {
 	}
 }
 
+func TestCanonicalJSONIgnoresFormatting(t *testing.T) {
+	spaced := []byte("{\n  \"b\": [1, 2],\n  \"a\": {\"y\": 1.5, \"x\": null}\n}")
+	compact := []byte(`{"a":{"x":null,"y":1.5},"b":[1,2]}`)
+
+	got, err := canonicalJSON(spaced)
+
+	want, _ := canonicalJSON(compact)
+	if err != nil || !bytes.Equal(got, want) {
+		t.Errorf("got %s, %v; want %s", got, err, want)
+	}
+	if _, err := canonicalJSON([]byte("{")); err == nil {
+		t.Error("broken JSON must be an error")
+	}
+}
+
+// canonicalJSON is the JSON of data with its keys sorted and no spacing, so that reformatting a fixture is not a change.
+func canonicalJSON(data []byte) ([]byte, error) {
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		return nil, err
+	}
+	return json.Marshal(v)
+}
+
 // A tab left open across a deploy keeps the version of the API it was built for. The fingerprint covers every fixture of
-// testdata/ (a new endpoint's joins it) and the codes and surfaces, not the bounds: a stale bound only makes the server name a field, and nothing breaks.
+// testdata/ (a new endpoint's joins it) and the codes and surfaces. A fixture that pins a bound, such as a distance the
+// server refuses, moves it too: change the fingerprint without raising apiVersion, as no tab built before breaks on a bound.
 func TestAPIVersionIsBumpedWithTheShapeOfTheAPI(t *testing.T) {
 	h := sha256.New()
 	fixtures, err := filepath.Glob("testdata/*.json")
@@ -197,8 +223,12 @@ func TestAPIVersionIsBumpedWithTheShapeOfTheAPI(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		canonical, err := canonicalJSON(data)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
 		h.Write([]byte(name))
-		h.Write(data)
+		h.Write(canonical)
 	}
 	shape, _ := json.Marshal([]any{bounds.ErrorCodes, bounds.Surfaces})
 	h.Write(shape)
