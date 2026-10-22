@@ -54,6 +54,12 @@ export async function openCriteria(page: Page) {
   if ((await bar.isVisible()) && !(await page.getByTestId('sub-page').isVisible())) await bar.click();
 }
 
+/** Types the start point, which a desktop needs before it shows the criteria. */
+export async function setStart(page: Page, position: string) {
+  await page.getByTestId('criteria-start').fill(position);
+  await page.getByTestId('criteria-start').press('Enter');
+}
+
 /** Picks an option in one of the settings' dropdowns, the way a user does: open the list, click the option. */
 export async function selectOption(page: Page, testId: string, option: string) {
   await page.getByTestId(testId).click();

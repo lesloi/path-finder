@@ -15,6 +15,11 @@ const fr = criteriaText.fr;
 
 const map = () => maps.at(-1)!;
 const field = () => screen.getByTestId('criteria-start');
+// A desktop shows the criteria only once there is a start point.
+function setStartPoint() {
+  fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+  fireEvent.keyDown(field(), { key: 'Enter' });
+}
 const place = (lng: number, lat: number) => act(() => map().fire('click', { lngLat: { lng, lat } }));
 const items = () => screen.queryAllByTestId(/^criteria-waypoint-item-\d+$/);
 const names = () => items().map((item) => item.querySelector('[data-name]')!.textContent);
@@ -135,6 +140,7 @@ describe('CriteriaView', () => {
     it.each(['en', 'fr'] as const)('names every control on desktops in %s', (language) => {
       onDesktop();
       const { container } = render(<CriteriaView language={language} />);
+      setStartPoint();
 
       expectNamedControls(container);
     });
@@ -424,11 +430,27 @@ describe('CriteriaView', () => {
 
     onDesktop();
     rerender(<CriteriaView language="en" />);
+    setStartPoint();
 
     expect(screen.getByTestId('criteria-surface-unpaved')).toBeChecked();
   });
 
   describe('on desktops', () => {
+    it('shows the criteria only once there is a start point', () => {
+      onDesktop();
+      render(<CriteriaView language="en" />);
+      expect(screen.getByTestId('criteria-start')).toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-surface-unpaved')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-distance')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-long-press')).toBeInTheDocument();
+
+      setStartPoint();
+
+      expect(screen.getByTestId('criteria-surface-unpaved')).toBeInTheDocument();
+      expect(screen.getByTestId('criteria-distance')).toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-long-press')).not.toBeInTheDocument();
+    });
+
     it('stops picking the start point when the settings open', () => {
       onDesktop();
       render(<CriteriaView language="en" />);
@@ -771,8 +793,7 @@ describe('CriteriaView', () => {
       return routeSets;
     }
     async function submit() {
-      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
-      fireEvent.keyDown(field(), { key: 'Enter' });
+      setStartPoint();
       fireEvent.click(screen.getByTestId('criteria-submit'));
     }
     // The map settles on the routes it frames: it then draws them and takes its snapshot. The effects that listen
@@ -1000,6 +1021,7 @@ describe('CriteriaView', () => {
       const routeSets = ask(answer(route(0)));
       render(<CriteriaView language="en" />);
       act(() => map().fire('style.load'));
+      setStartPoint();
       fireEvent.click(screen.getByTestId('criteria-target-duration'));
       await submit();
       await screen.findByTestId('routes-count');
@@ -1228,6 +1250,7 @@ describe('CriteriaView', () => {
         onDesktop();
         stubFetch(() => Promise.resolve(answer(route(0))));
         render(<CriteriaView language="en" />);
+        setStartPoint();
         fireEvent.change(screen.getByTestId('criteria-distance'), { target: { value: '21' } });
         fireEvent.click(screen.getByTestId('criteria-surface-paved'));
         fireEvent.click(screen.getByTestId('criteria-elevation-target'));
@@ -1398,6 +1421,7 @@ describe('CriteriaView', () => {
       ask(answer(route(0)));
       render(<CriteriaView language="en" />);
       act(() => map().fire('style.load'));
+      setStartPoint();
       fireEvent.click(screen.getByTestId('criteria-surface-unpaved'));
       await submit();
       await screen.findByTestId('routes-count');
