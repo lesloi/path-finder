@@ -41,23 +41,14 @@ export function SearchingPanel({ language }: { language: Language }) {
         {routesText[language].finding}
       </p>
       {/* Outside the status: only its text is announced. */}
-      {/* The lines of the route set above its rows: the count, then the pace, each as tall as its buttons. */}
       <div
         data-testid="routes-placeholder"
         aria-hidden
-        className="flex animate-pulse flex-col gap-2 motion-reduce:animate-none"
+        className={`flex animate-pulse gap-2 motion-reduce:animate-none ${desktop ? 'flex-col' : 'overflow-hidden pb-1'}`}
       >
-        <div className="flex min-h-touch items-center">
-          <div className={`${BAR} h-4 w-24`} />
-        </div>
-        <div className="flex min-h-touch items-center">
-          <div className={`${BAR} h-3.5 w-40`} />
-        </div>
-        <div className={desktop ? 'flex flex-col gap-2' : 'flex gap-2 overflow-hidden pb-1'}>
-          {Array.from({ length: desktop ? DESKTOP_ROWS : PHONE_ROWS }, (_, index) => (
-            <PlaceholderRow key={index} className={desktop ? '' : 'w-[88%] flex-none'} />
-          ))}
-        </div>
+        {Array.from({ length: desktop ? DESKTOP_ROWS : PHONE_ROWS }, (_, index) => (
+          <PlaceholderRow key={index} className={desktop ? '' : 'w-[88%] flex-none'} />
+        ))}
       </div>
     </>
   );

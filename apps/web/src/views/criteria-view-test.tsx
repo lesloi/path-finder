@@ -1,5 +1,6 @@
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 
+import { MAX_WAYPOINTS } from '../contract/index.ts';
 import { basemapStyle } from '../components/basemap-style.ts';
 import { LazyStartPointMap } from '../components/index.ts';
 import { CriteriaView } from './criteria-view.tsx';
@@ -2278,6 +2279,15 @@ describe('CriteriaView', () => {
       const list = screen.getByTestId('criteria-waypoint-list');
       expect(names()).toEqual([en.waypointLabel, en.waypointLabel]);
       expect(list.nextElementSibling).toBe(screen.getByTestId('criteria-submit'));
+    });
+
+    it('shows how many waypoints are set out of the maximum', () => {
+      render(<CriteriaView language="en" />);
+
+      placeThenOpenCriteria(2);
+
+      expect(screen.getByTestId('criteria-waypoint-count')).toHaveTextContent(`2/${MAX_WAYPOINTS}`);
+      expect(screen.getByTestId('criteria-waypoint-count')).toHaveTextContent(en.countOfMax(2, MAX_WAYPOINTS));
     });
 
     it('has no section without waypoints', () => {
