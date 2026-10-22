@@ -21,11 +21,18 @@ import {
   type PaceUnit,
 } from '../core/index.ts';
 import { criteriaText, routesText, type Language } from '../i18n/index.ts';
-import { RouteFigures, SurfaceShare, TechnicalMarker, surfaceShares } from './route-figures.tsx';
+import {
+  ImportedMarker,
+  RouteFigures,
+  routeTitle,
+  SurfaceShare,
+  TechnicalMarker,
+  surfaceShares,
+} from './route-figures.tsx';
 import { RouteTimeline } from './route-timeline.tsx';
 import { RouteCarousel } from './route-carousel.tsx';
 import { RoutePace } from './route-pace.tsx';
-import { RouteExportButton } from './route-export-button.tsx';
+import { canExport, RouteExportButton } from './route-export-button.tsx';
 
 // A horizontal move of the pointer longer than this, in px, and longer than its vertical move, swipes.
 const SWIPE_PX = 50;
@@ -133,7 +140,11 @@ export function RouteSetView({
     <>
       <div className="flex items-center justify-between gap-2 -mt-2 -mb-5">
         <strong data-testid="routes-count" className="text-lg">
-          {t.routeCount(routes.length)}
+          {routes[0]?.imported ? (
+            <ImportedMarker text={t.importedTrack} testId="routes-imported" />
+          ) : (
+            t.routeCount(routes.length)
+          )}
         </strong>
         {!desktop && selected !== undefined && (
           // Said again as the carousel moves; the cards alone do not tell which one is in the middle.
@@ -198,11 +209,11 @@ function RouteRow({
   const shares = surfaceShares(route, language);
   const surface = `${t.paved} ${shares.paved} · ${t.unpaved} ${shares.unpaved}`;
   const name = [
-    t.route(index + 1, count),
+    routeTitle(route, language, index, count),
     distance,
     ...(gain ? [`${t.elevationGain} ${gain}`] : []),
     `${t.estimatedDuration} ${duration}`,
-    surface,
+    ...(route.imported ? [] : [surface]),
     ...(route.technical ? [t.technical] : []),
   ].join(', ');
   return (
@@ -227,6 +238,13 @@ function RouteRow({
       }}
       onBlur={onPreviewEnd}
     >
+      {route.imported?.name && (
+        <span className="w-full min-w-0" {...hint(route.imported.name, 'top-start')}>
+          <strong data-testid={`routes-row-${index}-name`} className="block truncate text-sm">
+            {route.imported.name}
+          </strong>
+        </span>
+      )}
       <span className="flex w-full items-center gap-3">
         <RouteThumbnail geometry={route.geometry} index={index} {...(snapshot && { snapshot })} />
         <span className="flex min-w-0 flex-none flex-col gap-1">
@@ -255,7 +273,9 @@ function RouteRow({
         <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
         <ChevronRight size={18} aria-hidden className="ml-auto flex-none text-ink-2" />
       </span>
-      <SurfaceBar testId={`routes-row-${index}-surface`} unpavedShare={shares.unpavedShare} label={surface} />
+      {!route.imported && (
+        <SurfaceBar testId={`routes-row-${index}-surface`} unpavedShare={shares.unpavedShare} label={surface} />
+      )}
     </button>
   );
 }
@@ -331,10 +351,18 @@ function RouteDetail({
           <ArrowLeftRight size={18} aria-hidden />
           {t.reverseRoute}
         </button>
-        <strong data-testid="route-position" aria-label={t.route(selected + 1, routes.length)}>
-          {selected + 1}/{routes.length}
-        </strong>
+        {!route.imported && (
+          <strong data-testid="route-position" aria-label={routeTitle(route, language, selected, routes.length)}>
+            {selected + 1}/{routes.length}
+          </strong>
+        )}
       </div>
+      {/* Wrapped, not cut: a phone has no hover to read the rest of it. */}
+      {route.imported?.name && (
+        <strong data-testid="route-name" className="text-lg break-words">
+          {route.imported.name}
+        </strong>
+      )}
       <div className="flex items-center gap-3">
         <RouteThumbnail
           testId="route-thumbnail"
@@ -356,16 +384,18 @@ function RouteDetail({
       <SurfaceShare route={route} language={language} />
       <RouteTimeline route={route} language={language} pace={pace} waypoints={waypoints} waypointPois={waypointPois} />
       {/* Pinned to the bottom of the sheet's scroll area: on a short phone the profile pushes it under the fold. The top padding masks what scrolls under it; the negative margin takes back the flex gap it replaces. */}
-      <div className="sticky bottom-0 -mt-3 bg-surface pt-3">
-        <RouteExportButton
-          route={route}
-          language={language}
-          paceUnit={paceUnit}
-          pace={pace}
-          waypoints={waypoints}
-          waypointPois={waypointPois}
-        />
-      </div>
+      {canExport(route) && (
+        <div className="sticky bottom-0 -mt-3 bg-surface pt-3">
+          <RouteExportButton
+            route={route}
+            language={language}
+            paceUnit={paceUnit}
+            pace={pace}
+            waypoints={waypoints}
+            waypointPois={waypointPois}
+          />
+        </div>
+      )}
     </div>
   );
 }

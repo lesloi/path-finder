@@ -28,6 +28,9 @@ export const criteriaText = {
     // Paris.
     coordinatesHint: 'For example: 48.85, 2.35 (latitude, longitude)',
     unavailable: 'Your location is unavailable.',
+    importGpx: 'Open a GPX track',
+    importFailed: 'This file is not a GPX track.',
+    importFailedHint: 'Pick a .gpx file with at least two points.',
     pickHint: 'Long-press the map to pick your start point.',
     pickHintDesktop: 'Long-press the map or type coordinates.',
     target: 'Target',
@@ -110,6 +113,9 @@ export const criteriaText = {
     unreadable: 'Coordonnées incorrectes.',
     coordinatesHint: 'Exemple : 48.85, 2.35 (latitude, longitude)',
     unavailable: 'Votre position n’est pas disponible.',
+    importGpx: 'Ouvrir une trace GPX',
+    importFailed: 'Ce fichier n’est pas une trace GPX.',
+    importFailedHint: 'Choisissez un fichier .gpx d’au moins deux points.',
     // One line on a phone.
     pickHint: 'Choisissez le départ d’un appui long sur la carte.',
     pickHintDesktop: 'Faites un appui long sur la carte ou saisissez des coordonnées.',

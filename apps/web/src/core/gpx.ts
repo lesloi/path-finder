@@ -144,7 +144,7 @@ function fileName({ distance, elevationGain }: GpxRoute, exportedAt: Date): stri
 }
 
 /** Douglas–Peucker, with a tolerance doubled from 1 m until at most `max` points are left. */
-function simplify(geometry: [number, number, number?][], max: number): [number, number, number?][] {
+export function simplify(geometry: [number, number, number?][], max: number): [number, number, number?][] {
   if (geometry.length <= max) return geometry;
   // Metres on a local equirectangular projection, close enough over a loop.
   const scale = 111_195;

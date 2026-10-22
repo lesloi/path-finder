@@ -1,10 +1,10 @@
 import { ArrowLeftRight, X } from 'lucide-react';
 
-import { DOCK, ElevationProfile, ICON_BUTTON, tip } from '../components/index.ts';
+import { DOCK, ElevationProfile, hint, ICON_BUTTON, tip } from '../components/index.ts';
 import { elevationProfile, type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
-import { RouteExportButton } from './route-export-button.tsx';
-import { RouteFigures, SurfaceShare, TechnicalMarker } from './route-figures.tsx';
+import { canExport, RouteExportButton } from './route-export-button.tsx';
+import { RouteFigures, routeTitle, SurfaceShare, TechnicalMarker } from './route-figures.tsx';
 import { RouteStepStrip } from './route-step-strip.tsx';
 
 /**
@@ -41,6 +41,7 @@ export function RouteDock({
   waypointPois?: WaypointPois | undefined;
 }) {
   const t = routesText[language];
+  const title = routeTitle(route, language, index, count);
   const hasProfile = elevationProfile(route.geometry) !== undefined;
   const strip = (
     <RouteStepStrip
@@ -53,14 +54,15 @@ export function RouteDock({
     />
   );
   return (
-    <section
-      data-testid="route-dock"
-      className={`${DOCK} items-stretch gap-4 p-4`}
-      aria-label={t.route(index + 1, count)}
-    >
+    <section data-testid="route-dock" className={`${DOCK} items-stretch gap-4 p-4`} aria-label={title}>
       <div className="flex w-52 flex-none flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
-          <strong data-testid="route-position">{t.route(index + 1, count)}</strong>
+          {/* The tip is on the box, not on the text that is cut: the cut text would clip it. */}
+          <span className="min-w-0" {...hint(title, 'bottom-start')}>
+            <strong data-testid="route-position" className="block truncate">
+              {title}
+            </strong>
+          </span>
           <button
             type="button"
             data-testid="route-reverse"
@@ -75,16 +77,18 @@ export function RouteDock({
         {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" className="justify-center" />}
         <SurfaceShare route={route} language={language} />
         {/* Under the rest, whatever its height. */}
-        <div className="mt-auto">
-          <RouteExportButton
-            route={route}
-            language={language}
-            paceUnit={paceUnit}
-            pace={pace}
-            waypoints={waypoints}
-            waypointPois={waypointPois}
-          />
-        </div>
+        {canExport(route) && (
+          <div className="mt-auto">
+            <RouteExportButton
+              route={route}
+              language={language}
+              paceUnit={paceUnit}
+              pace={pace}
+              waypoints={waypoints}
+              waypointPois={waypointPois}
+            />
+          </div>
+        )}
       </div>
       {/* Room on the right for the close button, which the pins of the profile would otherwise sit under. */}
       <div className="flex min-w-0 flex-1 flex-col justify-center pr-10">

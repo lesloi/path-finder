@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { useToastTimeout, type SheetState } from '../components/index.ts';
-import type { MapSnapshot, Position, RouteSetRequest } from '../core/index.ts';
+import type { MapSnapshot, Position, Route, RouteSetRequest } from '../core/index.ts';
 import { useRouteSet, type Refusal } from '../state/index.ts';
 
 /**
@@ -11,7 +11,7 @@ import { useRouteSet, type Refusal } from '../state/index.ts';
  */
 export function useRouteBrowser() {
   const [refusal, setRefusal] = useState<Refusal>();
-  const { routeSet, loading, find, clear } = useRouteSet(setRefusal);
+  const { routeSet, loading, find, show, clear } = useRouteSet(setRefusal);
   const [selected, setSelected] = useState<number>();
   // The route a pointer or the focus is on in the list: the map highlights it without selecting it.
   const [preview, setPreview] = useState<number>();
@@ -78,6 +78,15 @@ export function useRouteBrowser() {
       setReversed(new Set());
       setSheet('collapsed');
       find(request);
+    },
+    /** Shows a track loaded from a file as a route set of one, selected. */
+    showImported(request: RouteSetRequest, route: Route) {
+      setRefusal(undefined);
+      setSelected(0);
+      setPreview(undefined);
+      setReversed(new Set());
+      setSheet('collapsed');
+      show(request, [route]);
     },
     /** Forgets the route set, and any search under way, such as when a new start point makes it stale. */
     drop() {

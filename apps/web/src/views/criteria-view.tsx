@@ -32,6 +32,7 @@ import {
 import { useCoverage, useSettings } from '../state/index.ts';
 import { CriteriaBar } from './criteria-bar.tsx';
 import { CriteriaForm, criteriaChanged, criteriaRequest, useCriteriaDraft } from './criteria-form.tsx';
+import { GpxImportButton } from './gpx-import-button.tsx';
 import { RouteDock } from './route-dock.tsx';
 import { RouteErrorToast } from './route-error-toast.tsx';
 import { AvoidedAreaList } from './avoided-area-list.tsx';
@@ -41,6 +42,8 @@ import { useRouteBrowser } from './use-route-browser.ts';
 import { RouteSetView } from './route-set-view.tsx';
 import {
   criteriaSummary,
+  importGpx,
+  MAX_IMPORT_FILE_BYTES,
   DEFAULT_AVOIDED_RADIUS,
   fitRadius,
   maxRadiusAround,
@@ -231,6 +234,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const [listFolded, setListFolded] = useState(false);
   // What went wrong, and the start point then: setting a new one drops the toast.
   const [toast, setToast] = useState<{ problem: 'unavailable' | 'unreadable'; start?: Position }>();
+  const [importFailed, setImportFailed] = useState(false);
+  useToastTimeout(importFailed || undefined, () => setImportFailed(false));
   const settingsLink = useRef<HTMLAnchorElement>(null);
   const map = useRef<MapHandle>(null);
   const [mapView, setMapView] = useState<MapView>({ bearing: 0, rotated: false, movedAway: false });
@@ -273,7 +278,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     draft[2]();
     browser.ask(request);
   };
-  const stale = Boolean(routeSet && current && criteriaChanged(current, routeSet.request));
+  // A loaded track was not asked for with criteria, which cannot make it stale.
+  const stale = Boolean(
+    routeSet && !routeSet.routes[0]?.imported && current && criteriaChanged(current, routeSet.request),
+  );
   useRootProperty('--column-inset', '0px', desktop && formFolded);
   useRootProperty('--list-inset', listFolded ? '0px' : 'var(--list-reserved)', listShown);
   useRootProperty('--dock-inset', 'var(--dock-reserved)', dockShown);
@@ -410,6 +418,26 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     changeStart(position);
   }
 
+  // The track is read here, in the browser: the file goes nowhere. It is shown as a route set of one, whose request
+  // only holds what the figures need (its start and length, and the pace the durations follow).
+  async function importTrack(file: File) {
+    const route = file.size <= MAX_IMPORT_FILE_BYTES ? importGpx(await file.text(), pace, file.name) : undefined;
+    if (!route) return setImportFailed(true);
+    setImportFailed(false);
+    setLayerOpen(false);
+    setCleared(false);
+    setListFolded(false);
+    browser.showImported(
+      {
+        start: [route.geometry[0][0], route.geometry[0][1]],
+        target: { distance: route.distance },
+        surface: 'any',
+        pace,
+      },
+      route,
+    );
+  }
+
   function warn(problem: 'unavailable' | 'unreadable') {
     setToast({ problem, start });
   }
@@ -510,7 +538,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       waypoints={waypoints}
       avoidedAreas={avoidedAreas}
       draft={draft}
-      searched={routesShown}
+      // The button says "search again" only after a search: a loaded track was none.
+      searched={routesShown && !routeSet?.routes[0]?.imported}
       waypointList={
         start && (desktop || waypoints.length > 0) ? (
           <WaypointList
@@ -539,6 +568,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           />
         ) : undefined
       }
+      // A phone has its button in the sheet, where it is seen first.
+      onImport={desktop ? importTrack : undefined}
       onStartChange={moveStart}
       onUnreadable={() => warn('unreadable')}
       onPick={() => {
@@ -759,6 +790,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
                 >
                   {t.setCriteria}
                 </button>
+                {/* Never disabled: a track needs neither a start point nor the server. */}
+                <GpxImportButton language={language} onFile={importTrack} />
               </>
             )}
             {cancelButton}
@@ -844,6 +877,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       {browser.refusal && (
         <RouteErrorToast language={language} refusal={browser.refusal} onDismiss={browser.dismissError} />
       )}
+      {importFailed && (
+        <Toast testId="gpx-import-toast" onDismiss={() => setImportFailed(false)}>
+          {t.importFailed}
+          <br />
+          {t.importFailedHint}
+        </Toast>
+      )}
       {toast && toast.start === start && (
         <Toast testId="criteria-toast" onDismiss={() => setToast(undefined)}>
           {toast.problem === 'unavailable' ? t.unavailable : t.unreadable}
@@ -867,6 +907,7 @@ function CriteriaFields({
   searched,
   waypointList,
   avoidedList,
+  onImport,
   onStartChange,
   onUnreadable,
   onPick,
@@ -884,6 +925,7 @@ function CriteriaFields({
   searched: boolean;
   waypointList: ReactNode;
   avoidedList: ReactNode;
+  onImport?: ((file: File) => void) | undefined;
   onStartChange: (start: Position) => void;
   onUnreadable: () => void;
   onPick: () => void;
@@ -934,6 +976,7 @@ function CriteriaFields({
         avoidedList={avoidedList}
         onSubmit={onSubmit}
       />
+      {onImport && <GpxImportButton language={language} onFile={onImport} />}
     </>
   );
 }
