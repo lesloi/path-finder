@@ -6,21 +6,14 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 
-// The ID of a build is a hash of what it is built from, as `import.meta.env.VITE_BUILD_ID`: it names the service
-// worker's cache, which a deploy of docs, CI or the server alone then leaves as it is. A random ID would empty it on
-// every deploy. The sources are hashed, not the bundle, which does not see `public/`; the tests are left out, as editing
-// one changes nothing the user gets.
+// The ID of a build is a hash of its sources, as `import.meta.env.VITE_BUILD_ID` and in `dist/build-id`: the API
+// answers 426 to a tab with another ID, and the service worker's cache is named by it. A random ID would reload every
+// tab and empty the cache on each deploy, docs and CI included. `contract.json` is an input, so editing its
+// `apiVersion` forces a new ID. The sources are hashed, not the bundle, which does not see `public/`; tests are left
+// out.
 function buildId(): Plugin {
   const root = fileURLToPath(new URL('.', import.meta.url));
-  const inputs = [
-    'src',
-    'public',
-    'index.html',
-    'package.json',
-    'vite.config.ts',
-    '../../pnpm-lock.yaml',
-    '../server/contract/contract.json',
-  ];
+  const inputs = ['src', 'public', 'vite.config.ts', '../server/contract/contract.json'];
   const files = (path: string): string[] =>
     statSync(path).isDirectory()
       ? readdirSync(path)
@@ -28,6 +21,7 @@ function buildId(): Plugin {
           .filter((name) => !name.includes('-test.'))
           .flatMap((name) => files(join(path, name)))
       : [path];
+  let id = '';
   return {
     name: 'build-id',
     apply: 'build',
@@ -36,7 +30,11 @@ function buildId(): Plugin {
       for (const file of inputs.flatMap((input) => files(join(root, input)))) {
         hash.update(relative(root, file)).update(readFileSync(file));
       }
-      return { define: { 'import.meta.env.VITE_BUILD_ID': JSON.stringify(hash.digest('hex').slice(0, 16)) } };
+      id = hash.digest('hex').slice(0, 16);
+      return { define: { 'import.meta.env.VITE_BUILD_ID': JSON.stringify(id) } };
+    },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'build-id', source: id });
     },
   };
 }

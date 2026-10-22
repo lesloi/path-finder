@@ -22,9 +22,10 @@ By default:
   beyond it the answer is `429`, never a queue.
 - There is no activity: the user sets a length, a surface preference and an elevation gain, and the pace is the
   only trace of who they are. Cycling will be a travel mode (#131), not an activity.
-- A built web app sends `apiVersion` (from `contract.json`) in `X-Api-Version`; the server answers `426` on a mismatch so
-  stale tabs ask the user to reload. Raise it only when a tab built before can no longer use the API; the guard test in
-  `contract` says when to decide.
+- A built web app sends its build ID in `X-Api-Version`, a hash of its sources that the build also writes in
+  `dist/build-id`; the server answers `426` on a mismatch so stale tabs ask the user to reload. To reload tabs after a
+  change that leaves the sources alone (a changed meaning of the API), raise `apiVersion` in `contract.json` (optional,
+  read by no code): it only gives the build a new ID.
 - The credits page stays accurate, and every GPX export carries the OSM attribution.
 - Elevation comes from BD ALTI and is stored on every graph node at build time; the server never reads
   BD ALTI tiles while serving.

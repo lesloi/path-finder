@@ -35,7 +35,7 @@ type CoverageSource interface {
 
 // Config is what New needs; the zero value of an optional field is its default.
 type Config struct {
-	// WebRoot holds the built web app.
+	// WebRoot holds the built web app, with the `build-id` file its build writes.
 	WebRoot   string
 	Generator RouteSetGenerator
 	// Coverage answers GET /api/v1/coverage; without it the route is not served.
@@ -76,7 +76,7 @@ func New(cfg Config) http.Handler {
 	if cfg.GenerationTimeout <= 0 {
 		cfg.GenerationTimeout = 15 * time.Second
 	}
-	a := &app{cfg: cfg}
+	a := &app{cfg: cfg, buildID: readBuildID(cfg.WebRoot)}
 
 	r := chi.NewRouter()
 	if cfg.Log != nil {
@@ -94,23 +94,24 @@ func New(cfg Config) http.Handler {
 		routeSets = routeSets.With(rateLimit(newRateLimiter(cfg.RateLimit, cfg.RateWindow)))
 	}
 	// The body is read before a generation slot is taken: a slow upload must not hold one.
-	routeSets = routeSets.With(a.checkVersion, readBody)
+	routeSets = routeSets.With(a.checkBuild, readBody)
 	if cfg.Limits {
 		routeSets = routeSets.With(throttle(cfg.LoopLimit))
 	}
 	routeSets.Post("/api/v1/route-sets", a.routeSets)
 	if cfg.Coverage != nil {
-		r.With(a.checkVersion).Get("/api/v1/coverage", a.coverage)
+		r.With(a.checkBuild).Get("/api/v1/coverage", a.coverage)
 	}
 	if cfg.POIDir != "" {
-		r.With(a.checkVersion).Get(poiTilesPath+"{x}/{y}", a.poiTile)
+		r.With(a.checkBuild).Get(poiTilesPath+"{x}/{y}", a.poiTile)
 	}
 	r.NotFound(staticFiles(cfg.WebRoot).ServeHTTP)
 	return r
 }
 
 type app struct {
-	cfg Config
+	cfg     Config
+	buildID string
 }
 
 // contentSecurityPolicy is the Content-Security-Policy of every answer. The only third party is the Géoplateforme, for the map: its
@@ -142,13 +143,11 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// checkVersion answers 426 to a tab built for another version of the API. A tab from before the version existed sends
-// the ID of its build instead and cannot tell a later bump apart, so it is sent to reload this once.
-func (a *app) checkVersion(next http.Handler) http.Handler {
-	current := strconv.Itoa(contract.APIVersion)
+// checkBuild answers 426 to a tab left open across a deploy that changed the web app: it sends the ID of its build as
+// its API version.
+func (a *app) checkBuild(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		version := r.Header.Get("X-Api-Version")
-		if (version != "" && version != current) || (version == "" && r.Header.Get("X-Build-Id") != "") {
+		if id := r.Header.Get("X-Api-Version"); a.buildID != "" && id != "" && id != a.buildID {
 			refuse(w, http.StatusUpgradeRequired, contract.CodeStaleBuild)
 			return
 		}
@@ -237,6 +236,15 @@ func (a *app) coverage(w http.ResponseWriter, _ *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-cache") // the data can be reloaded: ask again, the answer is small
 	writeJSON(w, http.StatusOK, contract.Coverage{Cells: cells})
+}
+
+// readBuildID returns the ID written by each web app build, or none when the web app is not built.
+func readBuildID(webRoot string) string {
+	data, err := os.ReadFile(filepath.Join(webRoot, "build-id"))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 // poiTilesPath is where tiles are served. A tile request says which ~27 km of the map the user looks at, so it is

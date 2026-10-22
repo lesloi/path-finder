@@ -1,10 +1,9 @@
-import { API_VERSION } from '../contract/index.ts';
-
 /**
- * The header that tells the API which version of it the app is built for, so that it can refuse a tab left open across
- * a breaking deploy. Outside a build there is none: the dev server may run an older binary than `contract.json`, and a
- * reload would not fix that.
+ * The header that tells the API which version of it the app was built for (its build ID), so that it can answer a tab
+ * left open across a deploy.
  */
-export function apiVersionHeader(): Record<string, string> {
-  return typeof import.meta.env.VITE_BUILD_ID === 'string' ? { 'X-Api-Version': String(API_VERSION) } : {};
+export function buildIdHeader(): Record<string, string> {
+  const buildId: unknown = import.meta.env.VITE_BUILD_ID;
+  // Outside a build there is no id, and "undefined" would never match the API's.
+  return typeof buildId === 'string' ? { 'X-Api-Version': buildId } : {};
 }

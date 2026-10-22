@@ -1,6 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import { API_VERSION } from '../contract/index.ts';
 import type { Route, RouteSetRequest } from '../core/index.ts';
 import { requestRouteSet, retryDelay, useRouteSet } from './route-set.ts';
 
@@ -46,17 +45,17 @@ describe('requestRouteSet', () => {
     );
   });
 
-  it('sends the version of the API the app is built for', async () => {
+  it('sends the build id of the app', async () => {
     vi.stubEnv('VITE_BUILD_ID', 'build-1');
     const fetchMock = answer(Response.json({ routes: [] }));
 
     await requestRouteSet(request);
 
     const [, { headers }] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(new Headers(headers).get('X-Api-Version')).toBe(String(API_VERSION));
+    expect(new Headers(headers).get('X-Api-Version')).toBe('build-1');
   });
 
-  it('sends no API version outside a build', async () => {
+  it('sends no build id outside a build', async () => {
     const fetchMock = answer(Response.json({ routes: [] }));
 
     await requestRouteSet(request);

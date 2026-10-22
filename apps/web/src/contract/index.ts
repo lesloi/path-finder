@@ -14,7 +14,6 @@ export {
 } from './criteria.ts';
 export type { ApiError, ErrorCode, SurfaceStretch, TechnicalStretch } from './errors.ts';
 export {
-  API_VERSION,
   AVOIDED_AREA_RADIUS,
   CLIMB_PER_EFFORT_KM,
   ERROR_CODES,
