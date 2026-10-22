@@ -32,6 +32,8 @@ function answer(response: Response | Promise<Response>) {
 }
 
 describe('requestRouteSet', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it('posts the criteria to the API and returns the routes', async () => {
     const fetchMock = answer(Response.json({ routes: [route] }));
 
@@ -45,12 +47,22 @@ describe('requestRouteSet', () => {
   });
 
   it('sends the version of the API the app is built for', async () => {
+    vi.stubEnv('VITE_BUILD_ID', 'build-1');
     const fetchMock = answer(Response.json({ routes: [] }));
 
     await requestRouteSet(request);
 
     const [, { headers }] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(new Headers(headers).get('X-Api-Version')).toBe(String(API_VERSION));
+  });
+
+  it('sends no API version outside a build', async () => {
+    const fetchMock = answer(Response.json({ routes: [] }));
+
+    await requestRouteSet(request);
+
+    const [, { headers }] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new Headers(headers).has('X-Api-Version')).toBe(false);
   });
 
   it('returns how long the API asks to wait', async () => {

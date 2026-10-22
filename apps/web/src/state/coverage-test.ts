@@ -11,8 +11,11 @@ function answer(response: Response | Promise<Response>) {
   return fetchMock;
 }
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe('requestCoverage', () => {
   it('asks the API with its version, and nothing else', async () => {
+    vi.stubEnv('VITE_BUILD_ID', 'build-1');
     const fetchMock = answer(Response.json({ cells }));
 
     expect(await requestCoverage()).toEqual(cells);

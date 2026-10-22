@@ -22,7 +22,7 @@ By default:
   beyond it the answer is `429`, never a queue.
 - There is no activity: the user sets a length, a surface preference and an elevation gain, and the pace is the
   only trace of who they are. Cycling will be a travel mode (#131), not an activity.
-- The web app sends `apiVersion` (from `contract.json`) in `X-Api-Version`; the server answers `426` on a mismatch so
+- A built web app sends `apiVersion` (from `contract.json`) in `X-Api-Version`; the server answers `426` on a mismatch so
   stale tabs ask the user to reload. Raise it only when a tab built before can no longer use the API; the guard test in
   `contract` says when to decide.
 - The credits page stays accurate, and every GPX export carries the OSM attribution.
