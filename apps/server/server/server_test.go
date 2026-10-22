@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -42,7 +43,6 @@ func webRoot(t *testing.T) string {
 		}
 	}
 	write("index.html", "<html>app</html>")
-	write("build-id", "build-2\n")
 	write("assets/app-abc123.js", "console.log(1)")
 	return dir
 }
@@ -152,15 +152,27 @@ func TestRouteSetsRefusals(t *testing.T) {
 	})
 }
 
-func TestStaleBuildMustReload(t *testing.T) {
+func TestAnOutdatedAPIVersionMustReload(t *testing.T) {
 	h := newServer(t, nil)
-	stale := do(h, http.MethodPost, "/api/v1/route-sets", `{}`, "", map[string]string{"X-Build-Id": "build-1"})
-	if stale.Code != 426 || stale.errorCode(t) != "stale-build" {
-		t.Errorf("stale build: got %d %s", stale.Code, stale.Body.String())
+	current := strconv.Itoa(contract.APIVersion)
+	cases := map[string]struct {
+		headers map[string]string
+		want    int
+	}{
+		"older version":                {map[string]string{"X-Api-Version": "0"}, 426},
+		"newer version":                {map[string]string{"X-Api-Version": "999"}, 426},
+		"tab from before the version":  {map[string]string{"X-Build-Id": "build-1"}, 426},
+		"current version":              {map[string]string{"X-Api-Version": current}, 200},
+		"current version, other build": {map[string]string{"X-Api-Version": current, "X-Build-Id": "any"}, 200},
+		"no header":                    {nil, 200},
 	}
-	for name, headers := range map[string]map[string]string{"current": {"X-Build-Id": "build-2"}, "none": nil} {
-		if r := do(h, http.MethodPost, "/api/v1/route-sets", `{}`, "", headers); r.Code != 200 {
-			t.Errorf("%s build: got %d", name, r.Code)
+	for name, tc := range cases {
+		r := do(h, http.MethodPost, "/api/v1/route-sets", `{}`, "", tc.headers)
+		if r.Code != tc.want {
+			t.Errorf("%s: got %d, want %d", name, r.Code, tc.want)
+		}
+		if tc.want == 426 && r.errorCode(t) != "stale-build" {
+			t.Errorf("%s: got %s", name, r.Body.String())
 		}
 	}
 }
@@ -357,7 +369,6 @@ func TestStaticFilesAreCachedByKind(t *testing.T) {
 	for path, want := range map[string]string{
 		"/":                     "no-cache",
 		"/assets/app-abc123.js": immutable,
-		"/build-id":             "no-cache",
 		"/assets/missing.js":    "",
 	} {
 		r := do(h, http.MethodGet, path, "", "", nil)
@@ -373,14 +384,6 @@ func TestStaticFilesAreCachedByKind(t *testing.T) {
 	}
 	if r := do(h, http.MethodPost, "/", "", "", nil); r.Code != 404 {
 		t.Errorf("POST to a static path: got %d", r.Code)
-	}
-}
-
-func TestWithoutABuiltWebAppAnyBuildIsAccepted(t *testing.T) {
-	h := New(Config{WebRoot: t.TempDir(), Generator: generatorFunc(okGenerator)})
-	r := do(h, http.MethodPost, "/api/v1/route-sets", `{}`, "", map[string]string{"X-Build-Id": "build-0"})
-	if r.Code != 200 {
-		t.Errorf("no build-id file: got %d", r.Code)
 	}
 }
 

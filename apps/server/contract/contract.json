@@ -1,4 +1,5 @@
 {
+  "apiVersion": 1,
   "maxDistanceKm": 50,
   "minDistanceKm": 2,
   "durationMinutes": { "min": 15, "max": 360 },

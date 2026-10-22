@@ -32,6 +32,11 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   holds the bounds and error codes, and the cases of the tests that both sides run. The server alone
   decides what is valid; the web app checks early to name the wrong field. Two languages, one
   vocabulary, and a test fails on the side left behind.
+- **A stale tab is told to reload by a version of the API, not by the ID of the build.** The ID changed on every
+  deploy, so a fix to the docs, the CI or a label asked everyone to reload for nothing. `apiVersion` in `contract.json`
+  is raised by hand when a tab built before can no longer use the API; a test fingerprints what such a tab reads or
+  sends (every fixture of `testdata/`, the error codes and the surfaces, not the bounds) and fails until someone has decided
+  whether to raise it. The build ID stays, derived from the sources, to name the service worker's cache.
 - **A country's graph is built in one go, on disk; a server maps one graph per territory (`DATA_DIR`).** The build sorts its
   records on disk and reads them back in order, instead of keeping every node in memory: metropolitan France takes
   185 s and 2.4 GB of resident memory at its peak on 16 cores (the build in memory needs 11.6 GB), its landmarks 158 s and

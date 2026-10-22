@@ -1,5 +1,5 @@
 import { parsePoiTile, type Poi } from '../core/index.ts';
-import { buildIdHeader } from './api.ts';
+import { apiVersionHeader } from './api.ts';
 
 /** How long a tile that could not be had is left alone: a server with no tiles, or no network, is not asked at every move. */
 export const POI_RETRY_MS = 30_000;
@@ -9,7 +9,7 @@ const failedAt = new Map<string, number>();
 
 async function fetchTile(x: number, y: number): Promise<Poi[] | undefined> {
   try {
-    const response = await fetch(`/api/v1/poi-tiles/${x}/${y}`, { headers: buildIdHeader() });
+    const response = await fetch(`/api/v1/poi-tiles/${x}/${y}`, { headers: apiVersionHeader() });
     return response.ok ? parsePoiTile(await response.json()) : undefined;
   } catch {
     return undefined;
