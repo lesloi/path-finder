@@ -5,4 +5,4 @@ export type Basemap = 'plan' | 'minimal' | 'aerial';
 export const BASEMAPS: Basemap[] = ['plan', 'minimal', 'aerial'];
 
 /** The basemap before the user picks one. */
-export const DEFAULT_BASEMAP: Basemap = 'plan';
+export const DEFAULT_BASEMAP: Basemap = 'minimal';

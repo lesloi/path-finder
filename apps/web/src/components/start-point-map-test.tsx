@@ -188,18 +188,18 @@ describe('StartPointMap', () => {
   });
 
   describe('the basemap', () => {
-    it('starts on the Plan IGN raster', () => {
+    it('starts on Epure', () => {
       render(<StartPointMap onStartChange={vi.fn()} />);
-
-      expect(map().options.style).toEqual(basemapStyle('plan'));
-      expect(JSON.stringify(map().options.style)).toContain('GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2');
-    });
-
-    it('starts on the basemap it is given', () => {
-      render(<StartPointMap basemap="minimal" onStartChange={vi.fn()} />);
 
       expect(map().options.style).toBe(basemapStyle('minimal'));
       expect(map().options.style).toMatch(/PLAN\.IGN\/epure\.json$/);
+    });
+
+    it('starts on the basemap it is given', () => {
+      render(<StartPointMap basemap="plan" onStartChange={vi.fn()} />);
+
+      expect(map().options.style).toEqual(basemapStyle('plan'));
+      expect(JSON.stringify(map().options.style)).toContain('GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2');
     });
 
     it('serves the aerial photography as JPEG tiles', () => {
@@ -272,7 +272,7 @@ describe('StartPointMap', () => {
 
     it('goes back to the previous basemap when the style of the new one fails to load', () => {
       const onBasemapFail = vi.fn();
-      const view = render(<StartPointMap onBasemapFail={onBasemapFail} onStartChange={vi.fn()} />);
+      const view = render(<StartPointMap basemap="plan" onBasemapFail={onBasemapFail} onStartChange={vi.fn()} />);
       act(() => map().fire('style.load'));
 
       view.rerender(<StartPointMap basemap="minimal" onBasemapFail={onBasemapFail} onStartChange={vi.fn()} />);

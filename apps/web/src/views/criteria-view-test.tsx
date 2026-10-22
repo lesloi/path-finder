@@ -111,6 +111,7 @@ describe('CriteriaView', () => {
   });
 
   it('goes back to the saved basemap that failed to load', () => {
+    localStorage.setItem('path-finder.settings', JSON.stringify({ basemap: 'plan' }));
     render(<CriteriaView language="en" />);
     act(() => maps.at(-1)!.fire('style.load'));
     const settings = renderHook(() => useSettings());
