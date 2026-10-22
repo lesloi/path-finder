@@ -42,8 +42,8 @@ func OpenLazy(dir string, proj Projection, cache int) (*LazyDEM, error) {
 			return nil, err
 		}
 	}
-	for i, h := range headers {
-		if err := sameGrid(paths[i], h.ncols, h.nrows, h.cs, headers[0].ncols, headers[0].nrows, headers[0].cs); err != nil {
+	for i, h := range headers[1:] {
+		if err := h.sameGrid(paths[i+1], headers[0]); err != nil {
 			return nil, err
 		}
 	}
