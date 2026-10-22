@@ -336,6 +336,12 @@ type Report struct {
 // BuildGraph builds the graph file of the extracts, on disk when there is one extract: its memory then does not grow
 // with the country. Several extracts, which are the small territories, are joined in memory.
 func BuildGraph(pbfPaths []string, demDir string, proj elevation.Projection, outPath string, opts Options, log io.Writer) error {
+	if len(pbfPaths) == 0 {
+		return errors.New("build-graph needs at least one -pbf")
+	}
+	if demDir == "" {
+		return errors.New("build-graph needs -dem, the directory of the BD ALTI tiles")
+	}
 	if len(pbfPaths) != 1 {
 		fmt.Fprintf(log, "%d extracts: built in memory\n", len(pbfPaths))
 		return Build(pbfPaths, demDir, proj, outPath, log)
@@ -355,11 +361,27 @@ func BuildGraph(pbfPaths []string, demDir string, proj elevation.Projection, out
 	return nil
 }
 
+// staleScratch is how old a scratch directory is when its build is taken for dead: a build killed by the system (out of
+// memory) cannot remove its own, and the directory is as big as the extract. A build creates files in its directory at every
+// step and takes hours, not a day.
+const staleScratch = 24 * time.Hour
+
+// sweepScratch removes the scratch directories below tmp that nothing has touched for staleScratch.
+func sweepScratch(tmp string) {
+	old, _ := filepath.Glob(filepath.Join(tmp, "pf-external-*"))
+	for _, dir := range old {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() && time.Since(info.ModTime()) > staleScratch {
+			os.RemoveAll(dir)
+		}
+	}
+}
+
 // scratch makes the directory of the runs below tmp, and returns a function that removes it.
 func scratch(tmp string) (string, func(), error) {
 	if err := os.MkdirAll(tmp, 0o755); err != nil {
 		return "", nil, err
 	}
+	sweepScratch(tmp)
 	dir, err := os.MkdirTemp(tmp, "pf-external-*")
 	if err != nil {
 		return "", nil, err

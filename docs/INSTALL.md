@@ -77,7 +77,8 @@ profile and to one graph: build them again after each graph; the server refuses 
 Metropolitan France is one `build-graph` from the France extract and three `build-alt`, as above, with `-pbf` the
 Geofabrik `france-latest.osm.pbf` and `-dem` the BD ALTI of every department. The build works on disk, and its memory does
 not grow with the extract (it needs a sorted one, as Geofabrik's are). Its temporary files go beside the graph, or to `-tmp`:
-never a memory-backed `/tmp`, they are as big as the extract. Count about 9 GB of temporary disk beside the 4.2 GB graph, and
+never a memory-backed `/tmp`, they are as big as the extract; a build removes the `pf-external-*` directories there that a
+killed build left more than a day ago. Count about 9 GB of temporary disk beside the 4.2 GB graph, and
 about 9 GB of landmark files. `-chunk` and `-cache` size the sorts and the BD ALTI tiles kept in memory. `build-alt` also works
 on disk, `-workers` landmarks at a time (2 by default, each worker holds one distance per node), with `-tmp` for its files.
 
