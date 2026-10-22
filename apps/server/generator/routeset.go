@@ -237,6 +237,12 @@ func (r *ranking) add(candidates ...*candidate) {
 	sort.SliceStable(r.all, func(i, j int) bool { return r.all[i].score < r.all[j].score })
 }
 
+// holdsADirectSuggestion tells whether the direct loop is in the ranking without being a match: the matches then
+// fill the set one short.
+func (r *ranking) holdsADirectSuggestion() bool {
+	return slices.ContainsFunc(r.all, func(e ranked) bool { return e.direct && e.tier != tierMatch })
+}
+
 // sharing is how much of a route another one covers, for the ranking to leave out a duplicate. The direct loop
 // that goes back over its steps covers few cells, so against it the share of the larger route counts: the loops that
 // go through the same waypoint are not duplicates of it.

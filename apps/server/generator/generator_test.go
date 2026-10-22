@@ -639,3 +639,19 @@ func TestGenerateServesTheDirectLoopBeyondTheTargetWhateverItsGain(t *testing.T)
 		t.Errorf("%d routes, err = %v, %d searches, want the direct loop alone", len(routes), err, looper.loopCalls)
 	}
 }
+
+func TestGenerateKeepsEightMatchesWhenTheDirectLoopIsLeftOut(t *testing.T) {
+	short := engineLoop(0)
+	short.Distance = 3_000 // much shorter than the target: left out of the set
+	var loops []*engine.Route
+	for h := 0.0; h < 360; h += 40 {
+		loops = append(loops, engineLoop(h))
+	}
+	looper := &fakeLooper{direct: short, loops: loops, askEnough: true}
+
+	routes, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints))
+
+	if err != nil || looper.enoughAt != maxRoutes || len(routes) != maxRoutes {
+		t.Errorf("Enough at %d loops, %d routes, err = %v, want %d of each", looper.enoughAt, len(routes), err, maxRoutes)
+	}
+}
