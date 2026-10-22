@@ -4,19 +4,25 @@ import type { Position } from './coordinates.ts';
 import { boundsAround } from './route.ts';
 
 /** The kinds of points of interest the map can show. */
-export type PoiCategory = 'water' | 'viewpoint';
+export type PoiCategory = 'water' | 'viewpoint' | 'toilets' | 'shelter';
 
 /** The categories in the order the layers popover lists them. */
-export const POI_CATEGORIES: PoiCategory[] = ['water', 'viewpoint'];
+export const POI_CATEGORIES: PoiCategory[] = ['water', 'viewpoint', 'toilets', 'shelter'];
 
 /** What the map shows of the points of interest: each category, and whether seasonal water points are among them. */
 export type PoiLayers = Record<PoiCategory | 'seasonal', boolean>;
 
 /** The keys of the layers, in the order the popover lists them. */
-export const POI_LAYER_KEYS: (keyof PoiLayers)[] = ['water', 'seasonal', 'viewpoint'];
+export const POI_LAYER_KEYS: (keyof PoiLayers)[] = ['water', 'seasonal', 'viewpoint', 'toilets', 'shelter'];
 
-/** Water points are shown, seasonal ones too, until the user hides them; viewpoints once the user shows them. */
-export const DEFAULT_POI_LAYERS: PoiLayers = { water: true, viewpoint: false, seasonal: true };
+/** Water points are shown, seasonal ones too, until the user hides them; the other categories once the user shows them. */
+export const DEFAULT_POI_LAYERS: PoiLayers = {
+  water: true,
+  viewpoint: false,
+  toilets: false,
+  shelter: false,
+  seasonal: true,
+};
 
 /** From this zoom, the map shows points of interest and asks for their tiles; a lower view would span too many. */
 export const POI_MIN_ZOOM = 11;
@@ -39,7 +45,9 @@ export const waypointPoiAt = (pois: WaypointPois, position: Position): WaypointP
 /** What a point of interest is called: its OSM name, else what it is. */
 export function poiLabel({ category, seasonal, name }: WaypointPoi, language: Language): string {
   const words = commonText[language];
-  return name ?? (category === 'viewpoint' ? words.viewpoint : seasonal ? words.seasonalWaterPoint : words.waterPoint);
+  if (name) return name;
+  if (category === 'water') return seasonal ? words.seasonalWaterPoint : words.waterPoint;
+  return words[category];
 }
 
 /** The categories that are on. */
@@ -72,7 +80,8 @@ export const poiTilesAround = (geometry: number[][], margin: number): [number, n
   poiTilesCovering(boundsAround(geometry, margin));
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
-const isCategory = (value: unknown): value is PoiCategory => POI_CATEGORIES.includes(value as PoiCategory);
+/** Whether a value names a category of points of interest. */
+export const isPoiCategory = (value: unknown): value is PoiCategory => POI_CATEGORIES.includes(value as PoiCategory);
 
 /** The points of an answer of `GET /api/v1/poi-tiles/{x}/{y}`; what is not a point is left out, and a bad answer holds none. */
 export function parsePoiTile(body: unknown): Poi[] {
@@ -81,7 +90,7 @@ export function parsePoiTile(body: unknown): Poi[] {
   for (const item of body.pois as unknown[]) {
     if (typeof item !== 'object' || item === null) continue;
     const { category, position, seasonal, name } = item as Record<string, unknown>;
-    if (!isCategory(category) || !Array.isArray(position) || position.length !== 2) continue;
+    if (!isPoiCategory(category) || !Array.isArray(position) || position.length !== 2) continue;
     const [lon, lat] = position as unknown[];
     if (!isNumber(lon) || !isNumber(lat)) continue;
     pois.push({

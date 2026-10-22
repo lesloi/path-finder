@@ -24,23 +24,42 @@ import (
 const (
 	categoryWater     = "water"
 	categoryViewpoint = "viewpoint"
+	categoryToilets   = "toilets"
+	categoryShelter   = "shelter"
 )
 
 // classifyPOI tells which category a tagged object belongs to, if any, and whether a water point is seasonal.
-// An object that says drinking_water=no is never a water point, whatever else it is tagged. Any value of
+// An object has one category and water comes first: a hut with drinking water is a water point. An object that says
+// drinking_water=no is not a water point, but it can still be something else (toilets often say it). Any value of
 // seasonal but "no" counts: the tag holds the season, such as summer.
 func classifyPOI(tags osm.Tags) (category string, seasonal bool) {
 	drinking := tags.Find("drinking_water")
-	switch {
-	case drinking == "no":
-		return "", false
-	case tags.Find("amenity") == "drinking_water" || drinking == "yes":
+	if drinking != "no" && (tags.Find("amenity") == "drinking_water" || drinking == "yes") {
 		s := tags.Find("seasonal")
 		return categoryWater, s != "" && s != "no"
-	case tags.Find("tourism") == "viewpoint":
+	}
+	amenity, tourism := tags.Find("amenity"), tags.Find("tourism")
+	switch {
+	case tourism == "viewpoint":
 		return categoryViewpoint, false
+	// Toilets of a shop (access=customers) are not for passers-by.
+	case amenity == "toilets" && accessible(tags) && tags.Find("access") != "customers":
+		return categoryToilets, false
+	case accessible(tags) && ((amenity == "shelter" && !notForWalkers[tags.Find("shelter_type")]) ||
+		tourism == "alpine_hut" || tourism == "wilderness_hut"):
+		return categoryShelter, false
 	}
 	return "", false
+}
+
+// notForWalkers are the shelter_type values of shelters that are no stop for a walker: a bus stop, livestock, bombs.
+var notForWalkers = map[string]bool{"public_transport": true, "field_shelter": true, "bomb_shelter": true}
+
+// accessible tells whether anyone may walk up to the object: access=private and access=no keep it out. Fee-paying
+// objects stay in: they are still a stop.
+func accessible(tags osm.Tags) bool {
+	access := tags.Find("access")
+	return access != "private" && access != "no"
 }
 
 // poiScan is what the files hold: the points that have a position of their own, and the ways that need one.

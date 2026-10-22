@@ -29,6 +29,7 @@ import {
   poiLabel,
   poiTilesCovering,
   type PoiCategory,
+  isPoiCategory,
   POI_CATEGORIES,
   markerInterval,
   midpointWithin,
@@ -619,11 +620,15 @@ export function StartPointMap({
       geometry: unknown;
     }): { position: Position; poi: WaypointPoi } | undefined => {
       const { category, seasonal, name } = feature?.properties ?? {};
-      if (category !== 'water' && category !== 'viewpoint') return undefined;
+      if (!isPoiCategory(category)) return undefined;
       const [lon, lat] = (feature!.geometry as { coordinates: number[] }).coordinates;
       return {
         position: [lon!, lat!] as Position,
-        poi: { category, seasonal: Boolean(seasonal), ...(typeof name === 'string' && name && { name }) },
+        poi: {
+          category,
+          seasonal: Boolean(seasonal),
+          ...(typeof name === 'string' && name && { name }),
+        },
       };
     };
     const showLabel = ({ features }: { features?: { properties: Record<string, unknown>; geometry: unknown }[] }) => {
