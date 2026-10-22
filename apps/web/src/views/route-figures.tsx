@@ -128,12 +128,9 @@ export function routeTitle(route: Route, language: Language, index: number, coun
 }
 
 /** The mark of a track the user loaded from a file, with the text that says it (the track's name, or what it is). */
-export function ImportedMarker({ text, testId, className = '' }: { text: string; testId: string; className?: string }) {
+export function ImportedMarker({ text, testId }: { text: string; testId: string }) {
   return (
-    <span
-      data-testid={testId}
-      className={`flex min-w-0 items-center gap-1 text-sm font-semibold text-ink ${className}`}
-    >
+    <span data-testid={testId} className="flex min-w-0 items-center gap-1 text-sm font-semibold text-ink">
       <FileUp size={14} aria-hidden className="flex-none text-accent" />
       <span className="truncate">{text}</span>
     </span>

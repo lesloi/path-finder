@@ -278,10 +278,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     draft[2]();
     browser.ask(request);
   };
-  // A loaded track was not asked for with criteria, which cannot make it stale.
-  const stale = Boolean(
-    routeSet && !routeSet.routes[0]?.imported && current && criteriaChanged(current, routeSet.request),
-  );
+  // A track loaded from a file was not asked for with criteria: they cannot make it stale, nor search it again.
+  const fromFile = Boolean(routeSet?.routes[0]?.imported);
+  const stale = Boolean(routeSet && !fromFile && current && criteriaChanged(current, routeSet.request));
   useRootProperty('--column-inset', '0px', desktop && formFolded);
   useRootProperty('--list-inset', listFolded ? '0px' : 'var(--list-reserved)', listShown);
   useRootProperty('--dock-inset', 'var(--dock-reserved)', dockShown);
@@ -539,7 +538,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       avoidedAreas={avoidedAreas}
       draft={draft}
       // The button says "search again" only after a search: a loaded track was none.
-      searched={routesShown && !routeSet?.routes[0]?.imported}
+      searched={routesShown && !fromFile}
       waypointList={
         start && (desktop || waypoints.length > 0) ? (
           <WaypointList
@@ -568,8 +567,6 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           />
         ) : undefined
       }
-      // A phone has its button in the sheet, where it is seen first.
-      onImport={desktop ? importTrack : undefined}
       onStartChange={moveStart}
       onUnreadable={() => warn('unreadable')}
       onPick={() => {
@@ -721,7 +718,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
               Path finder
             </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">{criteriaFields}</div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+              {criteriaFields}
+              <GpxImportButton language={language} onFile={importTrack} />
+            </div>
           </FoldablePanel>
           {listShown && (
             <FoldablePanel
@@ -907,7 +907,6 @@ function CriteriaFields({
   searched,
   waypointList,
   avoidedList,
-  onImport,
   onStartChange,
   onUnreadable,
   onPick,
@@ -925,7 +924,6 @@ function CriteriaFields({
   searched: boolean;
   waypointList: ReactNode;
   avoidedList: ReactNode;
-  onImport?: ((file: File) => void) | undefined;
   onStartChange: (start: Position) => void;
   onUnreadable: () => void;
   onPick: () => void;
@@ -976,7 +974,6 @@ function CriteriaFields({
         avoidedList={avoidedList}
         onSubmit={onSubmit}
       />
-      {onImport && <GpxImportButton language={language} onFile={onImport} />}
     </>
   );
 }

@@ -6,24 +6,26 @@ import { climbAndDescent, elevationProfile, kmBetween, type Route } from './rout
 export const MAX_IMPORT_FILE_BYTES = 20_000_000;
 
 // By local name, so that GPX 1.0 and 1.1 are both read whatever the namespace.
-function elementsNamed(parent: ParentNode, name: string): Element[] {
-  return [...parent.querySelectorAll('*')].filter((element) => element.localName === name);
-}
+const childNamed = (parent: Element, name: string) => [...parent.children].find((child) => child.localName === name);
 
-function pointsOf(document: Document): [number, number, number?][] | undefined {
+function pointsOf(document: Document): Route['geometry'] | undefined {
   // A planned route is read only when there is no recorded track.
-  const tracks = elementsNamed(document, 'trkpt');
-  const elements = tracks.length > 0 ? tracks : elementsNamed(document, 'rtept');
-  const points: [number, number, number?][] = [];
+  let elements = document.getElementsByTagNameNS('*', 'trkpt');
+  if (elements.length === 0) elements = document.getElementsByTagNameNS('*', 'rtept');
+  const points: number[][] = [];
+  let withHeights = true;
   for (const element of elements) {
-    const [lat, lon] = [Number(element.getAttribute('lat')), Number(element.getAttribute('lon'))];
     if (!element.hasAttribute('lat') || !element.hasAttribute('lon')) return undefined;
+    const [lat, lon] = [Number(element.getAttribute('lat')), Number(element.getAttribute('lon'))];
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return undefined;
-    const ele = elementsNamed(element, 'ele')[0]?.textContent?.trim();
+    const ele = childNamed(element, 'ele')?.textContent?.trim();
     const height = ele ? Number(ele) : NaN;
-    points.push(Number.isFinite(height) ? [lon, lat, height] : [lon, lat]);
+    if (!Number.isFinite(height)) withHeights = false;
+    points.push([lon, lat, height]);
   }
-  return points.length >= 2 ? points : undefined;
+  if (points.length < 2) return undefined;
+  // The heights are kept only when every point has one: a track with some missing would draw a profile that is made up.
+  return (withHeights ? points : points.map(([lon, lat]) => [lon, lat])) as Route['geometry'];
 }
 
 const MAX_NAME = 100;
@@ -32,13 +34,13 @@ const clean = (text: string | null | undefined, max: number) =>
   text?.replace(/\s+/g, ' ').trim().slice(0, max) || undefined;
 
 // What the file calls itself: its track, its planned route, then its own metadata, else the name of the file.
-function describe(document: Document, fileName?: string): NonNullable<Route['imported']> {
-  const owners = ['trk', 'rte', 'metadata'].flatMap((tag) => elementsNamed(document, tag).slice(0, 1));
-  const named = owners
-    .map((owner) => elementsNamed(owner, 'name').find((e) => e.parentElement === owner))
+function trackName(document: Document, fileName?: string): string | undefined {
+  const top = [...document.documentElement.children];
+  const named = ['trk', 'rte', 'metadata']
+    .map((tag) => top.find(({ localName }) => localName === tag))
+    .map((owner) => owner && childNamed(owner, 'name'))
     .find(Boolean);
-  const name = clean(named?.textContent, MAX_NAME) ?? clean(fileName?.replace(/\.gpx$/i, ''), MAX_NAME);
-  return name ? { name } : {};
+  return clean(named?.textContent, MAX_NAME) ?? clean(fileName?.replace(/\.gpx$/i, ''), MAX_NAME);
 }
 
 /**
@@ -50,29 +52,28 @@ export function importGpx(text: string, pace: number, fileName?: string): Route 
   if (text.length > MAX_IMPORT_FILE_BYTES) return undefined;
   const document = new DOMParser().parseFromString(text, 'application/xml');
   if (document.querySelector('parsererror') || document.documentElement.localName !== 'gpx') return undefined;
-  const points = pointsOf(document);
-  if (!points) return undefined;
+  const geometry = pointsOf(document);
+  if (!geometry) return undefined;
 
-  const withHeights = points.every((point) => point.length === 3);
-  const flat = withHeights ? points : points.map(([lon, lat]): [number, number] => [lon, lat]);
   // Measured on every point, then simplified for what is drawn: a recording holds tens of thousands.
   let distance = 0;
-  for (let k = 1; k < flat.length; k++) distance += kmBetween(flat[k - 1]! as number[], flat[k]! as number[]);
-  const geometry = simplify(flat, MAX_GPX_POINTS) as Route['geometry'];
+  for (let k = 1; k < geometry.length; k++) distance += kmBetween(geometry[k - 1]!, geometry[k]!);
+  const drawn = simplify(geometry, MAX_GPX_POINTS) as Route['geometry'];
 
-  const profile = withHeights ? elevationProfile(geometry) : undefined;
-  const { climb, descent } = profile ? climbAndDescent(profile) : {};
+  const profile = elevationProfile(drawn);
+  const stats = profile && climbAndDescent(profile);
+  const name = trackName(document, fileName);
   const route: Route = {
-    geometry,
+    geometry: drawn,
     distance,
-    ...(climb !== undefined && { elevationGain: climb, elevationLoss: descent! }),
+    ...(stats && { elevationGain: stats.climb, elevationLoss: stats.descent }),
     estimatedDuration: 0,
     kind: 'match',
     unpavedShare: 0,
     surfaces: [],
     technical: false,
     technicalStretches: [],
-    imported: describe(document, fileName),
+    imported: name ? { name } : {},
   };
   route.estimatedDuration = estimatedDuration(route, pace);
   return route;
