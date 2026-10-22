@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { CircleCheck, CirclePlus, X } from 'lucide-react';
 
-import { AVOIDED_AREA_RADIUS, type AvoidedArea } from '../contract/index.ts';
+import { AVOIDED_AREA_RADIUS, MAX_AVOIDED_AREAS, type AvoidedArea } from '../contract/index.ts';
 import { AVOIDED_RADIUS_STEP } from '../core/index.ts';
+import { CountOfMax } from '../components/count-of-max.tsx';
 import { AvoidedAreaBadge } from '../components/avoided-area-badge.tsx';
 import { hint, tip } from '../components/index.ts';
 import { criteriaText, type Language } from '../i18n/index.ts';
@@ -39,7 +40,15 @@ export function AvoidedAreaList({
   return (
     <section className="flex flex-col gap-2" data-testid="criteria-avoided-list">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-ink-2">{t.avoidedAreas}</h2>
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-sm font-semibold text-ink-2">{t.avoidedAreas}</h2>
+          <CountOfMax
+            language={language}
+            count={areas.length}
+            max={MAX_AVOIDED_AREAS}
+            testId="criteria-avoided-count"
+          />
+        </div>
         <button
           type="button"
           data-testid="criteria-avoided"
