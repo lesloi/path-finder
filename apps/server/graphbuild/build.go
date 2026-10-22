@@ -37,10 +37,11 @@ var highwayKinds = map[string]uint8{
 
 var surfaceGroups = map[string]uint8{
 	"asphalt": engine.SurfacePaved, "paved": engine.SurfacePaved, "concrete": engine.SurfacePaved, "concrete:plates": engine.SurfacePaved, "concrete:lanes": engine.SurfacePaved,
+	"brick": engine.SurfacePaved, "bricks": engine.SurfacePaved, "cement": engine.SurfacePaved, "chipseal": engine.SurfacePaved,
 	"paving_stones": engine.SurfacePaved, "metal": engine.SurfacePaved, "wood": engine.SurfacePaved, "sett": engine.SurfacePaved,
 	"compacted": engine.SurfaceCompact, "fine_gravel": engine.SurfaceCompact, "gravel": engine.SurfaceCompact, "unpaved": engine.SurfaceCompact,
 	"dirt": engine.SurfaceRough, "earth": engine.SurfaceRough, "ground": engine.SurfaceRough, "grass": engine.SurfaceRough, "sand": engine.SurfaceRough, "mud": engine.SurfaceRough,
-	"rock": engine.SurfaceRough, "pebblestone": engine.SurfaceRough, "cobblestone": engine.SurfaceRough, "grass_paver": engine.SurfaceRough, "woodchips": engine.SurfaceRough,
+	"rock": engine.SurfaceRough, "pebblestone": engine.SurfaceRough, "cobblestone": engine.SurfaceRough, "unhewn_cobblestone": engine.SurfaceRough, "stepping_stones": engine.SurfaceRough, "grass_paver": engine.SurfaceRough, "woodchips": engine.SurfaceRough,
 }
 
 // classifyWay decides whether a pedestrian can use a way, and under which kind and surface group, with the
