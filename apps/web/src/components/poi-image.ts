@@ -28,6 +28,16 @@ const GLYPHS: Record<PoiCategory, (x: number, y: number) => boolean> = {
     return y >= -0.62 && Math.abs(x) <= (0.42 * (y + 0.62)) / 0.82;
   },
   viewpoint: (x, y) => camera(x / CAMERA_SCALE, y / CAMERA_SCALE),
+  // Two standing figures: a head over a body each.
+  toilets: (x, y) => {
+    const side = Math.abs(x) - 0.42;
+    return Math.hypot(side, y + 0.45) <= 0.2 || (Math.abs(side) <= 0.2 && y >= -0.15 && y <= 0.6);
+  },
+  // A hut: a roof over a box with a door.
+  shelter: (x, y) => {
+    if (y >= -0.7 && y < -0.05) return Math.abs(x) <= (0.8 * (y + 0.7)) / 0.65;
+    return y >= -0.05 && y <= 0.65 && Math.abs(x) <= 0.55 && !(Math.abs(x) < 0.17 && y > 0.2);
+  },
 };
 
 const images = new Map<string, ReturnType<typeof drawPoiImage>>();

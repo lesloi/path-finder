@@ -46,4 +46,9 @@ export const MAP_COLORS = {
 export const MAP_INK = '#1c1d1b';
 
 /** The colour of each category of points of interest on the map; the layers popover paints its swatches with them. */
-export const POI_COLORS: Record<PoiCategory, string> = { water: '#0e7490', viewpoint: '#a16207' };
+export const POI_COLORS: Record<PoiCategory, string> = {
+  water: '#0e7490',
+  viewpoint: '#a16207',
+  toilets: '#6d28d9',
+  shelter: '#15803d',
+};

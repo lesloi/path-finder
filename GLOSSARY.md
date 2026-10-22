@@ -162,3 +162,11 @@ _Avoid_: Fountain (not every fountain has drinking water)
 **Viewpoint**:
 A POI with a view worth stopping for. Hidden by default.
 _Avoid_: Panorama, summit
+
+**Toilets**:
+A POI with public toilets, fee-paying ones included. Hidden by default.
+_Avoid_: WC, restroom
+
+**Shelter**:
+A POI to take cover in: a shelter, an alpine hut or a wilderness hut; a bus stop shelter is not one. Hidden by default.
+_Avoid_: Refuge (it is the French word for the hut)

@@ -10,7 +10,7 @@ and an elevation gain. Vocabulary: [GLOSSARY.md](./GLOSSARY.md).
   built ahead of serving, and it serves the built web app on the same origin.
 - The graph is built from OSM PBF files and BD ALTI by the binary's own `build-graph` and `build-alt`
   commands, never while serving.
-- The points of interest (water points, viewpoints) come from the same extracts. Their tiles are served as they
+- The points of interest (water points and the like) come from the same extracts. Their tiles are served as they
   are and never logged; without them the map shows none.
 - pnpm for the web app, Go for the server (`CGO_ENABLED=0`); the scripts are in the root `package.json`.
 
