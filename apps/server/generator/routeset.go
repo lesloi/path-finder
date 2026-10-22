@@ -178,11 +178,13 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	estimated := cand.effortDistance() * c.Pace
 	results := checks(c, cand, estimated)
 	score, worst := 0.0, tierMatch
+	// The direct loop is offered beyond the target: the waypoints set its length, and no detour shortens it, so
+	// nothing can do better on any criterion. Short of the target the loops through the waypoints, with their
+	// detours, make up for it. Generate decides on the same test whether to search loops at all.
+	beyond := cand.direct && overshoots(c, cand)
 	for _, r := range results {
 		if r.tier == tierOut {
-			// The direct loop is offered beyond the target: the waypoints set its length, and no detour shortens it.
-			// Short of the target the loops through the waypoints, with their detours, make up for it.
-			if !cand.direct || r.gap < 0 {
+			if !beyond {
 				return ranked{}, false
 			}
 			r.tier = tierWide

@@ -455,6 +455,28 @@ func TestADirectLoopBeyondTheTargetIsAlwaysAnEntryAsASuggestion(t *testing.T) {
 	}
 }
 
+func TestADirectLoopBeyondTheTargetStaysAnEntryWhenItsGainIsOffToo(t *testing.T) {
+	flat := stick(40)
+	flat.elevationGain = ptr(20) // the target is 300 m
+
+	entry, ok := classify(criteria(nil), flat, 500)
+
+	if !ok || entry.route.Kind != "suggestion" {
+		t.Errorf("ok = %v, kind = %q, want a suggestion: the loops cannot do better on the distance", ok, entry.route.Kind)
+	}
+}
+
+func TestADirectLoopWithTheRightDistanceButOffGainIsLeftOut(t *testing.T) {
+	flat := stick(10)
+	flat.elevationGain = ptr(20)
+
+	_, ok := classify(criteria(nil), flat, 500)
+
+	if ok {
+		t.Error("a direct loop of the right distance but off the gain is an entry: the loops can do better")
+	}
+}
+
 func TestADirectLoopMuchShorterThanTheTargetIsLeftOut(t *testing.T) {
 	// The loops through the waypoints add detours up to the target: a short walk would only take the place of one.
 	_, ok := classify(criteria(nil), stick(3), 500)

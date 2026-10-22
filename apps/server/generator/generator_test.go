@@ -626,3 +626,16 @@ func TestGenerateStopsSearchingOnceTheSetIsFullWithTheDirectLoopAsASuggestion(t 
 		t.Errorf("Enough said to stop after %d loops, want at most %d", looper.enoughAt, maxRoutes)
 	}
 }
+
+func TestGenerateServesTheDirectLoopBeyondTheTargetWhateverItsGain(t *testing.T) {
+	long := engineLoop(0)
+	long.Distance, long.Ascent = 30_000, 20 // 3 times the target, flat for a gain target of 300 m
+	looper := &fakeLooper{direct: long, loops: []*engine.Route{engineLoop(120)}}
+	withGain := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":300,"surface":"any","pace":6,"waypoints":[[6.1294,46.0342]]}`
+
+	routes, err := generate(t, looper, context.Background(), withGain)
+
+	if err != nil || len(routes) != 1 || looper.loopCalls != 0 {
+		t.Errorf("%d routes, err = %v, %d searches, want the direct loop alone", len(routes), err, looper.loopCalls)
+	}
+}
