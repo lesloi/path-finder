@@ -2,7 +2,9 @@ import { ArrowDown, ArrowUp, MapPinCheck, MapPinPlus, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { WaypointPin } from '../components/waypoint-pin.tsx';
+import { CountOfMax } from '../components/count-of-max.tsx';
 import { hint, tip } from '../components/index.ts';
+import { MAX_WAYPOINTS } from '../contract/index.ts';
 import { poiLabel, waypointPoiAt, type Position, type WaypointPois } from '../core/index.ts';
 import { criteriaText, type Language } from '../i18n/index.ts';
 
@@ -87,7 +89,15 @@ export function WaypointList({
   return (
     <section className="flex flex-col gap-2" data-testid="criteria-waypoint-list">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-ink-2">{t.waypoints}</h2>
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-sm font-semibold text-ink-2">{t.waypoints}</h2>
+          <CountOfMax
+            language={language}
+            count={waypoints.length}
+            max={MAX_WAYPOINTS}
+            testId="criteria-waypoint-count"
+          />
+        </div>
         {add && (
           <button
             type="button"
