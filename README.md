@@ -38,7 +38,7 @@
   the routes and keeps nothing.
 - **Map tiles**, with their fonts and icons, come from the French national mapping agency
   (IGN).
-- **Points of interest** (drinking water, viewpoints) load from the app's own server, as tiles. A tile request
+- **Points of interest** load from the app's own server, as tiles. A tile request
   reveals the area you view (~30 km) and is never logged.
 
 ## Getting started

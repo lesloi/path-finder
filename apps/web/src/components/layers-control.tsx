@@ -6,7 +6,13 @@ import { criteriaText, type Language } from '../i18n/index.ts';
 import { PoiBadge } from './poi-badge.tsx';
 import { FLOATING_BUTTON, tip } from './styles.ts';
 
-const LABELS = { water: 'poiWater', viewpoint: 'poiViewpoint', seasonal: 'poiSeasonal' } as const;
+const LABELS = {
+  water: 'poiWater',
+  viewpoint: 'poiViewpoint',
+  toilets: 'poiToilets',
+  shelter: 'poiShelter',
+  seasonal: 'poiSeasonal',
+} as const;
 
 /**
  * The button over the map that opens the popover of layers: one checkbox per category of points of interest.
