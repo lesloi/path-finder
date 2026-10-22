@@ -34,10 +34,10 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   vocabulary, and a test fails on the side left behind.
 - **A country's graph is built in one go, on disk; a server maps one graph per territory (`DATA_DIR`).** The build sorts its
   records on disk and reads them back in order, instead of keeping every node in memory: metropolitan France takes
-  225 s and 1.4 GB at its peak (11.6 GB in memory), its landmarks 158 s and 0.4 GB of heap (9.9 GB in memory), and the files
-  are the same byte for byte. It costs 2.5 to 3.3 times the time and about 9 GB of temporary disk, put beside the output,
-  never on a memory-backed `/tmp`. Served as one 4.2 GB file, France answers as fast as a zone did and with the same routes
-  (the heap stays near 35 MB; the page cache fills). An overseas territory stays a graph of its own in a subdirectory: its
+  185 s and 2.4 GB of resident memory at its peak on 16 cores (the build in memory needs 11.6 GB), its landmarks 158 s and
+  0.4 GB of heap (9.9 GB in memory), and the files are the same byte for byte. It needs about 13 GB of temporary disk, put
+  beside the output, never on a memory-backed `/tmp`. Served as one 4.2 GB file, France answers as fast as a zone did and
+  with the same routes (the heap stays near 35 MB; the page cache fills). An overseas territory stays a graph of its own in a subdirectory: its
   tiles come in another projection and its extract is far from the others. No routing sits in front of the servers:
   opening a graph costs no memory, since its spatial index is in `graph.bin`, and a start point is answered by the graph
   holding it with the most room. Fixed file names (`graph.bin`, and `any.alt`, `paved.alt`, `unpaved.alt`, one landmark
