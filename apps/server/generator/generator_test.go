@@ -687,3 +687,31 @@ func TestGenerateKeepsTheOutAndBackRoutesFoundWhenTheContextEnds(t *testing.T) {
 		t.Errorf("routes = %d, err = %v, want the route found", len(routes), err)
 	}
 }
+
+func TestGenerateRefusesAnOutAndBackRouteLongerThanTheLongestRoute(t *testing.T) {
+	// Arrange: the straight line is short, but the way found winds over 60 km
+	long := engineLoop(0)
+	long.Distance = 60_000
+	looper := &fakeLooper{outAndBack: []*engine.Route{long}}
+
+	// Act
+	_, err := generate(t, looper, context.Background(), outAndBackBody)
+
+	// Assert
+	var ce *contract.CriteriaError
+	if !errors.As(err, &ce) || ce.Field != "destination" {
+		t.Errorf("err = %v, want a CriteriaError on destination", err)
+	}
+}
+
+func TestGenerateKeepsTheOutAndBackRoutesWithinTheLongestRoute(t *testing.T) {
+	short, long := engineLoop(0), engineLoop(180)
+	short.Distance, long.Distance = 40_000, 60_000
+	looper := &fakeLooper{outAndBack: []*engine.Route{long, short}}
+
+	routes, err := generate(t, looper, context.Background(), outAndBackBody)
+
+	if err != nil || len(routes) != 1 || routes[0].Distance != 40 {
+		t.Errorf("routes = %+v, err = %v, want only the 40 km route", routes, err)
+	}
+}

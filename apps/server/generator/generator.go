@@ -168,11 +168,21 @@ func (g *Generator) outAndBack(ctx context.Context, looper Looper, c contract.Cr
 	case err != nil && ctx.Err() == nil:
 		return nil, err
 	}
+	// The straight lines bound the route found only from below: a winding way can be longer than any route may be.
 	set := newRanking(c, km)
+	tooLong := 0
 	for _, r := range found {
-		if cand := toCandidate(r); cand != nil {
+		cand := toCandidate(r)
+		switch {
+		case cand == nil:
+		case cand.distance > contract.MaxDistanceKm():
+			tooLong++
+		default:
 			set.add(cand)
 		}
+	}
+	if tooLong > 0 && tooLong == len(found) && ctx.Err() == nil {
+		return nil, &contract.CriteriaError{Field: "destination", Message: "the way to the destination is too long for an out-and-back route"}
 	}
 	routes := set.routes(cmpOr(g.MaxRoutes, maxRoutes))
 	if ctx.Err() != nil && len(routes) == 0 {

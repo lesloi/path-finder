@@ -435,6 +435,60 @@ describe('CriteriaView', () => {
     expect(screen.getByTestId('criteria-surface-unpaved')).toBeChecked();
   });
 
+  describe('out and back on desktops', () => {
+    const longPress = (lng: number, lat: number) => {
+      act(() => {
+        map().fire('touchstart', { lngLat: { lng, lat }, originalEvent: { touches: [{}] } });
+        vi.advanceTimersByTime(600);
+      });
+    };
+    const destinationMarkers = () =>
+      markers.filter((marker) => marker.shown && marker.options?.element?.className.includes('border-accent'));
+    const startMarkers = () =>
+      markers.filter((marker) => marker.shown && marker.options?.element?.className.includes('border-start'));
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      onDesktop();
+      render(<CriteriaView language="en" />);
+      setStartPoint();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('sets the start point on a long press by default, with a loop', () => {
+      longPress(6.3, 45.9);
+
+      expect(startMarkers().at(-1)?.position).toEqual([6.3, 45.9]);
+      expect(destinationMarkers()).toHaveLength(0);
+    });
+
+    it('sets the destination on a long press while it lacks one, then the start point again', () => {
+      fireEvent.click(screen.getByTestId('criteria-shape-outAndBack'));
+
+      longPress(6.3, 45.9);
+      expect(destinationMarkers().at(-1)?.position).toEqual([6.3, 45.9]);
+      expect(startMarkers().at(-1)?.position).toEqual([6.2, 45.8]);
+
+      longPress(6.4, 45.95);
+      expect(startMarkers().at(-1)?.position).toEqual([6.4, 45.95]);
+      expect(destinationMarkers().at(-1)?.position).toEqual([6.3, 45.9]);
+    });
+
+    it('hides the destination on the map when the shape goes back to a loop', () => {
+      fireEvent.click(screen.getByTestId('criteria-shape-outAndBack'));
+      longPress(6.3, 45.9);
+      expect(destinationMarkers()).toHaveLength(1);
+
+      fireEvent.click(screen.getByTestId('criteria-shape-loop'));
+
+      expect(destinationMarkers()).toHaveLength(0);
+      expect(screen.queryByTestId('criteria-destination')).not.toBeInTheDocument();
+    });
+  });
+
   describe('on desktops', () => {
     it('shows the criteria only once there is a start point', () => {
       onDesktop();
