@@ -34,6 +34,8 @@ func TestClassifyWay(t *testing.T) {
 		{"not a highway", tags("waterway", "river"), false, 0, 0},
 		{"a motorway", tags("highway", "motorway"), false, 0, 0},
 		{"foot forbidden", tags("highway", "path", "foot", "no"), false, 0, 0},
+		{"foot private", tags("highway", "track", "foot", "private"), false, 0, 0},
+		{"foot private on a way open to all", tags("highway", "track", "access", "yes", "foot", "private"), false, 0, 0},
 		{"an area", tags("highway", "pedestrian", "area", "yes"), false, 0, 0},
 		{"private access", tags("highway", "track", "access", "private"), false, 0, 0},
 		{"private access with explicit foot", tags("highway", "track", "access", "private", "foot", "yes"), true, engine.KindTrack, engine.SurfaceUnknown},

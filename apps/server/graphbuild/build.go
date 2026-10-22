@@ -54,7 +54,7 @@ func classifyWay(tags osm.Tags) (kind, surf, flags uint8, ok bool) {
 		return 0, 0, 0, false
 	}
 	foot := tags.Find("foot")
-	if foot == "no" || tags.Find("area") == "yes" {
+	if foot == "no" || foot == "private" || tags.Find("area") == "yes" {
 		return 0, 0, 0, false
 	}
 	explicit := foot == "yes" || foot == "designated" || foot == "permissive"
