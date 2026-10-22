@@ -203,12 +203,12 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	for _, v := range visits {
 		cells[v.cell] = struct{}{}
 	}
-	return ranked{contract.Route{
+	return ranked{route: contract.Route{
 		Geometry: cand.geometry, Distance: cand.distance, ElevationGain: cand.elevationGain,
 		ElevationLoss: cand.elevationLoss, EstimatedDuration: estimated, Kind: kind,
 		UnpavedShare: cand.unpavedShare, Surfaces: cand.surfaces, Technical: cand.technical,
 		TechnicalStretches: cand.technicalStretches,
-	}, score, worst, cells, cand.direct}, true
+	}, score: score, tier: worst, cells: cells, direct: cand.direct}, true
 }
 
 // ranking holds the candidates that fit the criteria, the best first. Each is classified once as it is added,
@@ -269,8 +269,10 @@ func (r *ranking) routes(limit int) []contract.Route {
 	pick(tierMatch, limit)
 	pick(tierSuggestion, minRoutes)
 	pick(tierWide, minRoutes)
-	for _, entry := range r.all {
-		if entry.direct && !slices.ContainsFunc(picked, func(p ranked) bool { return p.direct }) && !shares(entry) {
+	// There is at most one direct loop. The sort restores the order the picks above give: by tier, then by score.
+	if i := slices.IndexFunc(r.all, func(e ranked) bool { return e.direct }); i >= 0 {
+		entry := r.all[i]
+		if !slices.ContainsFunc(picked, func(p ranked) bool { return p.direct }) && !shares(entry) {
 			if len(picked) >= limit {
 				picked = picked[:limit-1]
 			}

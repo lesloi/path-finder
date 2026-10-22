@@ -53,40 +53,36 @@ func cellsAlong(geometry [][]float64, start [2]float64, startRadius float64) []c
 	return visits
 }
 
-// sharedShare is the share of the smaller of two sets of cells that the other one also covers.
-func sharedShare(a, b map[cell]struct{}) float64 {
-	small, large := a, b
+// sharedCells counts the cells two sets have in common, and the sizes of the smaller and the larger set.
+func sharedCells(a, b map[cell]struct{}) (shared, small, large int) {
+	s, l := a, b
 	if len(a) > len(b) {
-		small, large = b, a
+		s, l = b, a
 	}
-	if len(small) == 0 {
-		return 0
-	}
-	shared := 0
-	for c := range small {
-		if _, ok := large[c]; ok {
+	for c := range s {
+		if _, ok := l[c]; ok {
 			shared++
 		}
 	}
-	return float64(shared) / float64(len(small))
+	return shared, len(s), len(l)
+}
+
+// sharedShare is the share of the smaller of two sets of cells that the other one also covers.
+func sharedShare(a, b map[cell]struct{}) float64 {
+	shared, small, _ := sharedCells(a, b)
+	if small == 0 {
+		return 0
+	}
+	return float64(shared) / float64(small)
 }
 
 // coveredShare is the share of the larger of two sets of cells that the other one also covers.
 func coveredShare(a, b map[cell]struct{}) float64 {
-	small, large := a, b
-	if len(a) > len(b) {
-		small, large = b, a
-	}
-	if len(large) == 0 {
+	shared, _, large := sharedCells(a, b)
+	if large == 0 {
 		return 0
 	}
-	shared := 0
-	for c := range small {
-		if _, ok := large[c]; ok {
-			shared++
-		}
-	}
-	return float64(shared) / float64(len(large))
+	return float64(shared) / float64(large)
 }
 
 // retraceShare is the share of a route walked twice, such as out-and-back stretches, from its
