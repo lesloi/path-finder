@@ -1,6 +1,7 @@
+import { kmBetween } from './distance.ts';
 import { MAX_GPX_POINTS, simplify } from './gpx.ts';
 import { estimatedDuration } from './pace.ts';
-import { climbAndDescent, elevationProfile, kmBetween, type Route } from './route.ts';
+import { climbAndDescent, elevationProfile, type Route } from './route.ts';
 
 /** Larger files are not tracks: reading one would freeze the tab. */
 export const MAX_IMPORT_FILE_BYTES = 20_000_000;

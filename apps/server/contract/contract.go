@@ -24,10 +24,16 @@ type limits struct {
 	AvoidedRadius    struct{ Min, Max float64 } `json:"avoidedAreaRadiusMetres"`
 	ClimbPerEffortKm float64                    `json:"climbPerEffortKm"`
 	HillyMatchPerKm  float64                    `json:"hillyMatchPerKm"`
-	CoverageCell     float64                    `json:"coverageCellDegrees"`
-	POITileZoom      int                        `json:"poiTileZoom"`
-	Surfaces         []string                   `json:"surfaces"`
-	ErrorCodes       []string                   `json:"errorCodes"`
+	SlopeEffort      struct {
+		Decay         float64 `json:"decay"`
+		EasiestGrade  float64 `json:"easiestGrade"`
+		MaxGrade      float64 `json:"maxGrade"`
+		StretchMetres float64 `json:"stretchMetres"`
+	} `json:"slopeEffort"`
+	CoverageCell float64  `json:"coverageCellDegrees"`
+	POITileZoom  int      `json:"poiTileZoom"`
+	Surfaces     []string `json:"surfaces"`
+	ErrorCodes   []string `json:"errorCodes"`
 }
 
 var bounds = func() limits {

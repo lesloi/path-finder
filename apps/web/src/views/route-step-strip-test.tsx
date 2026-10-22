@@ -22,7 +22,7 @@ const route: Route = {
 const at = (k: number): Position => [route.geometry[k][0], route.geometry[k][1]];
 
 function strip(props: Partial<Parameters<typeof RouteStepStrip>[0]> = {}, language: 'en' | 'fr' = 'en') {
-  return render(<RouteStepStrip route={route} language={language} pace={5.5} waypoints={undefined} {...props} />);
+  return render(<RouteStepStrip route={route} language={language} waypoints={undefined} {...props} />);
 }
 
 describe('RouteStepStrip', () => {
@@ -42,7 +42,7 @@ describe('RouteStepStrip', () => {
     const [start, summit] = screen.getAllByTestId('route-step');
     expect(start).toHaveTextContent('450 m');
     expect(start).not.toHaveTextContent('km');
-    expect(summit).toHaveTextContent('0.6 km · 16 min');
+    expect(summit).toHaveTextContent('0.6 km · 13 min');
     expect(summit).toHaveTextContent('600 m');
   });
 
@@ -59,9 +59,9 @@ describe('RouteStepStrip', () => {
 
     const [, summit] = screen.getAllByTestId('route-step');
     const leg = within(summit!).getByTestId('route-step-leg');
-    expect(leg).toHaveTextContent('0.6 km · 16 min');
+    expect(leg).toHaveTextContent('0.6 km · 13 min');
     expect(leg).toHaveTextContent('150 m');
-    expect(leg).not.toHaveTextContent('16 min ·');
+    expect(leg).not.toHaveTextContent('13 min ·');
   });
 
   it('names a waypoint by its point of interest, or by its number', () => {

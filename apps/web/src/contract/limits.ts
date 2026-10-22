@@ -13,6 +13,7 @@ export const AVOIDED_AREA_RADIUS = {
   max: contract.avoidedAreaRadiusMetres.max,
 };
 export const CLIMB_PER_EFFORT_KM = contract.climbPerEffortKm;
+export const SLOPE_EFFORT = contract.slopeEffort;
 export const HILLY_MATCH_PER_KM = contract.hillyMatchPerKm;
 export const POI_TILE_ZOOM = contract.poiTileZoom;
 export const SURFACES = contract.surfaces as Criteria['surface'][];

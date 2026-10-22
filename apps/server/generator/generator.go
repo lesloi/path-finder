@@ -165,7 +165,7 @@ func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, p
 	if cand == nil {
 		return nil, nil
 	}
-	estimated := effortDistance(cand.distance, cand.elevationGain) * c.Pace
+	estimated := cand.effortDistance() * c.Pace
 	// Only a loop that is too long is refused: detours make up for one that is too short.
 	if tooFar := checks(c, cand, estimated)[0]; tooFar.gap > 0 && tooFar.tier == tierOut {
 		return nil, tooLong

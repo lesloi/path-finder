@@ -114,20 +114,17 @@ export function legParts(
 export function RouteTimeline({
   route,
   language,
-  pace,
   waypoints,
   waypointPois = NO_POIS,
 }: {
   route: Route;
   language: Language;
-  /** Minutes per km, the pace of the route's duration. */
-  pace: number;
   waypoints: Position[] | undefined;
   waypointPois?: WaypointPois | undefined;
 }) {
   const t = routesText[language];
   const points = useMemo(() => waypoints ?? [], [waypoints]);
-  const steps = useMemo(() => routeTimeline(route, points, pace), [route, points, pace]);
+  const steps = useMemo(() => routeTimeline(route, points), [route, points]);
   if (steps.length === 0) return null;
 
   return (

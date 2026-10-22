@@ -1,6 +1,6 @@
 import { AVOIDED_AREA_RADIUS, METRES_PER_DEGREE, type AvoidedArea } from '../contract/index.ts';
 import type { Position } from './coordinates.ts';
-import { kmBetween } from './route.ts';
+import { kmBetween } from './distance.ts';
 
 // The server refuses an area that holds a point: the margin keeps a drawn circle clear of it.
 const MARGIN_M = 5;

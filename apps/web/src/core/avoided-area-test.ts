@@ -5,7 +5,7 @@ import {
   fitRadius,
   maxRadiusAround,
 } from './avoided-area.ts';
-import { kmBetween } from './route.ts';
+import { kmBetween } from './distance.ts';
 
 describe('circlePolygon', () => {
   const area = { center: [6.1294, 45.8992] as [number, number], radius: 400 };

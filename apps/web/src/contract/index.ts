@@ -16,6 +16,7 @@ export type { ApiError, ErrorCode, SurfaceStretch, TechnicalStretch } from './er
 export {
   AVOIDED_AREA_RADIUS,
   CLIMB_PER_EFFORT_KM,
+  SLOPE_EFFORT,
   ERROR_CODES,
   MAX_AVOIDED_AREAS,
   MAX_TARGET_DISTANCE,

@@ -96,8 +96,9 @@ under the duration and in the route list, and stored in their settings.
 _Avoid_: Speed, as a name for the pace (km/h is only one way to write it)
 
 **Effort distance**:
-Distance plus climb converted to distance, at 100 m of elevation gain for 1 km. Without
-an elevation gain, the distance alone. Estimated duration is effort distance times pace.
+Distance weighted by the slope of each stretch: climbs and steep descents count for more than flat ground, gentle
+descents for less. Without heights, the distance alone. Estimated duration is effort distance times pace. Turning a
+target duration into a distance, before any route exists, stands in for the slope with a flat rate of climb per km.
 _Avoid_: Kilomètre-effort, adjusted distance
 
 ### Results
