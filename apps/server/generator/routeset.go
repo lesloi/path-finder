@@ -180,8 +180,9 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	score, worst := 0.0, tierMatch
 	for _, r := range results {
 		if r.tier == tierOut {
-			// The direct loop is always offered: the waypoints set its length, and no detour changes it.
-			if !cand.direct {
+			// The direct loop is offered beyond the target: the waypoints set its length, and no detour shortens it.
+			// Short of the target the loops through the waypoints, with their detours, make up for it.
+			if !cand.direct || r.gap < 0 {
 				return ranked{}, false
 			}
 			r.tier = tierWide

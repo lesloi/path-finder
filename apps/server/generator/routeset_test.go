@@ -447,13 +447,20 @@ func TestADirectLoopIsNotPenalisedForRetracingItsWay(t *testing.T) {
 	}
 }
 
-func TestADirectLoopFarFromTheTargetIsAlwaysAnEntryAsASuggestion(t *testing.T) {
-	for _, distance := range []float64{3, 40} {
-		entry, ok := classify(criteria(nil), stick(distance), 500)
+func TestADirectLoopBeyondTheTargetIsAlwaysAnEntryAsASuggestion(t *testing.T) {
+	entry, ok := classify(criteria(nil), stick(40), 500)
 
-		if !ok || entry.route.Kind != "suggestion" || !entry.direct {
-			t.Errorf("%v km: ok = %v, kind = %q, direct = %v, want a suggestion", distance, ok, entry.route.Kind, entry.direct)
-		}
+	if !ok || entry.route.Kind != "suggestion" || !entry.direct {
+		t.Errorf("ok = %v, kind = %q, direct = %v, want a suggestion", ok, entry.route.Kind, entry.direct)
+	}
+}
+
+func TestADirectLoopMuchShorterThanTheTargetIsLeftOut(t *testing.T) {
+	// The loops through the waypoints add detours up to the target: a short walk would only take the place of one.
+	_, ok := classify(criteria(nil), stick(3), 500)
+
+	if ok {
+		t.Error("a direct loop of 3 km for 10 is an entry")
 	}
 }
 
@@ -462,14 +469,14 @@ func TestADirectLoopKeepsAPlaceAmongEightMatches(t *testing.T) {
 	for h := 0.0; h < 360; h += 45 {
 		r.add(compose(withHeading(h)))
 	}
-	r.add(stick(5))
+	r.add(stick(14))
 
 	routes := r.routes(maxRoutes)
 
 	if len(routes) != maxRoutes {
 		t.Fatalf("%d routes, want %d", len(routes), maxRoutes)
 	}
-	if got := routes[maxRoutes-1]; got.Distance != 5 || got.Kind != "suggestion" {
+	if got := routes[maxRoutes-1]; got.Distance != 14 || got.Kind != "suggestion" {
 		t.Errorf("last route = %v km, %q, want the direct loop as a suggestion after the matches", got.Distance, got.Kind)
 	}
 }
@@ -479,7 +486,7 @@ func TestADirectLoopDoesNotDropTheLoopsThatGoThroughItsWaypoint(t *testing.T) {
 	throughSummit := compose(func(c *candidate) {
 		c.geometry = [][]float64{startPoint(), at(-800, 1500), at(0, 2500), at(800, 1500), startPoint()}
 	})
-	r.add(throughSummit, stick(5))
+	r.add(throughSummit, stick(14))
 
 	routes := r.routes(maxRoutes)
 

@@ -92,7 +92,7 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   component of fewer than 1,000 nodes, which no leg reaches from the rest of the graph.
   With waypoints, the circle's points are only detours: each goes into the leg between two
   fixed points that it is nearest to, and only the detour is resized. The loop straight through
-  the waypoints is a candidate too, and it is always offered, as a suggestion when it is far from the target: a summit
+  the waypoints is a candidate too, and it is offered even when it is beyond the target, as a suggestion: a summit
   with a single access is where the loop goes back over its steps, farther than the target says, and nothing resizes a
   route the waypoints fix. It is not ranked down for retracing (the other loops are, and stay so), and the
   ranking keeps a place for it, which matches would otherwise fill. Beyond the target by more than a wide suggestion,
