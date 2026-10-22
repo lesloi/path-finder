@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, Mountain } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, FileUp, Mountain } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { SURFACE_CLASSES } from '../components/index.ts';
@@ -58,6 +58,8 @@ export function surfaceShares({ unpavedShare }: Route, language: Language) {
 
 /** The legend of the colours of the elevation profile, with the share of each surface. */
 export function SurfaceShare({ route, language }: { route: Route; language: Language }) {
+  // A loaded track has no surfaces: a share of zero would claim it is all paved.
+  if (route.imported) return null;
   const t = criteriaText[language];
   const shares = surfaceShares(route, language);
   return (
@@ -115,6 +117,22 @@ export function TechnicalMarker({
     <span data-testid={testId} className={`flex items-center gap-1 text-sm font-semibold text-ink ${className}`}>
       <Mountain size={14} aria-hidden className="text-technical" />
       {text}
+    </span>
+  );
+}
+
+/** What a route is called: the name of a loaded track, or its place in the route set. */
+export function routeTitle(route: Route, language: Language, index: number, count: number): string {
+  const t = routesText[language];
+  return route.imported ? (route.imported.name ?? t.importedTrack) : t.route(index + 1, count);
+}
+
+/** The mark of a track the user loaded from a file, with the text that says it (the track's name, or what it is). */
+export function ImportedMarker({ text, testId }: { text: string; testId: string }) {
+  return (
+    <span data-testid={testId} className="flex min-w-0 items-center gap-1 text-sm font-semibold text-ink">
+      <FileUp size={14} aria-hidden className="flex-none text-accent" />
+      <span className="truncate">{text}</span>
     </span>
   );
 }

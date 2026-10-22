@@ -156,8 +156,9 @@ test.describe('the route set', () => {
       await expect(page.getByTestId('route-dock')).toHaveCount(0);
 
       await page.getByTestId('routes-row-0').click();
-      // Over the map under the left column, where the routes are framed clear of, beside the attribution.
-      await page.mouse.click(300, page.viewportSize()!.height - 20);
+      // In the corner of the map the left column leaves free: the routes are framed clear of the column, the list and
+      // the dock, and the column's height follows its content, so no point below it holds for long.
+      await page.mouse.click(4, 4);
       await expect(page.getByTestId('route-dock')).toHaveCount(0);
     });
 

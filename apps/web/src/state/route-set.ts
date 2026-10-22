@@ -168,6 +168,12 @@ export function useRouteSet(onError: (refusal: Refusal) => void) {
       .catch(() => {});
   }
 
+  /** Shows routes the user loaded from a file, in the place of a search. */
+  function show(request: RouteSetRequest, routes: Route[]) {
+    clear();
+    setRouteSet({ request, routes });
+  }
+
   function clear() {
     running.current?.abort();
     previous.current = undefined;
@@ -175,5 +181,5 @@ export function useRouteSet(onError: (refusal: Refusal) => void) {
     setRouteSet(undefined);
   }
 
-  return { routeSet, loading, find, clear };
+  return { routeSet, loading, find, show, clear };
 }

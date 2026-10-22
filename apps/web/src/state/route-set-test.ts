@@ -185,6 +185,16 @@ describe('useRouteSet', () => {
     expect(result.current).toMatchObject({ loading: false, routeSet: { request, routes: [route] } });
   });
 
+  it('shows routes loaded from a file without asking the API, and stops a search under way', () => {
+    answer(new Promise<Response>(() => {}));
+    const { result } = renderHook(() => useRouteSet(vi.fn()));
+    act(() => result.current.find(request));
+
+    act(() => result.current.show(request, [route]));
+
+    expect(result.current).toMatchObject({ loading: false, routeSet: { request, routes: [route] } });
+  });
+
   it('reports an error and keeps no route set', async () => {
     answer(Response.json({ error: 'rate-limited' }, { status: 429 }));
     const onError = vi.fn();

@@ -26,6 +26,8 @@ export type Route = {
   technical: boolean;
   /** Where they are along the route, in order. */
   technicalStretches: TechnicalStretch[];
+  /** A track the user loaded from a GPX file: nothing is known of its surfaces or its technical stretches. */
+  imported?: { name?: string };
   /** Set once the user runs the route the other way: its waypoints are met from the last to the first. */
   reversed?: true;
 };
@@ -314,6 +316,15 @@ function climbsAndDescentsAt(points: number[][], wanted: number[]): { climbs: nu
     }
   }
   return { climbs, descents };
+}
+
+/** The climb and the descent in metres of a profile, counted as the API counts them. */
+export function climbAndDescent(profile: ProfilePoint[]): { climb: number; descent: number } {
+  const { climbs, descents } = climbsAndDescentsAt(
+    profile.map(({ height }) => [0, 0, height]),
+    [profile.length - 1],
+  );
+  return { climb: climbs[0]!, descent: descents[0]! };
 }
 
 // The totals at each stop, scaled so that the last is the API's figure: the sum over the points can only approach it,

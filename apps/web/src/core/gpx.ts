@@ -144,7 +144,12 @@ function fileName({ distance, elevationGain }: GpxRoute, exportedAt: Date): stri
 }
 
 /** Douglas–Peucker, with a tolerance doubled from 1 m until at most `max` points are left. */
-function simplify(geometry: [number, number, number?][], max: number): [number, number, number?][] {
+export function simplify(
+  geometry: [number, number, number?][],
+  max: number,
+  /** Also keeps the points whose height is off the line between their neighbours kept, as far as the tolerance. */
+  keepHeights = false,
+): [number, number, number?][] {
   if (geometry.length <= max) return geometry;
   // Metres on a local equirectangular projection, close enough over a loop.
   const scale = 111_195;
@@ -156,7 +161,11 @@ function simplify(geometry: [number, number, number?][], max: number): [number, 
     const [dx, dy] = [xy[b][0] - ax, xy[b][1] - ay];
     const length = Math.hypot(dx, dy);
     // A loop's first and last points are the same: measure from that point.
-    return length ? Math.abs(dx * (py - ay) - dy * (px - ax)) / length : Math.hypot(px - ax, py - ay);
+    const side = length ? Math.abs(dx * (py - ay) - dy * (px - ax)) / length : Math.hypot(px - ax, py - ay);
+    const [za, zb, z] = [geometry[a][2], geometry[b][2], geometry[k][2]];
+    if (!keepHeights || za === undefined || zb === undefined || z === undefined) return side;
+    const t = length ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (length * length))) : 0;
+    return Math.max(side, Math.abs(z - (za + t * (zb - za))));
   };
   for (let tolerance = 1; ; tolerance *= 2) {
     const kept = new Set([0, geometry.length - 1]);
