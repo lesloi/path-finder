@@ -436,6 +436,31 @@ describe('CriteriaView', () => {
     expect(screen.getByTestId('criteria-surface-unpaved')).toBeChecked();
   });
 
+  describe('the GPX import button', () => {
+    const importButton = () => screen.getByTestId('gpx-import');
+
+    it('is offered on a phone, with or without a start point', () => {
+      render(<CriteriaView language="en" />);
+      expect(importButton()).toHaveAccessibleName(en.importGpx);
+
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(importButton()).toBeInTheDocument();
+    });
+
+    it('is offered on a desktop, with or without a start point', () => {
+      onDesktop();
+      render(<CriteriaView language="en" />);
+      expect(importButton()).toHaveAccessibleName(en.importGpx);
+
+      setStartPoint();
+
+      expect(importButton()).toBeInTheDocument();
+    });
+  });
+
   describe('on desktops', () => {
     it('shows the criteria only once there is a start point', () => {
       onDesktop();
@@ -829,11 +854,13 @@ describe('CriteriaView', () => {
       expect(screen.getByTestId('criteria-submit')).toBeInTheDocument();
       expect(screen.getByTestId('routes-cancel')).toHaveAccessibleName(routesText.en.cancelSearch);
       expect(document.documentElement.style.getPropertyValue('--list-inset')).not.toBe('');
+      expect(screen.queryByTestId('gpx-import')).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId('routes-cancel'));
 
       expect(screen.queryByTestId('routes-loading')).not.toBeInTheDocument();
       expect(screen.queryByTestId('routes-cancel')).not.toBeInTheDocument();
+      expect(screen.getByTestId('gpx-import')).toBeInTheDocument();
       expect(document.documentElement.style.getPropertyValue('--list-inset')).toBe('');
     });
 
