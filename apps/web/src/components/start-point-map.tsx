@@ -705,7 +705,7 @@ export function StartPointMap({
     if (!start) return;
     const element = document.createElement('div');
     // A white dot with a brown ring, like the start of the logo's trail.
-    element.className = 'size-6 rounded-full border-6 border-start bg-white shadow-float';
+    element.className = 'size-4 rounded-full border-4 border-start bg-white shadow-float';
     const marker = new Marker({ element }).setLngLat(start).addTo(mapRef.current!);
     return () => {
       marker.remove();
