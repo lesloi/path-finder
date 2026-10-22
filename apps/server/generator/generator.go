@@ -74,6 +74,8 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	}
 	// The loop straight through the waypoints is a candidate of its own.
 	set := newRanking(criteria, km)
+	// The direct loop keeps a place in the set (see ranking.routes), so one match fewer fills it.
+	enough := limit
 	if len(criteria.Waypoints) > 0 {
 		for _, w := range criteria.Waypoints {
 			req.Waypoints = append(req.Waypoints, engine.Point{Lat: w[1], Lon: w[0]})
@@ -84,6 +86,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		}
 		if direct != nil {
 			set.add(direct)
+			enough = limit - 1
 			if overshoots(criteria, direct) {
 				// Searching loops would only cost CPU: each is as far from the target, and the direct loop is offered.
 				return set.routes(limit), nil
@@ -110,7 +113,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		if matches > best {
 			best, lastGain = matches, len(found)
 		}
-		return matches >= limit || len(found)-lastGain >= stopAfter
+		return matches >= enough || len(found)-lastGain >= stopAfter
 	}
 
 	loops, err := looper.Loops(ctx, req)

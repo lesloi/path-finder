@@ -22,6 +22,9 @@ type fakeLooper struct {
 	directErr   error
 	directCalls int
 	loopCalls   int
+	// enoughAt is the number of loops after which Enough said to stop, when the loops are given to it one by one; 0 if never.
+	enoughAt  int
+	askEnough bool
 }
 
 func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.DirectLoopRequest) (*engine.Route, error) {
@@ -32,6 +35,14 @@ func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.DirectLoopRequest) (
 func (f *fakeLooper) Loops(_ context.Context, req engine.LoopRequest) ([]*engine.Route, error) {
 	f.got = req
 	f.loopCalls++
+	if f.askEnough {
+		for i := range f.loops {
+			if req.Enough(f.loops[:i+1]) {
+				f.enoughAt = i + 1
+				return f.loops[:i+1], f.err
+			}
+		}
+	}
 	return f.loops, f.err
 }
 
@@ -589,5 +600,29 @@ func TestGeneratePassesTheAvoidedAreasToTheEngine(t *testing.T) {
 	}
 	if !reflect.DeepEqual(looper.got.Avoided, want) {
 		t.Errorf("avoided = %+v, want %+v", looper.got.Avoided, want)
+	}
+}
+
+func TestGenerateStopsSearchingOnceTheSetIsFullWithTheDirectLoopAsASuggestion(t *testing.T) {
+	long := engineLoop(0)
+	long.Distance = 12_800 // 28 % over the target of 10 km: a suggestion, which takes a place of the set
+	// Out to the waypoint and back by the same way, so that no loop of the set duplicates it.
+	long.Points = nil
+	for _, p := range [][]float64{startPoint(), at(6400, 0), startPoint()} {
+		long.Points = append(long.Points, engine.Position{Point: engine.Point{Lat: p[1], Lon: p[0]}, Elevation: 450})
+	}
+	var loops []*engine.Route
+	for h := 0.0; h < 360; h += 45 {
+		loops = append(loops, engineLoop(h))
+	}
+	looper := &fakeLooper{direct: long, loops: loops, askEnough: true}
+	east := `[[6.2120,45.8992]]`
+
+	if _, err := generate(t, looper, context.Background(), withWaypoints(east)); err != nil {
+		t.Fatal(err)
+	}
+
+	if looper.enoughAt == 0 || looper.enoughAt > maxRoutes {
+		t.Errorf("Enough said to stop after %d loops, want at most %d", looper.enoughAt, maxRoutes)
 	}
 }

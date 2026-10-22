@@ -107,7 +107,7 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   engine snaps (start, waypoints, control points) skip the nodes inside, so no candidate dies unseen. Polygons
   and picking one way wait: a way has no stable identifier across graph builds.
 - **A route set sends what it has when time is up.** Loops are searched in parallel and the search
-  stops at eight matches, after 60 loops in a row that add no match, or at the timeout; the routes found by
+  stops at eight matches (seven with the direct loop through the waypoints, which keeps a place), after 60 loops in a row that add no match, or at the timeout; the routes found by
   then are ranked and sent, and `504` is for none at all. Asking for more would only make the user wait
   longer for what they can already pick. The budget is 100 candidates: the production pod has one CPU
   and one search at a time, where a budget of 400 doubled the median time of the hardest criteria (1.8 to
