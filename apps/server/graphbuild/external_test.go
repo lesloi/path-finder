@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/lesloi/path-finder/apps/server/elevation"
+	"github.com/lesloi/path-finder/apps/server/engine"
 )
 
 // writeSquare writes a tile of 8 by 8 cells of 25 m whose lower-left corner is (xll, yll), rising to the north and the
@@ -380,7 +381,7 @@ func TestBuildOnDiskKeepsTheScratchOfABuildThatStillWrites(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(quiet, "elev-0.part"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	old := time.Now().Add(-2 * staleScratch)
+	old := time.Now().Add(-2 * engine.StaleScratch)
 	if err := os.Chtimes(quiet, old, old); err != nil { // after the file: creating it moved the directory's time
 		t.Fatal(err)
 	}
@@ -407,7 +408,7 @@ func TestBuildOnDiskSweepsTheScratchOfAKilledBuild(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	old := time.Now().Add(-2 * staleScratch)
+	old := time.Now().Add(-2 * engine.StaleScratch)
 	if err := os.Chtimes(stale, old, old); err != nil {
 		t.Fatal(err)
 	}

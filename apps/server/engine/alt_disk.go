@@ -20,6 +20,9 @@ func WriteLandmarksOnDisk(graphPath, path, profile string, count int, tmp string
 	return writeLandmarksOnDisk(graphPath, path, profile, count, tmp, workers, rowsAtATime)
 }
 
+// landmarksPattern names the scratch directories: MkdirTemp puts a random string where the star is.
+const landmarksPattern = "pf-landmarks-*"
+
 func writeLandmarksOnDisk(graphPath, path, profile string, count int, tmp string, workers, rowsAt int) error {
 	t0 := time.Now()
 	p, g, perNode, err := openForLandmarks(graphPath, profile, count)
@@ -33,7 +36,8 @@ func writeLandmarksOnDisk(graphPath, path, profile string, count int, tmp string
 	if err := os.MkdirAll(tmp, 0o755); err != nil {
 		return err
 	}
-	dir, err := os.MkdirTemp(tmp, "pf-landmarks-*")
+	SweepScratch(tmp, landmarksPattern)
+	dir, err := os.MkdirTemp(tmp, landmarksPattern)
 	if err != nil {
 		return err
 	}
