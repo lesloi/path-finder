@@ -361,19 +361,40 @@ func BuildGraph(pbfPaths []string, demDir string, proj elevation.Projection, out
 	return nil
 }
 
+// scratchPattern names the scratch directories: MkdirTemp puts a random string where the star is.
+const scratchPattern = "pf-external-*"
+
 // staleScratch is how old a scratch directory is when its build is taken for dead: a build killed by the system (out of
-// memory) cannot remove its own, and the directory is as big as the extract. A build creates files in its directory at every
-// step and takes hours, not a day.
+// memory) cannot remove its own, and the directory is as big as the extract. A build takes hours, not a day.
 const staleScratch = 24 * time.Hour
 
 // sweepScratch removes the scratch directories below tmp that nothing has touched for staleScratch.
 func sweepScratch(tmp string) {
-	old, _ := filepath.Glob(filepath.Join(tmp, "pf-external-*"))
+	old, _ := filepath.Glob(filepath.Join(tmp, scratchPattern))
 	for _, dir := range old {
-		if info, err := os.Stat(dir); err == nil && info.IsDir() && time.Since(info.ModTime()) > staleScratch {
+		if info, err := os.Stat(dir); err == nil && info.IsDir() && quietSince(dir, info.ModTime()) {
 			os.RemoveAll(dir)
 		}
 	}
+}
+
+// quietSince tells whether nothing in dir changed for staleScratch. The directory's own time moves only when a file is
+// created or removed in it, not when one is written to: a live build in a long step keeps writing to its files. Whatever
+// cannot be read counts as changed, so that a doubt never costs a build its files.
+func quietSince(dir string, modTime time.Time) bool {
+	if time.Since(modTime) <= staleScratch {
+		return false
+	}
+	list, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, e := range list {
+		if info, err := e.Info(); err != nil || time.Since(info.ModTime()) <= staleScratch {
+			return false
+		}
+	}
+	return true
 }
 
 // scratch makes the directory of the runs below tmp, and returns a function that removes it.
@@ -382,7 +403,7 @@ func scratch(tmp string) (string, func(), error) {
 		return "", nil, err
 	}
 	sweepScratch(tmp)
-	dir, err := os.MkdirTemp(tmp, "pf-external-*")
+	dir, err := os.MkdirTemp(tmp, scratchPattern)
 	if err != nil {
 		return "", nil, err
 	}

@@ -369,6 +369,34 @@ func TestBuildGraphNamesAMissingArgument(t *testing.T) {
 	}
 }
 
+func TestBuildOnDiskKeepsTheScratchOfABuildThatStillWrites(t *testing.T) {
+	// Arrange: a directory nothing has been created in for days, whose run was written to a moment ago
+	f := newFixture(t)
+	tmp := t.TempDir()
+	quiet := filepath.Join(tmp, "pf-external-quiet")
+	if err := os.Mkdir(quiet, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(quiet, "elev-0.part"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * staleScratch)
+	if err := os.Chtimes(quiet, old, old); err != nil { // after the file: creating it moved the directory's time
+		t.Fatal(err)
+	}
+
+	// Act
+	_, err := BuildOnDisk(f.pbf, f.dem, elevation.Lambert93Grid, filepath.Join(f.dir, "o.bin"), Options{Tmp: tmp, Chunk: 100, Cache: 2}, &bytes.Buffer{})
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(quiet, "elev-0.part")); err != nil {
+		t.Errorf("the scratch of a build that still writes was removed: %v", err)
+	}
+}
+
 func TestBuildOnDiskSweepsTheScratchOfAKilledBuild(t *testing.T) {
 	// Arrange: the scratch directories of a build killed long ago, and of one that is running
 	f := newFixture(t)
