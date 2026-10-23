@@ -875,10 +875,16 @@ describe('CriteriaView', () => {
       }
       const rootProperty = (name: string) => document.documentElement.style.getPropertyValue(name);
 
-      it('folds the form to its button and unfolds it, keeping what was typed', () => {
+      it('offers no button to hide the form before a search', () => {
         onDesktop();
         render(<CriteriaView language="en" />);
-        fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+
+        expect(screen.queryByTestId('criteria-fold')).not.toBeInTheDocument();
+      });
+
+      it('folds the form to its button and unfolds it, keeping what was typed', async () => {
+        await findRoutes();
+        const typed = field().getAttribute('value') ?? (field() as HTMLInputElement).value;
         const toggle = screen.getByTestId('criteria-fold');
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
@@ -892,13 +898,34 @@ describe('CriteriaView', () => {
 
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
         expect(screen.getByTestId('criteria-title').closest('aside')).not.toHaveAttribute('inert');
-        expect(field()).toHaveValue('45.8, 6.2');
+        expect(field()).toHaveValue(typed);
         expect(rootProperty('--column-inset')).toBe('');
       });
 
-      it('moves the focus to the button when the form folds around it', () => {
-        onDesktop();
-        render(<CriteriaView language="en" />);
+      it('shows the form again when the routes are cleared while it is folded', async () => {
+        await findRoutes();
+        fireEvent.click(screen.getByTestId('criteria-fold'));
+
+        fireEvent.click(screen.getByTestId('routes-clear'));
+
+        expect(screen.queryByTestId('criteria-fold')).not.toBeInTheDocument();
+        expect(screen.getByTestId('criteria-title').closest('aside')).not.toHaveAttribute('inert');
+        expect(rootProperty('--column-inset')).toBe('');
+      });
+
+      it('does not fold the form again by itself when a search follows clearing the routes', async () => {
+        await findRoutes();
+        fireEvent.click(screen.getByTestId('criteria-fold'));
+        fireEvent.click(screen.getByTestId('routes-clear'));
+
+        await submit();
+
+        expect(await screen.findByTestId('criteria-fold')).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByTestId('criteria-title').closest('aside')).not.toHaveAttribute('inert');
+      });
+
+      it('moves the focus to the button when the form folds around it', async () => {
+        await findRoutes();
         field().focus();
 
         fireEvent.click(screen.getByTestId('criteria-fold'));
