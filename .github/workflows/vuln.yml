@@ -1,0 +1,28 @@
+name: Vulnerabilities
+
+# A vulnerability is published without any change to the code, so the scan also runs every week.
+on:
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # Fails on a vulnerability that the code calls, in the standard library or in a dependency.
+  govulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/server/go.mod
+          cache-dependency-path: apps/server/go.sum
+      - run: CGO_ENABLED=0 go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+        working-directory: apps/server
