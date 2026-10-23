@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 
-import { useDesktop } from './use-desktop.ts';
+import { useDesktop, useHover } from './use-desktop.ts';
 
 // A stand-in media query whose width the test sets, notifying its listeners like a browser.
 function stubScreen(desktop: boolean) {
@@ -53,5 +53,28 @@ describe('useDesktop', () => {
     unmount();
 
     expect(listeners.size).toBe(0);
+  });
+});
+
+describe('useHover', () => {
+  it.each([
+    ['a screen that can hover', true],
+    ['a touch screen', false],
+  ])('is %s', (_, matches) => {
+    const { matchMedia } = stubScreen(matches);
+
+    const { result } = renderHook(() => useHover());
+
+    expect(result.current).toBe(matches);
+    expect(matchMedia).toHaveBeenCalledWith('(hover: hover)');
+  });
+
+  it('follows the screen as it changes', () => {
+    const { resize } = stubScreen(false);
+    const { result } = renderHook(() => useHover());
+
+    act(() => resize(true));
+
+    expect(result.current).toBe(true);
   });
 });
