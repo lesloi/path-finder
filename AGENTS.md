@@ -57,6 +57,6 @@ exception, ask the owner before implementing it.
 
 ## Issues
 
-- GitHub Issues on `lesloi/path-finder`. Labels: `needs-info`, `web`, `api` (the server), `infra`.
+- GitHub Issues on `lesloi/path-finder`. Labels: `web`, `api` (the server), `infra`.
 - To change an issue, edit its description rather than adding a comment; keep comments for a discussion.
 - Declare a dependency with GitHub's relations (`--blocked-by`, `--blocking`, `--parent`), not in the text.
