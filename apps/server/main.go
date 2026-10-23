@@ -126,10 +126,12 @@ func serve() {
 	// Empty, like unset, it takes the default rather than a random port.
 	port := envOr("PORT", "3000")
 
-	// A request is read in seconds (its body is a few hundred bytes), so a slow one is cut rather than kept.
+	// A request is read in seconds (its body is a few hundred bytes), so a slow one is cut rather than kept; a slow
+	// reader of the answer is cut too, once the generation had its time.
 	srv := &http.Server{
 		Handler:           server.New(cfg),
-		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 2 * time.Minute,
+		ReadHeaderTimeout: 10 * time.Second, ReadTimeout: server.ReadTimeout, WriteTimeout: server.WriteTimeout(cfg.GenerationTimeout),
+		IdleTimeout: 2 * time.Minute,
 	}
 	ln, err := net.Listen("tcp", ":"+port)
 	if err != nil {
