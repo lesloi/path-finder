@@ -884,7 +884,7 @@ describe('CriteriaView', () => {
 
       it('folds the form to its button and unfolds it, keeping what was typed', async () => {
         await findRoutes();
-        const typed = field().getAttribute('value') ?? (field() as HTMLInputElement).value;
+        fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
         const toggle = screen.getByTestId('criteria-fold');
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
@@ -898,7 +898,7 @@ describe('CriteriaView', () => {
 
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
         expect(screen.getByTestId('criteria-title').closest('aside')).not.toHaveAttribute('inert');
-        expect(field()).toHaveValue(typed);
+        expect(field()).toHaveValue('45.8, 6.2');
         expect(rootProperty('--column-inset')).toBe('');
       });
 
