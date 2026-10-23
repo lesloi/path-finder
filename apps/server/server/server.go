@@ -74,7 +74,7 @@ func New(cfg Config) http.Handler {
 		cfg.RateWindow = 10 * time.Minute
 	}
 	if cfg.GenerationTimeout <= 0 {
-		cfg.GenerationTimeout = 15 * time.Second
+		cfg.GenerationTimeout = defaultGenerationTimeout
 	}
 	a := &app{cfg: cfg, buildID: readBuildID(cfg.WebRoot)}
 

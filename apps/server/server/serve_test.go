@@ -94,3 +94,20 @@ func TestServeGivesUpOnRequestsThatOutlastTheGrace(t *testing.T) {
 	}
 	close(release)
 }
+
+func TestWriteTimeoutOutlastsTheReadAndTheGeneration(t *testing.T) {
+	for name, tc := range map[string]struct {
+		generation time.Duration
+		atLeast    time.Duration
+	}{
+		"default":         {0, ReadTimeout + defaultGenerationTimeout},
+		"a longer budget": {time.Minute, ReadTimeout + time.Minute},
+	} {
+		// Act
+		got := WriteTimeout(tc.generation)
+		// Assert
+		if got <= tc.atLeast {
+			t.Errorf("%s: %v does not leave room after %v", name, got, tc.atLeast)
+		}
+	}
+}
