@@ -111,6 +111,7 @@ function FoldablePanel({
   folded,
   label,
   ariaLabel,
+  tabShown = true,
   onToggle,
   children,
 }: {
@@ -119,6 +120,7 @@ function FoldablePanel({
   folded: boolean;
   label: string;
   ariaLabel?: string;
+  tabShown?: boolean;
   onToggle: () => void;
   children: ReactNode;
 }) {
@@ -140,22 +142,24 @@ function FoldablePanel({
       >
         {children}
       </aside>
-      <button
-        ref={tab}
-        type="button"
-        data-testid={testId}
-        className={`${FOLD_TAB} ${left ? 'left-full rounded-r-md' : 'right-full rounded-l-md'}`}
-        aria-expanded={!folded}
-        aria-controls={id}
-        {...tip(label, left ? 'bottom-start' : 'bottom-end')}
-        onClick={() => {
-          // The panel is about to be hidden: the focus would be lost with it.
-          if (panel.current?.contains(document.activeElement)) tab.current?.focus();
-          onToggle();
-        }}
-      >
-        <Icon size={16} aria-hidden />
-      </button>
+      {tabShown && (
+        <button
+          ref={tab}
+          type="button"
+          data-testid={testId}
+          className={`${FOLD_TAB} ${left ? 'left-full rounded-r-md' : 'right-full rounded-l-md'}`}
+          aria-expanded={!folded}
+          aria-controls={id}
+          {...tip(label, left ? 'bottom-start' : 'bottom-end')}
+          onClick={() => {
+            // The panel is about to be hidden: the focus would be lost with it.
+            if (panel.current?.contains(document.activeElement)) tab.current?.focus();
+            onToggle();
+          }}
+        >
+          <Icon size={16} aria-hidden />
+        </button>
+      )}
     </div>
   );
 }
@@ -268,6 +272,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   );
   const routesShown = Boolean(routeSet);
   const listShown = desktop && (loading || Boolean(routeSet));
+  // Without a search there is nothing to look at behind the form: it cannot stay hidden.
+  const [listWasShown, setListWasShown] = useState(listShown);
+  if (listWasShown !== listShown) {
+    setListWasShown(listShown);
+    if (!listShown) setFormFolded(false);
+  }
   // Nothing is selected until the user picks a route; a phone opens the first one's detail from its list.
   const selected = desktop ? browser.selected : (browser.selected ?? 0);
   const dockRoute = desktop ? atPace?.routes[selected ?? -1] : undefined;
@@ -285,7 +295,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // A track loaded from a file was not asked for with criteria: they cannot make it stale, nor search it again.
   const fromFile = Boolean(routeSet?.routes[0]?.imported);
   const stale = Boolean(routeSet && !fromFile && current && criteriaChanged(current, routeSet.request));
-  useRootProperty('--column-inset', '0px', desktop && formFolded);
+  useRootProperty('--column-inset', '0px', formFolded);
   useRootProperty('--list-inset', listFolded ? '0px' : 'var(--list-reserved)', listShown);
   useRootProperty('--dock-inset', 'var(--dock-reserved)', dockShown);
   // The floating buttons and the map attribution sit above the sheet, whatever its height.
@@ -724,6 +734,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             testId="criteria-fold"
             side="left"
             folded={formFolded}
+            tabShown={listShown}
             label={formFolded ? t.showSearch : t.hideSearch}
             onToggle={() => setFormFolded(!formFolded)}
           >
