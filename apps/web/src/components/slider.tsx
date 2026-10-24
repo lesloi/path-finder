@@ -16,6 +16,8 @@ export function Slider({
   shown,
   leading,
   aside,
+  align = 'start',
+  compact = false,
   min,
   max,
   step,
@@ -30,6 +32,10 @@ export function Slider({
   /** Before the value, on the same line. */
   leading?: ReactNode;
   aside?: ReactNode;
+  /** Where the value sits: over the middle of the range, as where the range is the only thing to read. */
+  align?: 'start' | 'center';
+  /** A value in smaller type, as in a bubble over the map where room is short. */
+  compact?: boolean;
   min: number;
   max: number;
   step: number;
@@ -48,10 +54,10 @@ export function Slider({
   };
   return (
     <div>
-      <div className="flex items-center justify-between gap-2">
+      <div className={`flex items-center gap-2 ${align === 'center' ? 'justify-center' : 'justify-between'}`}>
         <div className="flex items-center gap-2">
           {leading}
-          <output data-testid={testId && `${testId}-value`} className="text-xl font-bold">
+          <output data-testid={testId && `${testId}-value`} className={`font-bold ${compact ? 'text-lg' : 'text-xl'}`}>
             {shown}
           </output>
         </div>

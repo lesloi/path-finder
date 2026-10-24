@@ -1,6 +1,8 @@
 import {
+  Ban,
   ChevronLeft,
   ChevronRight,
+  CircleCheck,
   Crosshair,
   LoaderCircle,
   LocateFixed,
@@ -87,9 +89,9 @@ import {
 // A route set can fold its sheet down to the handle, the sheet of the form cannot.
 const SHEET_STOPS = ['folded', 'collapsed', 'expanded'] as const;
 
-// The bottom-right buttons: the location or reframe one, the waypoint one, the layers, the north. On phones they stack up
-// from the bottom, over the sheet; on desktops they line up from the right, above the dock when it is shown
-// (`--edge-bottom`). `--slot` counts the buttons the one stands on or beside.
+// The bottom-right buttons: the location or reframe one, the waypoint one, the avoided area one, the layers, the
+// north. On phones they stack up from the bottom, over the sheet; on desktops they line up from the right, above the
+// dock when it is shown (`--edge-bottom`). `--slot` counts the buttons the one stands on or beside.
 const STACKED =
   'right-safe-3 bottom-[calc(var(--sheet-height,0px)+--spacing(3)+var(--slot)*(var(--spacing-touch)+--spacing(2)))] ' +
   'desktop:right-[calc(env(safe-area-inset-right)+--spacing(3)+var(--slot)*(var(--spacing-touch)+--spacing(2)))] ' +
@@ -225,9 +227,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
   // The circles routes keep out of: kept here too, for this visit only, as the waypoints are.
-  const [drawnAreas, setAvoidedAreas] = useState<AvoidedArea[]>(NO_AREAS);
-  // A phone has neither the button nor the list to edit them: the areas drawn on a desktop do not apply there.
-  const avoidedAreas = desktop ? drawnAreas : NO_AREAS;
+  const [avoidedAreas, setAvoidedAreas] = useState<AvoidedArea[]>(NO_AREAS);
   // A tap on the veiled part of the map was refused: the banner says why for a while.
   const [refused, setRefused] = useState<'uncovered' | 'duplicate' | 'inside' | 'inArea'>();
   // The points of interest some waypoints were made from, by position; kept for the routes found, as for the criteria.
@@ -307,15 +307,15 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // On phones, in the place of the location button, which the routes hide.
   const reframeShown = routesShown && mapView.movedAway && !detailOpen;
 
-  // The button of a phone goes away with the route set, and with the search; a desktop has the list of the criteria.
-  const waypointButtonShown = Boolean(start) && !routesShown && !loading && !desktop;
+  // The round buttons of a phone that draw on the map, a waypoint and an area to avoid; a desktop has the lists.
+  const drawButtonsShown = Boolean(start) && !routesShown && !loading && !desktop;
 
   // A track is one tap away until a search is under way or a route is shown.
   const importShown = !routesShown && !loading && !detailOpen;
 
   // The place of each button in the stack: the location (or reframe) button keeps the corner, within reach of the
-  // thumb, then the waypoint one, then the layers, then the north.
-  const stack = [locateShown || reframeShown, waypointButtonShown, true, mapView.rotated];
+  // thumb, then the waypoint one, then the avoided area one, then the layers, then the north.
+  const stack = [locateShown || reframeShown, drawButtonsShown, drawButtonsShown, true, mapView.rotated];
   const slotOf = (button: number) => stack.slice(0, button).filter(Boolean).length;
 
   // A button that puts the map back goes away once it has: the focus goes on from the settings.
@@ -573,18 +573,18 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         ) : undefined
       }
       avoidedList={
-        // Placing areas needs a pointer and room: a phone has neither the button nor the list yet.
-        desktop && start ? (
+        // A phone draws a new area from its button over the map, and sets its radius in the bubble of its badge;
+        // the list there appears with the first area, to see it and to remove it.
+        start && (desktop || avoidedAreas.length > 0) ? (
           <AvoidedAreaList
             language={language}
             areas={avoidedAreas}
-            placing={avoiding}
-            full={avoidedAreas.length >= MAX_AVOIDED_AREAS}
-            onToggle={toggleAvoiding}
-            onResize={resizeAvoidedArea}
             onRemove={removeAvoidedArea}
-            onCenter={(index) => map.current?.centerOn(avoidedAreas[index]!.center)}
-            onPoint={(index) => map.current?.highlightArea(index)}
+            {...(desktop && {
+              add: { placing: avoiding, full: avoidedAreas.length >= MAX_AVOIDED_AREAS, onToggle: toggleAvoiding },
+              onCenter: (index: number) => map.current?.centerOn(avoidedAreas[index]!.center),
+              onPoint: (index: number | undefined) => map.current?.highlightArea(index),
+            })}
           />
         ) : undefined
       }
@@ -646,6 +646,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         onWaypointAdd={addWaypoint}
         onWaypointRefused={() => setRefused('uncovered')}
         onWaypointRemove={removeWaypoint}
+        onAvoidedAreaResize={resizeAvoidedArea}
         onAvoidedAreaRemove={removeAvoidedArea}
         onBasemapFail={(previous) => update({ basemap: previous })}
       />
@@ -671,9 +672,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             layers={poiLayers}
             onChange={(layers) => update({ poiLayers: layers })}
             className={`fixed z-5 ${STACKED}`}
-            style={slotStyle(slotOf(2))}
+            style={slotStyle(slotOf(3))}
           />
-          {waypointButtonShown && (
+          {drawButtonsShown && (
             <button
               type="button"
               data-testid="criteria-waypoint"
@@ -687,12 +688,26 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               {placing ? <MapPinCheck size={20} aria-hidden /> : <MapPinPlus size={20} aria-hidden />}
             </button>
           )}
+          {drawButtonsShown && (
+            <button
+              type="button"
+              data-testid="criteria-avoided"
+              className={`${FLOATING_BUTTON} fixed z-5 aria-pressed:bg-accent! aria-pressed:text-on-accent! disabled:text-ink-2 ${STACKED}`}
+              style={slotStyle(slotOf(2))}
+              {...tip(t.addAvoidedArea, 'stack')}
+              aria-pressed={avoiding}
+              disabled={!avoiding && avoidedAreas.length >= MAX_AVOIDED_AREAS}
+              onClick={toggleAvoiding}
+            >
+              {avoiding ? <CircleCheck size={20} aria-hidden /> : <Ban size={20} aria-hidden />}
+            </button>
+          )}
           {mapView.rotated && (
             <button
               type="button"
               data-testid="criteria-north"
               className={`${FLOATING_BUTTON} fixed z-5 ${STACKED}`}
-              style={slotStyle(slotOf(3))}
+              style={slotStyle(slotOf(4))}
               {...tip(t.resetNorth, 'stack')}
               onClick={() => putBack('resetNorth')}
             >
