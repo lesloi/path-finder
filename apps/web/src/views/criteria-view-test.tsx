@@ -178,6 +178,163 @@ describe('CriteriaView', () => {
     });
   });
 
+  describe('avoided areas on phones', () => {
+    const route = {
+      geometry: [
+        [6.2, 45.8, 450],
+        [6.21, 45.81, 480],
+      ],
+      distance: 10,
+      elevationGain: 30,
+      estimatedDuration: 70,
+      kind: 'match',
+      unpavedShare: 0.3,
+      surfaces: [{ surface: 'paved', from: 0, to: 10 }],
+      technical: false,
+      technicalStretches: [],
+    };
+    const areaButton = () => screen.getByTestId('criteria-avoided');
+    const areaMarkers = () => markers.filter((marker) => marker.shown && marker.options?.element?.dataset.area);
+    const lastRequest = (fetchMock: ReturnType<typeof vi.fn>) =>
+      JSON.parse(fetchMock.mock.calls.at(-1)![1].body as string) as Record<string, unknown>;
+    const openLayer = () => fireEvent.click(screen.getByTestId('criteria-bar'));
+    const enterStart = () => {
+      openLayer();
+      setStartPoint();
+      fireEvent.click(screen.getByTestId('sub-page-back'));
+    };
+    const addArea = (lng: number, lat: number) => {
+      fireEvent.click(areaButton());
+      place(lng, lat);
+    };
+    const done = () => fireEvent.click(screen.getByTestId('criteria-avoided-done'));
+
+    it('offers the button once a start point is set, and names it', () => {
+      render(<CriteriaView language="en" />);
+      expect(screen.queryByTestId('criteria-avoided')).not.toBeInTheDocument();
+
+      enterStart();
+
+      expect(areaButton()).toHaveAccessibleName(en.addAvoidedArea);
+    });
+
+    it('is named in French', () => {
+      render(<CriteriaView language="fr" />);
+      enterStart();
+
+      expect(areaButton()).toHaveAccessibleName(fr.addAvoidedArea);
+    });
+
+    it('asks for an area in a banner, places one on a tap, and ends with Done', () => {
+      render(<CriteriaView language="en" />);
+      enterStart();
+      fireEvent.click(areaButton());
+
+      expect(screen.getByTestId('criteria-avoided-bar')).toHaveTextContent(en.placeAvoidedAreaTouch);
+      expect(areaButton()).toHaveAttribute('aria-pressed', 'true');
+
+      place(6.21, 45.81);
+
+      expect(areaMarkers().map((marker) => [marker.options?.element?.textContent, marker.position])).toEqual([
+        ['1', [6.21, 45.81]],
+      ]);
+
+      done();
+
+      expect(screen.queryByTestId('criteria-avoided-bar')).not.toBeInTheDocument();
+      expect(areaButton()).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('stops at the third area, and disables the button then', () => {
+      render(<CriteriaView language="en" />);
+      enterStart();
+      fireEvent.click(areaButton());
+
+      place(6.21, 45.81);
+      place(6.22, 45.82);
+      place(6.23, 45.83);
+
+      expect(screen.queryByTestId('criteria-avoided-bar')).not.toBeInTheDocument();
+      expect(areaMarkers()).toHaveLength(3);
+      expect(areaButton()).toBeDisabled();
+    });
+
+    it('places no area that would hold the start point', () => {
+      render(<CriteriaView language="en" />);
+      enterStart();
+      fireEvent.click(areaButton());
+
+      place(6.2, 45.8);
+
+      expect(areaMarkers()).toHaveLength(0);
+      expect(screen.getByTestId('criteria-waypoint-refused')).toHaveTextContent(en.avoidedAreaOnPoint);
+    });
+
+    it('sends the areas with the criteria', async () => {
+      const fetchMock = vi.fn(() => Promise.resolve(Response.json({ routes: [route] })));
+      stubFetch(fetchMock);
+      render(<CriteriaView language="en" />);
+      enterStart();
+      addArea(6.21, 45.81);
+      done();
+
+      openLayer();
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      await screen.findByTestId('routes-count');
+      expect(lastRequest(fetchMock).avoidedAreas).toEqual([{ center: [6.21, 45.81], radius: 200 }]);
+    });
+
+    it('lists the areas in the criteria layer, to see and remove them', () => {
+      render(<CriteriaView language="en" />);
+      enterStart();
+      addArea(6.21, 45.81);
+      done();
+
+      openLayer();
+
+      expect(screen.getByTestId('criteria-avoided-count')).toHaveTextContent('1/3');
+      expect(screen.getByTestId('criteria-avoided-item-1-radius')).toHaveTextContent('200 m');
+
+      fireEvent.click(screen.getByTestId('criteria-avoided-item-1-remove'));
+
+      expect(screen.queryByTestId('criteria-avoided-list')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('sub-page-back'));
+      expect(areaMarkers()).toHaveLength(0);
+    });
+
+    it('refuses a waypoint placed inside an area', () => {
+      render(<CriteriaView language="en" />);
+      enterStart();
+      addArea(6.21, 45.81);
+      done();
+
+      fireEvent.click(screen.getByTestId('criteria-waypoint'));
+      place(6.21, 45.81);
+
+      expect(screen.getByTestId('criteria-waypoint-refused')).toHaveTextContent(en.waypointInAvoidedArea);
+    });
+
+    it('keeps the routes, and says they are stale, once an area is resized', async () => {
+      stubFetch(() => Promise.resolve(Response.json({ routes: [route] })));
+      render(<CriteriaView language="en" />);
+      enterStart();
+      addArea(6.21, 45.81);
+      done();
+      openLayer();
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+      await screen.findByTestId('routes-count');
+
+      act(() => areaMarkers()[0]!.options!.element!.click());
+      fireEvent.change(within(popups.at(-1)!.content!).getByTestId('criteria-avoided-radius'), {
+        target: { value: '600' },
+      });
+
+      expect(screen.getByTestId('routes-count')).toBeInTheDocument();
+      expect(screen.getByTestId('routes-stale')).toBeInTheDocument();
+    });
+  });
+
   describe('criteria', () => {
     it('sums them up in a bar over the map on phones, with the start point once it is set', () => {
       localStorage.setItem(

@@ -14,9 +14,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { createPortal } from 'react-dom';
 
-import type { AvoidedArea } from '../contract/index.ts';
+import { AVOIDED_AREA_RADIUS, type AvoidedArea } from '../contract/index.ts';
 
 import {
+  AVOIDED_RADIUS_STEP,
   circlePolygon,
   DEFAULT_BASEMAP,
   distanceMarkers,
@@ -48,6 +49,7 @@ import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-im
 import { POI_IMAGE_RATIO, poiImage, poiImageId } from './poi-image.ts';
 import { ROUTE_ARROW_RATIO, ROUTE_ARROW_SPACING, routeArrowImage } from './route-arrow-image.ts';
 import { MAP_COLORS, MAP_INK, ROUTE_COLORS, routeColor } from './route-colors.ts';
+import { Slider } from './slider.tsx';
 import {
   ROUTE_TAG_MUTED,
   ROUTE_TAG_PADDING,
@@ -239,6 +241,7 @@ export function StartPointMap({
   onAvoidedAreaAdd,
   onWaypointRefused,
   onWaypointRemove,
+  onAvoidedAreaResize,
   onAvoidedAreaRemove,
   onBasemapFail,
   onViewChange,
@@ -312,6 +315,8 @@ export function StartPointMap({
   onWaypointRemove?: (index: number) => void;
   /** The user asked to remove the avoided area at this index, from its bubble. */
   onAvoidedAreaRemove?: (index: number) => void;
+  /** The user set the radius of the avoided area at this index, from its bubble. */
+  onAvoidedAreaResize?: (index: number, radius: number) => void;
   /** The style of a new basemap could not be loaded: the map went back to this one, which the app should show. */
   onBasemapFail?: (basemap: Basemap) => void;
   /** The user turned or moved the map, or it was put back. */
@@ -383,10 +388,46 @@ export function StartPointMap({
     if (interactive) onRouteSelect?.(index);
   });
   const removeWaypoint = useEffectEvent((index: number) => onWaypointRemove?.(index));
-  const removeArea = useEffectEvent((index: number) => onAvoidedAreaRemove?.(index));
   // The bubble that offers to remove a waypoint.
   const bubbleRef = useRef<Popup>(undefined);
   const closeBubble = () => bubbleRef.current?.remove();
+  // The bubble over an avoided area: its radius and its removal. Its content is React, so that the slider follows
+  // the area as it changes; the popup itself belongs to the map.
+  const [areaBubble, setAreaBubble] = useState<{ index: number; host: HTMLElement; button: HTMLElement }>();
+  const areaPopup = useRef<Popup>(undefined);
+  const closeAreaBubble = useEffectEvent((back = false) => {
+    const button = areaBubble?.button;
+    areaPopup.current?.remove();
+    areaPopup.current = undefined;
+    setAreaBubble(undefined);
+    // Escape gives the keyboard back to the badge that opened the bubble.
+    if (back) button?.focus();
+  });
+  const openAreaBubble = useEffectEvent((index: number, at: Position, button: HTMLElement) => {
+    closeAreaBubble();
+    closeBubble();
+    const host = document.createElement('div');
+    areaPopup.current = new Popup({ closeButton: false, offset: AREA_BUBBLE_OFFSET, className: 'waypoint-bubble' })
+      .setLngLat(at)
+      .setDOMContent(host)
+      .addTo(mapRef.current!);
+    setAreaBubble({ index, host, button });
+  });
+  const toggleAreaBubble = useEffectEvent((index: number, at: Position, button: HTMLElement) => {
+    if (areaBubble?.index === index) closeAreaBubble();
+    else openAreaBubble(index, at, button);
+  });
+  // Escape puts the bubble away, as it does a popover, before the view acts on the key.
+  useEffect(() => {
+    if (!areaBubble) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      event.preventDefault();
+      closeAreaBubble(true);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [areaBubble]); // eslint-disable-line react-hooks/exhaustive-deps -- `closeAreaBubble` is an effect event
 
   useEffect(() => {
     const map = new Map({
@@ -660,6 +701,8 @@ export function StartPointMap({
     };
 
     map.on('click', ({ lngLat, point }) => {
+      // A tap elsewhere puts the bubble of an area away, as a popover does.
+      closeAreaBubble();
       // Only placing makes a point of interest of a tap: otherwise it is a label.
       pick('click', lngLat, isPlacing() ? poiAt(point) : undefined);
       // A route has its own click, on its wide hit line, and a point of interest its label: anywhere else is the
@@ -689,6 +732,7 @@ export function StartPointMap({
       clearTimeout(timer);
       label.current?.remove();
       bubbleRef.current?.remove();
+      areaPopup.current?.remove();
       map.remove();
     };
   }, []);
@@ -756,6 +800,7 @@ export function StartPointMap({
       host.addEventListener('click', (event) => {
         event.stopPropagation();
         closeBubble();
+        closeAreaBubble();
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.textContent = removeLabel;
@@ -820,19 +865,23 @@ export function StartPointMap({
   useEffect(() => {
     const map = mapRef.current!;
     const markers = avoidedAreas.map(({ center }, index) => {
-      const host = markerButton({
-        label: criteriaText[language].avoidedAreaName(index + 1),
-        at: center,
-        offset: AREA_BUBBLE_OFFSET,
-        removeLabel: criteriaText[language].removeAvoidedArea,
-        onRemove: () => removeArea(index),
-        bubbleFor: -1,
+      const host = document.createElement('button');
+      host.type = 'button';
+      // The badge is a target on a phone too: the padding gives it the size of a touch.
+      host.dataset.area = String(index + 1);
+      host.dataset.testid = 'criteria-avoided-marker';
+      host.className = 'grid cursor-pointer place-items-center p-2.5';
+      host.setAttribute('aria-label', criteriaText[language].avoidedAreaName(index + 1));
+      for (const type of ['mousedown', 'touchstart']) host.addEventListener(type, (event) => event.stopPropagation());
+      host.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleAreaBubble(index, center, host);
       });
       return { host, marker: new Marker({ element: host }).setLngLat(center).addTo(map) };
     });
     setAreaHosts(markers.map(({ host }) => host));
     return () => {
-      closeBubble();
+      closeAreaBubble();
       markers.forEach(({ marker }) => marker.remove());
     };
   }, [centres.join(';'), language]); // eslint-disable-line react-hooks/exhaustive-deps -- `avoidedAreas` changes with every resize
@@ -1119,6 +1168,71 @@ export function StartPointMap({
           index,
         ),
       )}
+      {areaBubble &&
+        avoidedAreas[areaBubble.index] &&
+        createPortal(
+          <AvoidedAreaBubble
+            language={language}
+            index={areaBubble.index}
+            area={avoidedAreas[areaBubble.index]}
+            onResize={(radius) => onAvoidedAreaResize?.(areaBubble.index, radius)}
+            onRemove={() => onAvoidedAreaRemove?.(areaBubble.index)}
+          />,
+          areaBubble.host,
+          'area-bubble',
+        )}
+    </div>
+  );
+}
+
+/** The bubble over an avoided area: its radius, and the button that takes it off the map. */
+function AvoidedAreaBubble({
+  language,
+  index,
+  area,
+  onResize,
+  onRemove,
+}: {
+  language: Language;
+  index: number;
+  area: AvoidedArea;
+  onResize: (radius: number) => void;
+  onRemove: () => void;
+}) {
+  const t = criteriaText[language];
+  const name = t.avoidedAreaName(index + 1);
+  const root = useRef<HTMLDivElement>(null);
+  // A keyboard or a screen reader lands on the radius at once: it is why the bubble is here.
+  useEffect(() => {
+    root.current?.querySelector<HTMLInputElement>('input[type="range"]')?.focus();
+  }, []);
+  return (
+    <div ref={root} className="flex w-60 flex-col px-2 pt-2 pb-0">
+      <div className="flex items-center gap-2 px-2 pb-1 text-sm font-semibold text-ink-2">
+        <AvoidedAreaBadge number={index + 1} />
+        {name}
+      </div>
+      <Slider
+        language={language}
+        testId="criteria-avoided-radius"
+        label={t.avoidedAreaRadiusOf(name)}
+        value={area.radius}
+        shown={t.avoidedAreaRadius(area.radius)}
+        align="center"
+        compact
+        min={AVOIDED_AREA_RADIUS.min}
+        max={AVOIDED_AREA_RADIUS.max}
+        step={AVOIDED_RADIUS_STEP}
+        onChange={onResize}
+      />
+      <button
+        type="button"
+        data-testid="criteria-avoided-bubble-remove"
+        className="rounded-md px-2 py-1.5 font-semibold text-accent"
+        onClick={onRemove}
+      >
+        {t.removeAvoidedArea}
+      </button>
     </div>
   );
 }

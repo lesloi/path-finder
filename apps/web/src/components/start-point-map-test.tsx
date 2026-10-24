@@ -1,6 +1,7 @@
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render, within } from '@testing-library/react';
 import { createRef } from 'react';
 
+import type { AvoidedArea } from '../contract/index.ts';
 import type { CoverageCell, Position } from '../core/index.ts';
 import { requestPoiTile } from '../state/index.ts';
 import { commonText, criteriaText } from '../i18n/index.ts';
@@ -1494,5 +1495,107 @@ describe('StartPointMap waypoints', () => {
     expect(pressed(shown()[0]!)).toHaveAttribute('aria-label', criteriaText.fr.waypointName(1));
     act(() => pressed(shown()[0]!).click());
     expect(popups.at(-1)!.content).toHaveTextContent(criteriaText.fr.removeWaypoint);
+  });
+});
+
+describe('StartPointMap avoided areas', () => {
+  const areas: AvoidedArea[] = [
+    { center: [6.1, 45.9], radius: 200 },
+    { center: [6.2, 45.8], radius: 400 },
+  ];
+  const shown = () => markers.filter((marker) => marker.shown && marker.options?.element?.dataset.area);
+  const pressed = (marker: (typeof markers)[number]) => marker.options!.element!;
+  const bubble = () => within(popups.at(-1)!.content!);
+
+  it('draws a numbered marker at each area', () => {
+    render(<StartPointMap avoidedAreas={areas} onStartChange={vi.fn()} />);
+
+    expect(shown().map((marker) => [pressed(marker).textContent, marker.position])).toEqual([
+      ['1', [6.1, 45.9]],
+      ['2', [6.2, 45.8]],
+    ]);
+  });
+
+  it('adds an area on a click while avoiding, and leaves the start point alone', () => {
+    const [onAvoidedAreaAdd, onStartChange] = [vi.fn(), vi.fn()];
+    render(<StartPointMap avoiding onAvoidedAreaAdd={onAvoidedAreaAdd} onStartChange={onStartChange} />);
+
+    act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
+
+    expect(onAvoidedAreaAdd).toHaveBeenCalledExactlyOnceWith([6.2, 45.8]);
+    expect(onStartChange).not.toHaveBeenCalled();
+  });
+
+  it('gives the radius of an area in its bubble, and resizes it from there', () => {
+    const onAvoidedAreaResize = vi.fn();
+    render(<StartPointMap avoidedAreas={areas} onAvoidedAreaResize={onAvoidedAreaResize} onStartChange={vi.fn()} />);
+
+    act(() => pressed(shown()[1]!).click());
+    const slider = bubble().getByTestId('criteria-avoided-radius');
+    expect(slider).toHaveValue('400');
+    expect(bubble().getByTestId('criteria-avoided-radius-value')).toHaveTextContent('400 m');
+
+    fireEvent.change(slider, { target: { value: '500' } });
+
+    expect(onAvoidedAreaResize).toHaveBeenCalledExactlyOnceWith(1, 500);
+  });
+
+  it('removes an area from its bubble, and names it in French', () => {
+    const onAvoidedAreaRemove = vi.fn();
+    render(
+      <StartPointMap
+        language="fr"
+        avoidedAreas={areas}
+        onAvoidedAreaRemove={onAvoidedAreaRemove}
+        onStartChange={vi.fn()}
+      />,
+    );
+
+    expect(pressed(shown()[0]!)).toHaveAttribute('aria-label', criteriaText.fr.avoidedAreaName(1));
+    act(() => pressed(shown()[0]!).click());
+
+    const remove = bubble().getByTestId('criteria-avoided-bubble-remove');
+    expect(remove).toHaveTextContent(criteriaText.fr.removeAvoidedArea);
+    fireEvent.click(remove);
+
+    expect(onAvoidedAreaRemove).toHaveBeenCalledExactlyOnceWith(0);
+  });
+
+  it('puts the bubble away on a tap elsewhere on the map', () => {
+    render(<StartPointMap avoidedAreas={areas} onStartChange={vi.fn()} />);
+    act(() => pressed(shown()[0]!).click());
+    expect(popups.at(-1)!.shown).toBe(true);
+
+    act(() => map().fire('click', { lngLat: { lng: 6.3, lat: 45.7 } }));
+
+    expect(popups.at(-1)!.shown).toBe(false);
+  });
+
+  it('puts the bubble away with Escape, and on a second tap on its badge', () => {
+    render(<StartPointMap avoidedAreas={areas} onStartChange={vi.fn()} />);
+    const badge = pressed(shown()[0]!);
+
+    act(() => badge.click());
+    expect(popups.at(-1)!.shown).toBe(true);
+    act(() => void fireEvent.keyDown(window, { key: 'Escape' }));
+    expect(popups.at(-1)!.shown).toBe(false);
+
+    act(() => badge.click());
+    expect(popups.at(-1)!.shown).toBe(true);
+    act(() => badge.click());
+    expect(popups.at(-1)!.shown).toBe(false);
+  });
+
+  it.each(['click', 'mousedown', 'touchstart'])('keeps a %s on an area from reaching the map', (type) => {
+    render(<StartPointMap avoiding avoidedAreas={areas} onStartChange={vi.fn()} />);
+    const container = document.createElement('div');
+    const heard = vi.fn();
+    container.addEventListener(type, heard);
+    const marker = pressed(shown()[0]!);
+    container.append(marker);
+
+    act(() => void marker.dispatchEvent(new Event(type, { bubbles: true })));
+
+    expect(heard).not.toHaveBeenCalled();
   });
 });

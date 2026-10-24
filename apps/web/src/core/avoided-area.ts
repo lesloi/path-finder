@@ -6,7 +6,7 @@ import { kmBetween } from './distance.ts';
 const MARGIN_M = 5;
 
 /** The radius of a new area, in metres. */
-export const DEFAULT_AVOIDED_RADIUS = 400;
+export const DEFAULT_AVOIDED_RADIUS = 200;
 
 /**
  * The largest radius, in metres, a circle around `center` can have without holding or touching any of the points: the
