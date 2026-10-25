@@ -119,9 +119,8 @@ The default `-dem-crs` is `lambert93`. Tiles read in the wrong projection give n
 ### Points of interest
 
 `build-pois` reads the same extracts and writes the tiles of the water points (`amenity=drinking_water`, or
-`drinking_water=yes` on any node or way, never `drinking_water=no`; `seasonal` and the `name` are kept) and of the viewpoints
-(`tourism=viewpoint`), of the toilets (`amenity=toilets`) and of the shelters (`amenity=shelter` but
-`shelter_type=public_transport`, `field_shelter` and `bomb_shelter`, `tourism=alpine_hut`, `tourism=wilderness_hut`); `access=private` and `access=no` leave an object
+`drinking_water=yes` on any node or way, never `drinking_water=no`; `seasonal` and the `name` are kept), of the viewpoints
+(`tourism=viewpoint`) and of the toilets (`amenity=toilets`); `access=private` and `access=no` leave an object
 out, and so does `access=customers` for toilets. An object has one category, water first. A tile is a JSON file `pois/{x}/{y}.json` of the zoom-10 grid, about 27 km wide, written only
 when it holds any point. A way stands for the mean of its nodes; relations are left out. Several extracts can
 overlap.

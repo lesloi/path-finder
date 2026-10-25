@@ -35,18 +35,10 @@ func TestClassifyPOI(t *testing.T) {
 		{"toilets for customers", [][2]string{{"amenity", "toilets"}, {"access", "customers"}}, "", false},
 		{"toilets with access=no", [][2]string{{"amenity", "toilets"}, {"access", "no"}}, "", false},
 		{"permissive toilets", [][2]string{{"amenity", "toilets"}, {"access", "permissive"}}, "toilets", false},
-		{"a shelter", [][2]string{{"amenity", "shelter"}}, "shelter", false},
-		{"a bus stop shelter", [][2]string{{"amenity", "shelter"}, {"shelter_type", "public_transport"}}, "", false},
-		{"a field shelter for livestock", [][2]string{{"amenity", "shelter"}, {"shelter_type", "field_shelter"}}, "", false},
-		{"a bomb shelter", [][2]string{{"amenity", "shelter"}, {"shelter_type", "bomb_shelter"}}, "", false},
 		{"a viewpoint with drinking_water=no", [][2]string{{"tourism", "viewpoint"}, {"drinking_water", "no"}}, "viewpoint", false},
-		{"a basic hut", [][2]string{{"amenity", "shelter"}, {"shelter_type", "basic_hut"}}, "shelter", false},
-		{"a private shelter", [][2]string{{"amenity", "shelter"}, {"access", "private"}}, "", false},
-		{"an alpine hut", [][2]string{{"tourism", "alpine_hut"}}, "shelter", false},
-		{"a wilderness hut", [][2]string{{"tourism", "wilderness_hut"}}, "shelter", false},
-		{"a private hut", [][2]string{{"tourism", "alpine_hut"}, {"access", "private"}}, "", false},
-		{"a hut with drinking water", [][2]string{{"tourism", "alpine_hut"}, {"drinking_water", "yes"}}, "water", false},
-		{"a hut without drinking water", [][2]string{{"tourism", "alpine_hut"}, {"drinking_water", "no"}}, "shelter", false},
+		{"a shelter", [][2]string{{"amenity", "shelter"}}, "", false},
+		{"an alpine hut", [][2]string{{"tourism", "alpine_hut"}}, "", false},
+		{"a wilderness hut", [][2]string{{"tourism", "wilderness_hut"}}, "", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -65,7 +57,7 @@ func TestClassifyPOI(t *testing.T) {
 }
 
 func TestClassifyPOIPutsSeasonalityOnWaterOnly(t *testing.T) {
-	for _, kv := range [][]string{{"tourism", "viewpoint"}, {"amenity", "toilets"}, {"amenity", "shelter"}} {
+	for _, kv := range [][]string{{"tourism", "viewpoint"}, {"amenity", "toilets"}} {
 		_, seasonal := classifyPOI(tags(append(kv, "seasonal", "summer")...))
 
 		if seasonal {

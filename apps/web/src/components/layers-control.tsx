@@ -10,7 +10,6 @@ const LABELS = {
   water: 'poiWater',
   viewpoint: 'poiViewpoint',
   toilets: 'poiToilets',
-  shelter: 'poiShelter',
   seasonal: 'poiSeasonal',
 } as const;
 

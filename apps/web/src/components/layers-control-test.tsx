@@ -5,7 +5,7 @@ import { LayersControl } from './layers-control.tsx';
 
 const t = criteriaText.en;
 
-function setup(layers = { water: true, viewpoint: false, toilets: false, shelter: false, seasonal: true }) {
+function setup(layers = { water: true, viewpoint: false, toilets: false, seasonal: true }) {
   const onChange = vi.fn();
   render(<LayersControl language="en" layers={layers} onChange={onChange} className="" />);
   const button = screen.getByTestId('criteria-layers');
@@ -33,13 +33,12 @@ describe('LayersControl', () => {
       water: true,
       viewpoint: false,
       toilets: false,
-      shelter: false,
       seasonal: false,
     });
   });
 
   it('has no seasonal row to use while the water points are hidden', () => {
-    const { open } = setup({ water: false, viewpoint: false, toilets: false, shelter: false, seasonal: true });
+    const { open } = setup({ water: false, viewpoint: false, toilets: false, seasonal: true });
     open();
 
     expect(screen.getByTestId('layers-seasonal')).toBeDisabled();
@@ -55,7 +54,6 @@ describe('LayersControl', () => {
       water: true,
       viewpoint: true,
       toilets: false,
-      shelter: false,
       seasonal: true,
     });
   });

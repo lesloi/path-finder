@@ -95,9 +95,9 @@ type Coverage struct {
 	Cells [][4]float64 `json:"cells"`
 }
 
-// POI is a point of interest of a tile: a water point, a viewpoint, toilets or a shelter, at longitude and latitude.
+// POI is a point of interest of a tile: a water point, a viewpoint or toilets, at longitude and latitude.
 type POI struct {
-	Category string     `json:"category"` // water, viewpoint, toilets or shelter
+	Category string     `json:"category"` // water, viewpoint or toilets
 	Position [2]float64 `json:"position"`
 	Seasonal bool       `json:"seasonal,omitempty"` // water points only
 	Name     string     `json:"name,omitempty"`     // the OSM name, when it has one

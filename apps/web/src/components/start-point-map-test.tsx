@@ -259,7 +259,6 @@ describe('StartPointMap', () => {
         'pois-water',
         'pois-viewpoint',
         'pois-toilets',
-        'pois-shelter',
         'routes-others',
         'routes-casing',
         'routes-line',
@@ -646,7 +645,6 @@ describe('StartPointMap', () => {
         'pois-water',
         'pois-viewpoint',
         'pois-toilets',
-        'pois-shelter',
         'routes-others',
         'routes-casing',
         'routes-line',
@@ -1126,7 +1124,7 @@ describe('StartPointMap points of interest', () => {
       (map().layers as { id: string; minzoom?: number }[])
         .filter(({ id }) => id.startsWith('pois'))
         .map(({ minzoom }) => minzoom),
-    ).toEqual([11, 11, 11, 11]);
+    ).toEqual([11, 11, 11]);
   });
 
   it('marks a seasonal point', async () => {

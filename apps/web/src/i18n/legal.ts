@@ -105,7 +105,7 @@ export const legalText = {
           },
           {
             paragraph: {
-              text: 'From zoom 11, the map also asks our server for the tiles of points of interest (drinking water, viewpoints, toilets, shelters) of the area you view. Reaching for the export button of a route does the same for the area around the route, to put its drinking water in the GPX file. A tile covers about 30 km, so the request reveals that area to our server, with your IP address as with any connection. These requests are never logged.',
+              text: 'From zoom 11, the map also asks our server for the tiles of points of interest (drinking water, viewpoints, toilets) of the area you view. Reaching for the export button of a route does the same for the area around the route, to put its drinking water in the GPX file. A tile covers about 30 km, so the request reveals that area to our server, with your IP address as with any connection. These requests are never logged.',
             },
           },
           {
@@ -263,7 +263,7 @@ export const legalText = {
           },
           {
             paragraph: {
-              text: 'À partir du zoom 11, la carte demande aussi à notre serveur les tuiles des points d’intérêt (eau potable, points de vue, toilettes, abris) de la zone affichée. Approcher le bouton d’export d’un itinéraire en fait autant pour la zone autour de l’itinéraire, afin de placer son eau potable dans le fichier GPX. Une tuile couvre environ 30 km : la requête révèle donc cette zone à notre serveur, avec votre adresse IP, comme pour toute connexion. Ces requêtes ne sont jamais journalisées.',
+              text: 'À partir du zoom 11, la carte demande aussi à notre serveur les tuiles des points d’intérêt (eau potable, points de vue, toilettes) de la zone affichée. Approcher le bouton d’export d’un itinéraire en fait autant pour la zone autour de l’itinéraire, afin de placer son eau potable dans le fichier GPX. Une tuile couvre environ 30 km : la requête révèle donc cette zone à notre serveur, avec votre adresse IP, comme pour toute connexion. Ces requêtes ne sont jamais journalisées.',
             },
           },
           {
