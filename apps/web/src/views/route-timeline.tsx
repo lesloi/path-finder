@@ -42,8 +42,8 @@ function Delta({
   language: Language;
 }) {
   return (
-    <span className="inline-flex items-center">
-      <Icon size={12} className="mr-0.5" aria-hidden />
+    <span className="whitespace-nowrap">
+      <Icon size={12} className="mr-0.5 inline align-[-1.5px]" aria-hidden />
       <span className="sr-only">{label}</span>
       {formatHeight(metres, language)}
     </span>
