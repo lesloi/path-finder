@@ -50,5 +50,4 @@ export const POI_COLORS: Record<PoiCategory, string> = {
   water: '#0e7490',
   viewpoint: '#a16207',
   toilets: '#6d28d9',
-  shelter: '#15803d',
 };

@@ -25,11 +25,10 @@ const (
 	categoryWater     = "water"
 	categoryViewpoint = "viewpoint"
 	categoryToilets   = "toilets"
-	categoryShelter   = "shelter"
 )
 
 // classifyPOI tells which category a tagged object belongs to, if any, and whether a water point is seasonal.
-// An object has one category and water comes first: a hut with drinking water is a water point. An object that says
+// An object has one category and water comes first: toilets with drinking water are a water point. An object that says
 // drinking_water=no is not a water point, but it can still be something else (toilets often say it). Any value of
 // seasonal but "no" counts: the tag holds the season, such as summer.
 func classifyPOI(tags osm.Tags) (category string, seasonal bool) {
@@ -45,15 +44,9 @@ func classifyPOI(tags osm.Tags) (category string, seasonal bool) {
 	// Toilets of a shop (access=customers) are not for passers-by.
 	case amenity == "toilets" && accessible(tags) && tags.Find("access") != "customers":
 		return categoryToilets, false
-	case accessible(tags) && ((amenity == "shelter" && !notForWalkers[tags.Find("shelter_type")]) ||
-		tourism == "alpine_hut" || tourism == "wilderness_hut"):
-		return categoryShelter, false
 	}
 	return "", false
 }
-
-// notForWalkers are the shelter_type values of shelters that are no stop for a walker: a bus stop, livestock, bombs.
-var notForWalkers = map[string]bool{"public_transport": true, "field_shelter": true, "bomb_shelter": true}
 
 // accessible tells whether anyone may walk up to the object: access=private and access=no keep it out. Fee-paying
 // objects stay in: they are still a stop.

@@ -36,16 +36,10 @@ describe('poiImage', () => {
     expect(pixel(image, image.width / 2, image.height / 2 + 3).slice(0, 3)).toEqual(hex(POI_COLORS.water));
   });
 
-  it.each(['toilets', 'shelter'] as const)('is a disc in the colour of %s', (category) => {
-    const image = poiImage(category, false);
+  it('is a disc in the colour of its category', () => {
+    const image = poiImage('toilets', false);
 
-    expect(pixel(image, image.width / 2, 8)).toEqual([...hex(POI_COLORS[category]), 255]);
-  });
-
-  it('draws a hut with a white body above its door', () => {
-    const image = poiImage('shelter', false);
-
-    expect(pixel(image, 20, 20)).toEqual([255, 255, 255, 255]);
+    expect(pixel(image, image.width / 2, 8)).toEqual([...hex(POI_COLORS.toilets), 255]);
   });
 
   it('draws two figures, with the disc showing between them', () => {

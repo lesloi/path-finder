@@ -9,7 +9,7 @@ const DEFAULTS = {
   paceUnit: 'min/km',
   theme: 'system',
   basemap: 'minimal',
-  poiLayers: { water: true, viewpoint: false, toilets: false, shelter: false, seasonal: true },
+  poiLayers: { water: true, viewpoint: false, toilets: false, seasonal: true },
   lastCriteria: {
     target: 'distance',
     distance: 10,
@@ -35,7 +35,7 @@ describe('useSettings', () => {
       paceUnit: 'km/h',
       theme: 'dark',
       basemap: 'aerial',
-      poiLayers: { water: false, viewpoint: true, toilets: false, shelter: false, seasonal: false },
+      poiLayers: { water: false, viewpoint: true, toilets: false, seasonal: false },
       lastCriteria: {
         target: 'duration',
         distance: 21.1,
@@ -163,26 +163,31 @@ describe('watchSettings', () => {
 
 describe('the points of interest layers', () => {
   it.each([
-    ['nothing is stored', '{}', { water: true, viewpoint: false, toilets: false, shelter: false, seasonal: true }],
+    ['nothing is stored', '{}', { water: true, viewpoint: false, toilets: false, seasonal: true }],
     [
       'a layer is not a boolean',
       '{"poiLayers":{"water":"no","viewpoint":1}}',
-      { water: true, viewpoint: false, toilets: false, shelter: false, seasonal: true },
+      { water: true, viewpoint: false, toilets: false, seasonal: true },
     ],
     [
       'only one layer is stored',
       '{"poiLayers":{"viewpoint":true}}',
-      { water: true, viewpoint: true, toilets: false, shelter: false, seasonal: true },
+      { water: true, viewpoint: true, toilets: false, seasonal: true },
     ],
     [
-      'layers stored before toilets and shelters',
+      'a shelter layer from an earlier version',
+      '{"poiLayers":{"shelter":true,"water":false}}',
+      { water: false, viewpoint: false, toilets: false, seasonal: true },
+    ],
+    [
+      'layers stored before toilets',
       '{"poiLayers":{"water":false,"viewpoint":true,"seasonal":false}}',
-      { water: false, viewpoint: true, toilets: false, shelter: false, seasonal: false },
+      { water: false, viewpoint: true, toilets: false, seasonal: false },
     ],
     [
       'the layers are not an object',
       '{"poiLayers":"water"}',
-      { water: true, viewpoint: false, toilets: false, shelter: false, seasonal: true },
+      { water: true, viewpoint: false, toilets: false, seasonal: true },
     ],
   ])('start from the defaults, each on its own, when %s', (_, stored, expected) => {
     localStorage.setItem(KEY, stored);
@@ -196,7 +201,7 @@ describe('the points of interest layers', () => {
     const first = renderHook(() => useSettings());
     act(() =>
       first.result.current[1]({
-        poiLayers: { water: false, viewpoint: true, toilets: false, shelter: false, seasonal: false },
+        poiLayers: { water: false, viewpoint: true, toilets: false, seasonal: false },
       }),
     );
     first.unmount();
@@ -207,7 +212,6 @@ describe('the points of interest layers', () => {
       water: false,
       viewpoint: true,
       toilets: false,
-      shelter: false,
       seasonal: false,
     });
   });
