@@ -139,7 +139,7 @@ export function RouteTimeline({
           return (
             <Fragment key={`${step.kind}-${step.number ?? ''}`}>
               {parts && (
-                <li data-testid="route-timeline-leg" className={`${LINE} pl-5 text-xs text-ink-2 italic`}>
+                <li data-testid="route-timeline-leg" className={`${LINE} pl-5 text-sm text-ink-2 italic`}>
                   {/* Plain inline text, so that every separator is one space, as in the step rows. */}
                   {parts.figures}
                   {/* Kept together, so that the dot never ends a line. */}

@@ -15,7 +15,7 @@ export function CountOfMax({
   // The max matters as the list fills; the first item already shows it, and an empty form stays bare.
   if (count === 0) return null;
   return (
-    <span data-testid={testId} className="text-xs text-ink-2 tabular-nums">
+    <span data-testid={testId} className="text-sm text-ink-2 tabular-nums">
       <span aria-hidden>
         {count}/{max}
       </span>

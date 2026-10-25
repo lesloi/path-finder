@@ -8,7 +8,7 @@ import { MAP_COLORS } from './route-colors.ts';
 export function AvoidedAreaBadge({ number, highlighted = false }: { number: number; highlighted?: boolean }) {
   return (
     <span
-      className={`grid size-6 flex-none place-items-center rounded-full border-2 border-white text-xs leading-none font-bold text-white shadow-md transition-transform ${highlighted ? 'scale-125' : ''}`}
+      className={`grid size-6 flex-none place-items-center rounded-full border-2 border-white text-sm leading-none font-bold text-white shadow-md transition-transform ${highlighted ? 'scale-125' : ''}`}
       style={{ backgroundColor: MAP_COLORS.avoided }}
       aria-hidden
     >
