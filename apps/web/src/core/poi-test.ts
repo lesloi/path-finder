@@ -39,18 +39,12 @@ describe('poiTilesCovering', () => {
 });
 
 describe('parsePoiTile', () => {
-  it('reads toilets and shelters', () => {
+  it('reads toilets', () => {
     const body = {
-      pois: [
-        { category: 'toilets', position: [2.1, 48.8] },
-        { category: 'shelter', position: [2.2, 48.9], name: 'Refuge du Col' },
-      ],
+      pois: [{ category: 'toilets', position: [2.1, 48.8] }],
     };
 
-    expect(parsePoiTile(body)).toEqual([
-      { category: 'toilets', position: [2.1, 48.8], seasonal: false },
-      { category: 'shelter', position: [2.2, 48.9], seasonal: false, name: 'Refuge du Col' },
-    ]);
+    expect(parsePoiTile(body)).toEqual([{ category: 'toilets', position: [2.1, 48.8], seasonal: false }]);
   });
 
   it('reads water points and viewpoints', () => {
@@ -104,15 +98,11 @@ describe('parsePoiTile', () => {
 
 describe('shownPoiCategories', () => {
   it('lists the categories that are on', () => {
-    expect(
-      shownPoiCategories({ water: true, viewpoint: false, toilets: false, shelter: false, seasonal: true }),
-    ).toEqual(['water']);
+    expect(shownPoiCategories({ water: true, viewpoint: false, toilets: false, seasonal: true })).toEqual(['water']);
   });
 
   it('lists none when all are off', () => {
-    expect(
-      shownPoiCategories({ water: false, viewpoint: false, toilets: false, shelter: false, seasonal: true }),
-    ).toEqual([]);
+    expect(shownPoiCategories({ water: false, viewpoint: false, toilets: false, seasonal: true })).toEqual([]);
   });
 });
 

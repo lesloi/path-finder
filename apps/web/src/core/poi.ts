@@ -4,23 +4,22 @@ import type { Position } from './coordinates.ts';
 import { boundsAround } from './route.ts';
 
 /** The kinds of points of interest the map can show. */
-export type PoiCategory = 'water' | 'viewpoint' | 'toilets' | 'shelter';
+export type PoiCategory = 'water' | 'viewpoint' | 'toilets';
 
 /** The categories in the order the layers popover lists them. */
-export const POI_CATEGORIES: PoiCategory[] = ['water', 'viewpoint', 'toilets', 'shelter'];
+export const POI_CATEGORIES: PoiCategory[] = ['water', 'viewpoint', 'toilets'];
 
 /** What the map shows of the points of interest: each category, and whether seasonal water points are among them. */
 export type PoiLayers = Record<PoiCategory | 'seasonal', boolean>;
 
 /** The keys of the layers, in the order the popover lists them. */
-export const POI_LAYER_KEYS: (keyof PoiLayers)[] = ['water', 'seasonal', 'viewpoint', 'toilets', 'shelter'];
+export const POI_LAYER_KEYS: (keyof PoiLayers)[] = ['water', 'seasonal', 'viewpoint', 'toilets'];
 
 /** Water points are shown, seasonal ones too, until the user hides them; the other categories once the user shows them. */
 export const DEFAULT_POI_LAYERS: PoiLayers = {
   water: true,
   viewpoint: false,
   toilets: false,
-  shelter: false,
   seasonal: true,
 };
 
