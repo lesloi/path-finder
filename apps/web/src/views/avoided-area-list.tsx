@@ -107,7 +107,7 @@ export function AvoidedAreaList({
                   </span>
                 </div>
               )}
-              <span data-testid={`${id}-radius`} className="w-14 flex-none text-right text-xs text-ink-2 tabular-nums">
+              <span data-testid={`${id}-radius`} className="w-14 flex-none text-right text-sm text-ink-2 tabular-nums">
                 {t.avoidedAreaRadius(area.radius)}
               </span>
               <button

@@ -12,7 +12,7 @@ const PLACED_POI = { poi: 'absolute top-0 left-0 h-[22px] w-[18px]', badge: 'abs
 const VARIANTS = {
   map: {
     box: 'relative block h-[29px] w-6 drop-shadow-md',
-    number: 'top-0 flex h-6 items-center justify-center text-xs',
+    number: 'top-0 flex h-6 items-center justify-center text-sm',
     ...PLACED_POI,
   },
   profile: {

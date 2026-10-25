@@ -131,7 +131,7 @@ export const RouteStepStrip = memo(function RouteStepStrip({
             <li
               key={`${step.kind}-${step.number ?? ''}`}
               data-testid="route-step"
-              className="relative w-max max-w-full min-w-0 rounded-sm border border-border px-2 py-1 text-center text-xs text-ink-2"
+              className="relative w-max max-w-full min-w-0 rounded-sm border border-border px-2 py-1 text-center text-sm text-ink-2"
             >
               <strong className="flex items-center justify-center gap-1 text-sm text-ink">
                 {/* The number on the icon of a point of interest sticks out on the right: room for it before the name. */}
