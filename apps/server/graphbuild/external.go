@@ -304,9 +304,10 @@ type Options struct {
 }
 
 const (
-	// DefaultChunk is about 256 MB of records per sort, the biggest being 32 bytes in memory; the buffers of the sorts
-	// being filled at once add up.
-	DefaultChunk = 8_000_000
+	// DefaultChunk is about 64 MB of records per sort, the biggest being 32 bytes in memory; the buffers of the sorts
+	// being filled at once add up. 2 M built a regional extract in the same time as 8 M with a quarter less memory; a
+	// country build only gets more runs, and the merge holds each open as a file with a 1 MB buffer (about 90 of them).
+	DefaultChunk = 2_000_000
 	DefaultCache = 128
 )
 
