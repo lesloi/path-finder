@@ -274,14 +274,18 @@ func joinNodes(pbf string, r *refs, found func(h idRef, at *[2]int32, first bool
 			return ErrNotSorted
 		}
 		last = id
-		at := [2]int32{int32(math.Round(n.Lat * 1e7)), int32(math.Round(n.Lon * 1e7))}
-		for more && head.id <= id {
-			var p *[2]int32
-			if head.id == id {
-				p = &at
-			}
-			if err := step(p); err != nil {
+		for more && head.id < id { // the references to nodes the extract does not hold
+			if err := step(nil); err != nil {
 				return err
+			}
+		}
+		if more && head.id == id {
+			// Only the nodes a way references are turned into degrees: the extract holds many more of them.
+			at := [2]int32{int32(math.Round(n.Lat * 1e7)), int32(math.Round(n.Lon * 1e7))}
+			for more && head.id == id {
+				if err := step(&at); err != nil {
+					return err
+				}
 			}
 		}
 		return nil

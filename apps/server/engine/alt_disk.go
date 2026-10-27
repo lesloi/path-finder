@@ -104,7 +104,8 @@ func writeColumns(g *graph, p *Profile, marks []uint32, count, columns, workers 
 	return fail
 }
 
-// transpose turns the columns into rows, rowsAt nodes at a time: a row holds one distance from each column.
+// transpose turns the columns into rows, rowsAt nodes at a time: a row holds one distance from each column. The
+// distances are 16-bit numbers, so each cell is a word rather than two bytes copied one by one.
 func transpose(w io.Writer, n, columns, rowsAt int, column func(int) string) error {
 	readers := make([]*bufio.Reader, columns)
 	for c := range readers {
@@ -115,24 +116,24 @@ func transpose(w io.Writer, n, columns, rowsAt int, column func(int) string) err
 		defer f.Close()
 		readers[c] = bufio.NewReaderSize(f, 1<<16)
 	}
-	chunk := make([][]byte, columns)
+	chunk := make([][]uint16, columns)
 	for c := range chunk {
-		chunk[c] = make([]byte, 2*rowsAt)
+		chunk[c] = make([]uint16, rowsAt)
 	}
-	rows := make([]byte, 2*columns*rowsAt)
+	rows := make([]uint16, columns*rowsAt)
 	for done := 0; done < n; {
 		length := min(rowsAt, n-done)
 		for c, r := range readers {
-			if _, err := io.ReadFull(r, chunk[c][:2*length]); err != nil {
+			if _, err := io.ReadFull(r, bytesOf(chunk[c][:length])); err != nil {
 				return err
 			}
 		}
 		for i := 0; i < length; i++ {
 			for c := range chunk {
-				copy(rows[2*(i*columns+c):], chunk[c][2*i:2*i+2])
+				rows[i*columns+c] = chunk[c][i]
 			}
 		}
-		if _, err := w.Write(rows[:2*columns*length]); err != nil {
+		if _, err := w.Write(bytesOf(rows[:columns*length])); err != nil {
 			return err
 		}
 		done += length

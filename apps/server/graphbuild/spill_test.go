@@ -1,9 +1,106 @@
 package graphbuild
 
 import (
+	"bufio"
+	"bytes"
+	"errors"
+	"io"
+	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 )
+
+// writeRecords writes records as a table would.
+func writeRecords(t *testing.T, records []idRef) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	b := make([]byte, idRefCodec.size)
+	for _, r := range records {
+		idRefCodec.put(b, r)
+		buf.Write(b)
+	}
+	return buf.Bytes()
+}
+
+func TestBlockReadsRecordsAcrossItsBlocks(t *testing.T) {
+	// Arrange: seven records, and a block that holds three of them
+	data := writeRecords(t, []idRef{{0, 0}, {1, 0}, {2, 0}, {3, 0}, {4, 0}, {5, 0}, {6, 0}})
+	b := newBlockSize(bufio.NewReader(bytes.NewReader(data)), idRefCodec, 3*idRefCodec.size)
+
+	// Act
+	var got []int64
+	for {
+		r, ok, err := b.next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			break
+		}
+		got = append(got, r.id)
+	}
+
+	// Assert
+	if want := []int64{0, 1, 2, 3, 4, 5, 6}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestBlockRefusesARecordCutShort(t *testing.T) {
+	// Arrange: two whole records, then half of one
+	data := writeRecords(t, []idRef{{0, 0}, {1, 0}})
+	data = append(data, data[:idRefCodec.size/2]...)
+	b := newBlockSize(bufio.NewReader(bytes.NewReader(data)), idRefCodec, 2*idRefCodec.size)
+	var err error
+
+	// Act
+	for err == nil {
+		_, _, err = b.next()
+	}
+
+	// Assert
+	if !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Errorf("got %v, want a record cut short", err)
+	}
+}
+
+func TestTableReaderNamesARecordCutShort(t *testing.T) {
+	// Arrange: a table of two records whose file lost its last byte
+	dir := t.TempDir()
+	tab, err := createTable(dir, "n", idRefCodec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range 2 {
+		if err := tab.put(idRef{int64(i), 0}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tab.finish(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Truncate(tab.path, int64(2*idRefCodec.size-1)); err != nil {
+		t.Fatal(err)
+	}
+	r, err := tab.reader()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.close()
+
+	// Act
+	var got error
+	for got == nil {
+		_, got = r.next()
+	}
+
+	// Assert
+	if !strings.Contains(got.Error(), "lost on the way") || !errors.Is(got, io.ErrUnexpectedEOF) {
+		t.Errorf("got %v", got)
+	}
+}
 
 func TestSpillGivesBackItsBufferOnceMerged(t *testing.T) {
 	// Arrange
