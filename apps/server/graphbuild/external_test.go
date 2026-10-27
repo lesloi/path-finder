@@ -127,7 +127,12 @@ func TestBuildOnDiskWritesTheGraphBuildWrites(t *testing.T) {
 	if err := Build([]string{f.pbf}, f.dem, proj, want, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	for _, o := range []Options{{Tmp: f.dir, Chunk: 1 << 20, Cache: 16}, {Tmp: f.dir, Chunk: 9, Cache: 1}, {Tmp: f.dir, Chunk: 50, Cache: 2}} {
+	// The last case leaves the chunk to withDefaults, as the command line does: nothing else would catch a default that
+	// changed the order of the records.
+	for _, o := range []Options{
+		{Tmp: f.dir, Chunk: 1 << 20, Cache: 16}, {Tmp: f.dir, Chunk: 9, Cache: 1}, {Tmp: f.dir, Chunk: 50, Cache: 2},
+		{Tmp: f.dir, Chunk: 0, Cache: 2},
+	} {
 		got := filepath.Join(f.dir, "got.bin")
 
 		// Act
