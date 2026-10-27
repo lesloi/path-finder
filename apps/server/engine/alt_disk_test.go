@@ -74,6 +74,73 @@ func TestLandmarksOnDiskAreTheLandmarksInMemory(t *testing.T) {
 	}
 }
 
+func TestAColumnIsWrittenInBlocks(t *testing.T) {
+	// Arrange: distances that quantize to known bytes, among them the unreachable one
+	dist := []float32{0, altUnitMeters, 2 * altUnitMeters, 3.9 * altUnitMeters, unreachable, 5, 0x1234 * altUnitMeters}
+	var want []byte
+	for _, d := range dist {
+		q := quantize(d)
+		want = append(want, byte(q), byte(q>>8))
+	}
+
+	// Act: three nodes a block, so the last block is a short one
+	path := filepath.Join(t.TempDir(), "column.u16")
+	err := writeColumn(path, dist, make([]byte, 2*3))
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("the column holds %v, want %v", got, want)
+	}
+}
+
+func TestADijkstraKeepsItsHeapBetweenCalls(t *testing.T) {
+	// Arrange: four calls, in both directions, on a graph whose frontier grows and empties more than once
+	p, g, _, err := openForLandmarks(islandGraph(t, t.TempDir()), "any", 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.file.unmap()
+	want, got := make([]float32, g.n), make([]float32, g.n)
+	var d dijkstra
+
+	for _, run := range []struct {
+		src      uint32
+		backward bool
+	}{{0, false}, {uint32(g.n - 1), true}, {5, false}, {2, true}} {
+		// Act
+		dijkstraAll(g, p, run.src, want, p.UpPerMeter, run.backward)
+		d.all(g, p, run.src, got, p.UpPerMeter, run.backward)
+
+		// Assert: the heap it kept changes nothing to the distances
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("node %d from %d (backward %v): %v, want %v", i, run.src, run.backward, got[i], want[i])
+			}
+		}
+	}
+	if cap(d.heap) == 0 {
+		t.Error("the heap was not kept for the next call")
+	}
+}
+
+func TestLandmarkWorkersFollowTheCPUs(t *testing.T) {
+	for procs, want := range map[int]int{1: 1, 2: 2, 8: 8, 16: 8, 64: 8} {
+		if got := landmarkWorkers(procs); got != want {
+			t.Errorf("%d CPUs: %d workers, want %d", procs, got, want)
+		}
+	}
+	if DefaultLandmarkWorkers() < 1 {
+		t.Error("the default must allow at least one worker")
+	}
+}
+
 func TestLandmarksOnDiskRefuseWhatInMemoryRefuses(t *testing.T) {
 	dir := t.TempDir()
 	graph := islandGraph(t, dir)

@@ -67,7 +67,7 @@ func run(command string, args []string) error {
 		profile := fs.String("profile", "any", "surface-preference profile: any, paved or unpaved")
 		count := fs.Int("landmarks", 8, "number of landmarks")
 		tmp := fs.String("tmp", "", "directory for the files of the build (default: the directory of -out, never a memory-backed /tmp)")
-		workers := fs.Int("workers", 2, "landmarks computed at a time, each worker holding one distance per node")
+		workers := fs.Int("workers", engine.DefaultLandmarkWorkers(), "landmarks computed at a time, each worker holding one distance per node (default: the CPUs, 8 at most)")
 		_ = fs.Parse(args)
 		if *out == "" {
 			*out = filepath.Join(dataDir(), engine.LandmarksFileName(*profile))
