@@ -45,7 +45,7 @@ func run(command string, args []string) error {
 		crs := fs.String("dem-crs", "lambert93", "projection of the BD ALTI tiles: lambert93 (metropolitan France), or utmZZn / utmZZs for an overseas territory, see docs/INSTALL.md")
 		tmp := fs.String("tmp", "", "directory for the temporary files of a build from one extract (default: the directory of -out, never a memory-backed /tmp)")
 		chunk := fs.Int("chunk", graphbuild.DefaultChunk, "records one sort holds in memory, for a build from one extract")
-		cache := fs.Int("cache", graphbuild.DefaultCache, "BD ALTI tiles kept in memory, for a build from one extract")
+		cache := fs.Int("cache", graphbuild.DefaultCache, "BD ALTI tiles kept in memory, for a build from one extract (the elevation step reads them ahead: a row of tiles is the least that pays, about three at the default)")
 		_ = fs.Parse(args)
 		proj, err := elevation.ParseProjection(*crs)
 		if err != nil {
