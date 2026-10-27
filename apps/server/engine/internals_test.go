@@ -21,6 +21,8 @@ func TestQuantizeRoundsDownAndSaturates(t *testing.T) {
 		{"under one unit", altUnitMeters - 0.1, 0},
 		{"one unit", altUnitMeters, 1},
 		{"unreachable", unreachable, altUnreachable},
+		{"the last number of 16 bits", altUnitMeters*altUnreachable - 1, altUnreachable - 1},
+		{"one unit too far for 16 bits", altUnitMeters * altUnreachable, altUnreachable},
 		{"too far for 16 bits", altUnitMeters * 70_000, altUnreachable},
 	}
 	for _, tc := range cases {

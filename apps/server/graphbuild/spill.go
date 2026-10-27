@@ -125,6 +125,61 @@ func writeRun[R any](path string, c codec[R], records []R) error {
 	return f.Close()
 }
 
+// blockBytes is how much a reader reads at a time: a record then costs one call per few KB instead of one per record,
+// and the codec still decodes it from where it lies in the block.
+const blockBytes = 32 << 10
+
+// block reads records from a reader a block at a time, and decodes them one by one from the block it holds.
+type block[R any] struct {
+	r   *bufio.Reader
+	c   codec[R]
+	buf []byte
+	at  int // the first byte of the next record
+}
+
+func newBlock[R any](r *bufio.Reader, c codec[R]) *block[R] {
+	return newBlockSize(r, c, blockBytes)
+}
+
+// newBlockSize is newBlock with blocks of up to size bytes, of whole records.
+func newBlockSize[R any](r *bufio.Reader, c codec[R], size int) *block[R] {
+	buf := make([]byte, max(size/c.size, 1)*c.size)
+	return &block[R]{r: r, c: c, buf: buf, at: len(buf)} // empty: the first record fills it
+}
+
+// next reads the record at the front of the block; ok is false at the end of the reader, which may fall between two
+// records but never within one: a record cut short is io.ErrUnexpectedEOF.
+func (b *block[R]) next() (rec R, ok bool, err error) {
+	if b.at == len(b.buf) {
+		if ok, err := b.fill(); !ok || err != nil {
+			return rec, false, err
+		}
+	}
+	rec = b.c.get(b.buf[b.at : b.at+b.c.size])
+	b.at += b.c.size
+	return rec, true, nil
+}
+
+// fill reads the next block, whole records only: the last one is short when the reader ends between two records.
+func (b *block[R]) fill() (ok bool, err error) {
+	n, err := io.ReadFull(b.r, b.buf)
+	switch err {
+	case nil:
+		b.at = 0
+		return true, nil
+	case io.EOF:
+		return false, nil
+	case io.ErrUnexpectedEOF:
+		if n%b.c.size != 0 {
+			return false, io.ErrUnexpectedEOF
+		}
+		b.buf, b.at = b.buf[:n], 0
+		return true, nil
+	default:
+		return false, err
+	}
+}
+
 // merge reads everything back in order, once the last record is in. It can be called again to read the records again.
 func (s *spill[R]) merge() (*merger[R], error) {
 	if err := s.flush(); err != nil {
@@ -140,8 +195,8 @@ func (s *spill[R]) merge() (*merger[R], error) {
 			return nil, err
 		}
 		m.files = append(m.files, f)
-		m.readers = append(m.readers, bufio.NewReaderSize(f, 1<<20))
-		rec, ok, err := m.read(i)
+		m.blocks = append(m.blocks, newBlock(bufio.NewReaderSize(f, 1<<20), s.c))
+		rec, ok, err := m.blocks[i].next()
 		if err != nil {
 			m.close()
 			return nil, err
@@ -179,11 +234,10 @@ type headItem[R any] struct {
 
 // merger reads sorted runs as one sorted stream, with a heap holding the next record of each run.
 type merger[R any] struct {
-	c       codec[R]
-	files   []*os.File
-	readers []*bufio.Reader
-	items   []headItem[R]
-	b       []byte
+	c      codec[R]
+	files  []*os.File
+	blocks []*block[R]
+	items  []headItem[R]
 }
 
 func (m *merger[R]) less(a, b headItem[R]) bool {
@@ -213,24 +267,9 @@ func (m *merger[R]) down(k int) {
 	}
 }
 
-// read reads the next record of run i; ok is false at its end.
-func (m *merger[R]) read(i int) (r R, ok bool, err error) {
-	if m.b == nil {
-		m.b = make([]byte, m.c.size)
-	}
-	switch _, err := io.ReadFull(m.readers[i], m.b); err {
-	case nil:
-		return m.c.get(m.b), true, nil
-	case io.EOF:
-		return r, false, nil
-	default:
-		return r, false, err
-	}
-}
-
 // refill puts the next record of the run of the top of the heap in its place, or takes the run out at its end.
 func (m *merger[R]) refill() error {
-	rec, ok, err := m.read(m.items[0].run)
+	rec, ok, err := m.blocks[m.items[0].run].next()
 	if err != nil {
 		return err
 	}
@@ -276,7 +315,7 @@ func (m *merger[R]) close() {
 	for _, f := range m.files {
 		f.Close()
 	}
-	m.files, m.readers = nil, nil
+	m.files, m.blocks = nil, nil
 }
 
 // table is a file written in one go, record after record, and read back in the same order.
@@ -329,21 +368,23 @@ func (t *table[R]) reader() (*tableReader[R], error) {
 	if err != nil {
 		return nil, err
 	}
-	return &tableReader[R]{f: f, r: bufio.NewReaderSize(f, 1<<20), c: t.c, b: make([]byte, t.c.size)}, nil
+	return &tableReader[R]{f: f, b: newBlock(bufio.NewReaderSize(f, 1<<20), t.c)}, nil
 }
 
 type tableReader[R any] struct {
 	f *os.File
-	r *bufio.Reader
-	c codec[R]
-	b []byte
+	b *block[R]
 }
 
 func (t *tableReader[R]) next() (r R, err error) {
-	if _, err := io.ReadFull(t.r, t.b); err != nil {
-		return r, fmt.Errorf("a record was lost on the way: %w", err)
+	rec, ok, err := t.b.next()
+	if err == nil && !ok {
+		err = io.EOF
 	}
-	return t.c.get(t.b), nil
+	if err != nil {
+		return rec, fmt.Errorf("a record was lost on the way: %w", err)
+	}
+	return rec, nil
 }
 
 func (t *tableReader[R]) close() { t.f.Close() }

@@ -3,7 +3,6 @@ package graphbuild
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 )
@@ -133,15 +132,15 @@ func (r *placedReader[R]) load() error {
 		return fmt.Errorf("%s: records %d to %d were lost on the way: %w", p.name, base, base+size-1, err)
 	}
 	defer f.Close()
-	in := bufio.NewReaderSize(f, 1<<20)
-	b := make([]byte, p.c.size)
+	in := newBlock(bufio.NewReaderSize(f, 1<<20), p.c)
 	for {
-		if _, err := io.ReadFull(in, b); err == io.EOF {
-			break
-		} else if err != nil {
+		rec, ok, err := in.next()
+		if err != nil {
 			return err
 		}
-		rec := p.c.get(b)
+		if !ok {
+			break
+		}
 		at := p.index(rec)
 		if at < base || at-base >= size {
 			return fmt.Errorf("%s: record %d found in partition %d, of records %d to %d", p.name, at, r.part, base, base+size-1)

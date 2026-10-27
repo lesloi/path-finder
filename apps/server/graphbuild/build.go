@@ -383,6 +383,8 @@ func haversineM(lat1, lon1, lat2, lon2 int32) float64 {
 	p1, p2 := float64(lat1)*1e-7*rad, float64(lat2)*1e-7*rad
 	dphi := p2 - p1
 	dl := (float64(lon2) - float64(lon1)) * 1e-7 * rad
-	a := math.Sin(dphi/2)*math.Sin(dphi/2) + math.Cos(p1)*math.Cos(p2)*math.Sin(dl/2)*math.Sin(dl/2)
+	// The compiler does not fold two identical calls of math.Sin into one, so each half-angle is computed once.
+	sd, sl := math.Sin(dphi/2), math.Sin(dl/2)
+	a := sd*sd + math.Cos(p1)*math.Cos(p2)*sl*sl
 	return 2 * earthRadiusM * math.Asin(math.Min(1, math.Sqrt(a)))
 }

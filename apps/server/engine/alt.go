@@ -82,16 +82,13 @@ func dijkstraAll(g *graph, p *Profile, src uint32, dist []float32, up float32, b
 	}
 }
 
-// quantize rounds a distance down to a 16-bit number of altUnitMeters.
+// quantize rounds a distance down to a 16-bit number of altUnitMeters. The unit is a power of two, so the integer
+// division gives the same number as the floor of the quotient in float64.
 func quantize(x float32) uint16 {
-	if x >= unreachable {
+	if x >= altUnitMeters*altUnreachable {
 		return altUnreachable
 	}
-	q := math.Floor(float64(x) / altUnitMeters)
-	if q >= altUnreachable {
-		return altUnreachable
-	}
-	return uint16(q)
+	return uint16(uint32(x) / altUnitMeters)
 }
 
 // pickMarks picks the landmarks: on an ellipse inscribed in the bounding box of the graph, each snapped to the nearest
