@@ -590,6 +590,9 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		}
 	}
 	all.close()
+	// The table is complete and every read of it is done: from here it would only hold 12 bytes per node, beside the
+	// edge partitions, until the scratch directory goes away.
+	os.Remove(seenTab.path)
 	byNode.finish(&tot)
 	deg = nil
 	for c := 1; c < len(cells); c++ {
