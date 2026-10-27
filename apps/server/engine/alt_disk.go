@@ -13,9 +13,14 @@ import (
 // rowsAtATime is how many nodes are turned from columns into rows at a time.
 const rowsAtATime = 1 << 16
 
+// columnBlockNodes is how many nodes a worker turns into bytes at a time: the block is written and reused, so a worker
+// holds one distance per node plus a few MB, not a whole column as well.
+const columnBlockNodes = 1 << 21
+
 // WriteLandmarksOnDisk is WriteLandmarks for a graph whose rows do not fit in memory: the distances of each landmark are
 // written to a file below tmp as soon as they are known, workers landmarks at a time (each worker holds one distance
-// per node), then the files are turned into rows in one pass. The file is the one WriteLandmarks writes.
+// per node and writes its column in blocks), then the files are turned into rows in one pass. The file is the one
+// WriteLandmarks writes.
 func WriteLandmarksOnDisk(graphPath, path, profile string, count int, tmp string, workers int) error {
 	return writeLandmarksOnDisk(graphPath, path, profile, count, tmp, workers, rowsAtATime)
 }
@@ -84,14 +89,11 @@ func writeColumns(g *graph, p *Profile, marks []uint32, count, columns, workers 
 		go func() {
 			defer wg.Done()
 			dist := make([]float32, g.n)
-			b := make([]byte, 2*g.n)
+			block := make([]byte, 2*min(columnBlockNodes, g.n))
+			var d dijkstra
 			for c, ok := take(); ok; c, ok = take() {
-				dijkstraAll(g, p, marks[c%count], dist, p.UpPerMeter, c >= count)
-				for i, d := range dist {
-					q := quantize(d)
-					b[2*i], b[2*i+1] = byte(q), byte(q>>8)
-				}
-				if err := os.WriteFile(column(c), b, 0o644); err != nil {
+				d.all(g, p, marks[c%count], dist, p.UpPerMeter, c >= count)
+				if err := writeColumn(column(c), dist, block); err != nil {
 					mu.Lock()
 					fail = err
 					mu.Unlock()
@@ -102,6 +104,36 @@ func writeColumns(g *graph, p *Profile, marks []uint32, count, columns, workers 
 	}
 	wg.Wait()
 	return fail
+}
+
+// writeColumn writes the quantized distances to path a block at a time, through block, which the caller reuses.
+func writeColumn(path string, dist []float32, block []byte) (err error) {
+	if len(block) < 2 {
+		return fmt.Errorf("engine: a column block of %d bytes holds no distance", len(block))
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	// The scratch directory goes away with the build: a half-written column need not be removed here.
+	defer func() {
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+	}()
+	perBlock := len(block) / 2
+	for start := 0; start < len(dist); start += perBlock {
+		end := min(start+perBlock, len(dist))
+		b := block[:2*(end-start)]
+		for i, v := range dist[start:end] {
+			q := quantize(v)
+			b[2*i], b[2*i+1] = byte(q), byte(q>>8)
+		}
+		if _, err := f.Write(b); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // transpose turns the columns into rows, rowsAt nodes at a time: a row holds one distance from each column. The

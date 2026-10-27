@@ -11,19 +11,35 @@ import (
 
 const unreachable = float32(1e30)
 
+// maxLandmarkWorkers is how many landmarks are computed at once at most: each worker holds one distance per node, so
+// beyond it the build is bound by memory rather than by CPUs.
+const maxLandmarkWorkers = 8
+
+// landmarkWorkers is how many landmarks to compute at once given the CPUs of the machine: one per CPU, eight at most.
+func landmarkWorkers(procs int) int { return min(procs, maxLandmarkWorkers) }
+
+// DefaultLandmarkWorkers is how many landmarks build-alt computes at once on this machine: one per CPU, eight at most.
+func DefaultLandmarkWorkers() int { return landmarkWorkers(runtime.GOMAXPROCS(0)) }
+
 type dijkItem struct {
 	d float32
 	n uint32
 }
 
-// dijkstraAll fills dist with the cost from src (or towards src when backward) under the
-// profile's multipliers and a climb penalty of up per metre.
-func dijkstraAll(g *graph, p *Profile, src uint32, dist []float32, up float32, backward bool) {
+// dijkstra is the scratch of one goroutine, kept from one search to the next: the heap grows to the widest frontier a
+// search reaches, and the next call reuses that array instead of pushing from a single item.
+type dijkstra struct {
+	heap []dijkItem
+}
+
+// all fills dist with the cost from src (or towards src when backward) under the profile's multipliers and a climb
+// penalty of up per metre.
+func (d *dijkstra) all(g *graph, p *Profile, src uint32, dist []float32, up float32, backward bool) {
 	for i := range dist {
 		dist[i] = unreachable
 	}
 	dist[src] = 0
-	heap := []dijkItem{{0, src}}
+	heap := append(d.heap[:0], dijkItem{0, src})
 	push := func(it dijkItem) {
 		heap = append(heap, it)
 		i := len(heap) - 1
@@ -80,6 +96,13 @@ func dijkstraAll(g *graph, p *Profile, src uint32, dist []float32, up float32, b
 			}
 		}
 	}
+	d.heap = heap
+}
+
+// dijkstraAll is all for a caller that runs one search: it makes no scratch to keep.
+func dijkstraAll(g *graph, p *Profile, src uint32, dist []float32, up float32, backward bool) {
+	var d dijkstra
+	d.all(g, p, src, dist, up, backward)
 }
 
 // quantize rounds a non-negative distance down to a 16-bit number of altUnitMeters. The unit is a power of two, so the
@@ -138,7 +161,7 @@ func buildLandmarks(g *graph, sp *spatial, p *Profile, count int, up float32) []
 	}
 	rows := make([]uint16, g.n*rowLen)
 	var wg sync.WaitGroup
-	sem := make(chan struct{}, min(runtime.GOMAXPROCS(0), 8))
+	sem := make(chan struct{}, DefaultLandmarkWorkers())
 	for li, m := range marks {
 		wg.Add(1)
 		go func() {
@@ -146,12 +169,13 @@ func buildLandmarks(g *graph, sp *spatial, p *Profile, count int, up float32) []
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			dist := make([]float32, g.n)
-			dijkstraAll(g, p, m, dist, up, false)
+			var d dijkstra
+			d.all(g, p, m, dist, up, false)
 			for n := 0; n < g.n; n++ {
 				rows[n*rowLen+li] = quantize(dist[n])
 			}
 			if up > 0 {
-				dijkstraAll(g, p, m, dist, up, true)
+				d.all(g, p, m, dist, up, true)
 				for n := 0; n < g.n; n++ {
 					rows[n*rowLen+count+li] = quantize(dist[n])
 				}

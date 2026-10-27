@@ -80,7 +80,8 @@ not grow with the extract (it needs a sorted one, as Geofabrik's are). Its tempo
 never a memory-backed `/tmp`, they are as big as the extract; `build-graph` and `build-alt` remove the `pf-external-*` and
 `pf-landmarks-*` directories there that a killed build left more than a day ago. Count about 9 GB of temporary disk beside the 4.2 GB graph, and
 about 9 GB of landmark files. `-chunk` and `-cache` size the sorts and the BD ALTI tiles kept in memory. `build-alt` also works
-on disk, `-workers` landmarks at a time (2 by default, each worker holds one distance per node), with `-tmp` for its files.
+on disk, `-workers` landmarks at a time (the CPUs, 8 at most, by default; each worker holds one distance per node, about
+4 bytes, and writes its column in blocks of a few MB), with `-tmp` for its files.
 
 Several `-pbf` are joined in memory, which suits a territory made of two extracts, not a country.
 
