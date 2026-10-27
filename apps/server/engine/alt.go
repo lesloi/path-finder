@@ -82,8 +82,8 @@ func dijkstraAll(g *graph, p *Profile, src uint32, dist []float32, up float32, b
 	}
 }
 
-// quantize rounds a distance down to a 16-bit number of altUnitMeters. The unit is a power of two, so the integer
-// division gives the same number as the floor of the quotient in float64.
+// quantize rounds a non-negative distance down to a 16-bit number of altUnitMeters. The unit is a power of two, so the
+// float64 quotient was exact, and a distance is never negative, so the integer division truncates where the floor did.
 func quantize(x float32) uint16 {
 	if x >= altUnitMeters*altUnreachable {
 		return altUnreachable
