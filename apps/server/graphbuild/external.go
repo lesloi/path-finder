@@ -424,16 +424,26 @@ func forEachStep(refs *placed[ref], ways []wayInfo, f func(a, b ref, attrs uint3
 	return nil
 }
 
+// maxReaders is how many goroutines parse the BD ALTI tiles ahead of the sampler of a build on disk: the CPUs, as many
+// at most as the build in memory reads them with.
+const maxReaders = 8
+
+// readAhead is how many readers a build on disk puts on the tiles: the parse of a tile is most of the elevation step,
+// and the sampling of one is far shorter than its read.
+func readAhead() int { return min(runtime.GOMAXPROCS(0), maxReaders) }
+
 // BuildOnDisk writes the graph of one extract (sorted by node id) and the tiles below demDir to outPath, as Build does,
 // with the memory of a few sorts, a few tiles and a few numbers per node, and the rest on disk below opts.Tmp.
 func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, opts Options, log io.Writer) (Report, error) {
 	var rep Report
 	opts = opts.withDefaults(outPath)
 	p := progress{log, time.Now()}
-	dem, err := elevation.OpenLazy(demDir, proj, opts.Cache)
+	dem, err := elevation.OpenLazy(demDir, proj, opts.Cache, readAhead())
 	if err != nil {
 		return rep, err
 	}
+	// A build that fails before its elevation step leaves the readers waiting for a point that never comes.
+	defer dem.Close()
 	dir, cleanup, err := scratch(opts.Tmp)
 	if err != nil {
 		return rep, err
@@ -474,7 +484,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 				return err
 			}
 			x, y := dem.Project(lat, lon)
-			if err := byTile.push(tileNode{dem.TileKeyAt(x, y), current, x, y}); err != nil {
+			if err := byTile.push(tileNode{dem.KeepAt(x, y), current, x, y}); err != nil {
 				return err
 			}
 		}
@@ -492,8 +502,11 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	p.step("%d candidate nodes joined with the extract", nodes)
 
 	// The elevation of every node, tile by tile; only whether it is known stays in memory, the number goes back on disk.
+	// The tiles are parsed ahead of the points, on the readers of LazyDEM: the parse is most of the step, and the cells
+	// of a point never reach a tile behind its own, so a window is all the memory it needs.
 	known := make([]uint64, (nodes+63)/64)
 	byNode := newPlaced(dir, "elev", nodeElevCodec, nodeElevNode, nodes, chunk)
+	dem.Plan() // the readers parse the tiles of the points and their neighbours, not the ones in between
 	tiles, err := byTile.merge()
 	if err != nil {
 		return rep, err
@@ -512,6 +525,7 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		return rep, err
 	}
 	byTile.finish(&tot)
+	dem.Close() // the readers stop before the tiles are counted and dropped
 	rep.TileLoads = dem.Loads()
 	dem = nil
 	runtime.GC() // the tiles are the biggest thing in memory, and they are out of reach now

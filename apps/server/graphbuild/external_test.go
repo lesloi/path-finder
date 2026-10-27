@@ -148,6 +148,9 @@ func TestBuildOnDiskWritesTheGraphBuildWrites(t *testing.T) {
 		if report.Nodes < 50 || report.Edges < 50 {
 			t.Errorf("%+v: a graph too small to prove anything: %+v", o, report)
 		}
+		if report.TileLoads != 3 {
+			t.Errorf("%+v: %d tile reads for the 3 tiles of the extract", o, report.TileLoads)
+		}
 		if o.Chunk == 9 && report.Runs < 10 {
 			t.Errorf("a chunk of 9 spilled %d runs", report.Runs)
 		}

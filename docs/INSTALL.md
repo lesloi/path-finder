@@ -79,7 +79,9 @@ Geofabrik `france-latest.osm.pbf` and `-dem` the BD ALTI of every department. Th
 not grow with the extract (it needs a sorted one, as Geofabrik's are). Its temporary files go beside the graph, or to `-tmp`:
 never a memory-backed `/tmp`, they are as big as the extract; `build-graph` and `build-alt` remove the `pf-external-*` and
 `pf-landmarks-*` directories there that a killed build left more than a day ago. Count about 9 GB of temporary disk beside the 4.2 GB graph, and
-about 9 GB of landmark files. `-chunk` and `-cache` size the sorts and the BD ALTI tiles kept in memory. `build-alt` also works
+about 9 GB of landmark files. `-chunk` and `-cache` size the sorts and the BD ALTI tiles kept in memory: the elevation
+step reads those tiles ahead of the sampler on the CPUs, eight at most, so `-cache` must hold a row of them plus a few
+(about 46 for France) or the build reads them one at a time again, and the default holds about three rows. `build-alt` also works
 on disk, `-workers` landmarks at a time (the CPUs, 8 at most, by default; each worker holds one distance per node, about
 4 bytes, and writes its column in blocks of a few MB), with `-tmp` for its files.
 

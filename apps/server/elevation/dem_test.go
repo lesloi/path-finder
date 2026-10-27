@@ -239,7 +239,7 @@ func TestOpenLazyNamesATileWhoseHeaderIsNotGzip(t *testing.T) {
 	}
 
 	// Act
-	_, err := OpenLazy(dir, Lambert93Grid, 1)
+	_, err := OpenLazy(dir, Lambert93Grid, 1, 0)
 
 	// Assert
 	if err == nil || !strings.Contains(err.Error(), "header.asc.gz") {
@@ -332,7 +332,7 @@ func TestTilesOfAnotherGridAreRefused(t *testing.T) {
 			writeSizedTile(t, dir, "b.asc", tc.n, 800100, tc.cellsize)
 
 			_, errLoad := Load(dir, Lambert93Grid)
-			_, errLazy := OpenLazy(dir, Lambert93Grid, 2)
+			_, errLazy := OpenLazy(dir, Lambert93Grid, 2, 0)
 
 			for name, err := range map[string]error{"Load": errLoad, "OpenLazy": errLazy} {
 				if err == nil || !strings.Contains(err.Error(), "b.asc") {
