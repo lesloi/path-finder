@@ -24,7 +24,7 @@ import (
 const loopLegMaxSettled = 300_000
 
 // minDetourShare is the least a loop through waypoints adds to the direct loop, as a share of the target
-// distance, so that loops differ even when the waypoints alone nearly make the target.
+// distance or effort, so that loops differ even when the waypoints alone nearly make the target.
 const minDetourShare = 0.15
 
 // metersPerDegree converts degrees of latitude to metres.
@@ -777,7 +777,7 @@ type loopParams struct {
 	distM, ascentM float64
 	ascentBand     AscentBand
 	// effort, when set, is the target duration as an effort distance: loops are sized and scored on their effort
-	// distance instead of their length. distM then only sizes the first circle.
+	// distance instead of their length. distM then only sizes the first circle of a loop without waypoints.
 	effort     *EffortTarget
 	candidates int
 	seed       uint64

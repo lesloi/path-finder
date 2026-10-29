@@ -90,9 +90,9 @@ type EffortTarget struct {
 	Slope  SlopeEffort
 }
 
-// LoopRequest asks for loops from Start. Distance is the target length in metres, or the length the first circle is
-// sized from when Effort is set, and Ascent the target elevation gain in metres (0 for none). The same Seed always
-// yields the same loops.
+// LoopRequest asks for loops from Start. Distance is the target length in metres, or the length the first circle of a
+// loop without waypoints is sized from when Effort is set, and Ascent the target elevation gain in metres (0 for
+// none). The same Seed always yields the same loops.
 type LoopRequest struct {
 	Start    Point
 	Distance float64

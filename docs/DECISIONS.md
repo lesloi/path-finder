@@ -122,13 +122,17 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   each stretch's length weighted by a slope curve (Tobler's hiking function, chosen over Minetti's energy cost because it slows steep
   descents, which Minetti does not when the goal is time) shared by the server and the web app (the elevation cursor needs it
   per stretch), and independent of the pace. A target duration still becomes a distance at the flat `climbPerEffortKm`
-  rate (400 m for 1 km) to size the first circle, but the engine then sizes and ranks loops on their effort distance
-  with the same curve, so the loop it aims at is the one the ranking estimates at the target duration. On the
-  benchmark graph (4 starts, 2 seeds, one core), a 120 min target at 6 min/km filled 3.75 matches of 5, and a full
-  set for 75 % of the requests, with the flat distance alone; aiming at the effort filled 5.00 and 100 %, the p90
-  fell from 1.05 s to 0.39 s, and the loops were shorter (17.4 km on average against 19.7). The cost of the search
-  (climb penalty, landmarks) is a separate model and does not change. Revisit if a target duration still misses
-  often on the hard starts (#324).
+  rate (400 m for 1 km), which sizes the first circle of a loop without waypoints; with waypoints, the detour is
+  sized from the effort the direct chain lacks. The engine then sizes and ranks loops on their effort distance with
+  the same curve, so the loop it aims at is the one the ranking estimates at the target duration. On the benchmark
+  graph (4 starts, 2 seeds, one core), a 120 min target at 6 min/km filled 3.75 matches of 5, and a full set for
+  75 % of the requests, with the flat distance alone; aiming at the effort filled 5.00 and 100 %, the p90 fell from
+  1.05 s to 0.39 s (the median rose from 0.25 to 0.28 s, within the noise of 8 requests), and the loops were
+  shorter (17.4 km on average against 19.7). A duration target is an effort, not a length: a loop of the right
+  duration can be longer than the distance the `maxDistanceKm` cap derives, which bounds the distance a request
+  asks for, as a distance target already accepts the match tolerance. The cost of the search (climb penalty,
+  landmarks) is a separate model and does not change. Revisit if a target duration still misses often on the hard
+  starts (#324).
 
 ## Elevation
 
