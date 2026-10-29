@@ -362,6 +362,28 @@ func TestGenerateOffersTheDirectLoopAsACandidate(t *testing.T) {
 	}
 }
 
+func TestGenerateHandsTheDirectLoopToTheEngine(t *testing.T) {
+	looper := &fakeLooper{direct: engineLoop(0), loops: []*engine.Route{engineLoop(120)}}
+
+	if _, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints)); err != nil {
+		t.Fatal(err)
+	}
+
+	if looper.got.Direct != looper.direct {
+		t.Errorf("the engine got %p as the direct loop, want %p", looper.got.Direct, looper.direct)
+	}
+}
+
+func TestGenerateKeepsTheDirectLoopWhenTheLoopSearchFindsNoRoute(t *testing.T) {
+	looper := &fakeLooper{direct: engineLoop(0), err: engine.ErrNoRoute}
+
+	routes, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints))
+
+	if err != nil || len(routes) != 1 || routes[0].Kind != "match" {
+		t.Errorf("routes = %+v, err = %v, want the direct loop alone", routes, err)
+	}
+}
+
 func TestGenerateAsksNothingOfTheEngineWithoutWaypoints(t *testing.T) {
 	looper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
 

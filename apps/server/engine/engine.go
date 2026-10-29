@@ -900,6 +900,17 @@ func collapse(points []uint32) []uint32 {
 	return out
 }
 
+// loopPoints is the chain a loop is routed through: the start, the control points and the start again, with a point
+// that repeats the one before it dropped. With anchors, the control points only add detours between the fixed points.
+// A chain of fewer than three points does not make a loop.
+func loopPoints(start uint32, circle, anchors []uint32, xy func(uint32) (x, y float64)) []uint32 {
+	circle = collapse(circle)
+	if anchors != nil {
+		return collapse(withControlPoints(anchors, circle, xy))
+	}
+	return collapse(append(append([]uint32{start}, circle...), start))
+}
+
 // liftReach is how far, as a share of the circle's radius, a control point may move to a higher or lower
 // node when the loop is as far from its elevation gain as can be.
 const liftReach = 0.4
@@ -1029,10 +1040,10 @@ func candidateLoop(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp
 			return best, CauseNoSnap
 		}
 		theta = turned
-		points := append(append([]uint32{start}, circle...), start)
-		if lp.anchors != nil {
-			// The user's waypoints fix the order; the circle's points only add detours between them.
-			points = collapse(withControlPoints(lp.anchors, points[1:len(points)-1], xy))
+		points := loopPoints(start, circle, lp.anchors, xy)
+		if len(points) < 3 {
+			// Every control point fell on the one before it: the chain is no loop.
+			return best, CauseSameNode
 		}
 		nodes, edges, cause := chainLegs(ctx, cx, s, climb, searchLimits{loopLegMaxSettled, lp.forbidden}, lp.stats != nil, points)
 		if cause != CauseNone {
