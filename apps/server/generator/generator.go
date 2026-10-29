@@ -79,10 +79,11 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		for _, w := range criteria.Waypoints {
 			req.Waypoints = append(req.Waypoints, engine.Point{Lat: w[1], Lon: w[0]})
 		}
-		direct, err := throughWaypoints(ctx, looper, criteria, req.Waypoints, req.Avoided)
+		direct, directRoute, err := throughWaypoints(ctx, looper, criteria, req.Waypoints, req.Avoided)
 		if err != nil {
 			return nil, err
 		}
+		req.Direct = directRoute
 		if direct != nil {
 			set.add(direct)
 			if set.holdsADirectSuggestion() {
@@ -120,9 +121,10 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 
 	loops, err := looper.Loops(ctx, req)
 	switch {
-	case errors.Is(err, engine.ErrOffGraph), errors.Is(err, engine.ErrNoLoop):
+	case errors.Is(err, engine.ErrOffGraph), errors.Is(err, engine.ErrNoLoop), errors.Is(err, engine.ErrNoRoute):
 		// Nothing more to offer from here: the direct loop through the waypoints, if any, or an empty
-		// route set, not a failure.
+		// route set, not a failure. ErrNoRoute means the loops through the waypoints found no route, which
+		// leaves the direct loop as the answer.
 	case err != nil && ctx.Err() == nil:
 		return nil, err
 	}
@@ -145,35 +147,36 @@ func avoidedCircles(areas []contract.AvoidedArea) []engine.Circle {
 
 // throughWaypoints routes the direct loop through the waypoints and refuses criteria whose waypoints
 // make a loop longer than any route may be, or that the engine cannot match to a way. It returns the direct loop as
-// a candidate, or nil when it goes nowhere. A loop beyond the target is no refusal: a summit with a single access
-// is farther than the target allows, and the loop is offered with the distance it has.
-func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, points []engine.Point, avoided []engine.Circle) (*candidate, error) {
+// a candidate and as the route the loop search reuses, or nil when it goes nowhere. A loop beyond the target is no
+// refusal: a summit with a single access is farther than the target allows, and the loop is offered with the
+// distance it has.
+func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, points []engine.Point, avoided []engine.Circle) (*candidate, *engine.Route, error) {
 	tooLong := &contract.CriteriaError{Field: "waypoints", Message: "waypoints make too long a route"}
 	// A loop is never shorter than the straight lines through its points: no need to search.
 	if crowFlies(c.Start, c.Waypoints)/1000 > contract.MaxDistanceKm() {
-		return nil, tooLong
+		return nil, nil, tooLong
 	}
-	route, err := looper.DirectLoop(ctx, engine.DirectLoopRequest{Start: engine.Point{Lat: c.Start[1], Lon: c.Start[0]}, Waypoints: points, Avoided: avoided})
+	direct, err := looper.DirectLoop(ctx, engine.DirectLoopRequest{Start: engine.Point{Lat: c.Start[1], Lon: c.Start[0]}, Waypoints: points, Avoided: avoided})
 	var waypoint *engine.WaypointError
 	switch {
 	case errors.As(err, &waypoint):
-		return nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoint is too far from a way", Waypoint: waypoint.Index}
+		return nil, nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoint is too far from a way", Waypoint: waypoint.Index}
 	case errors.Is(err, engine.ErrOffGraph):
-		return nil, &contract.CriteriaError{Field: "start", Message: "start point is too far from a way"}
+		return nil, nil, &contract.CriteriaError{Field: "start", Message: "start point is too far from a way"}
 	case errors.Is(err, engine.ErrNoRoute):
-		return nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoints are not joined by a way"}
+		return nil, nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoints are not joined by a way"}
 	case err != nil:
-		return nil, err
+		return nil, nil, err
 	}
-	cand := toCandidate(route)
+	cand := toCandidate(direct)
 	if cand == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if cand.distance > contract.MaxDistanceKm() {
-		return nil, tooLong
+		return nil, nil, tooLong
 	}
 	cand.direct = true
-	return cand, nil
+	return cand, direct, nil
 }
 
 // overshoots tells whether the direct loop is longer than the target allows even a wide suggestion: no loop

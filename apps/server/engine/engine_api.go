@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 )
 
 // maxSnapMeters is how far a requested point may be from the nearest graph node.
@@ -60,6 +61,11 @@ type Route struct {
 	TrailShare float64   // share of the distance on trails, 0 to 1
 	Stretches  []Stretch // the surface and technical ways along the route, consecutive stretches of one kind merged
 	Technical  bool      // the route holds a technical stretch
+	// anchors are the nodes a direct loop went through, waypoints included, the start first and last, and
+	// fingerprint is the graph they belong to. Loops reuses the chain of a direct loop this engine built, instead
+	// of routing the same waypoints a second time; both stay unset for a loop.
+	anchors     []uint32
+	fingerprint uint64
 }
 
 // AscentBand is a share of the target elevation gain, and a floor in metres for a small target, within which
@@ -80,6 +86,10 @@ type LoopRequest struct {
 	// Waypoints every loop goes through, in this order, between leaving Start and coming back to it. A
 	// route may retrace its steps to reach one. At most as many as the caller allows.
 	Waypoints []Point
+	// Direct, when set, is the loop through Waypoints the caller already found with DirectLoop. The engine reuses
+	// its chain when the waypoints snap to the same nodes on the same graph, so that a loop request does not route
+	// them twice; otherwise it routes them again.
+	Direct *Route
 	// Avoided are areas no loop may touch: a way that comes within the radius of a centre is left out of the
 	// searches, so that a loop never goes through one.
 	Avoided []Circle
@@ -205,7 +215,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if err != nil {
 		return nil, err
 	}
-	anchors, baseM, err := e.anchorLoop(ctx, start, req.Waypoints, forbidden)
+	anchors, baseM, err := e.anchorLoop(ctx, start, req.Waypoints, forbidden, req.Direct)
 	if err != nil {
 		return nil, err
 	}
@@ -291,40 +301,62 @@ func (e *Engine) nearestLarge(p Point, reachM float64, f *forbidden) (uint32, bo
 	return n, ok && d <= reachM
 }
 
-// routeAnchors routes the cheapest loop from the start node through the waypoints in order and back.
-// The anchors are the nodes it goes through, the start node first and last, without a node twice in a row:
-// fewer than two means every waypoint is the start node, and the loop goes nowhere.
-// With leaveSmall the waypoints move off the small components (see snapWaypoints): loops want it, a direct loop
-// goes where it is told.
-func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Point, leaveSmall bool, f *forbidden) (anchors, nodes, edges []uint32, err error) {
+// snapAnchors finds the node of the start and of each waypoint, the start first and last, without a node twice in a
+// row: fewer than two means every waypoint is the start node, and the loop goes nowhere. With leaveSmall the
+// waypoints move off the small components (see snapWaypoints).
+func (e *Engine) snapAnchors(start uint32, waypoints []Point, leaveSmall bool, f *forbidden) ([]uint32, error) {
 	snapped, err := e.snapWaypoints(waypoints, leaveSmall, f)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
-	anchors = collapse(append(append([]uint32{start}, snapped...), start))
-	if len(anchors) < 2 {
-		return anchors, []uint32{start}, nil, nil
-	}
+	return collapse(append(append([]uint32{start}, snapped...), start)), nil
+}
+
+// routeChain routes each leg between consecutive anchors, a leg avoiding the ways the earlier ones used.
+func (e *Engine) routeChain(ctx context.Context, anchors []uint32, f *forbidden) (nodes, edges []uint32, err error) {
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
 	nodes, edges, cause := chainLegs(ctx, e, s, e.prof.UpPerMeter, searchLimits{loopLegMaxSettled, f}, false, anchors)
 	if err := ctx.Err(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	if cause != CauseNone {
-		return nil, nil, nil, ErrNoRoute
+		return nil, nil, ErrNoRoute
 	}
-	return anchors, nodes, edges, nil
+	return nodes, edges, nil
+}
+
+// routeAnchors routes the cheapest loop from the start node through the waypoints in order and back.
+// With leaveSmall the waypoints move off the small components (see snapWaypoints): loops want it, a direct loop
+// goes where it is told.
+func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Point, leaveSmall bool, f *forbidden) (anchors, nodes, edges []uint32, err error) {
+	anchors, err = e.snapAnchors(start, waypoints, leaveSmall, f)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if len(anchors) < 2 {
+		return anchors, []uint32{start}, nil, nil
+	}
+	nodes, edges, err = e.routeChain(ctx, anchors, f)
+	return anchors, nodes, edges, err
 }
 
 // anchorLoop gives the anchors of the loops through the waypoints and the length of the cheapest one,
-// or nil anchors when there are no waypoints, or all of them are the start node.
-func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point, f *forbidden) (anchors []uint32, length float64, err error) {
+// or nil anchors when there are no waypoints, or all of them are the start node. When direct is the direct loop of
+// the same anchors, its length is the cheapest one, and the waypoints are not routed again.
+func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point, f *forbidden, direct *Route) (anchors []uint32, length float64, err error) {
 	if len(waypoints) == 0 {
 		return nil, 0, nil
 	}
-	anchors, nodes, edges, err := e.routeAnchors(ctx, start, waypoints, true, f)
+	anchors, err = e.snapAnchors(start, waypoints, true, f)
 	if err != nil || len(anchors) < 2 {
+		return nil, 0, err
+	}
+	if direct != nil && direct.Distance > 0 && direct.fingerprint == e.g.fingerprint && slices.Equal(direct.anchors, anchors) {
+		return anchors, direct.Distance, nil
+	}
+	nodes, edges, err := e.routeChain(ctx, anchors, f)
+	if err != nil {
 		return nil, 0, err
 	}
 	length, _, _ = measure(e.g, nodes, edges)
@@ -348,11 +380,13 @@ func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route,
 	if err != nil {
 		return nil, err
 	}
-	_, nodes, edges, err := e.routeAnchors(ctx, src, req.Waypoints, false, forbidden)
+	anchors, nodes, edges, err := e.routeAnchors(ctx, src, req.Waypoints, false, forbidden)
 	if err != nil {
 		return nil, err
 	}
-	return e.describe(nodes, edges), nil
+	r := e.describe(nodes, edges)
+	r.anchors, r.fingerprint = anchors, e.g.fingerprint
+	return r, nil
 }
 
 // describe measures a path of nodes joined by edges.
