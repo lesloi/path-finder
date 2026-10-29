@@ -93,6 +93,9 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   on a long loop in a valley most of the circle falls where no way is mapped within 400 m. A circle with a
   point beyond that reach is turned by the golden angle, up to eight times, and no point is placed on a
   component of fewer than 1,000 nodes, which no leg reaches from the rest of the graph.
+  For an explicit target gain, the circle is first aimed at the highest ground within reach (the mean elevation of
+  one of 16 sectors around the start), and stays random when no sector is 10 m above the start. Half the circles keep
+  a random direction, so a sector that kills its loops cannot empty a set.
   With waypoints, the circle's points are only detours: each goes into the leg between two
   fixed points that it is nearest to, and only the detour is resized. The loop straight through
   the waypoints is a candidate too, and it is offered even when it is beyond the target, as a suggestion: a summit

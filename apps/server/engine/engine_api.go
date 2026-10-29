@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -256,11 +257,18 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 			return req.Enough(loops)
 		}
 	}
-	found, failure := generate(ctx, e, e.sp, &loopParams{
+	lp := &loopParams{
 		distM: req.Distance, ascentM: req.Ascent, ascentBand: req.AscentBand, effort: req.Effort,
 		candidates: req.Candidates, seed: req.Seed,
 		anchors: anchors, baseM: baseM, baseEffort: baseEffort, stats: req.Stats, forbidden: forbidden,
-	}, start, enough)
+	}
+	// A loop with an elevation gain to make heads for the highest ground around the start, rather than a random way.
+	if req.Ascent > 0 {
+		if heading, ok := e.terrainHeading(start, math.Min(2*loopRadius(lp.extra()), headingReachMax), forbidden); ok {
+			lp.heading, lp.hasHeading = heading, true
+		}
+	}
+	found, failure := generate(ctx, e, e.sp, lp, start, enough)
 	if failure != nil {
 		return nil, failure
 	}
