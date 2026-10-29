@@ -117,15 +117,18 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   3.9 s at 40 km, +2000 m) for 0.2 more matches, while 100 with the stop costs no more than 80 without it
   and finds a few more. Raising the budget buys matches at +1000 m only, at the price of the other requests'
   `429`.
-- **The duration comes from the slope of each stretch; the target duration still turns into a distance at a flat
-  rate.** The estimated duration of a route is its effort distance times the pace, where the effort distance sums
+- **The duration comes from the slope of each stretch, and a target duration makes the search aim at that effort.**
+  The estimated duration of a route is its effort distance times the pace, where the effort distance sums
   each stretch's length weighted by a slope curve (Tobler's hiking function, chosen over Minetti's energy cost because it slows steep
   descents, which Minetti does not when the goal is time) shared by the server and the web app (the elevation cursor needs it
-  per stretch), and independent of the pace. Turning a target duration into a distance happens before a route exists,
-  so it has no slope to read and keeps a flat rate as a prior (`climbPerEffortKm`, 400 m for 1 km, a guess for a
-  typical loop that wants a benchmark on real graphs); the tolerances in the checks absorb the gap. The cost
-  of the search (climb penalty, landmarks) is a separate model and does not change. Revisit if routes found by
-  duration miss their target often (#324).
+  per stretch), and independent of the pace. A target duration still becomes a distance at the flat `climbPerEffortKm`
+  rate (400 m for 1 km) to size the first circle, but the engine then sizes and ranks loops on their effort distance
+  with the same curve, so the loop it aims at is the one the ranking estimates at the target duration. On the
+  benchmark graph (4 starts, 2 seeds, one core), a 120 min target at 6 min/km filled 3.75 matches of 5, and a full
+  set for 75 % of the requests, with the flat distance alone; aiming at the effort filled 5.00 and 100 %, the p90
+  fell from 1.05 s to 0.39 s, and the loops were shorter (17.4 km on average against 19.7). The cost of the search
+  (climb penalty, landmarks) is a separate model and does not change. Revisit if a target duration still misses
+  often on the hard starts (#324).
 
 ## Elevation
 

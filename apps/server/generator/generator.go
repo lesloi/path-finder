@@ -72,6 +72,17 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		req.Ascent = criteria.ElevationGain.Metres
 		req.AscentBand = engine.AscentBand{Share: matchTolerance.elevationGain, FloorM: matchTolerance.elevationGainFloor}
 	}
+	// A target duration is an effort distance: the search aims at it with the same curve the ranking estimates the
+	// duration with, so that a hilly loop is shorter than the flat prior rather than too slow.
+	if criteria.Target.Duration > 0 {
+		s := contract.SlopeEffortOf()
+		req.Effort = &engine.EffortTarget{
+			Metres: criteria.Target.Duration / criteria.Pace * 1000,
+			Slope: engine.SlopeEffort{
+				Decay: s.Decay, EasiestGrade: s.EasiestGrade, MaxGrade: s.MaxGrade, StretchMetres: s.StretchMetres,
+			},
+		}
+	}
 	// The loop straight through the waypoints is a candidate of its own.
 	set := newRanking(criteria, km)
 	enough := limit

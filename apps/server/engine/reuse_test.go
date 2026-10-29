@@ -21,7 +21,7 @@ func TestAnchorLoopReusesTheDirectLoopChain(t *testing.T) {
 	cancel() // A search that ran would stop on the cancelled context.
 
 	// Act
-	got, length, err := e.anchorLoop(ctx, start, []Point{pointOf(g, at(14, 10))}, nil, direct)
+	got, length, _, err := e.anchorLoop(ctx, start, []Point{pointOf(g, at(14, 10))}, nil, direct, nil)
 
 	// Assert
 	if err != nil || length != direct.Distance || !slices.Equal(got, anchors) {
@@ -48,7 +48,7 @@ func TestAnchorLoopRoutesAgainWhenTheDirectChainIsNotReusable(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			_, _, err := e.anchorLoop(ctx, start, []Point{waypoint}, nil, direct)
+			_, _, _, err := e.anchorLoop(ctx, start, []Point{waypoint}, nil, direct, nil)
 			if !errors.Is(err, context.Canceled) {
 				t.Errorf("err = %v, want the routing to start and stop on the cancelled context", err)
 			}

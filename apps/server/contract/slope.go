@@ -2,6 +2,9 @@ package contract
 
 import "math"
 
+// SlopeEffortOf returns the curve of contract.json, for a search that aims at a target effort distance.
+func SlopeEffortOf() SlopeEffort { return bounds.SlopeEffort }
+
 // EffortFactor is how much harder than flat ground a route is, by the slope of its stretches: its effort distance
 // over its distance. The heights are read over stretches of at least StretchMetres, since the grade between two
 // neighbouring points is mostly noise, and each stretch costs Tobler's hiking function relative to flat ground.

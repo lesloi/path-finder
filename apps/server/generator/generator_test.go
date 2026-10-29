@@ -110,6 +110,24 @@ func TestGenerateSpellsOutTheContract(t *testing.T) {
 	}
 }
 
+func TestGenerateGivesTheEngineTheEffortOfADurationTarget(t *testing.T) {
+	looper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
+	duration := `{"start":[6.1294,45.8992],"target":{"duration":90},"surface":"any","pace":6}`
+
+	if _, err := generate(t, looper, context.Background(), duration); err != nil {
+		t.Fatal(err)
+	}
+
+	if looper.got.Effort == nil || looper.got.Effort.Metres != 15_000 {
+		t.Fatalf("effort = %+v, want 15000 m", looper.got.Effort)
+	}
+	s := contract.SlopeEffortOf()
+	want := engine.SlopeEffort{Decay: s.Decay, EasiestGrade: s.EasiestGrade, MaxGrade: s.MaxGrade, StretchMetres: s.StretchMetres}
+	if looper.got.Effort.Slope != want {
+		t.Errorf("slope = %+v, want %+v", looper.got.Effort.Slope, want)
+	}
+}
+
 func TestGenerateSetsNoAscentForAShortcut(t *testing.T) {
 	looper := &fakeLooper{}
 	hilly := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":"hilly","surface":"any","pace":6}`
