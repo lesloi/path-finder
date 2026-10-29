@@ -2,7 +2,9 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"math"
+	"os"
 	"testing"
 
 	"github.com/lesloi/path-finder/apps/server/contract"
@@ -74,6 +76,38 @@ func TestEffortFactorOfPointsMatchesTheContract(t *testing.T) {
 
 	if math.Abs(got-want) > 1e-9 {
 		t.Errorf("effort factor = %.12f, want %.12f", got, want)
+	}
+}
+
+// TestEffortFactorFollowsTheSharedCases runs the cases the server and the web app share through the engine's mirror,
+// so a clamp or a descent that the contract handles cannot drift here unseen.
+func TestEffortFactorFollowsTheSharedCases(t *testing.T) {
+	data, err := os.ReadFile("../contract/testdata/slope-effort-cases.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct {
+		Name     string      `json:"name"`
+		Geometry [][]float64 `json:"geometry"`
+		Factor   float64     `json:"factor"`
+	}
+	if err := json.Unmarshal(data, &cases); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range cases {
+		if len(tc.Geometry) == 0 || len(tc.Geometry[0]) < 3 {
+			continue // the engine always reads heights from its nodes
+		}
+		t.Run(tc.Name, func(t *testing.T) {
+			points := make([]Position, len(tc.Geometry))
+			for i, p := range tc.Geometry {
+				points[i] = Position{Point: Point{Lat: p[1], Lon: p[0]}, Elevation: p[2]}
+			}
+
+			if got := effortFactorOfPoints(points, testSlope()); math.Abs(got-tc.Factor) > 1e-9 {
+				t.Errorf("effort factor = %.12f, want %.12f", got, tc.Factor)
+			}
+		})
 	}
 }
 

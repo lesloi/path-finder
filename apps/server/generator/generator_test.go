@@ -111,20 +111,37 @@ func TestGenerateSpellsOutTheContract(t *testing.T) {
 }
 
 func TestGenerateGivesTheEngineTheEffortOfADurationTarget(t *testing.T) {
-	looper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
-	duration := `{"start":[6.1294,45.8992],"target":{"duration":90},"surface":"any","pace":6}`
-
-	if _, err := generate(t, looper, context.Background(), duration); err != nil {
-		t.Fatal(err)
-	}
-
-	if looper.got.Effort == nil || looper.got.Effort.Metres != 15_000 {
-		t.Fatalf("effort = %+v, want 15000 m", looper.got.Effort)
+	cases := []struct {
+		name, body string
+		ascent     float64
+	}{
+		{"without a gain", `{"start":[6.1294,45.8992],"target":{"duration":90},"surface":"any","pace":6}`, 0},
+		{"with a gain", `{"start":[6.1294,45.8992],"target":{"duration":90},"elevationGain":300,"surface":"any","pace":6}`, 300},
+		{"with a shortcut", `{"start":[6.1294,45.8992],"target":{"duration":90},"elevationGain":"hilly","surface":"any","pace":6}`, 0},
+		{"with waypoints", `{"start":[6.1294,45.8992],"target":{"duration":90},"surface":"any","pace":6,"waypoints":` + twoWaypoints + `}`, 0},
 	}
 	s := contract.SlopeEffortOf()
-	want := engine.SlopeEffort{Decay: s.Decay, EasiestGrade: s.EasiestGrade, MaxGrade: s.MaxGrade, StretchMetres: s.StretchMetres}
-	if looper.got.Effort.Slope != want {
-		t.Errorf("slope = %+v, want %+v", looper.got.Effort.Slope, want)
+	wantSlope := engine.SlopeEffort{Decay: s.Decay, EasiestGrade: s.EasiestGrade, MaxGrade: s.MaxGrade, StretchMetres: s.StretchMetres}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			looper := &fakeLooper{direct: engineLoop(0), loops: []*engine.Route{engineLoop(0)}}
+			if _, err := generate(t, looper, context.Background(), tc.body); err != nil {
+				t.Fatal(err)
+			}
+
+			if looper.got.Effort == nil || looper.got.Effort.Metres != 15_000 {
+				t.Fatalf("effort = %+v, want 15000 m", looper.got.Effort)
+			}
+			if looper.got.Effort.Slope != wantSlope {
+				t.Errorf("slope = %+v, want %+v", looper.got.Effort.Slope, wantSlope)
+			}
+			if looper.got.Ascent != tc.ascent {
+				t.Errorf("ascent = %v, want %v", looper.got.Ascent, tc.ascent)
+			}
+			if tc.name == "with waypoints" && looper.got.Direct == nil {
+				t.Error("the direct loop was not handed to the engine")
+			}
+		})
 	}
 }
 
