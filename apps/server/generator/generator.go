@@ -86,6 +86,9 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	// The loop straight through the waypoints is a candidate of its own.
 	set := newRanking(criteria, km)
 	enough := limit
+	// directOver tells whether the waypoints already make a route beyond the match bound: every loop through them is
+	// at least as long, so none can match, and the direct loop is the answer.
+	directOver := false
 	if len(criteria.Waypoints) > 0 {
 		for _, w := range criteria.Waypoints {
 			req.Waypoints = append(req.Waypoints, engine.Point{Lat: w[1], Lon: w[0]})
@@ -101,8 +104,16 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 				// It keeps a place in the set (see ranking.routes), so one match fewer fills it.
 				enough = limit - 1
 			}
-			if overshoots(criteria, direct) {
-				// Searching loops would only cost CPU: each is as far from the target, and the direct loop is offered.
+			if criteria.Target.Distance > 0 && (criteria.ElevationGain == nil || criteria.ElevationGain.Shortcut == "") &&
+				directRoute != nil && directRoute.Shortest > 0 {
+				targetM := criteria.Target.Distance * 1000
+				if directRoute.Shortest-targetM > matchTolerance.distance*targetM {
+					directOver = true
+				}
+			}
+			if directOver || overshoots(criteria, direct) {
+				// Searching loops would only cost CPU: the shortest loop through the waypoints is already beyond the
+				// match bound, and every loop is at least that long; the direct loop is offered.
 				return set.routes(limit), nil
 			}
 		}

@@ -981,10 +981,11 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64, f *for
 		sign = -1
 	}
 	best, small := base, g.small
+	skip := func(n uint32) bool { return small.has(n) || f.has(n) }
 	for k := 0; k < 8; k++ {
 		a := float64(k) * math.Pi / 4
-		n, d, ok := sp.nearest(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl))
-		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev && !small.has(n) && !f.has(n) {
+		n, d, ok := sp.nearestWhere(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl), skip, maxSnapMeters)
+		if ok && d <= maxSnapMeters && sign*g.nodes[n].Elev > sign*g.nodes[best].Elev {
 			best = n
 		}
 	}
@@ -1047,11 +1048,13 @@ func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter [
 	cxm, cym := rc*math.Cos(theta), rc*math.Sin(theta)
 	nodes := make([]uint32, 0, len(jitter))
 	small := g.small
+	reach := snapReach(rc)
+	skip := func(n uint32) bool { return small.has(n) || f.has(n) }
 	for j := range jitter {
 		phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(len(jitter)+1)
 		x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
-		n, d, ok := sp.nearestWhere(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl), f.skip(), 0)
-		if !ok || d > snapReach(rc) || small.has(n) {
+		n, d, ok := sp.nearestWhere(g, slat+y/metersPerDegree, slon+x/(metersPerDegree*cosl), skip, reach)
+		if !ok || d > reach {
 			return nil, false
 		}
 		nodes = append(nodes, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift, f))

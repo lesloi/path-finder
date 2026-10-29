@@ -137,3 +137,28 @@ func TestNearestOutsideStopsAtItsReach(t *testing.T) {
 		t.Errorf("reach 150: found a node at %v m", dNear)
 	}
 }
+
+func TestTheShortestWaypointLoopFollowsTheLoopsOffAnIsland(t *testing.T) {
+	// Arrange: a start and a waypoint on a small island with a detour, and a lattice 150 m away; the loop search moves
+	// the two points to the lattice, where the loop is shorter than the island's.
+	g := &testGraph{}
+	g.grid(30, 40, flat)
+	start := g.addNode(-150, 1000, 100)
+	mid := g.addNode(-600, 1500, 100)
+	wp := g.addNode(-150, 2000, 100)
+	g.connect(start, mid, KindPath)
+	g.connect(mid, wp, KindPath)
+	e := openTest(t, g, false)
+	if !e.g.small.has(uint32(start)) {
+		t.Fatal("the island is not small")
+	}
+	// Act
+	r, err := e.DirectLoop(context.Background(), DirectLoopRequest{Start: pointOf(g, start), Waypoints: []Point{pointOf(g, wp)}})
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !(r.Shortest > 0 && r.Shortest < r.Distance) {
+		t.Errorf("shortest = %v, distance = %v: the loops move off the island, so their bound is not the island's loop", r.Shortest, r.Distance)
+	}
+}
