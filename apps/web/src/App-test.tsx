@@ -41,6 +41,27 @@ describe('App', () => {
 
     expect(screen.getByTestId('app-title')).toHaveAccessibleName('Path finder');
     expect(screen.getByTestId('criteria-tagline')).toHaveTextContent(commonText.en.description);
+    expect(document.querySelectorAll('h1')).toHaveLength(1);
+  });
+
+  it('leaves the only h1 to the page that opens over the map', async () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+
+    await onPage(commonText.en.settings);
+    expect([...document.querySelectorAll('h1')].map((heading) => heading.textContent)).toEqual([
+      commonText.en.settings,
+    ]);
+    expect(screen.getByTestId('app-title').tagName).toBe('H2');
+  });
+
+  it('leaves the only h1 to the criteria layer, which is a dialog too', () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId('criteria-open'));
+
+    expect(screen.getByTestId('app-title').tagName).toBe('H2');
   });
 
   it('names the tab after the app, then after the page that is open', async () => {

@@ -205,6 +205,30 @@ const LOCATE_GIVE_UP = 15_000;
 
 const NO_AREAS: AvoidedArea[] = [];
 
+/**
+ * The name of the app, as the heading of the home screen. A page, or the criteria layer, opens over the map in a
+ * dialog that brings the only h1 of the document, so this one steps down to h2 meanwhile.
+ */
+function HomeHeading({
+  subPageOpen,
+  className,
+  children,
+}: {
+  subPageOpen: boolean;
+  className: string;
+  children: ReactNode;
+}) {
+  return subPageOpen ? (
+    <h2 data-testid="app-title" className={className}>
+      {children}
+    </h2>
+  ) : (
+    <h1 data-testid="app-title" className={className}>
+      {children}
+    </h1>
+  );
+}
+
 export function CriteriaView({ language, pageOpen = false }: { language: Language; pageOpen?: boolean }) {
   const t = { ...commonText[language], ...criteriaText[language], ...routesText[language] };
   const desktop = useDesktop();
@@ -234,6 +258,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const [waypointPois, setWaypointPois] = useState<WaypointPois>({});
   // On phones, the criteria are a layer over the map; the height of the sheet is what the routes are framed clear of.
   const [layerOpen, setLayerOpen] = useState(false);
+  // The criteria layer and the pages are dialogs over the map: each brings the only h1 of the document while it is open.
+  const inSubPage = pageOpen || layerOpen;
   // The sheet says it, and describes its button by it, only while the form does not show its own message.
   const sheetUncovered = startUncovered && !layerOpen;
   const [sheetHeight, setSheetHeight] = useState(0);
@@ -754,10 +780,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             onToggle={() => setFormFolded(!formFolded)}
           >
             <div data-testid="criteria-title" className="flex flex-col gap-1 px-4 pt-4">
-              <h1 data-testid="app-title" className="flex items-center gap-2 text-lg font-bold">
+              <HomeHeading subPageOpen={inSubPage} className="flex items-center gap-2 text-lg font-bold">
                 <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
                 Path finder
-              </h1>
+              </HomeHeading>
               <p className="text-sm text-ink-2">{t.description}</p>
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">{criteriaFields}</div>
@@ -802,14 +828,20 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             onHeightChange={setSheetHeight}
           >
             {!browser.detail && staleNotice}
+            {/* The name stays once the routes take the place of what the app is, so the document keeps its heading. */}
+            {panel && (
+              <HomeHeading subPageOpen={inSubPage} className="sr-only">
+                Path finder
+              </HomeHeading>
+            )}
             {panel || (
               <>
                 {/* What the app is, before a route exists: the only words a search engine reads on the home page,
                     the map being a canvas. */}
                 <div data-testid="criteria-tagline" className="flex flex-col gap-1 text-center">
-                  <h1 data-testid="app-title" className="text-lg font-bold">
+                  <HomeHeading subPageOpen={inSubPage} className="text-lg font-bold">
                     Path finder
-                  </h1>
+                  </HomeHeading>
                   <p className="text-sm text-ink-2">{t.description}</p>
                 </div>
                 {/* Always mounted, so that a change of its text is announced. Not while the layer is open: the form shows its own message, and both would be announced. */}
