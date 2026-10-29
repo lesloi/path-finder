@@ -1,7 +1,7 @@
 import { Suspense, useDeferredValue, useEffect, type ComponentType } from 'react';
 
 import { LoadErrorBoundary, SubPage, lazyChunk, useTipDismiss } from './components/index.ts';
-import { applyDescription } from './core/index.ts';
+import { applyTitle } from './core/index.ts';
 import { commonText, type Language } from './i18n/index.ts';
 import { goTo, languageOf, useHash, useSettings } from './state/index.ts';
 import { CriteriaView } from './views/index.ts';
@@ -58,17 +58,19 @@ export function App() {
   const page = pages[shownHash];
   useTipDismiss();
 
+  // The document follows the language of its user; the title and the description a search engine reads do not: the
+  // app answers on one address, with no page per language, so metadata in the browser's language showed it an
+  // English text on a French page.
   useEffect(() => {
     document.documentElement.lang = language;
-    applyDescription(commonText[language].description);
   }, [language]);
+
+  useEffect(() => {
+    applyTitle(page && commonText.fr[page.title]);
+  }, [page]);
 
   return (
     <main>
-      {/* The map says what the app is: the name is for screen readers. */}
-      <h1 data-testid="app-title" className="sr-only">
-        Path finder
-      </h1>
       {/* Pages open over the map, which stays mounted so it keeps its view and start point. */}
       <CriteriaView language={language} pageOpen={Boolean(page)} />
       <Suspense fallback={null}>
