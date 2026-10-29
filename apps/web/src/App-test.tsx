@@ -4,6 +4,7 @@ import { Map, ScaleControl } from 'maplibre-gl';
 
 import { App, preloadPages } from './App.tsx';
 import { expectNamedControls } from './accessible-names.ts';
+import { HOME_TITLE } from './core/index.ts';
 import { commonText } from './i18n/index.ts';
 
 // jsdom has no WebGL.
@@ -35,10 +36,20 @@ describe('App', () => {
     await expect(preloadPages()).resolves.toBeUndefined();
   });
 
-  it('shows the app name', () => {
+  it('shows the app name, and what it does', () => {
     render(<App />);
 
-    expect(screen.getByTestId('app-title')).toHaveTextContent('Path finder');
+    expect(screen.getByTestId('app-title')).toHaveAccessibleName('Path finder');
+    expect(screen.getByTestId('criteria-tagline')).toHaveTextContent(commonText.en.description);
+  });
+
+  it('names the tab after the app, then after the page that is open', async () => {
+    render(<App />);
+    expect(document.title).toBe(HOME_TITLE);
+
+    fireEvent.click(screen.getByTestId('criteria-settings'));
+
+    await waitFor(() => expect(document.title).toBe('Réglages · Path finder'));
   });
 
   it.each([
@@ -225,15 +236,13 @@ describe('App', () => {
     expect(document.documentElement.lang).toBe('fr');
   });
 
-  it('describes the page in the language of the app', () => {
-    document.head.innerHTML = '<meta name="description" content="English">';
-    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['fr-FR']);
+  it('keeps the description in the language a search engine indexes', () => {
+    const indexed = 'Générez un parcours de course ou de trail sur mesure.';
+    document.head.innerHTML = `<meta name="description" content="${indexed}">`;
+    vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['en-US']);
     render(<App />);
 
-    expect(document.head.querySelector('meta[name="description"]')).toHaveAttribute(
-      'content',
-      commonText.fr.description,
-    );
+    expect(document.head.querySelector('meta[name="description"]')).toHaveAttribute('content', indexed);
   });
 
   it('sets the document language to en otherwise', () => {

@@ -753,9 +753,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             label={formFolded ? t.showSearch : t.hideSearch}
             onToggle={() => setFormFolded(!formFolded)}
           >
-            <div data-testid="criteria-title" className="flex items-center gap-2 px-4 pt-4 text-lg font-bold">
-              <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
-              Path finder
+            <div data-testid="criteria-title" className="flex flex-col gap-1 px-4 pt-4">
+              <h1 data-testid="app-title" className="flex items-center gap-2 text-lg font-bold">
+                <img className="rounded-sm" src="/favicon.svg" alt="" width="32" height="32" />
+                Path finder
+              </h1>
+              <p className="text-sm text-ink-2">{t.description}</p>
             </div>
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">{criteriaFields}</div>
           </FoldablePanel>
@@ -801,6 +804,14 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             {!browser.detail && staleNotice}
             {panel || (
               <>
+                {/* What the app is, before a route exists: the only words a search engine reads on the home page,
+                    the map being a canvas. */}
+                <div data-testid="criteria-tagline" className="flex flex-col gap-1 text-center">
+                  <h1 data-testid="app-title" className="text-lg font-bold">
+                    Path finder
+                  </h1>
+                  <p className="text-sm text-ink-2">{t.description}</p>
+                </div>
                 {/* Always mounted, so that a change of its text is announced. Not while the layer is open: the form shows its own message, and both would be announced. */}
                 <p
                   id={uncoveredId}
