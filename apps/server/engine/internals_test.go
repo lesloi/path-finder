@@ -574,3 +574,24 @@ func TestALiftedControlPointDoesNotLandOnAnIsland(t *testing.T) {
 		t.Errorf("the control point was lifted onto the island, node %d", got)
 	}
 }
+
+func TestALiftedControlPointSkipsASmallNodeForTheLargeOneBesideIt(t *testing.T) {
+	// Arrange: a large lattice, a small island on the north probe, and a high node of the lattice 10 m from it.
+	g := &testGraph{}
+	at := g.grid(41, 41, flat)
+	base := at(20, 20)
+	island := g.addNode(2250, 2000, 900)
+	g.connect(island, g.addNode(2250, 2050, 900), KindPath)
+	high := g.addNode(2250, 2010, 800)
+	g.connect(high, at(20, 22), KindPath)
+	e := openTest(t, g, false)
+	if !e.g.small.has(uint32(island)) || e.g.small.has(uint32(high)) {
+		t.Fatal("the island or the high node is on the wrong component")
+	}
+	// Act
+	got := liftedNode(e.g, e.sp, uint32(base), 250, 1, nil)
+	// Assert
+	if got != uint32(high) {
+		t.Errorf("lifted to %d (elevation %v), want the large high node %d", got, e.g.nodes[got].Elev, high)
+	}
+}

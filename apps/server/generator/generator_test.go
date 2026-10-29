@@ -644,6 +644,60 @@ func TestGenerateStopsWhenLoopsStopAddingMatches(t *testing.T) {
 	}
 }
 
+func TestGenerateKeepsTheDirectLoopAloneWhenTheWaypointsOvershootTheTarget(t *testing.T) {
+	direct := engineLoop(0)
+	direct.Distance, direct.Shortest = 12_000, 12_000 // 20 % over the 10 km target: a suggestion, even at its shortest
+	looper := &fakeLooper{direct: direct}
+
+	routes, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints))
+
+	if err != nil || len(routes) != 1 || routes[0].Kind != "suggestion" {
+		t.Fatalf("routes = %+v, err = %v, want the direct loop alone", routes, err)
+	}
+	if looper.loopCalls != 0 {
+		t.Error("loops were searched although every one is at least as long as the direct loop")
+	}
+}
+
+func TestGenerateStopsOnlyWhenTheShortestLoopIsOverTheMatchBound(t *testing.T) {
+	cases := []struct {
+		name     string
+		shortest float64
+		searched bool
+	}{
+		{"within the match bound", 10_900, true},
+		{"beyond the match bound", 11_100, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			direct := engineLoop(0)
+			direct.Distance, direct.Shortest = 12_000, tc.shortest
+			looper := &fakeLooper{direct: direct, loops: []*engine.Route{engineLoop(120)}}
+
+			if _, err := generate(t, looper, context.Background(), withWaypoints(twoWaypoints)); err != nil {
+				t.Fatal(err)
+			}
+			if searched := looper.loopCalls > 0; searched != tc.searched {
+				t.Errorf("loops searched = %v, want %v", searched, tc.searched)
+			}
+		})
+	}
+}
+
+func TestGenerateStillSearchesWithAShortcutPastTheMatchBound(t *testing.T) {
+	direct := engineLoop(0)
+	direct.Distance, direct.Shortest = 12_000, 12_000
+	looper := &fakeLooper{direct: direct, loops: []*engine.Route{engineLoop(120)}}
+	hilly := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":"hilly","surface":"any","pace":6,"waypoints":` + twoWaypoints + `}`
+
+	if _, err := generate(t, looper, context.Background(), hilly); err != nil {
+		t.Fatal(err)
+	}
+	if looper.loopCalls == 0 {
+		t.Error("a shortcut can improve with a longer loop: the search must run")
+	}
+}
+
 func TestGeneratePassesTheAvoidedAreasToTheEngine(t *testing.T) {
 	// Arrange
 	looper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
@@ -662,7 +716,7 @@ func TestGeneratePassesTheAvoidedAreasToTheEngine(t *testing.T) {
 
 func TestGenerateStopsSearchingOnceTheSetIsFullWithTheDirectLoopAsASuggestion(t *testing.T) {
 	long := engineLoop(0)
-	long.Distance = 12_800 // 28 % over the target of 10 km: a suggestion, which takes a place of the set
+	long.Distance, long.Ascent = 10_000, 150 // the distance matches, half the 300 m target: a suggestion
 	// Out to the waypoint and back by the same way, so that no loop of the set duplicates it.
 	long.Points = nil
 	for _, p := range [][]float64{startPoint(), at(6400, 0), startPoint()} {
@@ -674,8 +728,9 @@ func TestGenerateStopsSearchingOnceTheSetIsFullWithTheDirectLoopAsASuggestion(t 
 	}
 	looper := &fakeLooper{direct: long, loops: loops, askEnough: true}
 	east := `[[6.2120,45.8992]]`
+	withGain := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":300,"surface":"any","pace":6,"waypoints":` + east + `}`
 
-	if _, err := generate(t, looper, context.Background(), withWaypoints(east)); err != nil {
+	if _, err := generate(t, looper, context.Background(), withGain); err != nil {
 		t.Fatal(err)
 	}
 
@@ -710,5 +765,19 @@ func TestGenerateKeepsEightMatchesWhenTheDirectLoopIsLeftOut(t *testing.T) {
 
 	if err != nil || looper.enoughAt != maxRoutes || len(routes) != maxRoutes {
 		t.Errorf("Enough at %d loops, %d routes, err = %v, want %d of each", looper.enoughAt, len(routes), err, maxRoutes)
+	}
+}
+
+func TestGenerateStopsWithANumericGainWhenTheShortestIsOverTheMatchBound(t *testing.T) {
+	direct := engineLoop(0)
+	direct.Distance, direct.Shortest = 12_000, 12_000
+	looper := &fakeLooper{direct: direct, loops: []*engine.Route{engineLoop(120)}}
+	withGain := `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":300,"surface":"any","pace":6,"waypoints":` + twoWaypoints + `}`
+
+	if _, err := generate(t, looper, context.Background(), withGain); err != nil {
+		t.Fatal(err)
+	}
+	if looper.loopCalls != 0 {
+		t.Error("the distance cannot match; the gain does not make a loop through the waypoints shorter")
 	}
 }

@@ -62,6 +62,10 @@ type Route struct {
 	TrailShare float64   // share of the distance on trails, 0 to 1
 	Stretches  []Stretch // the surface and technical ways along the route, consecutive stretches of one kind merged
 	Technical  bool      // the route holds a technical stretch
+	// Shortest is the shortest length of a loop through the waypoints the loop search would take, with unit costs and
+	// no climb penalty, which DirectLoop also routes: no loop through them can be shorter. It is 0 when that chain
+	// could not be measured.
+	Shortest float64
 	// anchors are the nodes a direct loop went through, waypoints included, the start first and last, and
 	// fingerprint is the graph they belong to. Loops reuses the chain of a direct loop this engine built, instead
 	// of routing the same waypoints a second time; both stay unset for a loop.
@@ -206,11 +210,11 @@ func OpenDir(dir string, profiles ...string) (map[string]*Engine, error) {
 
 // Route finds the cheapest route from one point to another. It returns ctx's error when ctx ends first.
 func (e *Engine) Route(ctx context.Context, from, to Point) (*Route, error) {
-	src, d, ok := e.sp.nearest(e.g, from.Lat, from.Lon)
+	src, d, ok := e.sp.nearestWhere(e.g, from.Lat, from.Lon, nil, maxSnapMeters)
 	if !ok || d > maxSnapMeters {
 		return nil, ErrOffGraph
 	}
-	dst, d, ok := e.sp.nearest(e.g, to.Lat, to.Lon)
+	dst, d, ok := e.sp.nearestWhere(e.g, to.Lat, to.Lon, nil, maxSnapMeters)
 	if !ok || d > maxSnapMeters {
 		return nil, ErrOffGraph
 	}
@@ -291,7 +295,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 func (e *Engine) snapWaypoints(waypoints []Point, leaveSmall bool, f *forbidden) ([]uint32, error) {
 	nodes := make([]uint32, len(waypoints))
 	for i, w := range waypoints {
-		n, d, ok := e.sp.nearestWhere(e.g, w.Lat, w.Lon, f.skip(), 0)
+		n, d, ok := e.sp.nearestWhere(e.g, w.Lat, w.Lon, f.skip(), maxWaypointSnapMeters)
 		if !ok || d > maxWaypointSnapMeters {
 			return nil, &WaypointError{Index: i + 1}
 		}
@@ -307,7 +311,7 @@ func (e *Engine) snapWaypoints(waypoints []Point, leaveSmall bool, f *forbidden)
 
 // snapStart finds the node of a start point, or fails with ErrOffGraph.
 func (e *Engine) snapStart(p Point, f *forbidden) (uint32, error) {
-	n, d, ok := e.sp.nearestWhere(e.g, p.Lat, p.Lon, f.skip(), 0)
+	n, d, ok := e.sp.nearestWhere(e.g, p.Lat, p.Lon, f.skip(), maxSnapMeters)
 	if !ok || d > maxSnapMeters {
 		return 0, ErrOffGraph
 	}
@@ -406,6 +410,48 @@ func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point
 	return anchors, length, baseEffort, nil
 }
 
+// shortestLoop is the shortest length of a loop through the anchors: unit costs and no climb penalty, so no loop
+// through them can be shorter, and it is the lower bound a loop search may rely on. It is zero when the chain cannot
+// be routed.
+func shortestLoop(ctx context.Context, e *Engine, anchors []uint32, f *forbidden) float64 {
+	if len(anchors) < 2 {
+		return 0
+	}
+	// The profile's multipliers are not all 1: the cheapest chain for a preference can be longer than the shortest
+	// one, so the bound is searched with every way costing its length.
+	unit := *e
+	for k := range unit.mult {
+		for s := range unit.mult[k] {
+			unit.mult[k][s] = 1
+		}
+	}
+	unit.minMult = 1
+	unit.alt = nil
+	s := searcherPool.Get().(*searcher)
+	defer searcherPool.Put(s)
+	nodes, edges, cause := chainLegs(ctx, &unit, s, 0, searchLimits{loopLegMaxSettled, f}, false, anchors)
+	if cause != CauseNone {
+		return 0
+	}
+	dist, _, _ := measure(e.g, nodes, edges)
+	return dist
+}
+
+// shortestLoopForLoops is the shortest length of a loop through the waypoints the loop search would take, moving them
+// off the small components as it does. It is zero when they cannot be routed, or when the loop's anchors cannot be
+// snapped; the search then simply runs.
+func (e *Engine) shortestLoopForLoops(ctx context.Context, start Point, waypoints []Point, f *forbidden) float64 {
+	loopStart, err := e.snapLoopStart(start, f)
+	if err != nil {
+		return 0
+	}
+	anchors, err := e.snapAnchors(loopStart, waypoints, true, f)
+	if err != nil || len(anchors) < 2 {
+		return 0
+	}
+	return shortestLoop(ctx, e, anchors, f)
+}
+
 // DirectLoopRequest asks for the cheapest loop from Start through the Waypoints in order, keeping out of the
 // Avoided areas.
 type DirectLoopRequest struct {
@@ -429,6 +475,7 @@ func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route,
 	}
 	r := e.describe(nodes, edges)
 	r.anchors, r.fingerprint = anchors, e.g.fingerprint
+	r.Shortest = e.shortestLoopForLoops(ctx, req.Start, req.Waypoints, forbidden)
 	return r, nil
 }
 

@@ -92,7 +92,9 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   requests at +1000 m. A point may snap as far as 0.3 times the circle's radius (400 m at least), since
   on a long loop in a valley most of the circle falls where no way is mapped within 400 m. A circle with a
   point beyond that reach is turned by the golden angle, up to eight times, and no point is placed on a
-  component of fewer than 1,000 nodes, which no leg reaches from the rest of the graph.
+  component of fewer than 1,000 nodes, which no leg reaches from the rest of the graph. The snap takes the nearest
+  node in the reach that is neither on such a component nor in an avoided area; the circle is turned only when none is
+  that near.
   For an explicit target gain, the circle is first aimed at the highest ground within reach (the mean elevation of
   one of 16 sectors around the start), and stays random when no sector is 10 m above the start. Half the circles keep
   a random direction, so a sector that kills its loops cannot empty a set.
@@ -101,8 +103,11 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   the waypoints is a candidate too, and it is offered even when it is beyond the target, as a suggestion: a summit
   with a single access is where the loop goes back over its steps, farther than the target says, and nothing resizes a
   route the waypoints fix. It is not ranked down for retracing (the other loops are, and stay so), and the
-  ranking keeps a place for it, which matches would otherwise fill. Beyond the target by more than a wide suggestion,
-  it is offered alone, as no loop through the waypoints is nearer. Only waypoints that make a route longer than the
+  ranking keeps a place for it, which matches would otherwise fill. On a distance target with no flat or hilly
+  shortcut, it is offered alone as soon as the shortest loop through the waypoints is beyond the match bound, which
+  the engine measures by routing them again with no climb penalty: every loop through them is at least that long, so
+  none can match, and searching them would only cost CPU. Beyond the target by more than a wide
+  suggestion, it is offered alone in every case, as no loop through the waypoints is nearer. Only waypoints that make a route longer than the
   longest a request may ask for are refused, by the straight lines first and by the loop through them then. A waypoint is
   moved to the nearest way within 250 m, beyond which the criteria are refused, naming the waypoint by its number.
 - **Avoided areas are circles that forbid the ways they touch, up to three per set of criteria.** A penalty, as the
