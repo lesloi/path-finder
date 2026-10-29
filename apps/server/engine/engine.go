@@ -27,6 +27,13 @@ const loopLegMaxSettled = 300_000
 // distance or effort, so that loops differ even when the waypoints alone nearly make the target.
 const minDetourShare = 0.15
 
+// loopRadius is the radius of the control circle a loop of metres is expected to need.
+func loopRadius(metres float64) float64 { return metres / (2 * math.Pi * 1.3) }
+
+// headingReachMax caps the ground the heading looks at: the high ground of the longest loop is within a few km of its
+// start, and a wider scan would cost more than it says.
+const headingReachMax = 10_000
+
 // metersPerDegree converts degrees of latitude to metres.
 const metersPerDegree = geo.MetersPerDegree
 
@@ -787,6 +794,10 @@ type loopParams struct {
 	anchors    []uint32
 	baseM      float64
 	baseEffort float64
+	// heading is the direction of the highest ground around the start when hasHeading is set: a loop with an
+	// elevation gain to make heads there rather than in a random direction.
+	heading    float64
+	hasHeading bool
 	// stats, when set, counts why candidates fail. Nil in the product: finding why costs extra searches.
 	stats *LoopStats
 	// forbidden is what the request's avoided areas leave out of the searches, or nil for none.
@@ -808,6 +819,19 @@ func (lp *loopParams) score(dist, effort, ascent, overlap float64) float64 {
 		s += 2 * math.Abs(ascent-lp.ascentM) / math.Max(lp.ascentM, 50)
 	}
 	return s
+}
+
+// extra is the length or effort a loop has to add around its anchors, or its whole target when it has none: the
+// circle of a waypoint loop is the detour, not the whole loop.
+func (lp *loopParams) extra() float64 {
+	if lp.anchors == nil {
+		return lp.distM
+	}
+	target, base := lp.distM, lp.baseM
+	if lp.effort != nil {
+		target, base = lp.effort.Metres, lp.baseEffort
+	}
+	return math.Max(target-base, minDetourShare*target)
 }
 
 func measure(g *graph, nodes, edges []uint32) (dist, trail, overlap float64) {
@@ -967,6 +991,49 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64, f *for
 	return best
 }
 
+// terrainHeading is the direction, from start, of the highest ground within reach, or false when no sector is
+// clearly higher than the start. A loop with an elevation gain to make heads there rather than in a random direction,
+// so that its first circle climbs; one scan of the nodes around the start answers it for every candidate.
+func (e *Engine) terrainHeading(start uint32, reach float64, f *forbidden) (float64, bool) {
+	const sectors = 16
+	b := e.g.nodes[start]
+	lat, lon := float64(b.Lat)*1e-7, float64(b.Lon)*1e-7
+	cosl := math.Cos(lat * rad)
+	near := reach / 4 // the start's own ground says nothing of a direction
+	var sum [sectors]float64
+	var count [sectors]int
+	e.sp.eachNodeWithin(e.g, Point{Lat: lat, Lon: lon}, cosl, reach, func(v uint32) {
+		if v == start || e.g.small.has(v) || f.has(v) {
+			return
+		}
+		nd := &e.g.nodes[v]
+		dy := (float64(nd.Lat)*1e-7 - lat) * metersPerDegree
+		dx := (float64(nd.Lon)*1e-7 - lon) * metersPerDegree * cosl
+		if math.Hypot(dx, dy) < near {
+			return
+		}
+		i := int((math.Atan2(dy, dx) + math.Pi) / (2 * math.Pi) * sectors)
+		if i >= sectors {
+			i = sectors - 1
+		}
+		sum[i] += float64(nd.Elev) * 0.1
+		count[i]++
+	})
+	best, bestMean := -1, math.Inf(-1)
+	for i := range sum {
+		if count[i] == 0 {
+			continue
+		}
+		if mean := sum[i] / float64(count[i]); mean > bestMean {
+			best, bestMean = i, mean
+		}
+	}
+	if best < 0 || bestMean < float64(b.Elev)*0.1+10 {
+		return 0, false
+	}
+	return -math.Pi + (float64(best)+0.5)*2*math.Pi/sectors, true
+}
+
 // circleTries is how many turns of the control circle are tried before a candidate is given up.
 const circleTries = 8
 
@@ -1020,16 +1087,14 @@ func candidateLoop(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp
 	climb := cx.prof.UpPerMeter * float32(2*rng.f64())
 	k := 2 + int(rng.below(3))
 	theta := rng.f64() * 2 * math.Pi
-	// With waypoints, the circle only has to make up what the loop through them lacks.
-	extraM := lp.distM
-	if lp.anchors != nil {
-		target, base := lp.distM, lp.baseM
-		if lp.effort != nil {
-			target, base = lp.effort.Metres, lp.baseEffort
-		}
-		extraM = math.Max(target-base, minDetourShare*target)
+	if lp.hasHeading && index%2 == 0 {
+		// The high ground is a prior, not a route: half the candidates keep a random direction, so that a high
+		// sector which kills every loop cannot empty a request.
+		theta = lp.heading + (rng.f64()-0.5)*math.Pi/2
 	}
-	rc := extraM / (2 * math.Pi * 1.3)
+	// With waypoints, the circle only has to make up what the loop through them lacks.
+	extraM := lp.extra()
+	rc := loopRadius(extraM)
 	sn := g.nodes[start]
 	slat, slon := float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7
 	cosl := math.Cos(slat * rad)
