@@ -24,7 +24,7 @@ import (
 const loopLegMaxSettled = 300_000
 
 // minDetourShare is the least a loop through waypoints adds to the direct loop, as a share of the target
-// distance, so that loops differ even when the waypoints alone nearly make the target.
+// distance or effort, so that loops differ even when the waypoints alone nearly make the target.
 const minDetourShare = 0.15
 
 // metersPerDegree converts degrees of latitude to metres.
@@ -776,13 +776,17 @@ func (r *splitmix) below(n uint64) uint64 { return r.next() % n }
 type loopParams struct {
 	distM, ascentM float64
 	ascentBand     AscentBand
-	candidates     int
-	seed           uint64
+	// effort, when set, is the target duration as an effort distance: loops are sized and scored on their effort
+	// distance instead of their length. distM then only sizes the first circle of a loop without waypoints.
+	effort     *EffortTarget
+	candidates int
+	seed       uint64
 	// anchors are the nodes every loop goes through in order, from the start node back to it: the start
 	// node, the user's waypoints, the start node. Nil for a loop with no waypoints. baseM is the length
-	// of the cheapest loop through them.
-	anchors []uint32
-	baseM   float64
+	// of the cheapest loop through them, and baseEffort its effort distance.
+	anchors    []uint32
+	baseM      float64
+	baseEffort float64
 	// stats, when set, counts why candidates fail. Nil in the product: finding why costs extra searches.
 	stats *LoopStats
 	// forbidden is what the request's avoided areas leave out of the searches, or nil for none.
@@ -794,8 +798,12 @@ type loopResult struct {
 	dist, ascent, trail, overlap, score float64
 }
 
-func (lp *loopParams) score(dist, ascent, overlap float64) float64 {
-	s := 3*math.Abs(dist-lp.distM)/lp.distM + 3*overlap/dist
+func (lp *loopParams) score(dist, effort, ascent, overlap float64) float64 {
+	length, target := dist, lp.distM
+	if lp.effort != nil {
+		length, target = effort, lp.effort.Metres
+	}
+	s := 3*math.Abs(length-target)/target + 3*overlap/dist
 	if lp.ascentM > 0 {
 		s += 2 * math.Abs(ascent-lp.ascentM) / math.Max(lp.ascentM, 50)
 	}
@@ -1015,7 +1023,11 @@ func candidateLoop(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp
 	// With waypoints, the circle only has to make up what the loop through them lacks.
 	extraM := lp.distM
 	if lp.anchors != nil {
-		extraM = math.Max(lp.distM-lp.baseM, minDetourShare*lp.distM)
+		target, base := lp.distM, lp.baseM
+		if lp.effort != nil {
+			target, base = lp.effort.Metres, lp.baseEffort
+		}
+		extraM = math.Max(target-base, minDetourShare*target)
 	}
 	rc := extraM / (2 * math.Pi * 1.3)
 	sn := g.nodes[start]
@@ -1050,22 +1062,36 @@ func candidateLoop(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp
 			return best, cause
 		}
 		dist, trail, overlap := measure(g, nodes, edges)
+		effort := 0.0
+		if lp.effort != nil {
+			effort = dist * effortFactor(g, nodes, lp.effort.Slope)
+		}
 		asc := ascent(g, nodes)
-		sc := lp.score(dist, asc, overlap)
+		sc := lp.score(dist, effort, asc, overlap)
 		if best == nil || sc < best.score {
 			best = &loopResult{nodes, edges, dist, asc, trail, overlap, sc}
 		}
 		lift = climbLift(asc, lp.ascentM, lp.ascentBand)
-		if math.Abs(dist-lp.distM) < 0.03*lp.distM && lift == 0 {
+		measured, target := dist, lp.distM
+		if lp.effort != nil {
+			measured, target = effort, lp.effort.Metres
+		}
+		if math.Abs(measured-target) < 0.03*target && lift == 0 {
 			break
 		}
 		if lp.anchors != nil {
 			// Only the detour is resized: the loop through the waypoints stays what it is.
-			if added := dist - lp.baseM; added > 1 {
+			added := dist - lp.baseM
+			if lp.effort != nil {
+				added = effort - lp.baseEffort
+			}
+			if added > 1 {
 				rc *= extraM / added
 			} else {
 				rc *= 2
 			}
+		} else if lp.effort != nil {
+			rc *= lp.effort.Metres / effort
 		} else {
 			rc *= lp.distM / dist
 		}

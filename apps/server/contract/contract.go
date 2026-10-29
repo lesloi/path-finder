@@ -24,16 +24,21 @@ type limits struct {
 	AvoidedRadius    struct{ Min, Max float64 } `json:"avoidedAreaRadiusMetres"`
 	ClimbPerEffortKm float64                    `json:"climbPerEffortKm"`
 	HillyMatchPerKm  float64                    `json:"hillyMatchPerKm"`
-	SlopeEffort      struct {
-		Decay         float64 `json:"decay"`
-		EasiestGrade  float64 `json:"easiestGrade"`
-		MaxGrade      float64 `json:"maxGrade"`
-		StretchMetres float64 `json:"stretchMetres"`
-	} `json:"slopeEffort"`
-	CoverageCell float64  `json:"coverageCellDegrees"`
-	POITileZoom  int      `json:"poiTileZoom"`
-	Surfaces     []string `json:"surfaces"`
-	ErrorCodes   []string `json:"errorCodes"`
+	SlopeEffort      SlopeEffort                `json:"slopeEffort"`
+	CoverageCell     float64                    `json:"coverageCellDegrees"`
+	POITileZoom      int                        `json:"poiTileZoom"`
+	Surfaces         []string                   `json:"surfaces"`
+	ErrorCodes       []string                   `json:"errorCodes"`
+}
+
+// SlopeEffort is the curve that weights a stretch of a route by its grade: the effort distance is the length
+// times the mean weight. It is in contract.json, shared with the web app, and the engine reads it to aim a loop at
+// a target duration.
+type SlopeEffort struct {
+	Decay         float64 `json:"decay"`
+	EasiestGrade  float64 `json:"easiestGrade"`
+	MaxGrade      float64 `json:"maxGrade"`
+	StretchMetres float64 `json:"stretchMetres"`
 }
 
 var bounds = func() limits {

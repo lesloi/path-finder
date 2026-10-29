@@ -111,19 +111,27 @@ func TestSearcherResetWrapsItsEpoch(t *testing.T) {
 
 func TestLoopScoreCountsDistanceOverlapAndAscent(t *testing.T) {
 	lp := &loopParams{distM: 10_000}
-	if got := lp.score(10_000, 500, 0); got != 0 {
+	if got := lp.score(10_000, 0, 500, 0); got != 0 {
 		t.Errorf("a loop on target = %v", got)
 	}
-	if got := lp.score(12_000, 0, 1_200); math.Abs(got-(3*0.2+3*0.1)) > 1e-9 {
+	if got := lp.score(12_000, 0, 0, 1_200); math.Abs(got-(3*0.2+3*0.1)) > 1e-9 {
 		t.Errorf("distance and overlap = %v", got)
 	}
 	lp.ascentM = 1_000
-	if got := lp.score(10_000, 500, 0); math.Abs(got-1) > 1e-9 {
+	if got := lp.score(10_000, 0, 500, 0); math.Abs(got-1) > 1e-9 {
 		t.Errorf("half the ascent missing = %v, want 2 * 500/1000", got)
 	}
 	lp.ascentM = 10 // under the floor of 50 m
-	if got := lp.score(10_000, 60, 0); math.Abs(got-2) > 1e-9 {
+	if got := lp.score(10_000, 0, 60, 0); math.Abs(got-2) > 1e-9 {
 		t.Errorf("small ascent target = %v, want 2 * 50/50", got)
+	}
+	// An effort target scores the effort distance, not the length.
+	withEffort := &loopParams{distM: 10_000, effort: &EffortTarget{Metres: 10_000}}
+	if got := withEffort.score(8_000, 10_000, 0, 0); got != 0 {
+		t.Errorf("a loop on effort = %v", got)
+	}
+	if got := withEffort.score(8_000, 12_000, 0, 0); math.Abs(got-0.6) > 1e-9 {
+		t.Errorf("effort off by a fifth = %v, want 3 * 0.2", got)
 	}
 }
 

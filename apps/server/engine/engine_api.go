@@ -72,8 +72,27 @@ type Route struct {
 // a loop is on target. The caller owns what counts as a match, so the engine is told it.
 type AscentBand struct{ Share, FloorM float64 }
 
-// LoopRequest asks for loops from Start. Distance is the target length in metres and Ascent the
-// target elevation gain in metres (0 for none). The same Seed always yields the same loops.
+// SlopeEffort is the curve that weights a stretch of a route by its grade, as contract.json holds it: the effort
+// distance is the length times the mean weight. The zero value weighs every stretch the same.
+type SlopeEffort struct {
+	Decay         float64
+	EasiestGrade  float64
+	MaxGrade      float64
+	StretchMetres float64
+}
+
+// EffortTarget makes a loop request aim at a target duration: Metres is the effort distance the duration allows
+// (duration / pace), and Slope is the curve that turns a loop's geometry into its effort distance. The search sizes
+// and ranks loops on their effort distance instead of their length, so the loop it aims at is the one the ranking
+// estimates at that duration.
+type EffortTarget struct {
+	Metres float64
+	Slope  SlopeEffort
+}
+
+// LoopRequest asks for loops from Start. Distance is the target length in metres, or the length the first circle of a
+// loop without waypoints is sized from when Effort is set, and Ascent the target elevation gain in metres (0 for
+// none). The same Seed always yields the same loops.
 type LoopRequest struct {
 	Start    Point
 	Distance float64
@@ -81,6 +100,9 @@ type LoopRequest struct {
 	// AscentBand is how far a loop's elevation gain may be from Ascent to count as on target. A loop
 	// outside it is steered towards the target; the zero value steers nothing.
 	AscentBand AscentBand
+	// Effort, when set, makes the search size and score loops on their effort distance rather than their length, so
+	// that a target duration lands on the loop the ranking estimates at that duration.
+	Effort     *EffortTarget
 	Candidates int
 	Seed       uint64
 	// Waypoints every loop goes through, in this order, between leaving Start and coming back to it. A
@@ -210,12 +232,15 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if req.Distance <= 0 || req.Candidates <= 0 {
 		return nil, errors.New("engine: loops need a positive distance and candidate count")
 	}
+	if req.Effort != nil && req.Effort.Metres <= 0 {
+		return nil, errors.New("engine: an effort target needs a positive effort distance")
+	}
 	forbidden := e.g.forbiddenFor(req.Avoided)
 	start, err := e.snapLoopStart(req.Start, forbidden)
 	if err != nil {
 		return nil, err
 	}
-	anchors, baseM, err := e.anchorLoop(ctx, start, req.Waypoints, forbidden, req.Direct)
+	anchors, baseM, baseEffort, err := e.anchorLoop(ctx, start, req.Waypoints, forbidden, req.Direct, req.Effort)
 	if err != nil {
 		return nil, err
 	}
@@ -232,8 +257,9 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 		}
 	}
 	found, failure := generate(ctx, e, e.sp, &loopParams{
-		distM: req.Distance, ascentM: req.Ascent, ascentBand: req.AscentBand, candidates: req.Candidates, seed: req.Seed,
-		anchors: anchors, baseM: baseM, stats: req.Stats, forbidden: forbidden,
+		distM: req.Distance, ascentM: req.Ascent, ascentBand: req.AscentBand, effort: req.Effort,
+		candidates: req.Candidates, seed: req.Seed,
+		anchors: anchors, baseM: baseM, baseEffort: baseEffort, stats: req.Stats, forbidden: forbidden,
 	}, start, enough)
 	if failure != nil {
 		return nil, failure
@@ -341,26 +367,35 @@ func (e *Engine) routeAnchors(ctx context.Context, start uint32, waypoints []Poi
 	return anchors, nodes, edges, err
 }
 
-// anchorLoop gives the anchors of the loops through the waypoints and the length of the cheapest one,
-// or nil anchors when there are no waypoints, or all of them are the start node. When direct is the direct loop of
-// the same anchors, its length is the cheapest one, and the waypoints are not routed again.
-func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point, f *forbidden, direct *Route) (anchors []uint32, length float64, err error) {
+// anchorLoop gives the anchors of the loops through the waypoints, the length of the cheapest one and its effort
+// distance, or nil anchors when there are no waypoints, or all of them are the start node. When direct is the direct
+// loop of the same anchors, its length is the cheapest one, and the waypoints are not routed again.
+func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point, f *forbidden, direct *Route, effort *EffortTarget) (anchors []uint32, length, baseEffort float64, err error) {
 	if len(waypoints) == 0 {
-		return nil, 0, nil
+		return nil, 0, 0, nil
 	}
 	anchors, err = e.snapAnchors(start, waypoints, true, f)
 	if err != nil || len(anchors) < 2 {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	if direct != nil && direct.Distance > 0 && direct.fingerprint == e.g.fingerprint && slices.Equal(direct.anchors, anchors) {
-		return anchors, direct.Distance, nil
+		length = direct.Distance
+		baseEffort = length
+		if effort != nil {
+			baseEffort = length * effortFactorOfPoints(direct.Points, effort.Slope)
+		}
+		return anchors, length, baseEffort, nil
 	}
 	nodes, edges, err := e.routeChain(ctx, anchors, f)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	length, _, _ = measure(e.g, nodes, edges)
-	return anchors, length, nil
+	baseEffort = length
+	if effort != nil {
+		baseEffort = length * effortFactor(e.g, nodes, effort.Slope)
+	}
+	return anchors, length, baseEffort, nil
 }
 
 // DirectLoopRequest asks for the cheapest loop from Start through the Waypoints in order, keeping out of the
