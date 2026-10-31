@@ -26,44 +26,17 @@ jobs:
     needs: check
     uses: ./.github/workflows/server.yml
 
-  # Builds the multi-platform image and pushes it to GitHub Container Registry once the checks and tests pass; the pull requests
-  # build the app through the e2e tests (workflow `web`).
+  # Builds the image once (workflow `image`) and hands its digest to the deploy; the pull requests build the same image
+  # without pushing it, so a broken Dockerfile fails there rather than on the release.
   container:
     needs: [check, web, server]
-    runs-on: ubuntu-latest
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
+    uses: ./.github/workflows/image.yml
+    with:
+      push: true
+    # The called workflow pushes to the registry; it declares the same permissions, which a callee cannot raise.
     permissions:
       contents: read
       packages: write
-    steps:
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/setup-qemu-action@v4
-
-      - uses: docker/setup-buildx-action@v4
-
-      - id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha
-
-      - id: build
-        uses: docker/build-push-action@v7
-        with:
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   # Rolls the pushed image out to the cluster by its digest; it waits for the variable K8S_NAMESPACE, so nothing fails before
   # the cluster exists. The names of the objects default to the manifests of the cluster.
