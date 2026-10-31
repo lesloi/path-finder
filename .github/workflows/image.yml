@@ -63,7 +63,7 @@ jobs:
       - id: build
         uses: docker/build-push-action@v7
         with:
-          push: ${{ inputs.push }}
+          push: ${{ inputs.push == true }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
