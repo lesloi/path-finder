@@ -427,7 +427,7 @@ export function StartPointMap({
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [areaBubble]); // eslint-disable-line react-hooks/exhaustive-deps -- `closeAreaBubble` is an effect event
+  }, [areaBubble]);
 
   useEffect(() => {
     const map = new Map({
