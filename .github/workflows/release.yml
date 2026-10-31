@@ -66,7 +66,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # Rolls the pushed image out to the cluster by its digest; it waits for the variable K8S_NAMESPACE, so nothing fails before
-  # the cluster exists.
+  # the cluster exists. The names of the objects default to the manifests of the cluster.
   deploy:
     needs: container
     if: vars.K8S_NAMESPACE != ''
@@ -74,9 +74,9 @@ jobs:
     environment: production
     env:
       NAMESPACE: ${{ vars.K8S_NAMESPACE }}
-      DEPLOYMENT: ${{ vars.K8S_DEPLOYMENT }}
-      CONTAINER: ${{ vars.K8S_CONTAINER }}
-      CRONJOB: ${{ vars.K8S_CRONJOB }}
+      DEPLOYMENT: ${{ vars.K8S_DEPLOYMENT || 'path-finder' }}
+      CONTAINER: ${{ vars.K8S_CONTAINER || 'server' }}
+      CRONJOB: ${{ vars.K8S_CRONJOB || 'path-finder-data' }}
       KUBECONFIG_DATA: ${{ secrets.KUBECONFIG }}
       IMAGE: ghcr.io/${{ github.repository }}@${{ needs.container.outputs.digest }}
     steps:
