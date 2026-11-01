@@ -40,7 +40,7 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
 - **A country's graph is built in one go, on disk; a server maps one graph per territory (`DATA_DIR`).** The build sorts its
   records on disk and reads them back in order, instead of keeping every node in memory: metropolitan France takes
   185 s and 2.4 GB of resident memory at its peak on 16 cores (the build in memory needs 11.6 GB), its landmarks 158 s and
-  0.4 GB of heap (9.9 GB in memory), and the files are the same byte for byte. The landmarks run one per CPU, eight at
+  0.4 GB of heap each with one file per profile (9.9 GB in memory), and the files are the same byte for byte. The landmarks run one per CPU, eight at
   most (`-workers` lowers it), each holding one distance per node (about 4 bytes, whatever the graph, since its column
   is written in blocks): on a 20.6 M-node graph on 16 cores, 2 workers took 19.8 s and 8 took 9.2 s. It needs about
   13 GB of temporary disk, put
@@ -48,12 +48,33 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   with the same routes (the heap stays near 35 MB; the page cache fills). An overseas territory stays a graph of its own in a subdirectory: its
   tiles come in another projection and its extract is far from the others. No routing sits in front of the servers:
   opening a graph costs no memory, since its spatial index is in `graph.bin`, and a start point is answered by the graph
-  holding it with the most room. Fixed file names (`graph.bin`, and `any.alt`, `paved.alt`, `unpaved.alt`, one landmark
-  file per surface preference), written atomically, so a server only needs the directory read-only. The components too
+  holding it with the most room. Fixed file names (`graph.bin`, and `foot.alt`, the unit landmarks of walking), written
+  atomically, so a server only needs the directory read-only. The components too
   small to hold a loop and the long edges are found by the build and stored in `graph.bin`, with the two parameters in its
   header, so that the first search reads no more of the file than the ones after it (France: 127 ms cold, 0.15 GB at
   most in memory instead of 3.2 GB). Before, a country was cut into zones (`plan-zones`, `build-graph -bbox`) because
   its build did not fit in 2 GB; loops near the edge of a zone could not close beyond it.
+- **One graph carries both travel modes, and what a way is open to is a property of each edge.** Foot and bike access, a
+  technical bit per mode (foot `sac_scale` T3, bike `mtb:scale` 0–3) and, for a bike, the direction a oneway allows are
+  written on every edge, so that walking and cycling never need two graphs; the build also stores, per mode, the
+  components too small to hold a loop and the nodes that have an edge of the mode, so that snapping, control points,
+  lifting and the terrain heading never land where the mode cannot go, and a bike-only connector does not make a foot
+  island look large. The avoided areas and the long-way list follow the same access. Walking keeps its rules:
+  `access=no/private` closes a way unless a `foot` tag opens it, `foot=no/private` excludes, a trunk road needs a foot
+  tag, a cycleway with a `foot` tag follows it, and a `sac_scale` of T4 and up leaves walking alone. A bike cannot use a
+  `motorroad` or a way whose `bicycle` or `access` tag closes it; a footway, stair or pedestrian way needs an explicit
+  `bicycle=yes/designated/permissive` (a `bicycle=dismount` opens those, not a way an access tag or a motorroad closes);
+  a `mtb:scale` of 4 and up is no bike way. `oneway` is stored but not enforced: enforcing it
+  would change the stored components and node bitmaps, and the format already carries the direction for that later
+  change (#381). The format moved to `PFGRAPH9`, and a graph of an older one is refused.
+- **Landmark distances use unit costs, one file per mode.** A distance is the shortest length, with no climb and no
+  surface weight, so it is a lower bound for every surface preference of the mode, and tuning `kind × surface` or the
+  climb never invalidates a file. On the 20.6 M-node bench graph, one CPU, the unit metric made searches 10 % slower
+  overall and 19 % slower on `unpaved`, with identical routes, for 314 MB and 4 s instead of 629 MB and 7 s per profile:
+  one file per mode instead of three. The `.alt` header holds the metric, the mode and the graph fingerprint, and a
+  mismatch is refused. `build-alt -mode foot|bike` writes `foot.alt`; `-profile` writes `foot-<profile>.alt` for a
+  profile whose own costs are needed (a fallback if the unit metric is too slow on a country), and the server prefers
+  that file for that profile.
 - **A rebuild is served without a restart, and a file is replaced by renaming over it, never written
   in place.** A restart drops the searches in flight and closes the port for as long as it takes. The
   files are mapped, so a swap is a new set of mappings: each set counts its searches, and the last one out
@@ -66,9 +87,10 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
 - **Nodes are numbered along a Hilbert curve, and the grid index is stored in the graph file.** A route set
   then touches about 3 MB of the mapped files instead of about 66 MB, which lets a server with 2 GB of memory
   serve a whole country.
-- **The engine is our own A\* with landmark lower bounds (ALT)** on a pedestrian graph from OSM, not
-  BRouter. ALT made routes about 25 times faster, and a search only allocates in proportion to the
-  nodes it reaches. The landmarks' metric includes the climb penalty, so the bound stays valid.
+- **The engine is our own A\* with landmark lower bounds (ALT)** on a graph of OSM ways open to walking and
+  cycling, not BRouter. ALT made routes about 25 times faster, and a search only allocates in proportion to the
+  nodes it reaches. The landmarks' distances are a lower bound for every profile of the mode (unit costs), so the
+  bound stays valid whatever the surface or the climb.
 - **One routing profile per surface preference, and one climb cost for all.** The user sets a length, a
   surface preference and an elevation gain; there is no activity to route for. The target elevation gain
   steers the climb, so the climb cost does not change with the preference, and a preference only reweights
@@ -76,14 +98,16 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   `unpaved` the reverse, since the way kinds of `any` already lean towards paths and would drown a surface
   weight alone. Every multiplier stays at least 1, so that the search heuristic stays admissible.
   Revisit if the comparison with a reference (#131) shows that runners and walkers need different costs on the
-  same surface.
-- **Alpine ways (`sac_scale` T4 and up) are left out of the graph; T3 stays in and is only flagged.** A surface
+  same surface. Runners and walkers share them: the owner decided against splitting the costs by activity, and the
+  comparison with reference routes (#378) found no surface table to change. The profile is a surface preference within a
+  travel mode: `paved` and `unpaved` key road cycling and gravel/MTB riding too (#380).
+- **Alpine ways (`sac_scale` T4 and up) are left out of walking; T3 stays in and is only flagged.** A surface
   preference stays a weight, and there is no criterion to exclude anything: ways asking for more than hands, ropes or
   chains have no place in a generator of running and hiking routes, and are dropped when the graph is built. T3 ways
   are kept, and flagged so that a route holding one carries a badge, because the mountain massifs cannot be crossed
   without them. An earlier switch to allow them, off by default, was removed: it hid every mountain route behind a
-  setting, and the badge tells what a route holds. The change moved the graph format to `PFGRAPH7`, and a graph of an
-  older format is refused.
+  setting, and the badge tells what a route holds. A bike may still use a T4 path: its own gates are `bicycle`,
+  `motorroad` and `mtb:scale`.
 - **Loops go through 2–4 control points on a circle through the start point**, each leg avoiding what the
   earlier ones used, resized up to four times, then ranked on distance, overlap and elevation gain.
   A resizing also moves each point to the highest or lowest node around it when the gain is off the target

@@ -63,17 +63,34 @@ func run(command string, args []string) error {
 	case "build-alt":
 		fs := flag.NewFlagSet(command, flag.ExitOnError)
 		graph := fs.String("graph", filepath.Join(dataDir(), engine.GraphFileName), "graph file")
-		out := fs.String("out", "", "landmark file to write (default: the profile's file in the data directory)")
-		profile := fs.String("profile", "any", "surface-preference profile: any, paved or unpaved")
+		out := fs.String("out", "", "landmark file to write (default: the mode's unit file in the data directory, or the profile's costs file)")
+		modeName := fs.String("mode", "foot", "travel mode: foot or bike")
+		profile := fs.String("profile", "", "surface preference whose costs the landmarks hold (default: the unit metric, which every profile of the mode shares)")
 		count := fs.Int("landmarks", 8, "number of landmarks")
 		tmp := fs.String("tmp", "", "directory for the files of the build (default: the directory of -out, never a memory-backed /tmp)")
 		workers := fs.Int("workers", engine.DefaultLandmarkWorkers(), "landmarks computed at a time, each worker holding one distance per node (default: the CPUs, 8 at most)")
 		_ = fs.Parse(args)
-		if *out == "" {
-			*out = filepath.Join(dataDir(), engine.LandmarksFileName(*profile))
+		mode, ok := engine.ParseMode(*modeName)
+		if !ok {
+			return fmt.Errorf("unknown travel mode %q: use foot or bike", *modeName)
+		}
+		req := engine.LandmarkRequest{Mode: mode, Profile: *profile, Count: *count}
+		if req.Profile != "" {
+			known := false
+			for _, name := range engine.ProfileNames {
+				known = known || name == req.Profile
+			}
+			if !known {
+				return fmt.Errorf("unknown profile %q: use %s", req.Profile, strings.Join(engine.ProfileNames, ", "))
+			}
+			if *out == "" {
+				*out = filepath.Join(dataDir(), engine.LandmarksCostsFileName(mode, req.Profile))
+			}
+		} else if *out == "" {
+			*out = filepath.Join(dataDir(), engine.LandmarksFileName(mode))
 		}
 		// The distances go to disk as they are made, so that the memory follows the workers, not the number of nodes.
-		return engine.WriteLandmarksOnDisk(*graph, *out, *profile, *count, *tmp, *workers)
+		return engine.WriteLandmarksOnDisk(*graph, *out, req, *tmp, *workers)
 	}
 	return fmt.Errorf("unknown command %q: use build-graph, build-alt, build-pois, or none to serve", command)
 }
@@ -94,7 +111,11 @@ func serve() {
 	// The graph and the landmarks of each profile are built ahead of serving, by build-graph and build-alt.
 	// The port opens once the files are mapped and their headers checked.
 	opened := time.Now()
-	zones, err := engine.NewReloader(dataDir(), engine.ProfileNames...)
+	keys := make([]engine.EngineKey, len(engine.ProfileNames))
+	for i, name := range engine.ProfileNames {
+		keys[i] = engine.EngineKey{Mode: engine.Foot, Profile: name}
+	}
+	zones, err := engine.NewReloader(dataDir(), keys...)
 	if err != nil {
 		log.Fatal(err)
 	}

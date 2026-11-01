@@ -13,17 +13,21 @@ import (
 
 // GraphWriter writes the graph file of a graph too big to be in memory, section by section: the size of every section
 // but the last is known from the counts and the bounds, so each record goes to its place in the file as it comes, and
-// no section is written twice. The fingerprint is that of the nodes, then the offsets, then the edges, so those three
-// come in that order; the others come when the build has them.
+// no section is written twice. The fingerprint is that of the nodes, then the offsets, then the edges, then the small
+// components and the node modes of each travel mode, in that order, so those sections are closed in that order; the
+// grid and the long ways come when the build has them.
 type GraphWriter struct {
-	path, tmp                                   string
-	f                                           *os.File
-	head                                        graphHead
-	crc                                         hash.Hash64
-	nodes, off, edges, cells, grid, small, long *section
+	path, tmp                      string
+	f                              *os.File
+	head                           graphHead
+	crc                            hash.Hash64
+	nodes, off, edges, cells, grid *section
+	small, modes                   [NumModes]*section
+	long                           *section
 	// The records are written from the structs a graph in memory holds, so that both writers share their layout.
 	node [1]node
 	edge [1]edge
+	way  [1]longWay
 	b    [8]byte
 }
 
@@ -65,6 +69,7 @@ func CreateGraph(path string, nodes, edges uint32, box [4]int32) (*GraphWriter, 
 		smallLimit: smallComponentNodes, longMeters: longEdgeMeters,
 	}}
 	nx, ny := GridSize(box)
+	words := (uint64(nodes) + 63) / 64
 	pos := int64(graphHeaderSize)
 	open := func(name string, want uint64, fingerprinted bool) *section {
 		var out io.Writer = io.NewOffsetWriter(f, pos)
@@ -85,7 +90,12 @@ func CreateGraph(path string, nodes, edges uint32, box [4]int32) (*GraphWriter, 
 	w.edges = add("edges", uint64(edges), 12, true)
 	w.cells = add("grid cells", uint64(nx*ny+1), 4, false)
 	w.grid = add("grid nodes", n, 4, false)
-	w.small = add("small component words", (n+63)/64, 8, false)
+	for m := range w.small {
+		w.small[m] = add(Mode(m).String()+" small component words", words, 8, true)
+	}
+	for m := range w.modes {
+		w.modes[m] = add(Mode(m).String()+" node modes", words, 8, true)
+	}
 	w.long = open("long ways", math.MaxUint64, false) // the last section: how many is known at the end
 	return w, nil
 }
@@ -130,17 +140,53 @@ func (w *GraphWriter) GridNode(n uint32) error {
 	return w.grid.write(w.b[:4])
 }
 
-// Small adds the next word of the bitmap of the nodes of small components (see SmallComponentNodes).
-func (w *GraphWriter) Small(word uint64) error {
+// Small adds the next word of the bitmap of the nodes of small components of a mode (see SmallComponentNodes). The
+// words come after the edges, which its first call closes: the fingerprint reads them in that order.
+func (w *GraphWriter) Small(mode Mode, word uint64) error {
+	if w.small[mode].n == 0 && w.small[Foot].n == 0 && w.small[Bike].n == 0 {
+		if err := w.edges.w.Flush(); err != nil {
+			return err
+		}
+	}
+	if mode == Bike && w.small[Bike].n == 0 {
+		if err := w.small[Foot].w.Flush(); err != nil {
+			return err
+		}
+	}
+	if mode == Foot && w.small[Bike].n > 0 {
+		return fmt.Errorf("engine: the foot small components must all come before the bike ones")
+	}
 	binary.LittleEndian.PutUint64(w.b[:], word)
-	return w.small.write(w.b[:8])
+	return w.small[mode].write(w.b[:8])
 }
 
-// Long adds the next way longer than LongEdgeMeters, its lower node first, in the order of the graph.
-func (w *GraphWriter) Long(a, b uint32) error {
-	binary.LittleEndian.PutUint32(w.b[0:], a)
-	binary.LittleEndian.PutUint32(w.b[4:], b)
-	return w.long.write(w.b[:8])
+// NodeModes adds the next word of the bitmap of the nodes that have an edge of a mode. The bitmaps come after the
+// small components, which their first call closes, and one after the other.
+func (w *GraphWriter) NodeModes(mode Mode, word uint64) error {
+	if w.modes[Foot].n == 0 && w.modes[Bike].n == 0 {
+		for m := range w.small {
+			if err := w.small[m].w.Flush(); err != nil {
+				return err
+			}
+		}
+	}
+	if mode == Bike && w.modes[Bike].n == 0 {
+		if err := w.modes[Foot].w.Flush(); err != nil {
+			return err
+		}
+	}
+	if mode == Foot && w.modes[Bike].n > 0 {
+		return fmt.Errorf("engine: the foot node modes must all come before the bike ones")
+	}
+	binary.LittleEndian.PutUint64(w.b[:], word)
+	return w.modes[mode].write(w.b[:8])
+}
+
+// Long adds the next way longer than LongEdgeMeters, its lower node first, with the modes that may use it, in the
+// order of the graph.
+func (w *GraphWriter) Long(a, b uint32, modes uint8) error {
+	w.way[0] = longWay{A: a, B: b, Modes: modes}
+	return w.long.write(bytesOf(w.way[:]))
 }
 
 // close checks that a section is complete and puts what it holds in the file.
@@ -169,8 +215,10 @@ func (w *GraphWriter) Close() error {
 }
 
 func (w *GraphWriter) finish() error {
-	// The edges come last of the three that are fingerprinted: a graph with no edge closes its offsets here.
-	for _, s := range []*section{w.nodes, w.off, w.edges, w.cells, w.grid, w.small} {
+	// The sections closed here are those the fingerprint reads, in its order: the edges may still hold bytes when the
+	// small components start, which Small flushes first.
+	order := []*section{w.nodes, w.off, w.edges, w.small[Foot], w.small[Bike], w.modes[Foot], w.modes[Bike], w.cells, w.grid}
+	for _, s := range order {
 		if err := w.close(s); err != nil {
 			return err
 		}
@@ -180,7 +228,7 @@ func (w *GraphWriter) finish() error {
 	}
 	w.head.longEdges = uint32(w.long.n)
 	w.head.fingerprint = w.crc.Sum64()
-	end := w.long.start + int64(w.long.n)*8
+	end := w.long.start + int64(w.long.n)*12
 	if err := w.f.Truncate(end + pad16(end)); err != nil {
 		return err
 	}

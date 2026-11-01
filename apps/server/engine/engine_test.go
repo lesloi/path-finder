@@ -41,9 +41,14 @@ func (t *testGraph) dist(a, b int) float32 {
 }
 
 func (t *testGraph) connect(a, b int, kind uint8) {
+	t.connectModes(a, b, kind, EdgeFoot|EdgeBike)
+}
+
+// connectModes joins two nodes with a way only the given modes may use.
+func (t *testGraph) connectModes(a, b int, kind, modes uint8) {
 	l := t.dist(a, b)
-	t.edges[a] = append(t.edges[a], edge{To: uint32(b), Len: l, Kind: kind, Surf: SurfaceCompact})
-	t.edges[b] = append(t.edges[b], edge{To: uint32(a), Len: l, Kind: kind, Surf: SurfaceCompact})
+	t.edges[a] = append(t.edges[a], edge{To: uint32(b), Len: l, Kind: kind, Surf: SurfaceCompact, Modes: modes})
+	t.edges[b] = append(t.edges[b], edge{To: uint32(a), Len: l, Kind: kind, Surf: SurfaceCompact, Modes: modes})
 }
 
 // grid adds a w by h lattice of paths and returns the node index of cell (x, y).
@@ -89,12 +94,13 @@ func flat(x, y int) float64 { return 100 }
 // writeTestLandmarks builds the landmarks of the graph file at path, and returns the file they are in.
 func writeTestLandmarks(tb testing.TB, path string) string {
 	tb.Helper()
-	e, err := Open(path, "", "any")
+	e, err := Open(path, "", footKey("any"))
 	if err != nil {
 		tb.Fatal(err)
 	}
 	alt := filepath.Join(tb.TempDir(), "graph.alt")
-	if err := writeLandmarks(alt, 4, uint32(e.g.n), e.g.fingerprint, 8, buildLandmarks(e.g, e.sp, e.prof, 4, 8)); err != nil {
+	head := newAltHead(4, uint32(e.g.n), e.g.fingerprint, Foot, altMetricCosts, "any", 8)
+	if err := writeLandmarks(alt, head, buildLandmarks(e.g, e.sp, e.prof, Foot, 4, 8)); err != nil {
 		tb.Fatal(err)
 	}
 	return alt
@@ -107,12 +113,15 @@ func openTest(tb testing.TB, t *testGraph, withLandmarks bool) *Engine {
 	if withLandmarks {
 		alt = writeTestLandmarks(tb, path)
 	}
-	e, err := Open(path, alt, "any")
+	e, err := Open(path, alt, footKey("any"))
 	if err != nil {
 		tb.Fatal(err)
 	}
 	return e
 }
+
+// footKey is the key of a foot profile, the travel mode the server serves in v1.
+func footKey(profile string) EngineKey { return EngineKey{Foot, profile} }
 
 func pointOf(t *testGraph, n int) Point {
 	return Point{float64(t.nodes[n].Lat) * 1e-7, float64(t.nodes[n].Lon) * 1e-7}
@@ -368,13 +377,13 @@ func TestOpenRejectsBadInput(t *testing.T) {
 	g.grid(3, 3, flat)
 	path := g.write(t)
 
-	if _, err := Open(path, "", "teleport"); err == nil {
+	if _, err := Open(path, "", footKey("teleport")); err == nil {
 		t.Error("unknown profile: err = nil")
 	}
-	if _, err := Open(filepath.Join(t.TempDir(), "missing.bin"), "", "any"); err == nil {
+	if _, err := Open(filepath.Join(t.TempDir(), "missing.bin"), "", footKey("any")); err == nil {
 		t.Error("missing graph: err = nil")
 	}
-	if _, err := Open(path, path, "any"); err == nil {
+	if _, err := Open(path, path, footKey("any")); err == nil {
 		t.Error("graph file given as landmarks: err = nil")
 	}
 }
@@ -382,11 +391,11 @@ func TestOpenRejectsBadInput(t *testing.T) {
 func TestOpenAllSharesTheGraphBetweenProfiles(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(6, 6, flat)
-	engines, err := OpenAll(g.write(t), map[string]string{"any": "", "paved": ""})
+	engines, err := OpenAll(g.write(t), map[EngineKey]string{footKey("any"): "", footKey("paved"): ""})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if engines["any"].g != engines["paved"].g || engines["any"].sp != engines["paved"].sp {
+	if engines[footKey("any")].g != engines[footKey("paved")].g || engines[footKey("any")].sp != engines[footKey("paved")].sp {
 		t.Error("engines map the graph twice")
 	}
 	for name, e := range engines {
@@ -394,7 +403,7 @@ func TestOpenAllSharesTheGraphBetweenProfiles(t *testing.T) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	if _, err := OpenAll(g.write(t), map[string]string{"teleport": ""}); err == nil {
+	if _, err := OpenAll(g.write(t), map[EngineKey]string{{Foot, "teleport"}: ""}); err == nil {
 		t.Error("unknown profile: err = nil")
 	}
 }
@@ -438,16 +447,19 @@ func TestOpenDirOpensTheGraphAndTheLandmarksItHolds(t *testing.T) {
 	if err := b.WriteGraph(filepath.Join(dir, GraphFileName)); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteLandmarks(filepath.Join(dir, GraphFileName), filepath.Join(dir, LandmarksFileName("any")), "any", 2); err != nil {
+	if err := WriteLandmarks(filepath.Join(dir, GraphFileName), filepath.Join(dir, LandmarksFileName(Foot)), LandmarkRequest{Mode: Foot, Count: 2}); err != nil {
 		t.Fatal(err)
 	}
 
-	engines, err := OpenDir(dir, "any", "paved")
+	engines, err := OpenDir(dir, footKey("any"), footKey("paved"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if engines["any"].alt == nil || engines["paved"].alt != nil {
-		t.Errorf("landmarks: any %v, paved %v; only any has a file", engines["any"].alt != nil, engines["paved"].alt != nil)
+	if engines[footKey("any")].alt == nil || engines[footKey("paved")].alt == nil {
+		t.Errorf("landmarks: any %v, paved %v; both share the mode's unit file", engines[footKey("any")].alt != nil, engines[footKey("paved")].alt != nil)
+	}
+	if engines[footKey("any")].alt != engines[footKey("paved")].alt {
+		t.Error("the two profiles mapped the same landmark file twice")
 	}
 	if leftovers, _ := filepath.Glob(filepath.Join(dir, "*.tmp")); len(leftovers) != 0 {
 		t.Errorf("temporary files left behind: %v", leftovers)
@@ -455,7 +467,7 @@ func TestOpenDirOpensTheGraphAndTheLandmarksItHolds(t *testing.T) {
 }
 
 func TestOpenDirFailsWithoutAGraph(t *testing.T) {
-	_, err := OpenDir(t.TempDir(), "any")
+	_, err := OpenDir(t.TempDir(), footKey("any"))
 	if err == nil || !strings.Contains(err.Error(), "opening the data") {
 		t.Errorf("err = %v", err)
 	}
@@ -463,10 +475,10 @@ func TestOpenDirFailsWithoutAGraph(t *testing.T) {
 
 func TestAFailedWriteLeavesNoFile(t *testing.T) {
 	dir := t.TempDir()
-	if err := WriteLandmarks(filepath.Join(dir, "missing.bin"), filepath.Join(dir, "x.alt"), "any", 2); err == nil {
+	if err := WriteLandmarks(filepath.Join(dir, "missing.bin"), filepath.Join(dir, "x.alt"), LandmarkRequest{Mode: Foot, Profile: "any", Count: 2}); err == nil {
 		t.Error("landmarks of a graph that does not exist: err = nil")
 	}
-	if err := WriteLandmarks(filepath.Join(dir, "missing.bin"), filepath.Join(dir, "x.alt"), "teleport", 2); err == nil {
+	if err := WriteLandmarks(filepath.Join(dir, "missing.bin"), filepath.Join(dir, "x.alt"), LandmarkRequest{Mode: Foot, Profile: "teleport", Count: 2}); err == nil {
 		t.Error("unknown profile: err = nil")
 	}
 	if err := writeAtomic(filepath.Join(dir, "y"), func(tmp string) error {
@@ -493,7 +505,7 @@ func TestOpenDirOnAReadOnlyDirectory(t *testing.T) {
 	if err := b.WriteGraph(graph); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName("any")), "any", 2); err != nil {
+	if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName(Foot)), LandmarkRequest{Mode: Foot, Count: 2}); err != nil {
 		t.Fatal(err)
 	}
 	// What a read-only volume looks like to the pod: no file and no directory can be written.
@@ -512,14 +524,14 @@ func TestOpenDirOnAReadOnlyDirectory(t *testing.T) {
 		t.Skip("the directory is writable anyway (running as root?)")
 	}
 
-	engines, err := OpenDir(dir, "any", "paved")
+	engines, err := OpenDir(dir, footKey("any"), footKey("paved"))
 	if err != nil {
 		t.Fatalf("a read-only data directory: %v", err)
 	}
-	if engines["any"].alt == nil {
+	if engines[footKey("any")].alt == nil {
 		t.Error("the landmarks were not opened")
 	}
-	if _, err := engines["any"].Route(context.Background(), Point{Lat: 45, Lon: 6}, Point{Lat: 45.003, Lon: 6}); err != nil {
+	if _, err := engines[footKey("any")].Route(context.Background(), Point{Lat: 45, Lon: 6}, Point{Lat: 45.003, Lon: 6}); err != nil {
 		t.Errorf("a route on a read-only graph: %v", err)
 	}
 	if now, _ := filepath.Glob(filepath.Join(dir, "*")); len(now) != len(files) {
@@ -548,14 +560,14 @@ func TestLandmarksOfAnotherGraphOfTheSameSizeAreRefused(t *testing.T) {
 	first := write("first.bin", [4]float64{100, 110, 120, 130})
 	second := write("second.bin", [4]float64{130, 120, 110, 100}) // 4 nodes and 6 edges too
 	alt := filepath.Join(dir, "first.alt")
-	if err := WriteLandmarks(first, alt, "any", 2); err != nil {
+	if err := WriteLandmarks(first, alt, LandmarkRequest{Mode: Foot, Profile: "any", Count: 2}); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := Open(first, alt, "any"); err != nil {
+	if _, err := Open(first, alt, footKey("any")); err != nil {
 		t.Fatalf("the landmarks of their own graph: %v", err)
 	}
-	if _, err := Open(second, alt, "any"); err == nil || !strings.Contains(err.Error(), "another graph") {
+	if _, err := Open(second, alt, footKey("any")); err == nil || !strings.Contains(err.Error(), "another graph") {
 		t.Errorf("landmarks of another graph: err = %v, want it to refuse them", err)
 	}
 }
@@ -565,7 +577,7 @@ func TestAnOpenedGraphUsesTheSpatialIndexOfItsFile(t *testing.T) {
 	g := &testGraph{}
 	g.grid(6, 6, flat)
 	path := g.write(t)
-	e, err := Open(path, "", "any")
+	e, err := Open(path, "", footKey("any"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -585,7 +597,7 @@ func TestAnOpenedGraphUsesTheSpatialIndexOfItsFile(t *testing.T) {
 	if err := os.WriteFile(path, data[:len(data)-64], 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Open(path, "", "any"); err == nil || !strings.Contains(err.Error(), "shorter") {
+	if _, err := Open(path, "", footKey("any")); err == nil || !strings.Contains(err.Error(), "shorter") {
 		t.Errorf("a file cut in its index: err = %v, want it to say it is too short", err)
 	}
 }
@@ -781,7 +793,8 @@ func TestDirectLoopErrors(t *testing.T) {
 	if _, err := e.DirectLoop(context.Background(), DirectLoopRequest{Start: Point{46, 7}, Waypoints: []Point{w}}); !errors.Is(err, ErrOffGraph) || errors.As(err, &we) {
 		t.Errorf("start off the graph: err = %v, want ErrOffGraph and no waypoint", err)
 	}
-	g.addNode(2100, 2100, 100) // a way of its own, joined to nothing
+	islandEnd := g.addNode(2100, 2100, 100) // a way of its own, joined to nothing
+	g.connect(islandEnd, g.addNode(2200, 2100, 100), KindPath)
 	e = openTest(t, g, false)
 	island := offset(2100, 2100)
 	if _, err := e.DirectLoop(context.Background(), DirectLoopRequest{Start: start, Waypoints: []Point{island}}); !errors.Is(err, ErrNoRoute) {

@@ -26,7 +26,7 @@ const (
 // Files are what Write produced.
 type Files struct {
 	Graph     string
-	Landmarks map[string]string // by profile
+	Landmarks map[engine.Mode]string
 }
 
 // Write writes the graph and the landmarks of every profile into dir. Ways west of the start
@@ -64,13 +64,13 @@ func Write(dir string) (Files, error) {
 			}
 		}
 	}
-	f := Files{Graph: filepath.Join(dir, engine.GraphFileName), Landmarks: map[string]string{}}
+	f := Files{Graph: filepath.Join(dir, engine.GraphFileName), Landmarks: map[engine.Mode]string{}}
 	if err := b.WriteGraph(f.Graph); err != nil {
 		return Files{}, err
 	}
-	for _, profile := range engine.ProfileNames {
-		f.Landmarks[profile] = filepath.Join(dir, engine.LandmarksFileName(profile))
-		if err := engine.WriteLandmarks(f.Graph, f.Landmarks[profile], profile, 8); err != nil {
+	for _, mode := range []engine.Mode{engine.Foot, engine.Bike} {
+		f.Landmarks[mode] = filepath.Join(dir, engine.LandmarksFileName(mode))
+		if err := engine.WriteLandmarks(f.Graph, f.Landmarks[mode], engine.LandmarkRequest{Mode: mode, Count: 8}); err != nil {
 			return Files{}, err
 		}
 	}

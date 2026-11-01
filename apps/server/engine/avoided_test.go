@@ -66,7 +66,7 @@ func TestAnEdgeCrossingAnAreaIsForbiddenEvenWithBothEndsOutside(t *testing.T) {
 	g.connect(d, b, KindPath)
 	area := circleAt(g, 0, 500, 100)
 	e := openTest(t, g, false)
-	forbidden := newForbidden(e.g, []Circle{area})
+	forbidden := newForbidden(e.g, []Circle{area}, Foot)
 	// Act
 	r := newSearcher().route(context.Background(), e, 0, nil, searchLimits{forbidden: forbidden}, uint32(a), uint32(b))
 	// Assert
@@ -84,7 +84,7 @@ func TestAnAreaOnTheOnlyWayLeavesNoRoute(t *testing.T) {
 	at := g.grid(5, 1, flat)
 	area := circleAt(g, 0, 2*stepM, 30)
 	e := openTest(t, g, false)
-	forbidden := newForbidden(e.g, []Circle{area})
+	forbidden := newForbidden(e.g, []Circle{area}, Foot)
 	// Act
 	r := newSearcher().route(context.Background(), e, 0, nil, searchLimits{forbidden: forbidden}, uint32(at(0, 0)), uint32(at(4, 0)))
 	// Assert
@@ -99,7 +99,7 @@ func TestAStartInsideAnAreaMovesToTheNearestNodeOutside(t *testing.T) {
 	at := g.grid(21, 21, flat)
 	area := circleAt(g, 10*stepM, 10*stepM, 150)
 	e := openTest(t, g, false)
-	forbidden := newForbidden(e.g, []Circle{area})
+	forbidden := newForbidden(e.g, []Circle{area}, Foot)
 	// Act
 	node, err := e.snapStart(pointOf(g, at(10, 10)), forbidden)
 	// Assert
@@ -117,7 +117,7 @@ func TestWithoutAreasNothingIsForbidden(t *testing.T) {
 	g.grid(3, 3, flat)
 	e := openTest(t, g, false)
 	// Act
-	forbidden := newForbidden(e.g, nil)
+	forbidden := newForbidden(e.g, nil, Foot)
 	// Assert
 	if forbidden != nil {
 		t.Error("an empty set of areas must cost the searches nothing")
@@ -138,7 +138,7 @@ func TestAVeryLongEdgeCrossingAnAreaFarFromBothEndsIsForbidden(t *testing.T) {
 	area := circleAt(g, 0, 3000, 100)
 	e := openTest(t, g, false)
 	// Act
-	forbidden := newForbidden(e.g, []Circle{area})
+	forbidden := newForbidden(e.g, []Circle{area}, Foot)
 	// Assert
 	if !forbidden.holds(uint32(a), uint32(b)) {
 		t.Error("the long way through the area is allowed")
@@ -156,9 +156,9 @@ func TestTheSameAreasShareOneForbiddenSetAcrossCalls(t *testing.T) {
 	other := circleAt(g, 300, 300, 50)
 	e := openTest(t, g, false)
 	// Act
-	first := e.g.forbiddenFor([]Circle{one})
-	again := e.g.forbiddenFor([]Circle{one})
-	changed := e.g.forbiddenFor([]Circle{other})
+	first := e.g.forbiddenFor([]Circle{one}, Foot)
+	again := e.g.forbiddenFor([]Circle{one}, Foot)
+	changed := e.g.forbiddenFor([]Circle{other}, Foot)
 	// Assert
 	if first != again {
 		t.Error("the set was built again for the same areas")

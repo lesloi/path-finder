@@ -129,77 +129,126 @@ type LoopRequest struct {
 	Stats *LoopStats
 }
 
-// Open maps a graph file, and its landmark file when landmarksPath is not empty, for the named
-// surface-preference profile. The landmarks must have been built for the same profile.
-func Open(graphPath, landmarksPath, profile string) (*Engine, error) {
-	engines, err := OpenAll(graphPath, map[string]string{profile: landmarksPath})
+// EngineKey selects an engine of a graph: a travel mode and a surface preference. Several engines of one mode
+// share a landmark file; the surface preferences of a mode share one graph.
+type EngineKey struct {
+	Mode    Mode
+	Profile string
+}
+
+// Open maps a graph file, and its landmark file when landmarksPath is not empty, for the mode and the
+// surface-preference profile. The landmarks must have been built for the same mode, and for that profile when they
+// hold its costs.
+func Open(graphPath, landmarksPath string, key EngineKey) (*Engine, error) {
+	engines, err := OpenAll(graphPath, map[EngineKey]string{key: landmarksPath})
 	if err != nil {
 		return nil, err
 	}
-	return engines[profile], nil
+	return engines[key], nil
 }
 
-// OpenAll maps a graph file once and returns an engine per profile, keyed by name. The
-// value is the profile's landmark file, or empty for none. Engines share the graph and its index.
-func OpenAll(graphPath string, landmarks map[string]string) (map[string]*Engine, error) {
+// OpenAll maps a graph file once and returns an engine per key. The value is the key's landmark file, or empty for
+// none; engines of one mode that share a file share its mapping. Engines share the graph and its index.
+func OpenAll(graphPath string, landmarks map[EngineKey]string) (map[EngineKey]*Engine, error) {
 	g, err := openGraph(graphPath)
 	if err != nil {
 		return nil, err
 	}
-	sp := g.sp
-	engines := make(map[string]*Engine, len(landmarks))
-	for name, path := range landmarks {
-		p := profiles[name]
+	return openEngines(g, landmarks)
+}
+
+// openEngines builds the engines of a graph that is already mapped, so that a caller that opens several modes of a
+// data directory maps its graph once.
+func openEngines(g *graph, paths map[EngineKey]string) (map[EngineKey]*Engine, error) {
+	engines := make(map[EngineKey]*Engine, len(paths))
+	alts := make(map[string]*landmarks, len(paths))
+	var err error
+	for key, path := range paths {
+		p := profiles[key.Profile]
 		if p == nil {
 			closeEngines(engines, g)
-			return nil, fmt.Errorf("engine: unknown profile %q", name)
+			return nil, fmt.Errorf("engine: unknown profile %q", key.Profile)
 		}
-		e := &Engine{g: g, sp: sp, prof: p, minMult: p.minMult()}
+		if int(key.Mode) >= int(NumModes) {
+			closeEngines(engines, g)
+			return nil, fmt.Errorf("engine: unknown travel mode %d", key.Mode)
+		}
+		e := &Engine{g: g, sp: g.sp, mode: key.Mode, prof: p, minMult: p.minMult()}
 		for k := range e.mult {
 			for s := range e.mult[k] {
 				e.mult[k][s] = p.Kind[k] * p.Surf[s]
 			}
 		}
 		if path != "" {
-			if e.alt, err = openLandmarks(path, g); err != nil {
+			if e.alt = alts[path]; e.alt == nil {
+				if e.alt, err = openLandmarks(path, g, key); err != nil {
+					closeEngines(engines, g)
+					return nil, err
+				}
+				alts[path] = e.alt
+			} else if e.alt.metric != altMetricUnit || Mode(e.alt.mode) != key.Mode {
 				closeEngines(engines, g)
-				return nil, err
+				return nil, fmt.Errorf("engine: %s is shared by engines of another mode or metric", path)
 			}
 		}
-		engines[name] = e
+		engines[key] = e
 	}
 	return engines, nil
 }
 
-// closeEngines unmaps the graph the engines share, once, and the landmarks of each. Nothing may search after.
-func closeEngines(engines map[string]*Engine, g *graph) {
+// closeEngines unmaps the graph the engines share, once, and the landmark files of each, once. Nothing may search
+// after.
+func closeEngines(engines map[EngineKey]*Engine, g *graph) {
+	seen := make(map[*landmarks]bool, len(engines))
 	for _, e := range engines {
-		if e.alt != nil {
+		if e.alt != nil && !seen[e.alt] {
+			seen[e.alt] = true
 			e.alt.file.unmap()
 		}
 	}
 	g.file.unmap()
 }
 
-// Names of the files a data directory holds: the graph, and for each profile its landmarks.
+// Names of the files a data directory holds: the graph, and for each mode its landmarks.
 const GraphFileName = "graph.bin"
 
-// LandmarksFileName is the name of a profile's landmark file in a data directory.
-func LandmarksFileName(profile string) string { return profile + ".alt" }
+// LandmarksFileName is the name of a mode's landmark file in a data directory: the unit metric, shared by the
+// surface preferences of the mode.
+func LandmarksFileName(mode Mode) string { return mode.String() + ".alt" }
 
-// OpenDir opens the engines of the profiles from a data directory: its graph, and the landmarks
-// of each profile when the directory holds them (a search is slower without).
-func OpenDir(dir string, profiles ...string) (map[string]*Engine, error) {
-	landmarks := make(map[string]string, len(profiles))
-	for _, profile := range profiles {
-		path := filepath.Join(dir, LandmarksFileName(profile))
-		if _, err := os.Stat(path); err == nil {
-			landmarks[profile] = path
-		} else if errors.Is(err, fs.ErrNotExist) {
-			landmarks[profile] = ""
-		} else {
-			return nil, transientError{err}
+// LandmarksCostsFileName is the name of the landmark file of one surface preference's costs, when a data directory
+// holds one: a fallback for a mode whose unit metric is too slow. It takes precedence over the mode's unit file for
+// that profile.
+func LandmarksCostsFileName(mode Mode, profile string) string {
+	return mode.String() + "-" + profile + ".alt"
+}
+
+// landmarkPath finds the landmark file of a key in dir: its profile's costs when the directory holds one, else the
+// mode's unit file, else empty (a search runs without landmarks, only slower).
+func landmarkPath(dir string, key EngineKey) (string, error) {
+	for _, name := range []string{LandmarksCostsFileName(key.Mode, key.Profile), LandmarksFileName(key.Mode)} {
+		path := filepath.Join(dir, name)
+		_, err := os.Stat(path)
+		if err == nil {
+			return path, nil
 		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return "", transientError{err}
+		}
+	}
+	return "", nil
+}
+
+// OpenDir opens the engines of the keys from a data directory: its graph, and the landmarks of each when the
+// directory holds them (a search is slower without).
+func OpenDir(dir string, keys ...EngineKey) (map[EngineKey]*Engine, error) {
+	landmarks := make(map[EngineKey]string, len(keys))
+	for _, key := range keys {
+		path, err := landmarkPath(dir, key)
+		if err != nil {
+			return nil, err
+		}
+		landmarks[key] = path
 	}
 	engines, err := OpenAll(filepath.Join(dir, GraphFileName), landmarks)
 	if err != nil {
@@ -210,11 +259,11 @@ func OpenDir(dir string, profiles ...string) (map[string]*Engine, error) {
 
 // Route finds the cheapest route from one point to another. It returns ctx's error when ctx ends first.
 func (e *Engine) Route(ctx context.Context, from, to Point) (*Route, error) {
-	src, d, ok := e.sp.nearestWhere(e.g, from.Lat, from.Lon, nil, maxSnapMeters)
+	src, d, ok := e.sp.nearestWhere(e.g, from.Lat, from.Lon, e.modeSkip(nil), maxSnapMeters)
 	if !ok || d > maxSnapMeters {
 		return nil, ErrOffGraph
 	}
-	dst, d, ok := e.sp.nearestWhere(e.g, to.Lat, to.Lon, nil, maxSnapMeters)
+	dst, d, ok := e.sp.nearestWhere(e.g, to.Lat, to.Lon, e.modeSkip(nil), maxSnapMeters)
 	if !ok || d > maxSnapMeters {
 		return nil, ErrOffGraph
 	}
@@ -240,7 +289,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if req.Effort != nil && req.Effort.Metres <= 0 {
 		return nil, errors.New("engine: an effort target needs a positive effort distance")
 	}
-	forbidden := e.g.forbiddenFor(req.Avoided)
+	forbidden := e.g.forbiddenFor(req.Avoided, e.mode)
 	start, err := e.snapLoopStart(req.Start, forbidden)
 	if err != nil {
 		return nil, err
@@ -295,11 +344,11 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 func (e *Engine) snapWaypoints(waypoints []Point, leaveSmall bool, f *forbidden) ([]uint32, error) {
 	nodes := make([]uint32, len(waypoints))
 	for i, w := range waypoints {
-		n, d, ok := e.sp.nearestWhere(e.g, w.Lat, w.Lon, f.skip(), maxWaypointSnapMeters)
+		n, d, ok := e.sp.nearestWhere(e.g, w.Lat, w.Lon, e.modeSkip(f), maxWaypointSnapMeters)
 		if !ok || d > maxWaypointSnapMeters {
 			return nil, &WaypointError{Index: i + 1}
 		}
-		if leaveSmall && e.g.small.has(n) {
+		if leaveSmall && e.g.small[e.mode].has(n) {
 			if n, ok = e.nearestLarge(w, maxWaypointSnapMeters, f); !ok {
 				return nil, ErrNoRoute
 			}
@@ -311,7 +360,7 @@ func (e *Engine) snapWaypoints(waypoints []Point, leaveSmall bool, f *forbidden)
 
 // snapStart finds the node of a start point, or fails with ErrOffGraph.
 func (e *Engine) snapStart(p Point, f *forbidden) (uint32, error) {
-	n, d, ok := e.sp.nearestWhere(e.g, p.Lat, p.Lon, f.skip(), maxSnapMeters)
+	n, d, ok := e.sp.nearestWhere(e.g, p.Lat, p.Lon, e.modeSkip(f), maxSnapMeters)
 	if !ok || d > maxSnapMeters {
 		return 0, ErrOffGraph
 	}
@@ -323,7 +372,7 @@ func (e *Engine) snapStart(p Point, f *forbidden) (uint32, error) {
 // spends its budget on legs that cannot reach the rest of the graph.
 func (e *Engine) snapLoopStart(p Point, f *forbidden) (uint32, error) {
 	n, err := e.snapStart(p, f)
-	if err != nil || !e.g.small.has(n) {
+	if err != nil || !e.g.small[e.mode].has(n) {
 		return n, err
 	}
 	if n, ok := e.nearestLarge(p, maxSnapMeters, f); ok {
@@ -334,8 +383,9 @@ func (e *Engine) snapLoopStart(p Point, f *forbidden) (uint32, error) {
 
 // nearestLarge is the node nearest to p within reachM that is outside the small components.
 func (e *Engine) nearestLarge(p Point, reachM float64, f *forbidden) (uint32, bool) {
-	small := e.g.small
-	n, d, ok := e.sp.nearestWhere(e.g, p.Lat, p.Lon, func(n uint32) bool { return small != nil && small.has(n) || f.has(n) }, reachM)
+	small := e.g.small[e.mode]
+	skip := e.modeSkip(f)
+	n, d, ok := e.sp.nearestWhere(e.g, p.Lat, p.Lon, func(n uint32) bool { return small != nil && small.has(n) || skip(n) }, reachM)
 	return n, ok && d <= reachM
 }
 
@@ -464,7 +514,7 @@ type DirectLoopRequest struct {
 // over its steps where it must. It fails with ErrOffGraph for a start point off the ways, a
 // *WaypointError for a waypoint off them, and ErrNoRoute when they are not joined.
 func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route, error) {
-	forbidden := e.g.forbiddenFor(req.Avoided)
+	forbidden := e.g.forbiddenFor(req.Avoided, e.mode)
 	src, err := e.snapStart(req.Start, forbidden)
 	if err != nil {
 		return nil, err
@@ -510,9 +560,13 @@ func isUnpaved(kind, surf uint8) bool {
 
 // stretches tells the surface along a path of edges, and whether any of them is technical.
 func (e *Engine) stretches(edges []uint32) (out []Stretch, technical bool) {
+	technicalBit := EdgeTechnical
+	if e.mode == Bike {
+		technicalBit = EdgeTechnicalBike
+	}
 	for _, id := range edges {
 		ed := e.g.edges[id]
-		isTechnical := ed.Flags&EdgeTechnical != 0
+		isTechnical := ed.Flags&technicalBit != 0
 		technical = technical || isTechnical
 		unpaved := isUnpaved(ed.Kind, ed.Surf)
 		if n := len(out); n > 0 && out[n-1].Unpaved == unpaved && out[n-1].Technical == isTechnical {

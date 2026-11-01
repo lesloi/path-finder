@@ -42,7 +42,8 @@ The steps below put the data under `data/` in the repository. Any other director
 
 The server binary builds its own graph, and the landmarks that speed up searches, with two commands.
 Run them ahead of serving, never while it serves. They write into the **data directory**, set by
-`DATA_DIR` (`data` by default): `graph.bin`, then `any.alt`, `paved.alt` and `unpaved.alt`, one per surface preference.
+`DATA_DIR` (`data` by default): `graph.bin`, then `foot.alt`, the landmarks of the walking mode, which its three
+surface preferences share.
 
 The area where routes can start is that of the extracts you build the graph from, and of the BD ALTI tiles under them. The server
 finds it by itself from the graph (and from each territory of `DATA_DIR`), with nothing to configure: the web app greys out the rest
@@ -54,32 +55,34 @@ CGO_ENABLED=0 go build -o path-finder .
 
 export DATA_DIR=$PWD/../../data
 ./path-finder build-graph -pbf $DATA_DIR/osm/rhone-alpes-latest.osm.pbf -dem $DATA_DIR/bdalti-asc
-./path-finder build-alt -profile any
-./path-finder build-alt -profile paved
-./path-finder build-alt -profile unpaved
+./path-finder build-alt -mode foot
 ```
 
-A graph of a format before `PFGRAPH8` (the current one), or built with other parameters, is refused when the server starts, and the log says to run
-`build-graph` again, then `build-alt` for each profile. A server that is running keeps the graphs it serves when
+A graph of a format before `PFGRAPH9` (the current one), or built with other parameters, is refused when the server starts, and the log says to run
+`build-graph` again, then `build-alt` for the mode. A server that is running keeps the graphs it serves when
 replaced files cannot be served, and says why in its log.
 
 A file appears in its place only once it is complete, so a directory that is being rebuilt never holds
 a half-written one. A running server looks at the directory every 30 seconds and serves the files that replace
 the ones it maps, with no restart. Replace a file by renaming a new one over it, never by writing into it.
 
-`-landmarks` sets how many landmarks to compute (8 by
-default): more make long searches faster and the file bigger. A way with no BD ALTI elevation under
-it is left out, so routes only exist where you downloaded tiles. Landmarks belong to one surface-preference
-profile and to one graph: build them again after each graph; the server refuses those of another graph.
+`-landmarks` sets how many landmarks to compute (8 by default): more make long searches faster and the file
+bigger. A way with no BD ALTI elevation under it is left out, so routes only exist where you downloaded
+tiles. Landmarks belong to one travel mode and to one graph, and hold no climb, so that every surface
+preference of the mode shares them and tuning a profile never invalidates a file: build them again after
+each graph, and after a change of the graph's ways; the server refuses those of another graph or mode.
+
+A profile that falls back to its own costs, because the unit metric is too slow on a whole country, takes
+`-profile paved` and writes `foot-paved.alt`: the server prefers that file for that profile of the mode.
 
 ### Metropolitan France
 
-Metropolitan France is one `build-graph` from the France extract and three `build-alt`, as above, with `-pbf` the
+Metropolitan France is one `build-graph` from the France extract and one `build-alt` per mode, as above, with `-pbf` the
 Geofabrik `france-latest.osm.pbf` and `-dem` the BD ALTI of every department. The build works on disk, and its memory does
 not grow with the extract (it needs a sorted one, as Geofabrik's are). Its temporary files go beside the graph, or to `-tmp`:
 never a memory-backed `/tmp`, they are as big as the extract; `build-graph` and `build-alt` remove the `pf-external-*` and
-`pf-landmarks-*` directories there that a killed build left more than a day ago. Count about 9 GB of temporary disk beside the 4.2 GB graph, and
-about 9 GB of landmark files. `-chunk` and `-cache` size the sorts and the BD ALTI tiles kept in memory: the elevation
+`pf-landmarks-*` directories there that a killed build left more than a day ago. Count about 9 GB of temporary disk beside the graph, and
+about 1.5 GB of landmark files per mode. `-chunk` and `-cache` size the sorts and the BD ALTI tiles kept in memory: the elevation
 step reads those tiles ahead of the sampler on the CPUs, eight at most, so `-cache` must hold a row of them plus a few
 (about 46 for France) or the build reads them one at a time again, and the default holds about three rows. `build-alt` also works
 on disk, `-workers` landmarks at a time (the CPUs, 8 at most, by default; each worker holds one distance per node, about
@@ -112,9 +115,7 @@ as `-pbf`; they are joined in memory.
 ```sh
 dir=$DATA_DIR/guadeloupe && mkdir -p "$dir"
 ./path-finder build-graph -pbf $DATA_DIR/osm/guadeloupe-latest.osm.pbf -dem $DATA_DIR/bdalti-d971 -dem-crs utm20n -out "$dir/graph.bin"
-for profile in any paved unpaved; do
-  ./path-finder build-alt -graph "$dir/graph.bin" -out "$dir/$profile.alt" -profile "$profile"
-done
+./path-finder build-alt -graph "$dir/graph.bin" -out "$dir/foot.alt" -mode foot
 ```
 
 The default `-dem-crs` is `lambert93`. Tiles read in the wrong projection give no elevation, and the build fails.
@@ -142,13 +143,13 @@ development.
 
 The server maps every graph when it starts and answers from the one that holds the start point with the most
 room round it, or from the next one if that has no way near it. A directory that holds a `graph.bin` is one
-graph, and the server refuses one that also has graphs beside it. In a directory of graphs each needs its `any.alt`, `paved.alt` and `unpaved.alt`, and a subdirectory with landmarks or a
+graph, and the server refuses one that also has graphs beside it. In a directory of graphs each needs its `foot.alt`, and a subdirectory with landmarks or a
 temporary file but no `graph.bin` (a build that failed) stops the server.
 
 ## 4. Run it locally
 
 ```sh
-export DATA_DIR=$PWD/data   # holds graph.bin, and any.alt, paved.alt and unpaved.alt if you built them
+export DATA_DIR=$PWD/data   # holds graph.bin and foot.alt if you built them
 pnpm dev
 ```
 
@@ -168,18 +169,18 @@ pnpm start   # http://localhost:3000
 
 ### Environment variables
 
-| Variable             | Required | Default       | Description                                                                                                                                                |
-| -------------------- | -------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                                                                                   |
-| `PORT`               | no       | `3000`        | Port the server listens on                                                                                                                                 |
-| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                                                                                          |
-| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin` and the optional `any.alt`, `paved.alt` and `unpaved.alt`, or one such subdirectory per territory, and the optional `pois/` |
-| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                                                                                 |
-| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))                                                                 |
-| `SEARCH_SEED`        | no       | random        | A whole number that fixes the seed of every search, so that the same criteria bring the same loops (for tests)                                             |
-| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none                                                                         |
-| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                                                                               |
-| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                                                                                |
+| Variable             | Required | Default       | Description                                                                                                                  |
+| -------------------- | -------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `APP_ENV`            | no       |               | `development` turns off the limits and turns on the logs                                                                     |
+| `PORT`               | no       | `3000`        | Port the server listens on                                                                                                   |
+| `WEB_ROOT`           | no       | `../web/dist` | The built web app                                                                                                            |
+| `DATA_DIR`           | no       | `data`        | The directory with `graph.bin` and the optional `foot.alt`, or one such subdirectory per territory, and the optional `pois/` |
+| `TRUSTED_PROXIES`    | no       |               | Proxies trusted for `X-Forwarded-For` ([details](#behind-a-reverse-proxy))                                                   |
+| `LOOP_LIMIT`         | no       | by CPUs       | Route sets generated at once; beyond it the answer is `429` ([details](#how-many-at-once))                                   |
+| `SEARCH_SEED`        | no       | random        | A whole number that fixes the seed of every search, so that the same criteria bring the same loops (for tests)               |
+| `GENERATION_TIMEOUT` | no       | `15s`         | How long a route set may take; the routes found by then are sent, or `504` if none                                           |
+| `RATE_LIMIT`         | no       | `60`          | Requests per client address and `RATE_WINDOW`; beyond it the answer is `429`                                                 |
+| `RATE_WINDOW`        | no       | `10m`         | The window of the rate limit, such as `10m`                                                                                  |
 
 ### How many at once
 
@@ -213,7 +214,7 @@ graph in a directory outside it. Then replace the graph's link by renaming a new
 directory at the same depth (`mv -T ../swap/guadeloupe guadeloupe`): none sees a new `graph.bin` with old landmarks.
 Remove the old graph afterwards. Territories are small, and are replaced one at a time.
 
-The data is a volume: mount the directory holding `graph.bin`, `any.alt`, `paved.alt` and `unpaved.alt`, or one such
+The data is a volume: mount the directory holding `graph.bin` and `foot.alt`, or one such
 subdirectory per territory, on `/data` (the image sets `DATA_DIR=/data`), read-only. The server only reads it, and
 maps the files rather than copying them, so servers that share the directory share its page cache. They pick
 up a rebuild by themselves.

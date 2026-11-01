@@ -59,11 +59,13 @@ type graph struct {
 	off         []uint32
 	edges       []edge
 	sp          *spatial
-	// small holds the nodes of components too small to hold a loop (control points keep off them), and long the ways
-	// too long for a scan of the nodes around an area to find: the build found both, so that no search reads the
-	// whole graph to.
-	small nodeSet
-	long  [][2]uint32
+	// small holds, per travel mode, the nodes of components too small to hold a loop (control points keep off them);
+	// nodeModes which nodes have an edge of each mode; and long the ways too long for a scan of the nodes around an
+	// area to find, with the modes that may use them. The build found all three, so that no search reads the whole
+	// graph to.
+	small     [NumModes]nodeSet
+	nodeModes [NumModes]nodeSet
+	long      []longWay
 	// forbiddenMu guards lastForbidden, the set of the last areas asked for: a request asks twice, for its
 	// direct loop and for its loops, and the set is read only once built.
 	forbiddenMu   sync.Mutex
@@ -196,12 +198,22 @@ func openGraph(path string) (_ *graph, err error) {
 	if g.sp.nodes, err = view[uint32](data, listAt, n); err != nil {
 		return nil, fmt.Errorf("%s: index nodes: %w", path, err)
 	}
+	words := (n + 63) / 64
 	smallAt := align16(listAt + 4*n)
-	longAt := align16(smallAt + 8*((n+63)/64))
-	if g.small, err = view[uint64](data, smallAt, (n+63)/64); err != nil {
-		return nil, fmt.Errorf("%s: small components: %w", path, err)
+	at := smallAt
+	for m := range g.small {
+		if g.small[m], err = view[uint64](data, at, words); err != nil {
+			return nil, fmt.Errorf("%s: %s small components: %w", path, Mode(m), err)
+		}
+		at = align16(at + 8*words)
 	}
-	if g.long, err = view[[2]uint32](data, longAt, int(head.longEdges)); err != nil {
+	for m := range g.nodeModes {
+		if g.nodeModes[m], err = view[uint64](data, at, words); err != nil {
+			return nil, fmt.Errorf("%s: %s node modes: %w", path, Mode(m), err)
+		}
+		at = align16(at + 8*words)
+	}
+	if g.long, err = view[longWay](data, at, int(head.longEdges)); err != nil {
 		return nil, fmt.Errorf("%s: long ways: %w", path, err)
 	}
 	return g, nil
@@ -232,9 +244,11 @@ type landmarks struct {
 	unit   float32
 	rowLen int
 	rows   []uint16
+	mode   Mode
+	metric uint32
 }
 
-func openLandmarks(path string, g *graph) (_ *landmarks, err error) {
+func openLandmarks(path string, g *graph, key EngineKey) (_ *landmarks, err error) {
 	m, err := mapFile(path)
 	if err != nil {
 		return nil, err
@@ -253,7 +267,21 @@ func openLandmarks(path string, g *graph) (_ *landmarks, err error) {
 	if n != g.n || head.fingerprint != g.fingerprint {
 		return nil, fmt.Errorf("%s was built for another graph: build it again with build-alt", path)
 	}
-	a := &landmarks{file: m, l: l, climb: head.climb, unit: head.unit}
+	if Mode(head.mode) != key.Mode {
+		return nil, fmt.Errorf("%s holds the landmarks of the %s mode, not of %s: build it again with build-alt -mode %s", path, Mode(head.mode), key.Mode, key.Mode)
+	}
+	// The unit metric serves every surface preference; the costs of one serve only that one, and only if it is the
+	// profile the search runs with.
+	switch head.metric {
+	case altMetricUnit:
+	case altMetricCosts:
+		if head.profile != profileID(key.Profile) || profiles[key.Profile] == nil || head.climb != profiles[key.Profile].UpPerMeter {
+			return nil, fmt.Errorf("%s holds the landmarks of another profile's costs: build it again with build-alt -mode %s -profile %s", path, key.Mode, key.Profile)
+		}
+	default:
+		return nil, fmt.Errorf("%s holds landmarks of a metric this server does not know: build it again with build-alt", path)
+	}
+	a := &landmarks{file: m, l: l, climb: head.climb, unit: head.unit, mode: key.Mode, metric: head.metric}
 	a.rowLen = l
 	if a.climb > 0 {
 		a.rowLen = 2 * l
@@ -300,9 +328,24 @@ type Engine struct {
 	g       *graph
 	alt     *landmarks
 	sp      *spatial
+	mode    Mode
 	prof    *Profile
 	mult    [NumKinds][NumSurfaces]float32
 	minMult float32
+}
+
+// usable tells whether the way of an edge is open to the engine's travel mode.
+func (e *Engine) usable(ed *edge) bool { return ed.Modes&e.mode.Bit() != 0 }
+
+// nodeUsable tells whether a node has an edge of the engine's travel mode, so that snapping never moves a point
+// onto a node the mode cannot reach.
+func (e *Engine) nodeUsable(n uint32) bool { return e.g.nodeModes[e.mode].has(n) }
+
+// modeSkip is the filter that keeps a nearest-node search off the nodes the travel mode cannot reach, and off an
+// avoided area.
+func (e *Engine) modeSkip(f *forbidden) func(uint32) bool {
+	modes := e.g.nodeModes[e.mode]
+	return func(n uint32) bool { return !modes.has(n) || f.has(n) }
 }
 
 // spatial is a grid over the graph: the nodes of each cell, as numbers in one list, so that finding the
@@ -688,10 +731,10 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 		nu := &nodes[u]
 		for e := g.off[u]; e < g.off[u+1]; e++ {
 			ed := &edges[e]
-			nv := &nodes[ed.To]
-			if lim.forbidden.holds(u, ed.To) {
+			if !cx.usable(ed) || lim.forbidden.holds(u, ed.To) {
 				continue
 			}
+			nv := &nodes[ed.To]
 			c := ed.Len * cx.mult[ed.Kind][ed.Surf]
 			if dz := float32(nv.Elev-nu.Elev) * 0.1; dz > 0 {
 				c += dz * climb
@@ -967,9 +1010,9 @@ func climbLift(ascent, target float64, band AscentBand) float64 {
 }
 
 // liftedNode is the highest node (lift > 0) or lowest (lift < 0) among base and those nearest to eight
-// points reachM around it, leaving out the nodes of small components, or base for no lift. Fixed directions keep
-// a seed's loops the same.
-func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64, f *forbidden) uint32 {
+// points reachM around it, leaving out the nodes of small components and those the mode cannot reach, or base for no
+// lift. Fixed directions keep a seed's loops the same.
+func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64, f *forbidden, mode Mode) uint32 {
 	if lift == 0 {
 		return base
 	}
@@ -980,8 +1023,8 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64, f *for
 	if lift < 0 {
 		sign = -1
 	}
-	best, small := base, g.small
-	skip := func(n uint32) bool { return small.has(n) || f.has(n) }
+	best, small, modes := base, g.small[mode], g.nodeModes[mode]
+	skip := func(n uint32) bool { return !modes.has(n) || small.has(n) || f.has(n) }
 	for k := 0; k < 8; k++ {
 		a := float64(k) * math.Pi / 4
 		n, d, ok := sp.nearestWhere(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl), skip, maxSnapMeters)
@@ -1004,7 +1047,7 @@ func (e *Engine) terrainHeading(start uint32, reach float64, f *forbidden) (floa
 	var sum [sectors]float64
 	var count [sectors]int
 	e.sp.eachNodeWithin(e.g, Point{Lat: lat, Lon: lon}, cosl, reach, func(v uint32) {
-		if v == start || e.g.small.has(v) || f.has(v) {
+		if v == start || !e.nodeUsable(v) || e.g.small[e.mode].has(v) || f.has(v) {
 			return
 		}
 		nd := &e.g.nodes[v]
@@ -1043,13 +1086,13 @@ const goldenAngle = 2.399963229728653
 
 // circlePoints is the node of each control point of the circle of radius rc whose centre lies towards theta
 // from the point (slat, slon), or false when one is farther than snapReach from any way.
-func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64, f *forbidden) ([]uint32, bool) {
+func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64, f *forbidden, mode Mode) ([]uint32, bool) {
 	cosl := math.Cos(slat * rad)
 	cxm, cym := rc*math.Cos(theta), rc*math.Sin(theta)
 	nodes := make([]uint32, 0, len(jitter))
-	small := g.small
+	small, modes := g.small[mode], g.nodeModes[mode]
 	reach := snapReach(rc)
-	skip := func(n uint32) bool { return small.has(n) || f.has(n) }
+	skip := func(n uint32) bool { return !modes.has(n) || small.has(n) || f.has(n) }
 	for j := range jitter {
 		phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(len(jitter)+1)
 		x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)
@@ -1057,7 +1100,7 @@ func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter [
 		if !ok || d > reach {
 			return nil, false
 		}
-		nodes = append(nodes, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift, f))
+		nodes = append(nodes, liftedNode(g, sp, n, math.Abs(lift)*liftReach*rc, lift, f, mode))
 	}
 	return nodes, true
 }
@@ -1065,10 +1108,10 @@ func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter [
 // rotatedCircle is circlePoints for theta, or for the first of the next turns that falls on ways. In a valley
 // most directions lead to a wall: at Chamonix, 30 km, 44 % of the circles had a point beyond reach, and turning
 // it up to circleTries times leaves none. The turn it used comes back, to be kept for the resizings.
-func rotatedCircle(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64, f *forbidden) ([]uint32, float64, bool) {
+func rotatedCircle(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter []float64, lift float64, f *forbidden, mode Mode) ([]uint32, float64, bool) {
 	for r := 0; r < circleTries; r++ {
 		turned := theta + float64(r)*goldenAngle
-		if nodes, ok := circlePoints(g, sp, slat, slon, rc, turned, jitter, lift, f); ok {
+		if nodes, ok := circlePoints(g, sp, slat, slon, rc, turned, jitter, lift, f, mode); ok {
 			return nodes, turned, true
 		}
 	}
@@ -1115,7 +1158,7 @@ func candidateLoop(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp
 		if ctx.Err() != nil {
 			return best, CauseCanceled
 		}
-		circle, turned, ok := rotatedCircle(g, sp, slat, slon, rc, theta, jitter, lift, lp.forbidden)
+		circle, turned, ok := rotatedCircle(g, sp, slat, slon, rc, theta, jitter, lift, lp.forbidden, cx.mode)
 		if !ok {
 			return best, CauseNoSnap
 		}

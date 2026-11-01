@@ -19,6 +19,7 @@ type forbidden struct {
 	circles []Circle
 	cosLat  []float64 // of each circle's centre, which a node test would otherwise compute again for every node
 	edges   *avoidSet
+	mode    Mode // the ways are those the mode may use: an area off a bike's ways does not forbid a foot's
 }
 
 // has tells whether node n lies inside an area.
@@ -42,27 +43,21 @@ func (f *forbidden) holds(a, b uint32) bool {
 	return f != nil && f.edges.contains(pairKey(a, b))
 }
 
-// skip is the filter that keeps a nearest-node search off the nodes inside an area, or nil for none.
-func (f *forbidden) skip() func(uint32) bool {
-	if f == nil {
-		return nil
-	}
-	return f.has
-}
-
 // longEdgeMeters is the length from which a way is looked for by itself and not through the nodes around an
 // area: a longer way can cross an area far from both of its ends, and searching so far around every area would
 // read a large part of the graph for the few ways that long.
 const longEdgeMeters = 500
 
-// longEdgeList is the ways longer than longEdgeMeters, once each, as their two end nodes (the lower number first), in
-// the order of the graph. A graph file stores them: a build finds them when it writes the edges.
-func longEdgeList(off []uint32, edges []edge, n int) [][2]uint32 {
-	var long [][2]uint32
+// longEdgeList is the ways longer than longEdgeMeters, as their two end nodes (the lower number first) and the
+// modes that may use them, in the order of the graph. A graph file stores them: a build finds them when it writes
+// the edges. Two parallel ways between the same nodes are two records, each with its own modes, so that a way only
+// one mode may use does not forbid the other mode's way.
+func longEdgeList(off []uint32, edges []edge, n int) []longWay {
+	var long []longWay
 	for u := uint32(0); int(u) < n; u++ {
 		for _, e := range edges[off[u]:off[u+1]] {
 			if e.To > u && e.Len > longEdgeMeters {
-				long = append(long, [2]uint32{u, e.To})
+				long = append(long, longWay{A: u, B: e.To, Modes: e.Modes & EdgeAllModes})
 			}
 		}
 	}
@@ -70,18 +65,19 @@ func longEdgeList(off []uint32, edges []edge, n int) [][2]uint32 {
 }
 
 // forbiddenFor is newForbidden, kept for the next call with the same areas: a request asks for its direct loop
-// and for its loops one after the other.
-func (g *graph) forbiddenFor(circles []Circle) *forbidden {
+// and for its loops one after the other. The mode is part of what is kept: two requests of one graph may avoid the
+// same area on ways only one of them can use.
+func (g *graph) forbiddenFor(circles []Circle, mode Mode) *forbidden {
 	if len(circles) == 0 {
 		return nil
 	}
 	g.forbiddenMu.Lock()
 	last := g.lastForbidden
 	g.forbiddenMu.Unlock()
-	if last != nil && slices.Equal(last.circles, circles) {
+	if last != nil && last.mode == mode && slices.Equal(last.circles, circles) {
 		return last
 	}
-	f := newForbidden(g, circles)
+	f := newForbidden(g, circles, mode)
 	g.forbiddenMu.Lock()
 	g.lastForbidden = f
 	g.forbiddenMu.Unlock()
@@ -89,12 +85,13 @@ func (g *graph) forbiddenFor(circles []Circle) *forbidden {
 }
 
 // newForbidden finds the ways that touch an area, by their straight line between nodes (a way has no other
-// geometry in the graph), or returns nil for no area.
-func newForbidden(g *graph, circles []Circle) *forbidden {
+// geometry in the graph), or returns nil for no area. It only keeps the ways the mode may use.
+func newForbidden(g *graph, circles []Circle, mode Mode) *forbidden {
 	if len(circles) == 0 {
 		return nil
 	}
-	f := &forbidden{g: g, circles: slices.Clone(circles), cosLat: make([]float64, len(circles)), edges: newAvoidSet()}
+	f := &forbidden{g: g, circles: slices.Clone(circles), cosLat: make([]float64, len(circles)), edges: newAvoidSet(), mode: mode}
+	bit := mode.Bit()
 	long := g.long
 	for i, c := range circles {
 		cosl := math.Cos(c.Center.Lat * rad)
@@ -107,11 +104,15 @@ func newForbidden(g *graph, circles []Circle) *forbidden {
 		// A way no longer than longEdgeMeters that touches the area has an end within that of it.
 		g.sp.eachNodeWithin(g, c.Center, cosl, c.RadiusM+longEdgeMeters, func(u uint32) {
 			for e := g.off[u]; e < g.off[u+1]; e++ {
-				touch(u, g.edges[e].To)
+				if ed := &g.edges[e]; ed.Modes&bit != 0 {
+					touch(u, ed.To)
+				}
 			}
 		})
 		for _, way := range long {
-			touch(way[0], way[1])
+			if way.Modes&bit != 0 {
+				touch(way.A, way.B)
+			}
 		}
 	}
 	return f
