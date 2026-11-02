@@ -62,9 +62,9 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   island look large. The avoided areas and the long-way list follow the same access. Walking keeps its rules:
   `access=no/private` closes a way unless a `foot` tag opens it, `foot=no/private` excludes, a trunk road needs a foot
   tag, a cycleway with a `foot` tag follows it, and a `sac_scale` of T4 and up leaves walking alone. A bike cannot use a
-  `motorroad` or a way whose `bicycle` or `access` tag closes it; a footway, stair or pedestrian way needs an explicit
-  `bicycle=yes/designated/permissive` (a `bicycle=dismount` opens those, not a way an access tag or a motorroad closes);
-  a `mtb:scale` of 4 and up is no bike way. `oneway` is stored but not enforced: enforcing it
+  `motorroad`, nor a `trunk` road or a way whose `bicycle`/`access` tag closes it, without an explicit
+  `bicycle=yes/designated/permissive`; a footway, stair or pedestrian way needs such a tag (a `bicycle=dismount` opens
+  those, not a way an access tag or a motorroad closes); a `mtb:scale` of 4 and up is no bike way. `oneway` is stored but not enforced: enforcing it
   would change the stored components and node bitmaps, and the format already carries the direction for that later
   change (#381). The format moved to `PFGRAPH9`, and a graph of an older one is refused.
 - **Landmark distances use unit costs, one file per mode.** A distance is the shortest length, with no climb and no

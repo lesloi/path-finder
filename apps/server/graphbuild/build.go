@@ -145,9 +145,15 @@ func classifyWay(tags osm.Tags) (w rawWay, ok bool) {
 	if bicycle == "no" || bicycle == "private" {
 		bikeOK = false
 	}
-	// A trunk road or a motorway is no place for a walker unless a foot tag says so; a motorroad is none for a bike.
-	if kind == engine.KindTrunk && !explicitFoot(tags) {
-		footOK = false
+	// A trunk road or a motorway is no place for a walker unless a foot tag says so, and none for a bike unless a
+	// bicycle tag does; a motorroad is none for a bike.
+	if kind == engine.KindTrunk {
+		if !explicitFoot(tags) {
+			footOK = false
+		}
+		if !bikeAllowedTag(tags) {
+			bikeOK = false
+		}
 	}
 	if tags.Find("motorroad") == "yes" {
 		bikeOK = false
