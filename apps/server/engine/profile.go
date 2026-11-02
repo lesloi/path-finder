@@ -64,6 +64,20 @@ type Profile struct {
 // ProfileNames are the surface preferences a profile exists for, the ones of the contract.
 var ProfileNames = []string{"any", "paved", "unpaved"}
 
+// unitProfile is the metric the landmarks are built with: every way costs its length, and climbing nothing. Its
+// distances are a lower bound for every surface preference and every travel mode, so one file per mode serves them
+// all; it never weights a search.
+func unitProfile() *Profile {
+	p := &Profile{Name: "unit"}
+	for i := range p.Kind {
+		p.Kind[i] = 1
+	}
+	for i := range p.Surf {
+		p.Surf[i] = 1
+	}
+	return p
+}
+
 // anyProfile is the profile of no preference, from the costs validated so far. The others derive from it.
 func anyProfile() *Profile {
 	return &Profile{

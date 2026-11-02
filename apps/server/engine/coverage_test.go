@@ -57,7 +57,7 @@ func TestCoverageIsTheCellsHoldingANode(t *testing.T) {
 	writeZone(t, filepath.Join(dir, "reunion"), squareAt(-21.155, 55.455, 0.002))
 	writeZone(t, filepath.Join(dir, "mayotte"), squareAt(-12.855, 45.155, 0.002))
 	writeZone(t, filepath.Join(dir, "guyane"), squareAt(4.945, -52.355, 0.002))
-	z, err := OpenZones(dir, "any", "paved")
+	z, err := OpenZones(dir, footKey("any"), footKey("paved"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestCoverageIsTheCellsHoldingANode(t *testing.T) {
 func TestReloaderCoverage(t *testing.T) {
 	dir := t.TempDir()
 	writeZone(t, dir, squareAt(45.905, 6.11, 0.002))
-	r, err := NewReloader(dir, "any", "paved")
+	r, err := NewReloader(dir, footKey("any"), footKey("paved"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestCoverageReachesAsFarAsAStartSnaps(t *testing.T) {
 	dir := t.TempDir()
 	// 0.0005° (about 40 m) from the west edge of its cell, and 300 m from the south edge of the cell below.
 	writeZone(t, dir, squareAt(45.9027, 6.1005, 0.002))
-	z, err := OpenZones(dir, "any", "paved")
+	z, err := OpenZones(dir, footKey("any"), footKey("paved"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestCoverageLeavesOutWhatIsPastTheSnapDistance(t *testing.T) {
 	dir := t.TempDir()
 	// More than 400 m from every edge of the cell: it alone is covered.
 	writeZone(t, dir, squareAt(45.95, 6.15, 0.002))
-	z, err := OpenZones(dir, "any", "paved")
+	z, err := OpenZones(dir, footKey("any"), footKey("paved"))
 	if err != nil {
 		t.Fatal(err)
 	}

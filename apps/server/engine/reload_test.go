@@ -12,11 +12,11 @@ import (
 	"time"
 )
 
-// reloadProfiles are the profiles of the tests: writeZone writes the landmarks of each.
-var reloadProfiles = ProfileNames
+// reloadProfiles are the engines of the tests: writeZone writes the unit landmarks of their mode.
+var reloadProfiles = []EngineKey{{Foot, "any"}, {Foot, "paved"}}
 
-// filesPerZone is what a zone of the tests maps: its graph, and the landmarks of each profile.
-var filesPerZone = int64(1 + len(ProfileNames))
+// filesPerZone is what a zone of the tests maps: its graph, and its mode's unit landmarks.
+var filesPerZone = int64(2)
 
 // renameOver renames files from one directory over the same names in another, as a deployment does.
 func renameOver(t *testing.T, from, to string, names ...string) {
@@ -31,9 +31,7 @@ func renameOver(t *testing.T, from, to string, names ...string) {
 // deployLandmarks renames the landmarks of the zone written in aside over those of dir.
 func deployLandmarks(t *testing.T, aside, dir string) {
 	t.Helper()
-	for _, profile := range reloadProfiles {
-		renameOver(t, aside, dir, LandmarksFileName(profile))
-	}
+	renameOver(t, aside, dir, LandmarksFileName(Foot))
 }
 
 // deployGraphOnly renames the graph of g over the one of dir and leaves its landmarks in the directory it
@@ -212,10 +210,8 @@ func TestAFlatZoneKeepsItsLandmarksOptional(t *testing.T) {
 	dir := t.TempDir()
 	g, centre := zoneGraph(0, 0)
 	writeZone(t, dir, g)
-	for _, profile := range reloadProfiles {
-		if err := os.Remove(filepath.Join(dir, LandmarksFileName(profile))); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.Remove(filepath.Join(dir, LandmarksFileName(Foot))); err != nil {
+		t.Fatal(err)
 	}
 	r := newReloader(t, dir)
 	if swapped, err := r.Reload(); swapped || err != nil {
@@ -272,7 +268,7 @@ func TestOpenZonesLetsGoOfWhatItMappedWhenAZoneFails(t *testing.T) {
 	g, _ := zoneGraph(0, 0)
 	writeZone(t, filepath.Join(dir, "a"), g)
 	writeZone(t, filepath.Join(dir, "b"), g)
-	if err := os.Remove(filepath.Join(dir, "b", LandmarksFileName("paved"))); err != nil {
+	if err := os.Remove(filepath.Join(dir, "b", LandmarksFileName(Foot))); err != nil {
 		t.Fatal(err)
 	}
 	base := openMappings.Load()

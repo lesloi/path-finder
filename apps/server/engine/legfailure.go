@@ -44,9 +44,9 @@ func (s *LoopStats) record(c LegCause, lost bool) {
 // diagnoseFloodNodes bounds the search for the extent of a component.
 const diagnoseFloodNodes = 50_000
 
-// isolated tells whether a walk from one node, bounded to diagnoseFloodNodes nodes, runs out of nodes
-// without meeting the other: it has then left a whole component behind.
-func isolated(g *graph, from, to uint32) bool {
+// isolated tells whether a walk from one node on the ways of a mode, bounded to diagnoseFloodNodes nodes, runs out of
+// nodes without meeting the other: it has then left a whole component behind.
+func isolated(g *graph, mode Mode, from, to uint32) bool {
 	seen := map[uint32]struct{}{from: {}}
 	queue := []uint32{from}
 	for head := 0; head < len(queue); head++ {
@@ -55,6 +55,9 @@ func isolated(g *graph, from, to uint32) bool {
 			return false
 		}
 		for e := g.off[u]; e < g.off[u+1]; e++ {
+			if g.edges[e].Modes&mode.Bit() == 0 {
+				continue
+			}
 			v := g.edges[e].To
 			if _, ok := seen[v]; ok {
 				continue
@@ -76,7 +79,7 @@ func diagnose(ctx context.Context, cx *Engine, s *searcher, climb float32, avoid
 	if ctx.Err() != nil {
 		return CauseCanceled
 	}
-	if isolated(cx.g, from, to) || isolated(cx.g, to, from) {
+	if isolated(cx.g, cx.mode, from, to) || isolated(cx.g, cx.mode, to, from) {
 		return CauseDisconnected
 	}
 	if avoid != nil && s.route(ctx, cx, climb, nil, lim, from, to) != nil {
@@ -163,16 +166,40 @@ func (c *Components) SmallBitmap(limit int) []uint64 {
 	return small
 }
 
-// smallBitmap is the small components of a graph held in memory: what a graph file stores, and, in the tests, the
-// oracle of the one a build streams.
-func smallBitmap(n int, off []uint32, edges []edge, limit int) []uint64 {
-	c := NewComponents(n)
+// smallBitmaps are the small components of each travel mode of a graph held in memory: what a graph file stores,
+// and, in the tests, the oracle of the one a build streams. A way only joins the components of the modes that may
+// use it, so that a bike-only connector does not make a foot island look large.
+func smallBitmaps(n int, off []uint32, edges []edge, limit int) [NumModes][]uint64 {
+	var out [NumModes][]uint64
+	for m := range out {
+		c := NewComponents(n)
+		bit := Mode(m).Bit()
+		for u := uint32(0); int(u) < n; u++ {
+			for _, e := range edges[off[u]:off[u+1]] {
+				if e.To > u && e.Modes&bit != 0 { // every edge is stored both ways
+					c.Join(u, e.To)
+				}
+			}
+		}
+		out[m] = c.SmallBitmap(limit)
+	}
+	return out
+}
+
+// nodeModeBitmaps is, for each travel mode, the nodes that have an edge of it.
+func nodeModeBitmaps(n int, off []uint32, edges []edge) [NumModes][]uint64 {
+	var out [NumModes][]uint64
+	for m := range out {
+		out[m] = make([]uint64, (n+63)/64)
+	}
 	for u := uint32(0); int(u) < n; u++ {
 		for _, e := range edges[off[u]:off[u+1]] {
-			if e.To > u { // every edge is stored both ways
-				c.Join(u, e.To)
+			for m := range out {
+				if e.Modes&Mode(m).Bit() != 0 {
+					out[m][u>>6] |= 1 << (u & 63)
+				}
 			}
 		}
 	}
-	return c.SmallBitmap(limit)
+	return out
 }

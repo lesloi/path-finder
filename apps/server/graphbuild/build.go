@@ -21,10 +21,31 @@ import (
 	"github.com/lesloi/path-finder/apps/server/engine"
 )
 
+// rawWay is a way of the extract that at least one travel mode may use, with what it says of both modes.
 type rawWay struct {
-	kind, surf, flags uint8
-	ids               []int64
-	idx               []uint32
+	kind, surf, flags, modes uint8
+	ids                      []int64
+	idx                      []uint32
+}
+
+// The modes byte of a way, before it is turned into the modes of each of its two edges: the access bits of the
+// engine, and the direction a bike may ride when oneway leaves only one.
+const (
+	bikeForward  uint8 = 1 << 2
+	bikeBackward uint8 = 1 << 3
+)
+
+// edgeModes is the modes byte of the edge of a way in one direction: its access, and whether this direction is the
+// one a bike may ride against a oneway.
+func edgeModes(wayModes uint8, forward bool) uint8 {
+	out := wayModes & engine.EdgeAllModes
+	if out&engine.EdgeBike == 0 {
+		return out // no bike may ride the way: a direction of it means nothing
+	}
+	if forward && wayModes&bikeForward != 0 || !forward && wayModes&bikeBackward != 0 {
+		out |= engine.EdgeBikeThisWay
+	}
+	return out
 }
 
 var highwayKinds = map[string]uint8{
@@ -44,45 +65,158 @@ var surfaceGroups = map[string]uint8{
 	"rock": engine.SurfaceRough, "pebblestone": engine.SurfaceRough, "cobblestone": engine.SurfaceRough, "unhewn_cobblestone": engine.SurfaceRough, "stepping_stones": engine.SurfaceRough, "grass_paver": engine.SurfaceRough, "woodchips": engine.SurfaceRough,
 }
 
-// classifyWay decides whether a pedestrian can use a way, and under which kind and surface group, with the
-// edge flags it carries. A way with no sac_scale is neither flagged nor left out. One of T3 (ropes, chains, hands for
-// balance) is flagged technical; one of T4 and up, an alpine route, is left out. T1 and T2 are ordinary hiking and
-// trail running.
-func classifyWay(tags osm.Tags) (kind, surf, flags uint8, ok bool) {
-	hw := tags.Find("highway")
-	kind, ok = highwayKinds[hw]
-	if !ok {
-		return 0, 0, 0, false
+// explicitFoot tells whether a foot tag opens a way the access tag closes.
+func explicitFoot(tags osm.Tags) bool {
+	switch tags.Find("foot") {
+	case "yes", "designated", "permissive":
+		return true
 	}
-	foot := tags.Find("foot")
-	if foot == "no" || foot == "private" || tags.Find("area") == "yes" {
-		return 0, 0, 0, false
+	return false
+}
+
+// bikeAllowedTag tells whether a bicycle tag opens a way that an access tag closes. A dismount does not: it is an
+// access, not a key.
+func bikeAllowedTag(tags osm.Tags) bool {
+	switch tags.Find("bicycle") {
+	case "yes", "designated", "permissive":
+		return true
 	}
-	explicit := foot == "yes" || foot == "designated" || foot == "permissive"
-	switch tags.Find("access") {
-	case "no", "private":
-		if !explicit {
-			return 0, 0, 0, false
+	return false
+}
+
+// bikeMayRide tells whether a bicycle tag lets a bike onto a way that is ordinarily not open to one, such as a
+// footway or a stair. A dismount counts: the bike is pushed.
+func bikeMayRide(tags osm.Tags) bool {
+	switch tags.Find("bicycle") {
+	case "yes", "designated", "permissive", "dismount":
+		return true
+	}
+	return false
+}
+
+// bikeDirection says, for each direction of a way, whether a bike may ride it: no oneway leaves both, oneway one, and
+// oneway:bicycle or a contraflow cycleway lane overrides oneway.
+func bikeDirection(tags osm.Tags) (forward, backward bool) {
+	forward, backward = true, true
+	switch tags.Find("oneway") {
+	case "yes", "true", "1":
+		backward = false
+	case "-1", "reverse":
+		forward = false
+	}
+	switch tags.Find("oneway:bicycle") {
+	case "yes", "true", "1":
+		forward, backward = true, false
+	case "-1", "reverse":
+		forward, backward = false, true
+	case "no":
+		forward, backward = true, true
+	}
+	if strings.HasPrefix(tags.Find("cycleway:forward"), "opposite") {
+		forward = true
+	}
+	if strings.HasPrefix(tags.Find("cycleway:backward"), "opposite") {
+		backward = true
+	}
+	return forward, backward
+}
+
+// classifyWay decides which travel modes may use a way, and under which kind and surface group, with the edge flags
+// each mode carries. A way no mode may use is left out. A foot way with no sac_scale is neither flagged nor left out:
+// one of T3 (ropes, chains, hands for balance) is flagged technical, one of T4 and up, an alpine route, is left out,
+// and T1 and T2 are ordinary hiking and trail running. A bike way with an mtb:scale of 0 to 3 is flagged technical,
+// and one of 4 and up is left out.
+func classifyWay(tags osm.Tags) (w rawWay, ok bool) {
+	kind, ok := highwayKinds[tags.Find("highway")]
+	if !ok || tags.Find("area") == "yes" {
+		return rawWay{}, false
+	}
+	w.kind, w.surf = kind, surfaceGroups[tags.Find("surface")]
+	foot, bicycle, access := tags.Find("foot"), tags.Find("bicycle"), tags.Find("access")
+
+	// access=no or private closes a way to both modes, unless the mode's own tag opens it. A dismount does not open
+	// a way the access tag closes.
+	closedByAccess := access == "no" || access == "private"
+	footOK := !closedByAccess || explicitFoot(tags)
+	bikeOK := !closedByAccess || bikeAllowedTag(tags)
+	if foot == "no" || foot == "private" {
+		footOK = false
+	}
+	if bicycle == "no" || bicycle == "private" {
+		bikeOK = false
+	}
+	// A trunk road or a motorway is no place for a walker unless a foot tag says so, and none for a bike unless a
+	// bicycle tag does; a motorroad is none for a bike.
+	if kind == engine.KindTrunk {
+		if !explicitFoot(tags) {
+			footOK = false
+		}
+		if !bikeAllowedTag(tags) {
+			bikeOK = false
 		}
 	}
-	if kind == engine.KindTrunk && !explicit {
-		return 0, 0, 0, false
+	if tags.Find("motorroad") == "yes" {
+		bikeOK = false
 	}
-	if kind == engine.KindCycleway && !explicit && foot != "" {
-		return 0, 0, 0, false
+	// A cycleway is open to walkers unless a foot tag says otherwise; a footway, a stair or a pedestrian way is open
+	// to a bike only when a bicycle tag says so, a dismount included.
+	if kind == engine.KindCycleway && !explicitFoot(tags) && foot != "" {
+		footOK = false
+	}
+	switch kind {
+	case engine.KindFootway, engine.KindSteps, engine.KindPedestrian:
+		bikeOK = bikeOK && bikeMayRide(tags)
 	}
 	// A way can carry several scales, such as hiking;demanding_mountain_hiking: one value from T3 up is enough.
 	for _, scale := range strings.Split(tags.Find("sac_scale"), ";") {
 		switch strings.TrimSpace(scale) {
 		case "alpine_hiking", "demanding_alpine_hiking", "difficult_alpine_hiking":
-			return 0, 0, 0, false
+			footOK = false
 		case "demanding_mountain_hiking":
-			flags = engine.EdgeTechnical
+			w.flags |= engine.EdgeTechnical
 		}
 	}
-	return kind, surfaceGroups[tags.Find("surface")], flags, true
+	for _, scale := range strings.Split(tags.Find("mtb:scale"), ";") {
+		switch strings.TrimSpace(scale) {
+		case "0", "1", "2", "3":
+			w.flags |= engine.EdgeTechnicalBike
+		case "4", "5", "6":
+			bikeOK = false
+		}
+	}
+	// A mode that may not use the way keeps no technical bit: the flags only tell a route that holds the way.
+	if !footOK {
+		w.flags &^= engine.EdgeTechnical
+	}
+	if !bikeOK {
+		w.flags &^= engine.EdgeTechnicalBike
+	}
+	if footOK {
+		w.modes |= engine.EdgeFoot
+	}
+	if bikeOK {
+		w.modes |= engine.EdgeBike
+		forward, backward := bikeDirection(tags)
+		if forward {
+			w.modes |= bikeForward
+		}
+		if backward {
+			w.modes |= bikeBackward
+		}
+	}
+	if w.modes&engine.EdgeAllModes == 0 {
+		return rawWay{}, false
+	}
+	return w, true
 }
 
+// wayAttrs packs what a way says of both modes into the 32 bits of a wayInfo or an outEdge: the kind, the surface,
+// the flags of each mode and the modes byte.
+func wayAttrs(w rawWay) uint32 {
+	return uint32(w.kind) | uint32(w.surf)<<8 | uint32(w.flags)<<16 | uint32(w.modes)<<24
+}
+
+// readWays reads the ways of an extract that at least one travel mode can use.
 func readWays(path string) ([]rawWay, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -98,15 +232,15 @@ func readWays(path string) ([]rawWay, error) {
 		if !isWay {
 			continue
 		}
-		kind, surf, flags, ok := classifyWay(w.Tags)
+		way, ok := classifyWay(w.Tags)
 		if !ok || len(w.Nodes) < 2 {
 			continue
 		}
-		ids := make([]int64, len(w.Nodes))
+		way.ids = make([]int64, len(w.Nodes))
 		for i, n := range w.Nodes {
-			ids[i] = int64(n.ID)
+			way.ids[i] = int64(n.ID)
 		}
-		ways = append(ways, rawWay{kind: kind, surf: surf, flags: flags, ids: ids})
+		ways = append(ways, way)
 	}
 	return ways, sc.Err()
 }
@@ -164,7 +298,7 @@ func Build(pbfPaths []string, demDir string, proj elevation.Projection, outPath 
 		}
 		ways = append(ways, w...)
 	}
-	p.step("pass 1: %d walkable ways", len(ways))
+	p.step("pass 1: %d ways open to a mode", len(ways))
 
 	idx := make(map[int64]uint32, 1<<22)
 	for wi := range ways {
@@ -270,10 +404,10 @@ func assemble(ways []rawWay, lat, lon []int32, elev []int32) ([]engine.Node, []u
 	edgeCount := off[kept]
 	edges := make([]engine.Edge, edgeCount)
 	fill := make([]uint32, kept)
-	add := func(a, b uint32, l float32, kind, surf, flags uint8) {
+	add := func(a, b uint32, l float32, kind, surf, flags, modes uint8) {
 		e := off[a] + fill[a]
 		fill[a]++
-		edges[e] = engine.Edge{To: b, Len: l, Kind: kind, Surf: surf, Flags: flags}
+		edges[e] = engine.Edge{To: b, Len: l, Kind: kind, Surf: surf, Flags: flags, Modes: modes}
 	}
 	for _, w := range ways {
 		for i := 1; i < len(w.idx); i++ {
@@ -283,8 +417,8 @@ func assemble(ways []rawWay, lat, lon []int32, elev []int32) ([]engine.Node, []u
 			}
 			ra, rb := remap[a], remap[b]
 			l := float32(haversineM(lat[a], lon[a], lat[b], lon[b]))
-			add(ra, rb, l, w.kind, w.surf, w.flags)
-			add(rb, ra, l, w.kind, w.surf, w.flags)
+			add(ra, rb, l, w.kind, w.surf, w.flags, edgeModes(w.modes, true))
+			add(rb, ra, l, w.kind, w.surf, w.flags, edgeModes(w.modes, false))
 		}
 	}
 	return nodes, off, edges

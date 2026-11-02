@@ -57,19 +57,36 @@ func (b *Builder) AddNode(lat, lon, elevation float64) int {
 	return len(b.nodes) - 1
 }
 
-// Connect joins two nodes with a way of the given kind and surface, usable both ways. Its length is
-// the distance between the nodes.
-func (b *Builder) Connect(from, to int, kind, surface uint8) { b.connect(from, to, kind, surface, 0) }
-
-// ConnectTechnical is Connect for a technical way (EdgeTechnical).
-func (b *Builder) ConnectTechnical(from, to int, kind, surface uint8) {
-	b.connect(from, to, kind, surface, EdgeTechnical)
+// Connect joins two nodes with a way of the given kind and surface, usable both ways by both travel modes. Its length
+// is the distance between the nodes.
+func (b *Builder) Connect(from, to int, kind, surface uint8) {
+	b.connect(from, to, kind, surface, 0, EdgeFoot|EdgeBike)
 }
 
-func (b *Builder) connect(from, to int, kind, surface, flags uint8) {
+// ConnectFoot is Connect for a way only walkers may use.
+func (b *Builder) ConnectFoot(from, to int, kind, surface uint8) {
+	b.connect(from, to, kind, surface, 0, EdgeFoot)
+}
+
+// ConnectBike is Connect for a way only bikes may use.
+func (b *Builder) ConnectBike(from, to int, kind, surface uint8) {
+	b.connect(from, to, kind, surface, 0, EdgeBike)
+}
+
+// ConnectTechnical is Connect for a way that asks for the hands on foot (EdgeTechnical).
+func (b *Builder) ConnectTechnical(from, to int, kind, surface uint8) {
+	b.connect(from, to, kind, surface, EdgeTechnical, EdgeFoot|EdgeBike)
+}
+
+// ConnectTechnicalBike is Connect for a way whose mtb:scale is 0 to 3 (EdgeTechnicalBike).
+func (b *Builder) ConnectTechnicalBike(from, to int, kind, surface uint8) {
+	b.connect(from, to, kind, surface, EdgeTechnicalBike, EdgeFoot|EdgeBike)
+}
+
+func (b *Builder) connect(from, to int, kind, surface, flags, modes uint8) {
 	length := b.distance(from, to)
-	b.edges[from] = append(b.edges[from], edge{To: uint32(to), Len: length, Kind: kind, Surf: surface, Flags: flags})
-	b.edges[to] = append(b.edges[to], edge{To: uint32(from), Len: length, Kind: kind, Surf: surface, Flags: flags})
+	b.edges[from] = append(b.edges[from], edge{To: uint32(to), Len: length, Kind: kind, Surf: surface, Flags: flags, Modes: modes})
+	b.edges[to] = append(b.edges[to], edge{To: uint32(from), Len: length, Kind: kind, Surf: surface, Flags: flags, Modes: modes})
 }
 
 func (b *Builder) distance(from, to int) float32 {
@@ -91,36 +108,60 @@ func (b *Builder) WriteGraph(path string) error {
 	return WriteGraph(path, b.nodes, off, all)
 }
 
-// WriteLandmarks computes the landmarks of a graph file for an activity profile and writes them to
-// path, for Open to map with the same profile.
-func WriteLandmarks(graphPath, path, profile string, count int) error {
-	p, g, _, err := openForLandmarks(graphPath, profile, count)
+// LandmarkRequest says which landmarks to build: the unit metric of a travel mode, which every surface preference of
+// the mode shares, or the costs and climb of one surface preference.
+type LandmarkRequest struct {
+	Mode Mode
+	// Profile is empty for the unit metric, or the surface preference whose costs the landmarks hold.
+	Profile string
+	Count   int
+}
+
+// unit tells whether the request is for the metric every profile of a mode shares.
+func (r LandmarkRequest) unit() bool { return r.Profile == "" }
+
+// WriteLandmarks computes the landmarks of a graph file for a mode and a metric and writes them to path, for Open to
+// map with the same.
+func WriteLandmarks(graphPath, path string, req LandmarkRequest) error {
+	p, g, up, err := openForLandmarks(graphPath, req)
 	if err != nil {
 		return err
 	}
 	defer g.file.unmap()
-	rows := buildLandmarks(g, g.sp, p, count, p.UpPerMeter)
-	return writeAtomic(path, func(tmp string) error {
-		return writeLandmarks(tmp, count, uint32(g.n), g.fingerprint, p.UpPerMeter, rows)
-	})
+	rows := buildLandmarks(g, g.sp, p, req.Mode, req.Count, up)
+	head := newAltHead(req.Count, uint32(g.n), g.fingerprint, req.Mode, metricOf(req), req.Profile, up)
+	return writeAtomic(path, func(tmp string) error { return writeLandmarks(tmp, head, rows) })
 }
 
-// openForLandmarks finds the profile, maps the graph and checks that the count fits a search. perNode is how many
-// landmark distances a node keeps per landmark: twice with climb, for both directions. The caller unmaps the graph.
-func openForLandmarks(graphPath, profile string, count int) (p *Profile, g *graph, perNode int, err error) {
-	p = profiles[profile]
-	if p == nil {
-		return nil, nil, 0, os.ErrInvalid
+// metricOf is the metric a request builds.
+func metricOf(req LandmarkRequest) uint32 {
+	if req.unit() {
+		return altMetricUnit
 	}
-	perNode = 1
-	if p.UpPerMeter > 0 {
+	return altMetricCosts
+}
+
+// openForLandmarks finds the profile and the climb of a request, maps the graph and checks that the count fits a
+// search. The caller unmaps the graph.
+func openForLandmarks(graphPath string, req LandmarkRequest) (p *Profile, g *graph, up float32, err error) {
+	if req.unit() {
+		p = unitProfile()
+	} else {
+		p = profiles[req.Profile]
+		if p == nil {
+			return nil, nil, 0, fmt.Errorf("engine: unknown profile %q", req.Profile)
+		}
+		up = p.UpPerMeter
+	}
+	perNode := 1
+	if up > 0 {
 		perNode = 2
 	}
-	if most := maxLandmarkValues / perNode; count < 1 || count > most {
-		return nil, nil, 0, fmt.Errorf("engine: %d landmarks is out of range for the %s profile (1 to %d)", count, profile, most)
+	if most := maxLandmarkValues / perNode; req.Count < 1 || req.Count > most {
+		return nil, nil, 0, fmt.Errorf("engine: %d landmarks is out of range (1 to %d)", req.Count, most)
 	}
 	if g, err = openGraph(graphPath); err != nil {
 		return nil, nil, 0, err
 	}
-	return p, g, perNode, nil
+	return p, g, up, nil
 }

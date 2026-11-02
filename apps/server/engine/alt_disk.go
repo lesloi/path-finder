@@ -21,20 +21,21 @@ const columnBlockNodes = 1 << 21
 // written to a file below tmp as soon as they are known, workers landmarks at a time (each worker holds one distance
 // per node and writes its column in blocks), then the files are turned into rows in one pass. The file is the one
 // WriteLandmarks writes.
-func WriteLandmarksOnDisk(graphPath, path, profile string, count int, tmp string, workers int) error {
-	return writeLandmarksOnDisk(graphPath, path, profile, count, tmp, workers, rowsAtATime)
+func WriteLandmarksOnDisk(graphPath, path string, req LandmarkRequest, tmp string, workers int) error {
+	return writeLandmarksOnDisk(graphPath, path, req, tmp, workers, rowsAtATime)
 }
 
 // landmarksPattern names the scratch directories: MkdirTemp puts a random string where the star is.
 const landmarksPattern = "pf-landmarks-*"
 
-func writeLandmarksOnDisk(graphPath, path, profile string, count int, tmp string, workers, rowsAt int) error {
+func writeLandmarksOnDisk(graphPath, path string, req LandmarkRequest, tmp string, workers, rowsAt int) error {
 	t0 := time.Now()
-	p, g, perNode, err := openForLandmarks(graphPath, profile, count)
+	p, g, up, err := openForLandmarks(graphPath, req)
 	if err != nil {
 		return err
 	}
 	defer g.file.unmap()
+	count, mode := req.Count, req.Mode
 	if tmp == "" {
 		tmp = filepath.Dir(path) // never a memory-backed /tmp: the columns are as big as the rows
 	}
@@ -48,27 +49,31 @@ func writeLandmarksOnDisk(graphPath, path, profile string, count int, tmp string
 	}
 	defer os.RemoveAll(dir)
 
-	marks := pickMarks(g, g.sp, p, count)
-	columns := count * perNode
+	marks := pickMarks(g, g.sp, p, mode, count)
+	columns := count
+	if up > 0 {
+		columns = 2 * count
+	}
 	column := func(c int) string { return filepath.Join(dir, fmt.Sprintf("column-%d.u16", c)) }
-	if err := writeColumns(g, p, marks, count, columns, workers, column); err != nil {
+	if err := writeColumns(g, p, mode, marks, count, columns, workers, column); err != nil {
 		return err
 	}
+	head := newAltHead(count, uint32(g.n), g.fingerprint, mode, metricOf(req), req.Profile, up)
 	err = writeAtomic(path, func(tmp string) error {
-		return writeLandmarksWith(tmp, count, uint32(g.n), g.fingerprint, p.UpPerMeter, func(w *bufio.Writer) error {
+		return writeLandmarksWith(tmp, head, func(w *bufio.Writer) error {
 			return transpose(w, g.n, columns, rowsAt, column)
 		})
 	})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "landmarks: %d, climb %.0f, built on disk in %v\n", count, p.UpPerMeter, time.Since(t0).Round(time.Second))
+	fmt.Fprintf(os.Stderr, "landmarks: %d, climb %.0f, built on disk in %v\n", count, up, time.Since(t0).Round(time.Second))
 	return nil
 }
 
 // writeColumns writes the quantized distances of each column to its file: the forward distances of the landmarks, then
 // the backward ones when the profile counts the climb.
-func writeColumns(g *graph, p *Profile, marks []uint32, count, columns, workers int, column func(int) string) error {
+func writeColumns(g *graph, p *Profile, mode Mode, marks []uint32, count, columns, workers int, column func(int) string) error {
 	var (
 		wg   sync.WaitGroup
 		mu   sync.Mutex
@@ -92,7 +97,7 @@ func writeColumns(g *graph, p *Profile, marks []uint32, count, columns, workers 
 			block := make([]byte, 2*min(columnBlockNodes, g.n))
 			var d dijkstra
 			for c, ok := take(); ok; c, ok = take() {
-				d.all(g, p, marks[c%count], dist, p.UpPerMeter, c >= count)
+				d.all(g, p, mode, marks[c%count], dist, p.UpPerMeter, c >= count)
 				if err := writeColumn(column(c), dist, block); err != nil {
 					mu.Lock()
 					fail = err

@@ -100,7 +100,7 @@ func TestTerrainHeadingSkipsAnAvoidedSector(t *testing.T) {
 	high := g.addNode(0, 1000, 300)
 	g.addNode(0, -1000, 100)
 	e := openTest(t, g, false)
-	f := e.g.forbiddenFor([]Circle{{Center: pointOf(g, high), RadiusM: 200}})
+	f := e.g.forbiddenFor([]Circle{{Center: pointOf(g, high), RadiusM: 200}}, Foot)
 
 	if heading, ok := e.terrainHeading(uint32(start), 2000, f); ok {
 		t.Errorf("the avoided high ground gave a heading of %v rad", heading)

@@ -22,6 +22,15 @@ import (
 	"github.com/lesloi/path-finder/apps/server/server"
 )
 
+// footKeys are the engines the server serves: every surface preference of walking.
+func footKeys() []engine.EngineKey {
+	keys := make([]engine.EngineKey, len(engine.ProfileNames))
+	for i, name := range engine.ProfileNames {
+		keys[i] = engine.EngineKey{Mode: engine.Foot, Profile: name}
+	}
+	return keys
+}
+
 func newServer(t *testing.T) http.Handler {
 	t.Helper()
 	dir := t.TempDir()
@@ -33,7 +42,7 @@ func newServer(t *testing.T) http.Handler {
 
 func serverOn(t *testing.T, dir string) http.Handler {
 	t.Helper()
-	zones, err := engine.OpenZones(dir, engine.ProfileNames...)
+	zones, err := engine.OpenZones(dir, footKeys()...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +227,7 @@ func TestTheSurfacePreferenceSteersTheSearch(t *testing.T) {
 	if _, err := standin.Write(dir); err != nil {
 		t.Fatal(err)
 	}
-	zones, err := engine.OpenZones(dir, engine.ProfileNames...)
+	zones, err := engine.OpenZones(dir, footKeys()...)
 	if err != nil {
 		t.Fatal(err)
 	}

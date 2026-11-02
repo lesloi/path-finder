@@ -186,13 +186,13 @@ func TestBuildMakesAGraphTheEngineRoutesOn(t *testing.T) {
 	if err := Build([]string{filepath.Join(dir, "a.pbf"), filepath.Join(dir, "b.pbf")}, dir, elevation.Lambert93Grid, graph, &log); err != nil {
 		t.Fatal(err)
 	}
-	for _, step := range []string{"BD ALTI: 1 tiles", "pass 1: 2 walkable ways", "graph: 5 nodes, 8 directed edges"} {
+	for _, step := range []string{"BD ALTI: 1 tiles", "pass 1: 2 ways open to a mode", "graph: 5 nodes, 8 directed edges"} {
 		if !strings.Contains(log.String(), step) {
 			t.Errorf("progress lacks %q:\n%s", step, log.String())
 		}
 	}
 
-	e, err := engine.Open(graph, "", "any")
+	e, err := engine.Open(graph, "", engine.EngineKey{Mode: engine.Foot, Profile: "any"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestBuildReadsOverseasTilesInTheirProjection(t *testing.T) {
 	if err := Build([]string{filepath.Join(dir, "a.pbf")}, dir, elevation.Lambert93Grid, filepath.Join(dir, "lambert.bin"), &bytes.Buffer{}); err == nil {
 		t.Error("the same tiles read as Lambert-93: err = nil, want no elevation")
 	}
-	e, err := engine.Open(graph, "", "any")
+	e, err := engine.Open(graph, "", engine.EngineKey{Mode: engine.Foot, Profile: "any"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,20 +269,27 @@ func TestBuildFlagsT3AndLeavesOutT4(t *testing.T) {
 	if err := Build([]string{filepath.Join(dir, "a.pbf")}, dir, elevation.Lambert93Grid, graph, &log); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(log.String(), "graph: 3 nodes") {
-		t.Errorf("the T4 way is in the graph:\n%s", log.String())
+	if !strings.Contains(log.String(), "graph: 5 nodes") {
+		t.Errorf("the graph does not hold the T4 way for bikes alone:\n%s", log.String())
 	}
 
-	e, err := engine.Open(graph, "", "any")
+	foot, err := engine.Open(graph, "", engine.EngineKey{Mode: engine.Foot, Profile: "any"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	r, err := e.Route(context.Background(), engine.Point{Lat: lat - step, Lon: lon}, engine.Point{Lat: lat + step, Lon: lon})
+	r, err := foot.Route(context.Background(), engine.Point{Lat: lat - step, Lon: lon}, engine.Point{Lat: lat + step, Lon: lon})
 	if err != nil || !r.Technical {
 		t.Errorf("route = %+v, err = %v: the T3 way should be there, flagged", r, err)
 	}
-	if _, err := e.Route(context.Background(), engine.Point{Lat: lat, Lon: lon + 0.01}, engine.Point{Lat: lat + step, Lon: lon + 0.01}); err != engine.ErrOffGraph {
-		t.Errorf("err = %v, want ErrOffGraph: nothing of the T4 way is in the graph", err)
+	if _, err := foot.Route(context.Background(), engine.Point{Lat: lat, Lon: lon + 0.01}, engine.Point{Lat: lat + step, Lon: lon + 0.01}); err != engine.ErrOffGraph {
+		t.Errorf("err = %v, want ErrOffGraph: no foot way reaches the T4 one", err)
+	}
+	bike, err := engine.Open(graph, "", engine.EngineKey{Mode: engine.Bike, Profile: "any"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := bike.Route(context.Background(), engine.Point{Lat: lat, Lon: lon + 0.01}, engine.Point{Lat: lat + step, Lon: lon + 0.01}); err != nil {
+		t.Errorf("a bike route on a T4 path, which only closes foot: %v", err)
 	}
 }
 

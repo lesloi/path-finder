@@ -14,7 +14,11 @@ func graphFixture(t *testing.T) ([]node, []uint32, []edge) {
 	t.Helper()
 	nodes := []node{{450_000_000, 60_000_000, 1000}, {450_030_000, 60_050_000, 1100}, {450_100_000, 60_020_000, -50}, {450_120_000, 60_200_000, 3000}, {450_130_000, 60_210_000, 0}}
 	off := []uint32{0, 1, 3, 4, 5, 6}
-	edges := []edge{{To: 1, Len: 600, Kind: 2, Surf: 1}, {To: 0, Len: 600, Kind: 2, Surf: 1}, {To: 3, Len: 7.5, Kind: 4, Flags: EdgeTechnical}, {To: 2, Len: 7.5, Kind: 4, Flags: EdgeTechnical}, {To: 3, Len: 1}, {To: 4, Len: 1}}
+	edges := []edge{
+		{To: 1, Len: 600, Kind: 2, Surf: 1, Modes: EdgeAllModes}, {To: 0, Len: 600, Kind: 2, Surf: 1, Modes: EdgeAllModes},
+		{To: 3, Len: 7.5, Kind: 4, Flags: EdgeTechnical, Modes: EdgeFoot}, {To: 2, Len: 7.5, Kind: 4, Flags: EdgeTechnical, Modes: EdgeFoot},
+		{To: 3, Len: 1, Modes: EdgeBike}, {To: 4, Len: 1, Modes: EdgeBike},
+	}
 	if long := longEdgeList(off, edges, len(nodes)); len(long) != 1 {
 		t.Fatalf("the fixture must hold one long way, holds %d", len(long))
 	}
@@ -46,13 +50,24 @@ func writeSections(w *GraphWriter, nodes []node, off []uint32, edges []edge) err
 		}
 	}
 	for _, l := range longEdgeList(off, edges, len(nodes)) {
-		if err := w.Long(l[0], l[1]); err != nil {
+		if err := w.Long(l.A, l.B, l.Modes); err != nil {
 			return err
 		}
 	}
-	for _, word := range smallBitmap(len(nodes), off, edges, smallComponentNodes) {
-		if err := w.Small(word); err != nil {
-			return err
+	small := smallBitmaps(len(nodes), off, edges, smallComponentNodes)
+	for m := range small {
+		for _, word := range small[m] {
+			if err := w.Small(Mode(m), word); err != nil {
+				return err
+			}
+		}
+	}
+	modes := nodeModeBitmaps(len(nodes), off, edges)
+	for m := range modes {
+		for _, word := range modes[m] {
+			if err := w.NodeModes(Mode(m), word); err != nil {
+				return err
+			}
 		}
 	}
 	for _, n := range sp.nodes {
@@ -98,6 +113,49 @@ func TestGraphWriterWritesTheGraphFromMemory(t *testing.T) {
 	}
 }
 
+func TestGraphWriterRefusesTheModesOutOfOrder(t *testing.T) {
+	// Arrange: one node, one word of each small bitmap, then the node modes
+	open := func(t *testing.T) *GraphWriter {
+		t.Helper()
+		w, err := CreateGraph(filepath.Join(t.TempDir(), "g.bin"), 1, 0, [4]int32{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(w.Abort)
+		for _, call := range []func() error{
+			func() error { return w.Node(node{}) },
+			func() error { return w.Offset(0) },
+			func() error { return w.Offset(0) },
+			func() error { return w.Small(Foot, 0) },
+			func() error { return w.Small(Bike, 0) },
+		} {
+			if err := call(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return w
+	}
+
+	t.Run("a foot node mode after a bike one", func(t *testing.T) {
+		w := open(t)
+		if err := w.NodeModes(Bike, 0); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.NodeModes(Foot, 0); err == nil {
+			t.Error("a foot word after a bike one was taken")
+		}
+	})
+	t.Run("a small component after the node modes", func(t *testing.T) {
+		w := open(t)
+		if err := w.NodeModes(Bike, 0); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Small(Foot, 0); err == nil {
+			t.Error("a small component word after the node modes was taken")
+		}
+	})
+}
+
 func TestGraphWriterRefusesASectionThatIsShort(t *testing.T) {
 	// Arrange: one edge fewer than announced
 	nodes, off, edges := graphFixture(t)
@@ -107,12 +165,12 @@ func TestGraphWriterRefusesASectionThatIsShort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := writeSections(w, nodes, off, edges); err != nil {
-		t.Fatal(err)
+	// Act: the short section is found when the small components start, or at Close
+	err = writeSections(w, nodes, off, edges)
+	if err == nil {
+		err = w.Close()
 	}
-
-	// Act
-	err = w.Close()
+	w.Abort()
 
 	// Assert: neither the graph nor its temporary file is there
 	if err == nil {

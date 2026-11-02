@@ -36,28 +36,38 @@ func TestAGraphStoresItsSmallComponentsAndItsLongWays(t *testing.T) {
 	path := g.write(t)
 
 	// Act
-	e, err := Open(path, "", "any")
+	e, err := Open(path, "", footKey("any"))
 
 	// Assert: the sets are those the in-memory passes find, so a search never has to read the graph to get them
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, n := range island {
-		if !e.g.small.has(uint32(n)) {
-			t.Errorf("node %d of the island is not small", n)
+	wantSmall := smallBitmaps(e.g.n, e.g.off, e.g.edges, smallComponentNodes)
+	for m := range e.g.small {
+		for _, n := range island {
+			if !e.g.small[m].has(uint32(n)) {
+				t.Errorf("node %d of the island is not small for the %s mode", n, Mode(m))
+			}
+		}
+		if e.g.small[m].has(uint32(long[0])) || e.g.small[m].has(uint32(long[1])) {
+			t.Errorf("the chain is small for the %s mode", Mode(m))
+		}
+		if !slices.Equal(e.g.small[m], nodeSet(wantSmall[m])) {
+			t.Errorf("the stored small components differ from the in-memory pass for the %s mode", Mode(m))
 		}
 	}
-	if e.g.small.has(uint32(long[0])) || e.g.small.has(uint32(long[1])) {
-		t.Error("the chain is small")
-	}
-	if want := smallBitmap(e.g.n, e.g.off, e.g.edges, smallComponentNodes); !slices.Equal(e.g.small, nodeSet(want)) {
-		t.Error("the stored small components differ from the in-memory pass")
-	}
-	if got := e.g.long; !slices.Equal(got, [][2]uint32{{uint32(long[0]), uint32(long[1])}}) {
+	if got := e.g.long; !slices.Equal(got, []longWay{{A: uint32(long[0]), B: uint32(long[1]), Modes: EdgeAllModes}}) {
 		t.Errorf("long ways = %v, want the one of 600 m, once", got)
 	}
 	if want := longEdgeList(e.g.off, e.g.edges, e.g.n); !slices.Equal(e.g.long, want) {
 		t.Error("the stored long ways differ from the in-memory pass")
+	}
+	// The node modes are those the edges give, for the snapping to keep off the nodes a mode cannot reach.
+	wantModes := nodeModeBitmaps(e.g.n, e.g.off, e.g.edges)
+	for m := range e.g.nodeModes {
+		if !slices.Equal(e.g.nodeModes[m], nodeSet(wantModes[m])) {
+			t.Errorf("the stored node modes differ from the in-memory pass for the %s mode", Mode(m))
+		}
 	}
 }
 
@@ -70,8 +80,10 @@ func TestAGraphWithNoComponentThatCanHoldALoopHasNoSmallOne(t *testing.T) {
 	e := openTest(t, g, false)
 	// Assert
 	for n := 0; n < e.g.n; n++ {
-		if e.g.small.has(uint32(n)) {
-			t.Fatalf("node %d is small in a graph with no large component", n)
+		for m := range e.g.small {
+			if e.g.small[m].has(uint32(n)) {
+				t.Fatalf("node %d is small for the %s mode in a graph with no large component", n, Mode(m))
+			}
 		}
 	}
 }
@@ -98,7 +110,7 @@ func TestAGraphBuiltWithOtherParametersIsRefused(t *testing.T) {
 				t.Fatal(err)
 			}
 			// Act
-			_, err = Open(path, "", "any")
+			_, err = Open(path, "", footKey("any"))
 			// Assert
 			if err == nil || !strings.Contains(err.Error(), "other parameters") || !strings.Contains(err.Error(), "build-graph") {
 				t.Errorf("err = %v, want it to refuse other parameters and say to build again", err)
@@ -115,11 +127,11 @@ func TestAGraphCutBeforeItsStoredSectionsIsRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, data[:len(data)-16], 0o644); err != nil { // the long way (8 bytes) and its padding are the last bytes
+	if err := os.WriteFile(path, data[:len(data)-16], 0o644); err != nil { // the long way (12 bytes) and its padding are the last bytes
 		t.Fatal(err)
 	}
 	// Act
-	_, err = Open(path, "", "any")
+	_, err = Open(path, "", footKey("any"))
 	// Assert
 	if err == nil {
 		t.Error("a graph without its last section was opened")

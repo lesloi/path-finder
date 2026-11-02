@@ -131,7 +131,7 @@ func TestABuilderFlagsTechnicalWays(t *testing.T) {
 	if err := b.WriteGraph(path); err != nil {
 		t.Fatal(err)
 	}
-	e, err := Open(path, "", "any")
+	e, err := Open(path, "", footKey("any"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestAGraphOfAnOlderFormatIsRefused(t *testing.T) {
 			path := g.write(t)
 			setMagic(t, path, magic) // its flags do not tell T3 from T4 and up: serving it would be wrong
 
-			_, err := Open(path, "", "any")
+			_, err := Open(path, "", footKey("any"))
 
 			if err == nil {
 				t.Error("a graph of an older format opened")

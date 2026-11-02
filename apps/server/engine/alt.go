@@ -33,8 +33,8 @@ type dijkstra struct {
 }
 
 // all fills dist with the cost from src (or towards src when backward) under the profile's multipliers and a climb
-// penalty of up per metre.
-func (d *dijkstra) all(g *graph, p *Profile, src uint32, dist []float32, up float32, backward bool) {
+// penalty of up per metre, on the ways the travel mode may use.
+func (d *dijkstra) all(g *graph, p *Profile, mode Mode, src uint32, dist []float32, up float32, backward bool) {
 	for i := range dist {
 		dist[i] = unreachable
 	}
@@ -78,6 +78,9 @@ func (d *dijkstra) all(g *graph, p *Profile, src uint32, dist []float32, up floa
 		u := it.n
 		for e := g.off[u]; e < g.off[u+1]; e++ {
 			ed := &g.edges[e]
+			if ed.Modes&mode.Bit() == 0 {
+				continue
+			}
 			v := ed.To
 			nd := it.d + ed.Len*p.Kind[ed.Kind]*p.Surf[ed.Surf]
 			if up > 0 {
@@ -100,9 +103,9 @@ func (d *dijkstra) all(g *graph, p *Profile, src uint32, dist []float32, up floa
 }
 
 // dijkstraAll is all for a caller that runs one search: it makes no scratch to keep.
-func dijkstraAll(g *graph, p *Profile, src uint32, dist []float32, up float32, backward bool) {
+func dijkstraAll(g *graph, p *Profile, mode Mode, src uint32, dist []float32, up float32, backward bool) {
 	var d dijkstra
-	d.all(g, p, src, dist, up, backward)
+	d.all(g, p, mode, src, dist, up, backward)
 }
 
 // quantize rounds a non-negative distance down to a 16-bit number of altUnitMeters. The unit is a power of two, so the
@@ -114,17 +117,20 @@ func quantize(x float32) uint16 {
 	return uint16(uint32(x) / altUnitMeters)
 }
 
-// pickMarks picks the landmarks: on an ellipse inscribed in the bounding box of the graph, each snapped to the nearest
-// node that can be reached from the middle of the area, so that none sits on a disconnected island.
-func pickMarks(g *graph, sp *spatial, p *Profile, count int) []uint32 {
+// pickMarks picks the landmarks of a mode: on an ellipse inscribed in the bounding box of the graph, each snapped to
+// the nearest node that can be reached from the middle of the area on that mode's ways, so that none sits on an island
+// the mode cannot leave.
+func pickMarks(g *graph, sp *spatial, p *Profile, mode Mode, count int) []uint32 {
 	minLat, maxLat, minLon, maxLon := int32(math.MaxInt32), int32(math.MinInt32), int32(math.MaxInt32), int32(math.MinInt32)
 	for _, n := range g.nodes {
 		minLat, maxLat = min(minLat, n.Lat), max(maxLat, n.Lat)
 		minLon, maxLon = min(minLon, n.Lon), max(maxLon, n.Lon)
 	}
-	center, _, _ := sp.nearest(g, float64(minLat+maxLat)/2e7, float64(minLon+maxLon)/2e7)
+	modes := g.nodeModes[mode]
+	center, _, _ := sp.nearestWhere(g, float64(minLat+maxLat)/2e7, float64(minLon+maxLon)/2e7,
+		func(n uint32) bool { return !modes.has(n) }, 0)
 	reach := make([]float32, g.n)
-	dijkstraAll(g, p, center, reach, 0, false)
+	dijkstraAll(g, p, mode, center, reach, 0, false)
 
 	// Landmarks on an ellipse inscribed in the bounding box, each snapped to the nearest reachable node.
 	var marks []uint32
@@ -149,11 +155,11 @@ func pickMarks(g *graph, sp *spatial, p *Profile, count int) []uint32 {
 	return marks
 }
 
-// buildLandmarks picks landmarks around the edge of the covered area and computes their distances,
-// as the landmark rows of the v2 file.
-func buildLandmarks(g *graph, sp *spatial, p *Profile, count int, up float32) []uint16 {
+// buildLandmarks picks landmarks around the edge of the covered area and computes their distances on the ways of a
+// travel mode, as the landmark rows of the file.
+func buildLandmarks(g *graph, sp *spatial, p *Profile, mode Mode, count int, up float32) []uint16 {
 	t0 := time.Now()
-	marks := pickMarks(g, sp, p, count)
+	marks := pickMarks(g, sp, p, mode, count)
 
 	rowLen := count
 	if up > 0 {
@@ -170,12 +176,12 @@ func buildLandmarks(g *graph, sp *spatial, p *Profile, count int, up float32) []
 			defer func() { <-sem }()
 			dist := make([]float32, g.n)
 			var d dijkstra
-			d.all(g, p, m, dist, up, false)
+			d.all(g, p, mode, m, dist, up, false)
 			for n := 0; n < g.n; n++ {
 				rows[n*rowLen+li] = quantize(dist[n])
 			}
 			if up > 0 {
-				d.all(g, p, m, dist, up, true)
+				d.all(g, p, mode, m, dist, up, true)
 				for n := 0; n < g.n; n++ {
 					rows[n*rowLen+count+li] = quantize(dist[n])
 				}
