@@ -47,7 +47,7 @@ func TestLandmarksOnDiskAreTheLandmarksInMemory(t *testing.T) {
 	for _, profile := range ProfileNames {
 		dir := t.TempDir()
 		want := filepath.Join(dir, "want.alt")
-		if err := WriteLandmarks(graph, want, profile, 4); err != nil {
+		if err := WriteLandmarks(graph, want, LandmarkRequest{Mode: Foot, Profile: profile, Count: 4}); err != nil {
 			t.Fatal(err)
 		}
 		// 7 does not divide the number of nodes: the last pass over the rows is a short one
@@ -55,7 +55,7 @@ func TestLandmarksOnDiskAreTheLandmarksInMemory(t *testing.T) {
 			got := filepath.Join(dir, "got.alt")
 
 			// Act
-			err := writeLandmarksOnDisk(graph, got, profile, 4, dir, workers, 7)
+			err := writeLandmarksOnDisk(graph, got, LandmarkRequest{Mode: Foot, Profile: profile, Count: 4}, dir, workers, 7)
 
 			// Assert
 			if err != nil {
@@ -102,7 +102,7 @@ func TestAColumnIsWrittenInBlocks(t *testing.T) {
 
 func TestADijkstraKeepsItsHeapBetweenCalls(t *testing.T) {
 	// Arrange: four calls, in both directions, on a graph whose frontier grows and empties more than once
-	p, g, _, err := openForLandmarks(islandGraph(t, t.TempDir()), "any", 4)
+	p, g, _, err := openForLandmarks(islandGraph(t, t.TempDir()), LandmarkRequest{Mode: Foot, Profile: "any", Count: 4})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,8 +115,8 @@ func TestADijkstraKeepsItsHeapBetweenCalls(t *testing.T) {
 		backward bool
 	}{{0, false}, {uint32(g.n - 1), true}, {5, false}, {2, true}} {
 		// Act
-		dijkstraAll(g, p, run.src, want, p.UpPerMeter, run.backward)
-		d.all(g, p, run.src, got, p.UpPerMeter, run.backward)
+		dijkstraAll(g, p, Foot, run.src, want, p.UpPerMeter, run.backward)
+		d.all(g, p, Foot, run.src, got, p.UpPerMeter, run.backward)
 
 		// Assert: the heap it kept changes nothing to the distances
 		for i := range want {
@@ -145,8 +145,8 @@ func TestLandmarksOnDiskRefuseWhatInMemoryRefuses(t *testing.T) {
 	dir := t.TempDir()
 	graph := islandGraph(t, dir)
 
-	unknown := WriteLandmarksOnDisk(graph, filepath.Join(dir, "a.alt"), "nope", 4, dir, 2)
-	tooMany := WriteLandmarksOnDisk(graph, filepath.Join(dir, "b.alt"), "any", 1000, dir, 2)
+	unknown := WriteLandmarksOnDisk(graph, filepath.Join(dir, "a.alt"), LandmarkRequest{Mode: Foot, Profile: "nope", Count: 4}, dir, 2)
+	tooMany := WriteLandmarksOnDisk(graph, filepath.Join(dir, "b.alt"), LandmarkRequest{Mode: Foot, Profile: "any", Count: 1000}, dir, 2)
 
 	if unknown == nil || tooMany == nil {
 		t.Errorf("unknown profile: %v, too many landmarks: %v", unknown, tooMany)
@@ -177,7 +177,7 @@ func TestLandmarksOnDiskSweepTheScratchOfAKilledBuild(t *testing.T) {
 	}
 
 	// Act
-	err := WriteLandmarksOnDisk(graph, filepath.Join(dir, "any.alt"), "any", 4, dir, 2)
+	err := WriteLandmarksOnDisk(graph, filepath.Join(dir, "any.alt"), LandmarkRequest{Mode: Foot, Profile: "any", Count: 4}, dir, 2)
 
 	// Assert
 	if err != nil {

@@ -162,7 +162,7 @@ func TestFileWritersFailOnAnUnwritablePath(t *testing.T) {
 	if err := writeGraph(missing, nil, []uint32{0}, nil); err == nil {
 		t.Error("writeGraph into a missing directory: err = nil")
 	}
-	if err := writeLandmarks(missing, 1, 0, 0, 8, nil); err == nil {
+	if err := writeLandmarks(missing, newAltHead(1, 0, 0, Foot, altMetricCosts, "any", 8), nil); err == nil {
 		t.Error("writeLandmarks into a missing directory: err = nil")
 	}
 	if got := bytesOf([]uint16(nil)); got != nil {
@@ -176,11 +176,11 @@ func TestLandmarkCountMustFitASearch(t *testing.T) {
 	path := g.write(t)
 	dir := t.TempDir()
 	for _, count := range []int{0, -1, 33, 40} {
-		if err := WriteLandmarks(path, filepath.Join(dir, "x.alt"), "any", count); err == nil {
+		if err := WriteLandmarks(path, filepath.Join(dir, "x.alt"), LandmarkRequest{Mode: Foot, Profile: "any", Count: count}); err == nil {
 			t.Errorf("%d landmarks: err = nil, but a search keeps %d values per node", count, maxLandmarkValues)
 		}
 	}
-	if err := WriteLandmarks(path, filepath.Join(dir, "ok.alt"), "any", 32); err != nil {
+	if err := WriteLandmarks(path, filepath.Join(dir, "ok.alt"), LandmarkRequest{Mode: Foot, Profile: "any", Count: 32}); err != nil {
 		t.Errorf("32 landmarks fit: %v", err)
 	}
 }
@@ -191,7 +191,7 @@ func TestOpenRefusesFilesThatAreShorterThanTheirHeader(t *testing.T) {
 	g.grid(6, 6, flat)
 	graph := g.write(t)
 	alt := filepath.Join(dir, "a.alt")
-	if err := WriteLandmarks(graph, alt, "any", 4); err != nil {
+	if err := WriteLandmarks(graph, alt, LandmarkRequest{Mode: Foot, Profile: "any", Count: 4}); err != nil {
 		t.Fatal(err)
 	}
 	truncate := func(from string, size int64) string {
@@ -207,13 +207,13 @@ func TestOpenRefusesFilesThatAreShorterThanTheirHeader(t *testing.T) {
 	}
 	info, _ := os.Stat(graph)
 	for _, size := range []int64{20, info.Size() / 2, info.Size() - 16} {
-		if _, err := Open(truncate(graph, size), "", "any"); err == nil {
+		if _, err := Open(truncate(graph, size), "", footKey("any")); err == nil {
 			t.Errorf("graph cut to %d of %d bytes: err = nil", size, info.Size())
 		}
 	}
 	info, _ = os.Stat(alt)
 	for _, size := range []int64{30, info.Size() - 2} {
-		if _, err := Open(graph, truncate(alt, size), "any"); err == nil {
+		if _, err := Open(graph, truncate(alt, size), footKey("any")); err == nil {
 			t.Errorf("landmarks cut to %d of %d bytes: err = nil", size, info.Size())
 		}
 	}
@@ -226,7 +226,7 @@ func TestAGraphWithoutEdgesOpensWithoutPanicking(t *testing.T) {
 	if err := b.WriteGraph(path); err != nil {
 		t.Fatal(err)
 	}
-	e, err := Open(path, "", "any")
+	e, err := Open(path, "", footKey("any"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +295,7 @@ func TestRoutesAcrossHighGroundAndBelowSeaLevelAreMeasuredRight(t *testing.T) {
 			if err := b.WriteGraph(path); err != nil {
 				t.Fatal(err)
 			}
-			e, err := Open(path, "", "any")
+			e, err := Open(path, "", footKey("any"))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -326,7 +326,7 @@ func TestAGraphOfAnotherVersionIsRefused(t *testing.T) {
 	if err := os.WriteFile(path, data, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Open(path, "", "any"); err == nil || !strings.Contains(err.Error(), "build-graph") {
+	if _, err := Open(path, "", footKey("any")); err == nil || !strings.Contains(err.Error(), "build-graph") {
 		t.Errorf("err = %v, want it to say to build the graph again", err)
 	}
 }
@@ -339,7 +339,7 @@ func TestASteepWayUpIsNotRefusedForItsClimb(t *testing.T) {
 			g.connect(i-1, i, KindPath)
 		}
 	}
-	e, err := Open(g.write(t), "", "paved")
+	e, err := Open(g.write(t), "", footKey("paved"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -432,10 +432,10 @@ func TestLiftedNodePicksTheHighestOrLowestNodeWithinReach(t *testing.T) {
 	e := openTest(t, g, false)
 	base := uint32(at(10, 10))
 	// Act
-	up := liftedNode(e.g, e.sp, base, 300, 1, nil)
-	down := liftedNode(e.g, e.sp, base, 300, -1, nil)
-	still := liftedNode(e.g, e.sp, base, 300, 0, nil)
-	tooShort := liftedNode(e.g, e.sp, base, 20, 1, nil)
+	up := liftedNode(e.g, e.sp, base, 300, 1, nil, Foot)
+	down := liftedNode(e.g, e.sp, base, 300, -1, nil, Foot)
+	still := liftedNode(e.g, e.sp, base, 300, 0, nil, Foot)
+	tooShort := liftedNode(e.g, e.sp, base, 20, 1, nil, Foot)
 	// Assert
 	if e.g.nodes[up].Elev <= e.g.nodes[base].Elev {
 		t.Errorf("up is not higher than the base node")
@@ -506,11 +506,11 @@ func TestAControlCircleTurnsToWhereWaysAre(t *testing.T) {
 	slat, slon := float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7
 	const rc, theta = 3000.0, math.Pi / 2 // towards the wall: its points fall 2 km from the band, past the 900 m reach
 	jitter := []float64{1, 1}
-	if _, ok := circlePoints(e.g, e.sp, slat, slon, rc, theta, jitter, 0, nil); ok {
+	if _, ok := circlePoints(e.g, e.sp, slat, slon, rc, theta, jitter, 0, nil, Foot); ok {
 		t.Fatal("the first circle was meant to fall off the ways")
 	}
 	// Act
-	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, rc, theta, jitter, 0, nil)
+	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, rc, theta, jitter, 0, nil, Foot)
 	// Assert
 	if !ok || len(nodes) != len(jitter) {
 		t.Fatalf("ok = %v with %d nodes, want a circle of %d points", ok, len(nodes), len(jitter))
@@ -527,7 +527,7 @@ func TestAControlCircleGivesUpWhenNoTurnReachesTheWays(t *testing.T) {
 	e := openTest(t, g, false)
 	sn := g.nodes[start]
 	// Act
-	_, _, ok := rotatedCircle(e.g, e.sp, float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7, 20_000, 0, []float64{1, 1, 1}, 0, nil)
+	_, _, ok := rotatedCircle(e.g, e.sp, float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7, 20_000, 0, []float64{1, 1, 1}, 0, nil, Foot)
 	// Assert
 	if ok {
 		t.Error("a circle 20 km wide around a 100 m lattice found ways within reach")
@@ -545,13 +545,13 @@ func TestAControlPointDoesNotLandOnAnIsland(t *testing.T) {
 	sn := g.nodes[start]
 	slat, slon := float64(sn.Lat)*1e-7, float64(sn.Lon)*1e-7
 	// Act
-	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, 3000, math.Pi/2, []float64{1, 1}, 0, nil)
+	nodes, used, ok := rotatedCircle(e.g, e.sp, slat, slon, 3000, math.Pi/2, []float64{1, 1}, 0, nil, Foot)
 	// Assert
 	if !ok || used == math.Pi/2 {
 		t.Fatalf("ok = %v, turn = %v: the first circle lands on the islands and should have been turned", ok, used)
 	}
 	for _, n := range nodes {
-		if e.g.small.has(n) {
+		if e.g.small[Foot].has(n) {
 			t.Errorf("node %d is on an island", n)
 		}
 	}
@@ -564,13 +564,13 @@ func TestALiftedControlPointDoesNotLandOnAnIsland(t *testing.T) {
 	hi := g.addNode(250, 0, 900)
 	g.connect(hi, g.addNode(300, 0, 900), KindPath)
 	e := openTest(t, g, false)
-	if !e.g.small.has(uint32(hi)) {
+	if !e.g.small[Foot].has(uint32(hi)) {
 		t.Fatal("the island is not small")
 	}
 	// Act
-	got := liftedNode(e.g, e.sp, uint32(start), 250, 1, nil)
+	got := liftedNode(e.g, e.sp, uint32(start), 250, 1, nil, Foot)
 	// Assert
-	if e.g.small.has(got) {
+	if e.g.small[Foot].has(got) {
 		t.Errorf("the control point was lifted onto the island, node %d", got)
 	}
 }
@@ -585,11 +585,11 @@ func TestALiftedControlPointSkipsASmallNodeForTheLargeOneBesideIt(t *testing.T) 
 	high := g.addNode(2250, 2010, 800)
 	g.connect(high, at(20, 22), KindPath)
 	e := openTest(t, g, false)
-	if !e.g.small.has(uint32(island)) || e.g.small.has(uint32(high)) {
+	if !e.g.small[Foot].has(uint32(island)) || e.g.small[Foot].has(uint32(high)) {
 		t.Fatal("the island or the high node is on the wrong component")
 	}
 	// Act
-	got := liftedNode(e.g, e.sp, uint32(base), 250, 1, nil)
+	got := liftedNode(e.g, e.sp, uint32(base), 250, 1, nil, Foot)
 	// Assert
 	if got != uint32(high) {
 		t.Errorf("lifted to %d (elevation %v), want the large high node %d", got, e.g.nodes[got].Elev, high)

@@ -140,7 +140,7 @@ func TestHarness(t *testing.T) {
 	if len(cfg.Caps) == 0 {
 		cfg.Caps = []int{maxRoutes}
 	}
-	zones, err := engine.NewReloader(cfg.DataDir, cfg.Surface)
+	zones, err := engine.NewReloader(cfg.DataDir, engine.EngineKey{Mode: engine.Foot, Profile: cfg.Surface})
 	if err != nil {
 		t.Fatal(err)
 	}

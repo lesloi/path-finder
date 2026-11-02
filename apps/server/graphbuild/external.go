@@ -184,7 +184,8 @@ var outEdgeCodec = codec[outEdge]{
 
 func outEdgeAt(r outEdge) uint32 { return r.at }
 
-// wayInfo is what the build needs to know of a way once its references are in order: how many, and what kind of way it is.
+// wayInfo is what the build needs to know of a way once its references are in order: how many references it has, and
+// what it says of both modes (see wayAttrs).
 type wayInfo struct{ length, attrs uint32 }
 
 func scanPBF(path string, skipNodes, skipWays bool, each func(osm.Object) error) error {
@@ -220,14 +221,14 @@ func spillRefs(pbf, dir string, chunk int) (*refs, error) {
 		if !ok {
 			return nil
 		}
-		kind, surf, flags, ok := classifyWay(w.Tags)
+		way, ok := classifyWay(w.Tags)
 		if !ok || len(w.Nodes) < 2 {
 			return nil
 		}
 		if uint64(r.count)+uint64(len(w.Nodes)) > math.MaxUint32 {
 			return errors.New("more than 2^32 - 1 references")
 		}
-		r.ways = append(r.ways, wayInfo{uint32(len(w.Nodes)), uint32(kind) | uint32(surf)<<8 | uint32(flags)<<16})
+		r.ways = append(r.ways, wayInfo{uint32(len(w.Nodes)), wayAttrs(way)})
 		for _, n := range w.Nodes {
 			if err := r.byID.push(idRef{int64(n.ID), r.count}); err != nil {
 				return err
@@ -679,10 +680,18 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 		}
 		ra, rb := remap[a.node], remap[b.node]
 		length := math.Float32bits(float32(haversineM(a.lat, a.lon, b.lat, b.lon)))
-		if err := byEdge.push(outEdge{take(nextEdge, ra), rb, length, attrs}); err != nil {
-			return err
+		// The access is the same both ways; the direction a bike may ride against a oneway is not.
+		wayModes := uint8(attrs >> 24)
+		for _, d := range [2]struct {
+			from, to uint32
+			forward  bool
+		}{{ra, rb, true}, {rb, ra, false}} {
+			modes := edgeModes(wayModes, d.forward)
+			if err := byEdge.push(outEdge{take(nextEdge, d.from), d.to, length, attrs&0x00FFFFFF | uint32(modes)<<24}); err != nil {
+				return err
+			}
 		}
-		return byEdge.push(outEdge{take(nextEdge, rb), ra, length, attrs})
+		return nil
 	})
 	if err != nil {
 		return rep, err
@@ -691,34 +700,63 @@ func BuildOnDisk(pbf, demDir string, proj elevation.Projection, outPath string, 
 	remap = nil
 	// The edges leave in the order of the graph, so the two sections that depend on them are found as they go: the
 	// ways too long for a scan of the nodes around an area, and the components, joined by each way once.
-	components := engine.NewComponents(int(kept))
+	// The components of each mode are found as the edges go: a way only joins the components of the modes that may use
+	// it, so that a bike-only connector does not turn a foot island into a large component.
+	var components [engine.NumModes]*engine.Components
+	for m := range components {
+		components[m] = engine.NewComponents(int(kept))
+	}
+	var nodeModes [engine.NumModes][]uint64
+	for m := range nodeModes {
+		nodeModes[m] = make([]uint64, (uint64(kept)+63)/64)
+	}
 	var src uint32
 	err = byEdge.each(func(e outEdge) error {
 		for e.at >= nextEdge[src] {
 			src++
 		}
 		length := math.Float32frombits(e.length)
+		modes := uint8(e.attrs >> 24)
 		if e.dst > src { // every edge is stored both ways
-			components.Join(src, e.dst)
+			for m, c := range components {
+				if modes&engine.Mode(m).Bit() != 0 {
+					c.Join(src, e.dst)
+				}
+			}
 			if length > engine.LongEdgeMeters {
-				if err := graph.Long(src, e.dst); err != nil {
+				if err := graph.Long(src, e.dst, modes&engine.EdgeAllModes); err != nil {
 					return err
 				}
 			}
 		}
-		return graph.Edge(engine.Edge{To: e.dst, Len: length, Kind: uint8(e.attrs), Surf: uint8(e.attrs >> 8), Flags: uint8(e.attrs >> 16)})
+		for m := range nodeModes {
+			if modes&engine.Mode(m).Bit() != 0 {
+				nodeModes[m][src>>6] |= 1 << (src & 63)
+				nodeModes[m][e.dst>>6] |= 1 << (e.dst & 63)
+			}
+		}
+		return graph.Edge(engine.Edge{To: e.dst, Len: length, Kind: uint8(e.attrs), Surf: uint8(e.attrs >> 8), Flags: uint8(e.attrs >> 16), Modes: modes})
 	})
 	if err != nil {
 		return rep, err
 	}
 	byEdge.finish(&tot)
 	nextEdge = nil
-	for _, word := range components.SmallBitmap(engine.SmallComponentNodes) {
-		if err := graph.Small(word); err != nil {
-			return rep, err
+	for m, c := range components {
+		for _, word := range c.SmallBitmap(engine.SmallComponentNodes) {
+			if err := graph.Small(engine.Mode(m), word); err != nil {
+				return rep, err
+			}
 		}
 	}
-	components = nil
+	components = [engine.NumModes]*engine.Components{}
+	for m := range nodeModes {
+		for _, word := range nodeModes[m] {
+			if err := graph.NodeModes(engine.Mode(m), word); err != nil {
+				return rep, err
+			}
+		}
+	}
 
 	// The spatial index: the nodes by cell.
 	err = byCell.each(func(c cellNode) error { return graph.GridNode(c.rank) })

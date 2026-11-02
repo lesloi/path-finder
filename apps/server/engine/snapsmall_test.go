@@ -24,7 +24,7 @@ func TestAStartOnAnIslandIsServedFromTheNearbyLattice(t *testing.T) {
 	// Arrange
 	g, island := islandBeside(-300)
 	e := openTest(t, g, false)
-	if !e.g.small.has(uint32(island)) {
+	if !e.g.small[Foot].has(uint32(island)) {
 		t.Fatal("the island is not small")
 	}
 	// Act
@@ -42,7 +42,7 @@ func TestAnIslandAloneAnswersNoLoopWithoutSearching(t *testing.T) {
 	// Arrange: the lattice is 1,000 m away, out of the snap reach
 	g, island := islandBeside(-1000)
 	e := openTest(t, g, false)
-	if !e.g.small.has(uint32(island)) {
+	if !e.g.small[Foot].has(uint32(island)) {
 		t.Fatal("the island is not small")
 	}
 	// A search that ran would end on the cancelled context.
@@ -149,7 +149,7 @@ func TestTheShortestWaypointLoopFollowsTheLoopsOffAnIsland(t *testing.T) {
 	g.connect(start, mid, KindPath)
 	g.connect(mid, wp, KindPath)
 	e := openTest(t, g, false)
-	if !e.g.small.has(uint32(start)) {
+	if !e.g.small[Foot].has(uint32(start)) {
 		t.Fatal("the island is not small")
 	}
 	// Act

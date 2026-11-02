@@ -34,7 +34,7 @@ type Zones struct {
 
 type zone struct {
 	box     bounds
-	engines map[string]*Engine
+	engines map[EngineKey]*Engine
 	graph   *graph
 }
 
@@ -44,13 +44,13 @@ func (zn *zone) close() { closeEngines(zn.engines, zn.graph) }
 // zoneOpens counts the calls of OpenZones, for the tests to see a reload that does not open.
 var zoneOpens atomic.Int64
 
-// OpenZones maps the zones of a data directory for the profiles. It fails at once on a zone that cannot be
-// served, or that did not finish building, rather than on the first request that needs it, or by leaving a hole
-// in the map. A zone in a directory of zones must have the landmarks of every profile: with many zones, one
-// that serves slowly would go unnoticed. A directory that is one zone keeps them optional.
-func OpenZones(dir string, profiles ...string) (_ *Zones, err error) {
-	if len(profiles) == 0 {
-		return nil, errors.New("engine: no profile to open")
+// OpenZones maps the zones of a data directory for the engines of the keys. It fails at once on a zone that cannot
+// be served, or that did not finish building, rather than on the first request that needs it, or by leaving a hole
+// in the map. A zone in a directory of zones must have the landmarks of every mode: with many zones, one that serves
+// slowly would go unnoticed. A directory that is one zone keeps them optional.
+func OpenZones(dir string, keys ...EngineKey) (_ *Zones, err error) {
+	if len(keys) == 0 {
+		return nil, errors.New("engine: no engine to open")
 	}
 	zoneOpens.Add(1)
 	dirs, flat, err := zoneDirs(dir)
@@ -65,18 +65,20 @@ func OpenZones(dir string, profiles ...string) (_ *Zones, err error) {
 		}
 	}()
 	for _, d := range dirs {
-		if !flat {
-			for _, profile := range profiles {
-				if _, err := os.Stat(filepath.Join(d, LandmarksFileName(profile))); err != nil {
-					return nil, fmt.Errorf("engine: zone %s has no %s: build it with build-alt", d, LandmarksFileName(profile))
+		for _, key := range keys {
+			if !flat {
+				if path, err := landmarkPath(d, key); err != nil {
+					return nil, err
+				} else if path == "" {
+					return nil, fmt.Errorf("engine: zone %s has no %s: build it with build-alt -mode %s", d, LandmarksFileName(key.Mode), key.Mode)
 				}
 			}
 		}
-		engines, err := OpenDir(d, profiles...)
+		engines, err := OpenDir(d, keys...)
 		if err != nil {
 			return nil, err
 		}
-		g := engines[profiles[0]].g
+		g := engines[keys[0]].g
 		z.zones = append(z.zones, &zone{box: g.sp.bounds, engines: engines, graph: g})
 		z.files[g.file.path] = g.file.id
 		for _, e := range engines {
@@ -128,14 +130,20 @@ func (z *Zones) release() {
 
 // scanFiles lists the files of the data directory that a server maps, with their versions. A landmark file that
 // is missing is left out: in a flat directory it is optional, and elsewhere OpenZones refuses the zone.
-func scanFiles(dir string, profiles []string) (map[string]fileID, error) {
+func scanFiles(dir string, keys []EngineKey) (map[string]fileID, error) {
 	dirs, _, err := zoneDirs(dir)
 	if err != nil {
 		return nil, err
 	}
 	names := []string{GraphFileName}
-	for _, profile := range profiles {
-		names = append(names, LandmarksFileName(profile))
+	seen := map[string]bool{GraphFileName: true}
+	for _, key := range keys {
+		for _, name := range []string{LandmarksFileName(key.Mode), LandmarksCostsFileName(key.Mode, key.Profile)} {
+			if !seen[name] {
+				seen[name] = true
+				names = append(names, name)
+			}
+		}
 	}
 	files := make(map[string]fileID, len(dirs)*len(names))
 	for _, d := range dirs {
@@ -161,23 +169,23 @@ func scanFiles(dir string, profiles []string) (map[string]fileID, error) {
 // A file is replaced by writing the new one aside and renaming it over the old: the mapping follows the inode,
 // so a file written in place is seen half done by the searches in flight, and a shorter one faults them.
 type Reloader struct {
-	dir      string
-	profiles []string
-	cur      atomic.Pointer[Zones]
-	mu       sync.Mutex // one reload at a time; guards what follows
+	dir  string
+	keys []EngineKey
+	cur  atomic.Pointer[Zones]
+	mu   sync.Mutex // one reload at a time; guards what follows
 	// failed is the files of the last reload that could not be served for what they hold, and why: the same
 	// files are not opened again to fail the same way. A failure of the system is tried again.
 	failed    map[string]fileID
 	failedErr error
 }
 
-// NewReloader opens the zones of dir for the profiles, like OpenZones.
-func NewReloader(dir string, profiles ...string) (*Reloader, error) {
-	z, err := OpenZones(dir, profiles...)
+// NewReloader opens the zones of dir for the engines of the keys, like OpenZones.
+func NewReloader(dir string, keys ...EngineKey) (*Reloader, error) {
+	z, err := OpenZones(dir, keys...)
 	if err != nil {
 		return nil, err
 	}
-	r := &Reloader{dir: dir, profiles: profiles}
+	r := &Reloader{dir: dir, keys: keys}
 	r.cur.Store(z)
 	return r, nil
 }
@@ -190,7 +198,7 @@ func (r *Reloader) Reload() (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	cur := r.cur.Load()
-	files, err := scanFiles(r.dir, r.profiles)
+	files, err := scanFiles(r.dir, r.keys)
 	if err != nil {
 		return false, err
 	}
@@ -200,7 +208,7 @@ func (r *Reloader) Reload() (bool, error) {
 	if maps.Equal(files, r.failed) {
 		return false, r.failedErr
 	}
-	next, err := OpenZones(r.dir, r.profiles...)
+	next, err := OpenZones(r.dir, r.keys...)
 	if err != nil {
 		var transient transientError
 		if !errors.As(err, &transient) { // the same files would fail the same way
@@ -248,10 +256,11 @@ func (r *Reloader) Len() int { return r.cur.Load().Len() }
 // Profile returns the loops of one profile over the zones served when each search starts, or nil when the
 // profile was not opened.
 func (r *Reloader) Profile(name string) *ProfileZones {
-	if r.cur.Load().Profile(name) == nil {
+	key := EngineKey{Foot, name}
+	if r.cur.Load().Engine(key) == nil {
 		return nil
 	}
-	return &ProfileZones{src: r, name: name}
+	return &ProfileZones{src: r, key: key}
 }
 
 func (r *Reloader) drop(z *Zones) { z.release() }
@@ -312,12 +321,16 @@ func zoneDirs(dir string) (dirs []string, flat bool, err error) {
 // Len is the number of zones.
 func (z *Zones) Len() int { return len(z.zones) }
 
-// Profile returns the loops of one profile over all the zones, or nil when it was not opened.
-func (z *Zones) Profile(name string) *ProfileZones {
-	if len(z.zones) == 0 || z.zones[0].engines[name] == nil {
+// Profile returns the loops of one foot profile over all the zones, or nil when it was not opened. Walking is the
+// only travel mode the server serves until cycling arrives (#380).
+func (z *Zones) Profile(name string) *ProfileZones { return z.Engine(EngineKey{Foot, name}) }
+
+// Engine returns the loops of one engine over all the zones, or nil when it was not opened.
+func (z *Zones) Engine(key EngineKey) *ProfileZones {
+	if len(z.zones) == 0 || z.zones[0].engines[key] == nil {
 		return nil
 	}
-	return &ProfileZones{src: z, name: name}
+	return &ProfileZones{src: z, key: key}
 }
 
 // zoneSource gives the zones a search runs on, and takes them back when it ends: fixed zones are theirs for
@@ -332,8 +345,8 @@ func (z *Zones) drop(*Zones)  {}
 
 // ProfileZones generates the loops of one profile, from whichever zone holds the start point.
 type ProfileZones struct {
-	src  zoneSource
-	name string
+	src zoneSource
+	key EngineKey
 }
 
 // Loops asks the zones whose box holds the start, the one with the most room round it first. A box is a
@@ -363,7 +376,7 @@ func inZones[T any](a *ProfileZones, start Point, search func(*Engine) (T, error
 	var candidates []candidate
 	for _, zn := range z.zones {
 		if m := edgeDistance(zn.box, start.Lat, start.Lon); m >= 0 {
-			candidates = append(candidates, candidate{zn.engines[a.name], m})
+			candidates = append(candidates, candidate{zn.engines[a.key], m})
 		}
 	}
 	if len(candidates) == 0 {
