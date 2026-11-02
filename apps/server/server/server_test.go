@@ -27,7 +27,9 @@ func (f generatorFunc) Generate(ctx context.Context, body json.RawMessage) (any,
 	return f(ctx, body)
 }
 
-func okGenerator(context.Context, json.RawMessage) (any, error) { return []string{"route"}, nil }
+func okGenerator(context.Context, json.RawMessage) (any, error) {
+	return map[string]any{"routes": []string{"route"}}, nil
+}
 
 func webRoot(t *testing.T) string {
 	t.Helper()
@@ -104,6 +106,19 @@ func TestEveryAnswerSendsTheSecurityHeaders(t *testing.T) {
 func TestRouteSetsAnswerTheRoutes(t *testing.T) {
 	r := post(newServer(t, nil), `{"start":[2,48]}`)
 	if r.Code != http.StatusOK || strings.TrimSpace(r.Body.String()) != `{"routes":["route"]}` {
+		t.Errorf("got %d %s", r.Code, r.Body.String())
+	}
+}
+
+func TestRouteSetsAnswerTheClosestGain(t *testing.T) {
+	closest := 296.0
+	h := newServer(t, func(c *Config) {
+		c.Generator = generatorFunc(func(context.Context, json.RawMessage) (any, error) {
+			return contract.RouteSet{Routes: []contract.Route{}, ClosestElevationGain: &closest}, nil
+		})
+	})
+	r := post(h, `{"start":[2,48]}`)
+	if r.Code != http.StatusOK || strings.TrimSpace(r.Body.String()) != `{"routes":[],"closestElevationGain":296}` {
 		t.Errorf("got %d %s", r.Code, r.Body.String())
 	}
 }

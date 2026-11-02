@@ -74,6 +74,16 @@ type TechnicalStretch struct {
 	To   float64 `json:"to"`
 }
 
+// RouteSet is the answer of POST /api/v1/route-sets: the routes, and what the web app needs to explain a target
+// the routes miss. Routes is never null in an answer; a route set with none is an empty list.
+type RouteSet struct {
+	Routes []Route `json:"routes"`
+	// ClosestElevationGain is the gain of the returned route nearest the requested one, in metres, when a
+	// numeric gain was asked and no returned route is within the match tolerance of it. Its presence tells the
+	// web app that the requested gain was not met, and the value the closest gain it can show.
+	ClosestElevationGain *float64 `json:"closestElevationGain,omitempty"`
+}
+
 // Route is one route of a route set. A geometry point is longitude, latitude and, with elevation
 // data, the height in metres.
 type Route struct {

@@ -63,6 +63,7 @@ func TestErrorCodesAreThoseOfTheContractFile(t *testing.T) {
 // The web app parses the same file, so a field renamed here fails its test too.
 func TestRouteSetMatchesTheWebAppsSample(t *testing.T) {
 	gain, loss := 250.0, 240.0
+	closest := 250.0
 	routes := []Route{
 		{
 			Geometry: [][]float64{{6.1294, 45.8992, 450.5}, {6.13, 45.9, 455}}, Distance: 10.2,
@@ -77,7 +78,7 @@ func TestRouteSetMatchesTheWebAppsSample(t *testing.T) {
 			Surfaces: []SurfaceStretch{{"paved", 0, 12.9}}, TechnicalStretches: []TechnicalStretch{},
 		},
 	}
-	got, err := json.Marshal(map[string]any{"routes": routes})
+	got, err := json.Marshal(RouteSet{Routes: routes, ClosestElevationGain: &closest})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,6 +95,17 @@ func TestRouteSetMatchesTheWebAppsSample(t *testing.T) {
 	}
 	if !reflect.DeepEqual(gotAny, wantAny) {
 		t.Errorf("route set JSON changed; testdata/route-set.json is what the web app reads:\n%s", got)
+	}
+}
+
+func TestRouteSetCarriesTheClosestGain(t *testing.T) {
+	closest := 296.0
+	got, err := json.Marshal(RouteSet{Routes: []Route{}, ClosestElevationGain: &closest})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != `{"routes":[],"closestElevationGain":296}` {
+		t.Errorf("route set = %s", got)
 	}
 }
 

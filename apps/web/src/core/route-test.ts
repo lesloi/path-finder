@@ -3,6 +3,7 @@ import type { Position } from './coordinates.ts';
 import { effortFactor } from './effort.ts';
 import {
   elevationProfile,
+  parseRouteSet,
   parseRoutes,
   reverseRoute,
   projectOnSnapshot,
@@ -47,6 +48,27 @@ const route: Route = {
   technical: false,
   technicalStretches: [],
 };
+
+describe('parseRouteSet', () => {
+  it('reads the routes and the closest gain of an answer', () => {
+    expect(parseRouteSet({ routes: [route], closestElevationGain: 296 })).toEqual({
+      routes: [route],
+      closestElevationGain: 296,
+    });
+  });
+
+  it('leaves the closest gain out when the API sends none', () => {
+    expect(parseRouteSet({ routes: [route] })).toEqual({ routes: [route] });
+  });
+
+  it.each([
+    ['a gain that is not a number', '296'],
+    ['a gain that is NaN', Number.NaN],
+    ['a negative gain', -1],
+  ])('refuses an answer with %s', (_, closestElevationGain) => {
+    expect(parseRouteSet({ routes: [route], closestElevationGain })).toBeUndefined();
+  });
+});
 
 describe('parseRoutes', () => {
   const answer = { routes: [route] };

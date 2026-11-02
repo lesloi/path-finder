@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { isCriteriaField, type CriteriaField, type ErrorCode } from '../contract/index.ts';
-import { parseRoutes, type Route, type RouteSetRequest } from '../core/index.ts';
+import { parseRouteSet, type Route, type RouteSet, type RouteSetRequest } from '../core/index.ts';
 import { buildIdHeader } from './api.ts';
 
 /**
@@ -52,7 +52,7 @@ function invalidCriteria(body: object): Refusal {
 export async function requestRouteSet(
   request: RouteSetRequest,
   signal?: AbortSignal,
-): Promise<{ routes: Route[] } | { refusal: Refusal; retryAfter?: number }> {
+): Promise<RouteSet | { refusal: Refusal; retryAfter?: number }> {
   let response: Response;
   try {
     response = await fetch('/api/v1/route-sets', {
@@ -79,8 +79,8 @@ export async function requestRouteSet(
     const refusal: Refusal = code === 'invalid-criteria' ? invalidCriteria(body as object) : { error: code };
     return { refusal, ...(retryAfter > 0 && { retryAfter }) };
   }
-  const routes = parseRoutes(body);
-  return routes ? { routes } : { refusal: { error: 'failed' } };
+  const routeSet = parseRouteSet(body);
+  return routeSet ? routeSet : { refusal: { error: 'failed' } };
 }
 
 // Times to ask again when the server is busy: a slot frees in well under a second, so most users never see it.
@@ -130,11 +130,12 @@ async function requestWithRetries(request: RouteSetRequest, signal: AbortSignal)
  * the API found none; after an error the routes shown before the request come back.
  */
 export function useRouteSet(onError: (refusal: Refusal) => void) {
-  const [routeSet, setRouteSet] = useState<{ request: RouteSetRequest; routes: Route[] }>();
+  type Shown = { request: RouteSetRequest } & RouteSet;
+  const [routeSet, setRouteSet] = useState<Shown>();
   const [loading, setLoading] = useState(false);
   const running = useRef<AbortController>(undefined);
   // What was shown when a request started: given back if the request gives no routes, so a refusal loses nothing.
-  const previous = useRef<{ request: RouteSetRequest; routes: Route[] }>(undefined);
+  const previous = useRef<Shown>(undefined);
   const report = useRef(onError);
   useEffect(() => {
     report.current = onError;
@@ -161,7 +162,13 @@ export function useRouteSet(onError: (refusal: Refusal) => void) {
           report.current({ error: 'no-routes' });
         } else {
           previous.current = undefined;
-          setRouteSet({ request, routes: result.routes });
+          setRouteSet({
+            request,
+            routes: result.routes,
+            ...(result.closestElevationGain !== undefined && {
+              closestElevationGain: result.closestElevationGain,
+            }),
+          });
         }
       })
       // Only a request cancelled by a newer one or by `clear` rejects.

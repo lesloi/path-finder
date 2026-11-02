@@ -116,8 +116,77 @@ func TestElevationGainTolerances(t *testing.T) {
 	if len(r) != 1 || r[0].Kind != "suggestion" {
 		t.Errorf("420 m: %+v", r)
 	}
-	if r := build(c, compose(withGain(ptr(530)))); len(r) != 0 {
-		t.Errorf("530 m kept: %+v", r)
+	// Beyond the wide margin, a gain still fills the set: the length is what the user asked, and the response
+	// reports how far the gain is.
+	if r := build(c, compose(withGain(ptr(530)))); len(r) != 1 || r[0].Kind != "suggestion" {
+		t.Errorf("530 m: %+v", r)
+	}
+}
+
+func TestACandidateOutOfReachInDistanceIsStillDropped(t *testing.T) {
+	c := criteria(func(c *contract.Criteria) { c.ElevationGain = &contract.ElevationGain{Metres: 1000} })
+	if r := build(c, compose(withDistance(14), withGain(ptr(300)))); len(r) != 0 {
+		t.Errorf("14 km kept: %+v", r)
+	}
+	// A distance suggestion whose gain is out is kept: only the gain is beyond the tolerances.
+	if r := build(c, compose(withDistance(12), withGain(ptr(300)))); len(r) != 1 || r[0].Kind != "suggestion" {
+		t.Errorf("12 km: %+v", r)
+	}
+}
+
+func routeWithGain(g float64) contract.Route {
+	return contract.Route{Distance: 10, ElevationGain: ptr(g)}
+}
+
+func TestClosestGainIsTheReturnedRouteNearestTheTarget(t *testing.T) {
+	cases := []struct {
+		name   string
+		gains  []float64
+		target float64
+		want   *float64
+	}{
+		{"below the target", []float64{300, 800}, 500, ptr(300)},
+		{"above the target", []float64{800}, 600, ptr(800)},
+		{"inside the match band", []float64{350}, 300, nil},
+		{"at the target", []float64{300}, 300, nil},
+		{"no route", nil, 300, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var routes []contract.Route
+			for _, g := range tc.gains {
+				routes = append(routes, routeWithGain(g))
+			}
+			got := closestGain(routes, tc.target)
+			if (got == nil) != (tc.want == nil) || got != nil && *got != *tc.want {
+				t.Errorf("closestGain = %v, want %v", got, tc.want)
+			}
+		})
+	}
+	if got := closestGain([]contract.Route{{Distance: 10}}, 300); got != nil {
+		t.Errorf("a route without a gain gave %v", *got)
+	}
+}
+
+func TestRouteSetReportsTheClosestGainOnlyWhenNoRouteMatches(t *testing.T) {
+	c := criteria(nil) // 10 km, 300 m
+	if set := routeSet(c, []contract.Route{routeWithGain(300)}); set.ClosestElevationGain != nil {
+		t.Errorf("a matching route still reports %v", *set.ClosestElevationGain)
+	}
+	high := criteria(func(c *contract.Criteria) { c.ElevationGain = &contract.ElevationGain{Metres: 500} })
+	set := routeSet(high, []contract.Route{routeWithGain(300), routeWithGain(800)})
+	if set.ClosestElevationGain == nil || *set.ClosestElevationGain != 300 {
+		t.Errorf("closest gain = %v, want 300", set.ClosestElevationGain)
+	}
+	if set := routeSet(criteria(func(c *contract.Criteria) { c.ElevationGain = nil }), []contract.Route{routeWithGain(300)}); set.ClosestElevationGain != nil {
+		t.Errorf("no gain target reports %v", *set.ClosestElevationGain)
+	}
+	hilly := criteria(func(c *contract.Criteria) { c.ElevationGain = &contract.ElevationGain{Shortcut: "hilly"} })
+	if set := routeSet(hilly, []contract.Route{routeWithGain(300)}); set.ClosestElevationGain != nil {
+		t.Errorf("a shortcut reports %v", *set.ClosestElevationGain)
+	}
+	if set := routeSet(c, nil); set.ClosestElevationGain != nil || set.Routes == nil {
+		t.Errorf("empty set = %+v", set)
 	}
 }
 
@@ -126,7 +195,6 @@ func TestElevationGainFloors(t *testing.T) {
 	r := build(flatTarget,
 		compose(withGain(ptr(50)), withHeading(0)),
 		compose(withGain(ptr(100)), withHeading(120)),
-		compose(withGain(ptr(151)), withHeading(240)),
 	)
 	equal(t, kinds(r), []string{"match", "suggestion"}, "kinds")
 	if *r[1].ElevationGain != 100 {
@@ -386,29 +454,30 @@ func TestWideSuggestionOffOnTwoCriteriaIsKept(t *testing.T) {
 	}
 }
 
-func TestBeyondTheWideTolerancesARouteIsDropped(t *testing.T) {
+func TestBeyondTheWideTolerancesOnlyTheDistanceIsDropped(t *testing.T) {
 	c := criteria(nil)
+	if r := build(c, compose(withDistance(13.6))); len(r) != 0 {
+		t.Errorf("a distance out of reach stays: %+v", r)
+	}
 	for name, cand := range map[string]*candidate{
-		"distance":       compose(withDistance(13.6)),
 		"elevationGain":  compose(withGain(ptr(530))),
 		"elevationBelow": compose(withGain(ptr(30))),
 	} {
 		t.Run(name, func(t *testing.T) {
-			if r := build(c, cand); len(r) != 0 {
+			if r := build(c, cand); len(r) != 1 || r[0].Kind != "suggestion" {
 				t.Errorf("routes = %+v", r)
 			}
 		})
 	}
 }
 
-func TestWideElevationGainFloor(t *testing.T) {
+func TestTheClosestGainRanksFirstAmongTheFallbacks(t *testing.T) {
 	c := criteria(func(c *contract.Criteria) { c.ElevationGain = &contract.ElevationGain{Metres: 100} })
 
-	inside := build(c, compose(withGain(ptr(245))))
-	outside := build(c, compose(withGain(ptr(255))))
+	r := build(c, compose(withGain(ptr(255)), withHeading(0)), compose(withGain(ptr(245)), withHeading(120)))
 
-	if len(inside) != 1 || len(outside) != 0 {
-		t.Errorf("inside = %+v, outside = %+v", inside, outside)
+	if len(r) != 2 || *r[0].ElevationGain != 245 || *r[1].ElevationGain != 255 {
+		t.Errorf("routes = %+v, want the closest gain first", r)
 	}
 }
 
@@ -466,14 +535,14 @@ func TestADirectLoopBeyondTheTargetStaysAnEntryWhenItsGainIsOffToo(t *testing.T)
 	}
 }
 
-func TestADirectLoopWithTheRightDistanceButOffGainIsLeftOut(t *testing.T) {
+func TestADirectLoopWithTheRightDistanceButOffGainStaysALateSuggestion(t *testing.T) {
 	flat := stick(10)
 	flat.elevationGain = ptr(20)
 
-	_, ok := classify(criteria(nil), flat, 500)
+	entry, ok := classify(criteria(nil), flat, 500)
 
-	if ok {
-		t.Error("a direct loop of the right distance but off the gain is an entry: the loops can do better")
+	if !ok || entry.route.Kind != "suggestion" {
+		t.Errorf("ok = %v, kind = %q, want a suggestion: the loop is of the right distance", ok, entry.route.Kind)
 	}
 }
 

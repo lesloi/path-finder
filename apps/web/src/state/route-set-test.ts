@@ -45,6 +45,12 @@ describe('requestRouteSet', () => {
     );
   });
 
+  it('returns the closest gain of an answer', async () => {
+    answer(Response.json({ routes: [route], closestElevationGain: 296 }));
+
+    expect(await requestRouteSet(request)).toEqual({ routes: [route], closestElevationGain: 296 });
+  });
+
   it('sends the build id of the app', async () => {
     vi.stubEnv('VITE_BUILD_ID', 'build-1');
     const fetchMock = answer(Response.json({ routes: [] }));
@@ -184,6 +190,15 @@ describe('useRouteSet', () => {
     expect(result.current).toMatchObject({ loading: false, routeSet: { request, routes: [route] } });
   });
 
+  it('keeps the closest gain of the answer', async () => {
+    answer(Response.json({ routes: [route], closestElevationGain: 296 }));
+    const { result } = renderHook(() => useRouteSet(vi.fn()));
+
+    act(() => result.current.find(request));
+
+    await waitFor(() => expect(result.current.routeSet).toMatchObject({ closestElevationGain: 296 }));
+  });
+
   it('shows routes loaded from a file without asking the API, and stops a search under way', () => {
     answer(new Promise<Response>(() => {}));
     const { result } = renderHook(() => useRouteSet(vi.fn()));
@@ -192,6 +207,7 @@ describe('useRouteSet', () => {
     act(() => result.current.show(request, [route]));
 
     expect(result.current).toMatchObject({ loading: false, routeSet: { request, routes: [route] } });
+    expect(result.current.routeSet).not.toHaveProperty('closestElevationGain');
   });
 
   it('reports an error and keeps no route set', async () => {

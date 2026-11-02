@@ -1,6 +1,6 @@
 import cases from '../../../server/contract/testdata/criteria-cases.json' with { type: 'json' };
 import routeSet from '../../../server/contract/testdata/route-set.json' with { type: 'json' };
-import { parseRoutes } from '../core/index.ts';
+import { parseRouteSet } from '../core/index.ts';
 import { CriteriaError, ERROR_CODES, parseCriteria, type ErrorCode } from './index.ts';
 
 // What the server's own tests read too: its cases, and the route set it sends.
@@ -47,12 +47,13 @@ describe('the contract with the server', () => {
   });
 
   it('reads the route set the server sends', () => {
-    const routes = parseRoutes(routeSet);
+    const parsed = parseRouteSet(routeSet);
 
-    expect(routes).toHaveLength(2);
-    expect(routes?.[0]).toMatchObject({ kind: 'match', elevationGain: 250, elevationLoss: 240, distance: 10.2 });
-    expect(routes?.[0]?.geometry[0]).toEqual([6.1294, 45.8992, 450.5]);
-    expect(routes?.[1]).toMatchObject({ kind: 'suggestion' });
-    expect(routes?.[1]).not.toHaveProperty('elevationGain');
+    expect(parsed?.routes).toHaveLength(2);
+    expect(parsed?.closestElevationGain).toBe(250);
+    expect(parsed?.routes[0]).toMatchObject({ kind: 'match', elevationGain: 250, elevationLoss: 240, distance: 10.2 });
+    expect(parsed?.routes[0]?.geometry[0]).toEqual([6.1294, 45.8992, 450.5]);
+    expect(parsed?.routes[1]).toMatchObject({ kind: 'suggestion' });
+    expect(parsed?.routes[1]).not.toHaveProperty('elevationGain');
   });
 });

@@ -62,12 +62,18 @@ const body = `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain"
 
 func generate(t *testing.T, looper *fakeLooper, ctx context.Context, request string) ([]contract.Route, error) {
 	t.Helper()
+	set, err := generateSet(t, looper, ctx, request)
+	return set.Routes, err
+}
+
+func generateSet(t *testing.T, looper *fakeLooper, ctx context.Context, request string) (contract.RouteSet, error) {
+	t.Helper()
 	g := &Generator{Engines: map[string]Looper{"any": looper}, Seed: func() uint64 { return 42 }}
 	out, err := g.Generate(ctx, json.RawMessage(request))
 	if err != nil {
-		return nil, err
+		return contract.RouteSet{}, err
 	}
-	return out.([]contract.Route), nil
+	return out.(contract.RouteSet), nil
 }
 
 func TestGenerateAsksTheEngineForLoopsFromTheCriteria(t *testing.T) {
@@ -105,8 +111,50 @@ func TestGenerateSpellsOutTheContract(t *testing.T) {
 	if len(r.Surfaces) != 2 || r.Surfaces[0] != (contract.SurfaceStretch{Surface: "paved", From: 0, To: 7.5}) {
 		t.Errorf("surfaces = %+v", r.Surfaces)
 	}
-	if _, err := json.Marshal(map[string]any{"routes": routes}); err != nil {
+	if _, err := json.Marshal(contract.RouteSet{Routes: routes}); err != nil {
 		t.Errorf("not JSON: %v", err)
+	}
+}
+
+func TestGenerateKeepsALoopWhoseGainIsOutOfReach(t *testing.T) {
+	looper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}} // 10 km, 300 m
+	set, err := generateSet(t, looper, context.Background(),
+		`{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":1500,"surface":"any","pace":6}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(set.Routes) != 1 || set.Routes[0].Kind != "suggestion" {
+		t.Fatalf("routes = %+v", set.Routes)
+	}
+	if set.ClosestElevationGain == nil || *set.ClosestElevationGain != 300 {
+		t.Errorf("closest gain = %v, want 300", set.ClosestElevationGain)
+	}
+}
+
+func TestGenerateLeavesTheClosestGainAloneWhenARouteMatchesIt(t *testing.T) {
+	looper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
+	set, err := generateSet(t, looper, context.Background(), body) // 10 km, 300 m
+	if err != nil {
+		t.Fatal(err)
+	}
+	if set.ClosestElevationGain != nil {
+		t.Errorf("closest gain = %v, want none", *set.ClosestElevationGain)
+	}
+}
+
+func TestGenerateReportsNoClosestGainWithoutANumericTarget(t *testing.T) {
+	for _, request := range []string{
+		`{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"any","pace":6}`,
+		`{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":"hilly","surface":"any","pace":6}`,
+	} {
+		looper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
+		set, err := generateSet(t, looper, context.Background(), request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if set.ClosestElevationGain != nil {
+			t.Errorf("%s: closest gain = %v", request, *set.ClosestElevationGain)
+		}
 	}
 }
 
@@ -581,7 +629,7 @@ func TestGenerateKeepsAtMostTheMaxRoutesItIsGiven(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Assert
-	if routes := out.([]contract.Route); len(routes) != 2 {
+	if routes := out.(contract.RouteSet).Routes; len(routes) != 2 {
 		t.Errorf("%d routes, want the cap of 2", len(routes))
 	}
 }
@@ -598,10 +646,14 @@ func TestGenerateStopsAtTheMaxRoutesItIsGiven(t *testing.T) {
 // enoughFor runs Generate with g and returns a function that hands the engine's callback one more loop at a
 // time, as the engine does, and tells whether the search would stop there.
 func enoughFor(t *testing.T, g *Generator) func(heading float64) bool {
+	return enoughForRequest(t, g, body)
+}
+
+func enoughForRequest(t *testing.T, g *Generator, request string) func(heading float64) bool {
 	t.Helper()
 	looper := &fakeLooper{}
 	g.Engines, g.Seed = map[string]Looper{"any": looper}, func() uint64 { return 42 }
-	if _, err := g.Generate(context.Background(), json.RawMessage(body)); err != nil {
+	if _, err := g.Generate(context.Background(), json.RawMessage(request)); err != nil {
 		t.Fatal(err)
 	}
 	var found []*engine.Route
@@ -641,6 +693,25 @@ func TestGenerateStopsWhenLoopsStopAddingMatches(t *testing.T) {
 				t.Errorf("stopped after loop %d, want %d", stoppedAt, tc.stopsAt)
 			}
 		})
+	}
+}
+
+func TestGenerateStopsWhenEveryLoopMissesTheGain(t *testing.T) {
+	// A target far beyond what the loop climbs: every loop is a suggestion, so the stop must still end the search.
+	const far = `{"start":[6.1294,45.8992],"target":{"distance":10},"elevationGain":1500,"surface":"any","pace":6}`
+
+	next := enoughForRequest(t, &Generator{StopAfter: 3}, far)
+
+	stoppedAt := 0
+	for i := 0; i < 10; i++ {
+		if next(0) {
+			stoppedAt = i + 1
+			break
+		}
+	}
+
+	if stoppedAt != 3 {
+		t.Errorf("stopped after loop %d, want 3", stoppedAt)
 	}
 }
 
