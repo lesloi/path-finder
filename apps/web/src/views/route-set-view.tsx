@@ -70,6 +70,7 @@ export function RouteSetView({
   onHover,
   waypoints,
   waypointPois,
+  closestElevationGain,
 }: {
   language: Language;
   paceUnit: PaceUnit;
@@ -95,6 +96,8 @@ export function RouteSetView({
   /** The points the routes were asked to go through, shown on the profile of a route and kept in its GPX file. */
   waypoints?: Position[] | undefined;
   waypointPois?: WaypointPois | undefined;
+  /** The gain of the closest route when none meets the requested one; the list says so. */
+  closestElevationGain?: number | undefined;
 }) {
   const desktop = useDesktop();
 
@@ -160,6 +163,14 @@ export function RouteSetView({
       <div className="-mb-2">
         <RoutePace paceUnit={paceUnit} language={language} pace={pace} onChange={onPaceChange} />
       </div>
+      {closestElevationGain !== undefined && (
+        <p
+          data-testid="routes-gain-missed"
+          className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm text-ink-2"
+        >
+          {t.gainMissed} {t.gainClosest(formatHeight(closestElevationGain, language))}
+        </p>
+      )}
       {desktop ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
           {rows.map((row, index) => (

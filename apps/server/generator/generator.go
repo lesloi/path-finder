@@ -114,7 +114,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 			if directOver || overshoots(criteria, direct) {
 				// Searching loops would only cost CPU: the shortest loop through the waypoints is already beyond the
 				// match bound, and every loop is at least that long; the direct loop is offered.
-				return set.routes(limit), nil
+				return routeSet(criteria, set.routes(limit)), nil
 			}
 		}
 	}
@@ -155,7 +155,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	if ctx.Err() != nil && len(routes) == 0 {
 		return nil, ctx.Err()
 	}
-	return routes, nil
+	return routeSet(criteria, routes), nil
 }
 
 // avoidedCircles is the areas of the criteria as the engine takes them.

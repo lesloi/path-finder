@@ -205,7 +205,7 @@ func run(t *testing.T, cfg harnessConfig, looper *countingLooper, st harnessStar
 		}
 		return s
 	}
-	routes := out.([]contract.Route)
+	routes := out.(contract.RouteSet).Routes
 	s.routes = len(routes)
 	if len(routes) < minRoutes && verbose {
 		fmt.Printf("  %s, %s, seed %d: %d route(s) after %s, %d loops found\n", c.label(), st.Name, seed, len(routes), s.elapsed.Round(time.Millisecond), s.found)

@@ -96,11 +96,27 @@ function parseRoute(value: unknown): Route | undefined {
   };
 }
 
-/** The routes of a route set answer, or undefined when the answer is not one. */
-export function parseRoutes(body: unknown): Route[] | undefined {
+/** The answer of a route set request: its routes, and the gain of the closest one when none meets a requested gain. */
+export type RouteSet = { routes: Route[]; closestElevationGain?: number };
+
+/** The routes and the closest gain of a route set answer, or undefined when the answer is not one. */
+export function parseRouteSet(body: unknown): RouteSet | undefined {
   if (!isObject(body) || !Array.isArray(body.routes)) return undefined;
   const routes = body.routes.map(parseRoute);
-  return routes.every((route) => route !== undefined) ? routes : undefined;
+  if (!routes.every((route) => route !== undefined)) return undefined;
+  const { closestElevationGain } = body;
+  if (closestElevationGain !== undefined && (!isNumber(closestElevationGain) || closestElevationGain < 0)) {
+    return undefined;
+  }
+  return {
+    routes: routes as Route[],
+    ...(closestElevationGain !== undefined && { closestElevationGain }),
+  };
+}
+
+/** The routes of a route set answer, or undefined when the answer is not one. */
+export function parseRoutes(body: unknown): Route[] | undefined {
+  return parseRouteSet(body)?.routes;
 }
 
 /**

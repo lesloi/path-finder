@@ -134,8 +134,10 @@ preference only affects ranking, never whether a route is a match.
 _Avoid_: Good route, result
 
 **Suggestion**:
-A route outside the tolerances but within a wider margin. It fills the route set when there
-are not enough matches.
+A route outside the tolerances, even beyond the wider margin. Suggestions fill a route set
+that has fewer than three routes: first within a wider margin, then, when the set is still
+short, routes that meet the distance or duration but not the elevation gain. When no route
+shown meets the elevation gain, the route set reports the gain of the closest one.
 _Avoid_: Alternative, fallback
 
 **GPX export**:

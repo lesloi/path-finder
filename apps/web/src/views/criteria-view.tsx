@@ -530,6 +530,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         language={language}
         paceUnit={paceUnit}
         routes={atPace.routes}
+        closestElevationGain={routeSet.closestElevationGain}
         pace={atPace.pace}
         snapshot={browser.snapshot}
         selected={selected}

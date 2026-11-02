@@ -182,12 +182,20 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	// nothing can do better on any criterion. Short of the target the loops through the waypoints, with their
 	// detours, make up for it. Generate decides on the same test whether to search loops at all.
 	beyond := cand.direct && overshoots(c, cand)
-	for _, r := range results {
+	// A numeric gain is the one criterion a route may miss and still be offered, as a last suggestion: the
+	// length is what the user asked, and the route set reports the closest gain. A shortcut is a kind of
+	// terrain, not a number to approximate, so an out-of-tier shortcut is still dropped.
+	gainOnly := c.ElevationGain != nil && c.ElevationGain.Shortcut == "" && len(results) > 1
+	for i, r := range results {
 		if r.tier == tierOut {
-			if !beyond {
+			switch {
+			case beyond:
+				r.tier = tierWide
+			case gainOnly && i == 1: // checks() appends the elevation gain last
+				r.tier = tierWide
+			default:
 				return ranked{}, false
 			}
-			r.tier = tierWide
 		}
 		worst = max(worst, r.tier)
 		score += r.relative
@@ -304,4 +312,44 @@ func buildRouteSet(c contract.Criteria, targetKm float64, candidates []*candidat
 	r := newRanking(c, targetKm)
 	r.add(candidates...)
 	return r.routes(limit)
+}
+
+// matchGainBound is how far a route's gain may be from target and still be a match, the floor included.
+func matchGainBound(target float64) float64 { return matchTolerance.gainBound(target) }
+
+// routeSet is the answer the generator sends: the routes and, when a numeric gain was asked and none of them
+// meets it, the gain of the closest one.
+func routeSet(c contract.Criteria, routes []contract.Route) contract.RouteSet {
+	if routes == nil {
+		routes = []contract.Route{}
+	}
+	set := contract.RouteSet{Routes: routes}
+	if c.ElevationGain != nil && c.ElevationGain.Shortcut == "" {
+		set.ClosestElevationGain = closestGain(routes, c.ElevationGain.Metres)
+	}
+	return set
+}
+
+// closestGain is the gain of the route nearest the target, when none of the routes is within the match
+// tolerance of it; nil when one is, or when no route carries a gain.
+func closestGain(routes []contract.Route, target float64) *float64 {
+	bound := matchGainBound(target)
+	best, found := 0.0, false
+	for _, r := range routes {
+		if r.ElevationGain == nil {
+			continue
+		}
+		g := *r.ElevationGain
+		gap := math.Abs(g - target)
+		if gap <= bound {
+			return nil
+		}
+		if !found || gap < math.Abs(best-target) {
+			best, found = g, true
+		}
+	}
+	if !found {
+		return nil
+	}
+	return &best
 }

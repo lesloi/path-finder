@@ -61,6 +61,7 @@ function View({
   pace = 6,
   open = false,
   waypoints,
+  closestElevationGain,
 }: {
   language?: 'en' | 'fr';
   paceUnit?: 'min/km' | 'km/h';
@@ -74,6 +75,7 @@ function View({
   pace?: number;
   open?: boolean;
   waypoints?: [number, number][];
+  closestElevationGain?: number;
 }) {
   const [selected, setSelected] = useState(0);
   const [detail, setDetail] = useState(open);
@@ -96,6 +98,7 @@ function View({
       onReverse={onReverse}
       onHover={onHover}
       {...(waypoints && { waypoints })}
+      {...(closestElevationGain !== undefined && { closestElevationGain })}
     />
   );
 }
@@ -115,6 +118,26 @@ describe('RouteSetView', () => {
       render(<View />);
 
       expect(screen.getByTestId('routes-clear')).toHaveAccessibleName(en.clearRoutes);
+    });
+
+    it.each(['en', 'fr'] as const)('says the elevation gain is not met, in %s', (language) => {
+      render(<View language={language} closestElevationGain={296} />);
+
+      const note = screen.getByTestId('routes-gain-missed');
+      expect(note).toHaveTextContent(routesText[language].gainMissed);
+      expect(note).toHaveTextContent('296 m');
+    });
+
+    it('says nothing when the API reports no closest gain', () => {
+      render(<View />);
+
+      expect(screen.queryByTestId('routes-gain-missed')).not.toBeInTheDocument();
+    });
+
+    it('shows a closest gain above the target as it is', () => {
+      render(<View closestElevationGain={800} />);
+
+      expect(screen.getByTestId('routes-gain-missed')).toHaveTextContent('800 m');
     });
 
     it('clears the results from the button', () => {

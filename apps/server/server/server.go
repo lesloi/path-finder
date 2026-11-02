@@ -22,10 +22,10 @@ import (
 	"github.com/lesloi/path-finder/apps/server/contract"
 )
 
-// RouteSetGenerator turns a request body into the routes of a route set. It must return once ctx
+// RouteSetGenerator turns a request body into the route set of an answer. It must return once ctx
 // ends. It reports a body that is not valid criteria as a *contract.CriteriaError.
 type RouteSetGenerator interface {
-	Generate(ctx context.Context, body json.RawMessage) (routes any, err error)
+	Generate(ctx context.Context, body json.RawMessage) (routeSet any, err error)
 }
 
 // CoverageSource lists the cells of the grid of contract.json where the server can route.
@@ -208,7 +208,7 @@ func (a *app) routeSets(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), a.cfg.GenerationTimeout)
 	defer cancel()
-	routes, err := a.cfg.Generator.Generate(ctx, body)
+	routeSet, err := a.cfg.Generator.Generate(ctx, body)
 	var criteria *contract.CriteriaError
 	switch {
 	case errors.As(err, &criteria):
@@ -224,7 +224,7 @@ func (a *app) routeSets(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusInternalServerError)
 	default:
-		writeJSON(w, http.StatusOK, map[string]any{"routes": routes})
+		writeJSON(w, http.StatusOK, routeSet)
 	}
 }
 

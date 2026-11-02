@@ -50,5 +50,6 @@
       "technical": false,
       "technicalStretches": []
     }
-  ]
+  ],
+  "closestElevationGain": 250
 }
