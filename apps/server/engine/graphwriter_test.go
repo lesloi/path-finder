@@ -114,36 +114,46 @@ func TestGraphWriterWritesTheGraphFromMemory(t *testing.T) {
 }
 
 func TestGraphWriterRefusesTheModesOutOfOrder(t *testing.T) {
-	// Arrange: the fingerprint reads the foot bitmaps before the bike ones
-	path := filepath.Join(t.TempDir(), "g.bin")
-	w, err := CreateGraph(path, 1, 0, [4]int32{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer w.Abort()
-	if err := w.Node(node{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Offset(0); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Offset(0); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Small(Bike, 0); err != nil {
-		t.Fatal(err)
+	// Arrange: one node, one word of each small bitmap, then the node modes
+	open := func(t *testing.T) *GraphWriter {
+		t.Helper()
+		w, err := CreateGraph(filepath.Join(t.TempDir(), "g.bin"), 1, 0, [4]int32{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(w.Abort)
+		for _, call := range []func() error{
+			func() error { return w.Node(node{}) },
+			func() error { return w.Offset(0) },
+			func() error { return w.Offset(0) },
+			func() error { return w.Small(Foot, 0) },
+			func() error { return w.Small(Bike, 0) },
+		} {
+			if err := call(); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return w
 	}
 
-	// Act and Assert
-	if err := w.Small(Foot, 0); err == nil {
-		t.Error("a foot word after a bike one was taken")
-	}
-	if err := w.NodeModes(Bike, 0); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.NodeModes(Foot, 0); err == nil {
-		t.Error("a foot word after a bike one was taken")
-	}
+	t.Run("a foot node mode after a bike one", func(t *testing.T) {
+		w := open(t)
+		if err := w.NodeModes(Bike, 0); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.NodeModes(Foot, 0); err == nil {
+			t.Error("a foot word after a bike one was taken")
+		}
+	})
+	t.Run("a small component after the node modes", func(t *testing.T) {
+		w := open(t)
+		if err := w.NodeModes(Bike, 0); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.Small(Foot, 0); err == nil {
+			t.Error("a small component word after the node modes was taken")
+		}
+	})
 }
 
 func TestGraphWriterRefusesASectionThatIsShort(t *testing.T) {
@@ -155,12 +165,12 @@ func TestGraphWriterRefusesASectionThatIsShort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := writeSections(w, nodes, off, edges); err != nil {
-		t.Fatal(err)
+	// Act: the short section is found when the small components start, or at Close
+	err = writeSections(w, nodes, off, edges)
+	if err == nil {
+		err = w.Close()
 	}
-
-	// Act
-	err = w.Close()
+	w.Abort()
 
 	// Assert: neither the graph nor its temporary file is there
 	if err == nil {

@@ -78,6 +78,36 @@ func TestAnEdgeCrossingAnAreaIsForbiddenEvenWithBothEndsOutside(t *testing.T) {
 	}
 }
 
+func TestAnAreaForbidsOnlyTheWaysOfTheModeItWasBuiltFor(t *testing.T) {
+	// Arrange: a long bike-only way, a long foot-only way, and a short bike-only way, each through its own area
+	g := &testGraph{}
+	a, b := g.addNode(0, 0, 100), g.addNode(0, 1000, 100)
+	g.connectModes(a, b, KindCycleway, EdgeBike)
+	c, d := g.addNode(1000, 0, 100), g.addNode(1000, 1000, 100)
+	g.connectModes(c, d, KindFootway, EdgeFoot)
+	e, f := g.addNode(2000, 0, 100), g.addNode(2000, 100, 100)
+	g.connectModes(e, f, KindCycleway, EdgeBike)
+	areas := []Circle{
+		circleAt(g, 0, 500, 60),
+		circleAt(g, 1000, 500, 60),
+		circleAt(g, 2000, 50, 60),
+	}
+	eng := openTest(t, g, false)
+	bike := newForbidden(eng.g, areas, Bike)
+	foot := newForbidden(eng.g, areas, Foot)
+
+	// Act and Assert: the long list and the scan of the nodes around an area both follow the mode.
+	if !bike.holds(uint32(a), uint32(b)) || foot.holds(uint32(a), uint32(b)) {
+		t.Error("the long bike-only way is not forbidden to bikes alone")
+	}
+	if !foot.holds(uint32(c), uint32(d)) || bike.holds(uint32(c), uint32(d)) {
+		t.Error("the long foot-only way is not forbidden to walking alone")
+	}
+	if !bike.holds(uint32(e), uint32(f)) || foot.holds(uint32(e), uint32(f)) {
+		t.Error("the short bike-only way is not forbidden to bikes alone")
+	}
+}
+
 func TestAnAreaOnTheOnlyWayLeavesNoRoute(t *testing.T) {
 	// Arrange
 	g := &testGraph{}

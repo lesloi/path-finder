@@ -173,6 +173,96 @@ func TestABikeOnlyConnectorDoesNotMakeAFootIslandLarge(t *testing.T) {
 	}
 }
 
+func TestOpenDirPrefersAProfilesCostsFile(t *testing.T) {
+	// Arrange: a graph with the mode's unit file and the costs of one profile
+	dir := t.TempDir()
+	var b Builder
+	for i := 0; i < 4; i++ {
+		b.AddNode(45+float64(i)*0.001, 6, 100+float64(i)*10)
+	}
+	for i := 0; i < 3; i++ {
+		b.Connect(i, i+1, KindPath, SurfaceCompact)
+	}
+	graph := filepath.Join(dir, GraphFileName)
+	if err := b.WriteGraph(graph); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksFileName(Foot)), LandmarkRequest{Mode: Foot, Count: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteLandmarks(graph, filepath.Join(dir, LandmarksCostsFileName(Foot, "paved")), LandmarkRequest{Mode: Foot, Profile: "paved", Count: 2}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	engines, err := OpenDir(dir, footKey("any"), footKey("paved"))
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := engines[footKey("any")].alt; got == nil || got.metric != altMetricUnit {
+		t.Errorf("any landmarks: %+v, want the unit file", got)
+	}
+	if got := engines[footKey("paved")].alt; got == nil || got.metric != altMetricCosts {
+		t.Errorf("paved landmarks: %+v, want its costs file", got)
+	}
+}
+
+func TestOpenAllRefusesAUnitFileSharedByTwoModes(t *testing.T) {
+	// Arrange: one foot unit file given to a foot engine and a bike engine
+	g, _, _ := accessGraph()
+	dir := t.TempDir()
+	path := g.write(t)
+	alt := filepath.Join(dir, "foot.alt")
+	if err := WriteLandmarks(path, alt, LandmarkRequest{Mode: Foot, Count: 2}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Act
+	_, err := OpenAll(path, map[EngineKey]string{
+		{Foot, "any"}: alt,
+		{Bike, "any"}: alt,
+	})
+
+	// Assert
+	if err == nil || !strings.Contains(err.Error(), "shared") {
+		t.Errorf("err = %v, want a refusal to share the file between modes", err)
+	}
+}
+
+func TestALandmarkFileWithAnUnknownModeOrUnitIsRefused(t *testing.T) {
+	g, _, _ := accessGraph()
+	path := g.write(t)
+	dir := t.TempDir()
+	alt := filepath.Join(dir, "foot.alt")
+	if err := WriteLandmarks(path, alt, LandmarkRequest{Mode: Foot, Count: 2}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(alt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write := func(name string, at int, value []byte) string {
+		t.Helper()
+		b := append([]byte(nil), data...)
+		copy(b[at:], value)
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, b, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	// Act and Assert
+	if _, err := Open(path, write("mode.alt", 32, []byte{9, 0, 0, 0}), footKey("any")); err == nil || !strings.Contains(err.Error(), "travel mode") {
+		t.Errorf("an unknown mode: err = %v", err)
+	}
+	if _, err := Open(path, write("unit.alt", 20, []byte{1, 0, 0, 0}), footKey("any")); err == nil || !strings.Contains(err.Error(), "unit") {
+		t.Errorf("an unknown unit: err = %v", err)
+	}
+}
+
 func TestTheLandmarksOfAnotherModeOrMetricAreRefused(t *testing.T) {
 	// Arrange
 	g, _, _ := accessGraph()

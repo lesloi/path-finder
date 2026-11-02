@@ -77,11 +77,12 @@ A profile that falls back to its own costs, because the unit metric is too slow 
 
 ### Metropolitan France
 
-Metropolitan France is one `build-graph` from the France extract and one `build-alt` per mode, as above, with `-pbf` the
+Metropolitan France is one `build-graph` from the France extract and one `build-alt -mode foot`, as above (one per mode
+once cycling ships), with `-pbf` the
 Geofabrik `france-latest.osm.pbf` and `-dem` the BD ALTI of every department. The build works on disk, and its memory does
 not grow with the extract (it needs a sorted one, as Geofabrik's are). Its temporary files go beside the graph, or to `-tmp`:
 never a memory-backed `/tmp`, they are as big as the extract; `build-graph` and `build-alt` remove the `pf-external-*` and
-`pf-landmarks-*` directories there that a killed build left more than a day ago. Count about 9 GB of temporary disk beside the graph, and
+`pf-landmarks-*` directories there that a killed build left more than a day ago. Count about 13 GB of temporary disk beside the graph, and
 about 1.5 GB of landmark files per mode. `-chunk` and `-cache` size the sorts and the BD ALTI tiles kept in memory: the elevation
 step reads those tiles ahead of the sampler on the CPUs, eight at most, so `-cache` must hold a row of them plus a few
 (about 46 for France) or the build reads them one at a time again, and the default holds about three rows. `build-alt` also works
@@ -208,8 +209,8 @@ The `Dockerfile` builds one image with the server and the web app, and no data. 
 
 To update the data from a job, build the new files beside the served ones and put them in service by renaming: a
 graph and its landmarks change together, and the pods follow within 30 seconds. Metropolitan France is one graph, so
-a rebuild needs room for both copies at once, about 13 GB each (a 4.2 GB graph and about 9 GB of landmarks), on top of the
-temporary disk of the build (about 9 GB, freed afterwards). Serve a directory of links, one per graph, and build each
+a rebuild needs room for both copies at once, about 6 GB each (a 4.3 GB graph and a 1.5 GB landmark file per mode), on
+top of the temporary disk of the build (about 13 GB, freed afterwards). Serve a directory of links, one per graph, and build each
 graph in a directory outside it. Then replace the graph's link by renaming a new link over it, made beside the served
 directory at the same depth (`mv -T ../swap/guadeloupe guadeloupe`): none sees a new `graph.bin` with old landmarks.
 Remove the old graph afterwards. Territories are small, and are replaced one at a time.

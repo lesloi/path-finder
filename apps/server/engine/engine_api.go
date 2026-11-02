@@ -66,11 +66,12 @@ type Route struct {
 	// no climb penalty, which DirectLoop also routes: no loop through them can be shorter. It is 0 when that chain
 	// could not be measured.
 	Shortest float64
-	// anchors are the nodes a direct loop went through, waypoints included, the start first and last, and
-	// fingerprint is the graph they belong to. Loops reuses the chain of a direct loop this engine built, instead
-	// of routing the same waypoints a second time; both stay unset for a loop.
+	// anchors are the nodes a direct loop went through, waypoints included, the start first and last, fingerprint is
+	// the graph they belong to, and mode the travel mode they were routed for. Loops reuses the chain of a direct
+	// loop this engine built, instead of routing the same waypoints a second time; all three stay unset for a loop.
 	anchors     []uint32
 	fingerprint uint64
+	mode        Mode
 }
 
 // AscentBand is a share of the target elevation gain, and a floor in metres for a small target, within which
@@ -440,7 +441,7 @@ func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point
 	if err != nil || len(anchors) < 2 {
 		return nil, 0, 0, err
 	}
-	if direct != nil && direct.Distance > 0 && direct.fingerprint == e.g.fingerprint && slices.Equal(direct.anchors, anchors) {
+	if direct != nil && direct.Distance > 0 && direct.mode == e.mode && direct.fingerprint == e.g.fingerprint && slices.Equal(direct.anchors, anchors) {
 		length = direct.Distance
 		baseEffort = length
 		if effort != nil {
@@ -524,7 +525,7 @@ func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route,
 		return nil, err
 	}
 	r := e.describe(nodes, edges)
-	r.anchors, r.fingerprint = anchors, e.g.fingerprint
+	r.anchors, r.fingerprint, r.mode = anchors, e.g.fingerprint, e.mode
 	r.Shortest = e.shortestLoopForLoops(ctx, req.Start, req.Waypoints, forbidden)
 	return r, nil
 }

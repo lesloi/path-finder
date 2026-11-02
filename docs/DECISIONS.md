@@ -39,12 +39,12 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   lever, read by no code, for the rest: raising it by hand gives the build a new ID.
 - **A country's graph is built in one go, on disk; a server maps one graph per territory (`DATA_DIR`).** The build sorts its
   records on disk and reads them back in order, instead of keeping every node in memory: metropolitan France takes
-  185 s and 2.4 GB of resident memory at its peak on 16 cores (the build in memory needs 11.6 GB), its landmarks 158 s and
-  0.4 GB of heap each with one file per profile (9.9 GB in memory), and the files are the same byte for byte. The landmarks run one per CPU, eight at
+  149 s and 2.4 GB of resident memory at its peak on 16 cores (the build in memory needs 11.6 GB), its unit landmarks
+  30 s and a 1.5 GB file, and the files are the same byte for byte. The landmarks run one per CPU, eight at
   most (`-workers` lowers it), each holding one distance per node (about 4 bytes, whatever the graph, since its column
   is written in blocks): on a 20.6 M-node graph on 16 cores, 2 workers took 19.8 s and 8 took 9.2 s. It needs about
-  13 GB of temporary disk, put
-  beside the output, never on a memory-backed `/tmp`. Served as one 4.2 GB file, France answers as fast as a zone did and
+  13 GB of temporary disk (12.8 GB in the France build, 568 runs), put
+  beside the output, never on a memory-backed `/tmp`. Served as one 4.3 GB file, France answers as fast as a zone did and
   with the same routes (the heap stays near 35 MB; the page cache fills). An overseas territory stays a graph of its own in a subdirectory: its
   tiles come in another projection and its extract is far from the others. No routing sits in front of the servers:
   opening a graph costs no memory, since its spatial index is in `graph.bin`, and a start point is answered by the graph
@@ -69,9 +69,11 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   change (#381). The format moved to `PFGRAPH9`, and a graph of an older one is refused.
 - **Landmark distances use unit costs, one file per mode.** A distance is the shortest length, with no climb and no
   surface weight, so it is a lower bound for every surface preference of the mode, and tuning `kind × surface` or the
-  climb never invalidates a file. On the 20.6 M-node bench graph, one CPU, the unit metric made searches 10 % slower
-  overall and 19 % slower on `unpaved`, with identical routes, for 314 MB and 4 s instead of 629 MB and 7 s per profile:
-  one file per mode instead of three. The `.alt` header holds the metric, the mode and the graph fingerprint, and a
+  climb never invalidates a file. On the bench graph, over five seeds, the unit metric made searches 8–11 % slower
+  and kept every match of `any` and `paved`; the first route stayed identical in 91–96 % of the requests, 85–89 % of the
+  routes were common, and two of 120 `unpaved` requests lost a match on long road loops. The owner chose no weighted
+  fallback: a shared metric cannot keep A*'s exploration order, so a route set may swap one loop for another of the same
+  quality. The unit file is 317 MB and 5 s instead of 629 MB and 20 s per profile, one file per mode instead of three. The `.alt` header holds the metric, the mode and the graph fingerprint, and a
   mismatch is refused. `build-alt -mode foot|bike` writes `foot.alt`; `-profile` writes `foot-<profile>.alt` for a
   profile whose own costs are needed (a fallback if the unit metric is too slow on a country), and the server prefers
   that file for that profile.

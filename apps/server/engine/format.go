@@ -71,6 +71,8 @@ type edge struct {
 	Modes uint8
 }
 
+// The Modes byte holds two modes and the bike direction bit: a third travel mode, or another per-mode bit, needs a
+// new graph format.
 const (
 	// EdgeFoot is set in edge.Modes for a way a walker may use.
 	EdgeFoot uint8 = 1 << iota

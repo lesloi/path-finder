@@ -143,7 +143,13 @@ func (w *GraphWriter) GridNode(n uint32) error {
 // Small adds the next word of the bitmap of the nodes of small components of a mode (see SmallComponentNodes). The
 // words come after the edges, which its first call closes: the fingerprint reads them in that order.
 func (w *GraphWriter) Small(mode Mode, word uint64) error {
+	if w.modes[Foot].n > 0 || w.modes[Bike].n > 0 {
+		return fmt.Errorf("engine: the small components must all come before the node modes")
+	}
 	if w.small[mode].n == 0 && w.small[Foot].n == 0 && w.small[Bike].n == 0 {
+		if err := w.edges.full(); err != nil {
+			return err
+		}
 		if err := w.edges.w.Flush(); err != nil {
 			return err
 		}
@@ -165,6 +171,9 @@ func (w *GraphWriter) Small(mode Mode, word uint64) error {
 func (w *GraphWriter) NodeModes(mode Mode, word uint64) error {
 	if w.modes[Foot].n == 0 && w.modes[Bike].n == 0 {
 		for m := range w.small {
+			if err := w.small[m].full(); err != nil {
+				return err
+			}
 			if err := w.small[m].w.Flush(); err != nil {
 				return err
 			}

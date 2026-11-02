@@ -267,13 +267,22 @@ func openLandmarks(path string, g *graph, key EngineKey) (_ *landmarks, err erro
 	if n != g.n || head.fingerprint != g.fingerprint {
 		return nil, fmt.Errorf("%s was built for another graph: build it again with build-alt", path)
 	}
+	if head.mode >= uint32(NumModes) {
+		return nil, fmt.Errorf("%s holds the landmarks of a travel mode this server does not know: build it again with build-alt", path)
+	}
 	if Mode(head.mode) != key.Mode {
 		return nil, fmt.Errorf("%s holds the landmarks of the %s mode, not of %s: build it again with build-alt -mode %s", path, Mode(head.mode), key.Mode, key.Mode)
+	}
+	if head.unit != altUnitMeters {
+		return nil, fmt.Errorf("%s holds distances in a unit this server does not know: build it again with build-alt", path)
 	}
 	// The unit metric serves every surface preference; the costs of one serve only that one, and only if it is the
 	// profile the search runs with.
 	switch head.metric {
 	case altMetricUnit:
+		if head.climb != 0 {
+			return nil, fmt.Errorf("%s holds climbed distances for the unit metric, which is length only: build it again with build-alt", path)
+		}
 	case altMetricCosts:
 		if head.profile != profileID(key.Profile) || profiles[key.Profile] == nil || head.climb != profiles[key.Profile].UpPerMeter {
 			return nil, fmt.Errorf("%s holds the landmarks of another profile's costs: build it again with build-alt -mode %s -profile %s", path, key.Mode, key.Profile)
