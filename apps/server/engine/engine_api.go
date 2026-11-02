@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -163,8 +164,21 @@ func OpenAll(graphPath string, landmarks map[EngineKey]string) (map[EngineKey]*E
 func openEngines(g *graph, paths map[EngineKey]string) (map[EngineKey]*Engine, error) {
 	engines := make(map[EngineKey]*Engine, len(paths))
 	alts := make(map[string]*landmarks, len(paths))
+	// The keys are opened in a fixed order, so that a shared landmark file is opened by the same engine and a refusal
+	// names the same file whatever the order of the map.
+	keys := make([]EngineKey, 0, len(paths))
+	for key := range paths {
+		keys = append(keys, key)
+	}
+	slices.SortFunc(keys, func(a, b EngineKey) int {
+		if c := cmp.Compare(a.Mode, b.Mode); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Profile, b.Profile)
+	})
 	var err error
-	for key, path := range paths {
+	for _, key := range keys {
+		path := paths[key]
 		p := profiles[key.Profile]
 		if p == nil {
 			closeEngines(engines, g)
