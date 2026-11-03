@@ -78,6 +78,9 @@ type candidate struct {
 	// direct marks the loop straight through the waypoints. Its length is set by them, not by the target, and it
 	// goes back over its steps where the graph offers no other way: it is not held to either.
 	direct bool
+	// lollipop marks a loop that reaches its high ground by a stem out and back: the stem's retrace is the shape,
+	// not a flaw, so the ranking does not penalise it.
+	lollipop bool
 }
 
 // effortDistance is the distance weighted by the slope of each stretch, in kilometres.
@@ -202,8 +205,9 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	}
 	visits := cellsAlong(cand.geometry, c.Start, radius)
 	score += surfaceMismatch(c.Surface, cand.unpavedShare)
-	// Going back over its steps is what a single access leaves the direct loop, not a flaw to rank it down for.
-	if !cand.direct {
+	// Going back over its steps is what a single access leaves the direct loop, and what a stem leaves a lollipop,
+	// not a flaw to rank it down for.
+	if !cand.direct && !cand.lollipop {
 		score += retraceShare(visits)
 	}
 	kind := "match"

@@ -76,6 +76,17 @@ func generateSet(t *testing.T, looper *fakeLooper, ctx context.Context, request 
 	return out.(contract.RouteSet), nil
 }
 
+func TestToCandidateCarriesTheLollipopFlag(t *testing.T) {
+	l := engineLoop(0)
+	l.Lollipop = true
+
+	c := toCandidate(l)
+
+	if c == nil || !c.lollipop {
+		t.Errorf("candidate = %+v, want the lollipop flag", c)
+	}
+}
+
 func TestGenerateAsksTheEngineForLoopsFromTheCriteria(t *testing.T) {
 	looper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
 	if _, err := generate(t, looper, context.Background(), body); err != nil {

@@ -123,6 +123,28 @@ func TestElevationGainTolerances(t *testing.T) {
 	}
 }
 
+func TestLollipopKeepsItsStemRetraceOutOfTheScore(t *testing.T) {
+	c := criteria(nil)
+	retraced := compose(func(c *candidate) {
+		c.geometry = [][]float64{startPoint(), at(0, 1500), startPoint(), at(0, 1500), startPoint()}
+	})
+
+	plain, ok := classify(c, retraced, 500)
+	if !ok {
+		t.Fatal("the retraced candidate is not classified")
+	}
+	flagged := *retraced
+	flagged.lollipop = true
+	lollipop, ok := classify(c, &flagged, 500)
+	if !ok {
+		t.Fatal("the lollipop candidate is not classified")
+	}
+
+	if lollipop.score >= plain.score {
+		t.Errorf("lollipop score = %v, plain = %v: the stem's retrace was ranked down", lollipop.score, plain.score)
+	}
+}
+
 func TestACandidateOutOfReachInDistanceIsStillDropped(t *testing.T) {
 	c := criteria(func(c *contract.Criteria) { c.ElevationGain = &contract.ElevationGain{Metres: 1000} })
 	if r := build(c, compose(withDistance(14), withGain(ptr(300)))); len(r) != 0 {
