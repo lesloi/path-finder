@@ -161,6 +161,18 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   the target, so the lollipop adds little there; it matters beyond that reach. Its local loop aims at the length and
   the gain at once, which the sources sized to the whole request cannot reconcile once the stems take their share: the
   repair step is where the two meet.
+- **A loop short of a gain is repaired by a summit detour, inside the match length band.** After the circles, the
+  summit source and the lollipop, when no route meets the gain, the engine takes up to 5 candidates whose length is
+  inside the band the caller gave (`DistanceBand`, the generator's match share) and whose gain is short, and detours
+  up to 3 of them through the highest summits near their path: the path is sampled every 2 km, each summit within
+  1.5 km of a sample, 600 m apart, 9 at most; the segment nearest a summit is replaced by the two legs through it,
+  both legs avoiding the replaced corridor, and the detour is kept only if the whole path stays inside the length
+  band. The lollipop repairs its local paths before composing them, with the local band, never the composed loop,
+  whose stem is the shape. The repaired paths are described beside the originals and the generator ranks them; the
+  original may still win on the distance, so the repair does not promise a match, only a closer gain in the set. On
+  a synthetic square with a 150 m summit 200 m off, a 16 km/0 m loop becomes 16.4 km/+150 m; on a low-relief start,
+  the repaired candidate gains about 60 m per summit but the ranking kept the shorter original, and the 25 Bosses
+  17.8 km/+512 m is over the band and is not repaired: it stays a suggestion with the closest gain.
 - **Avoided areas are circles that forbid the ways they touch, up to three per set of criteria.** A penalty, as the
   loop legs get for the ways of the earlier ones, would not keep a route out of a closed trail, which is what the
   user asks for. A way is forbidden when its straight line between nodes comes within the radius, so a long way

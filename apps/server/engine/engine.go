@@ -835,6 +835,7 @@ func (r *splitmix) below(n uint64) uint64 { return r.next() % n }
 type loopParams struct {
 	distM, ascentM float64
 	ascentBand     AscentBand
+	distanceBand   float64
 	// effort, when set, is the target duration as an effort distance: loops are sized and scored on their effort
 	// distance instead of their length. distM then only sizes the first circle of a loop without waypoints.
 	effort     *EffortTarget

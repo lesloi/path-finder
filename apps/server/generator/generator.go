@@ -68,6 +68,9 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		Seed:       g.seed(),
 		Avoided:    avoidedCircles(criteria.AvoidedAreas),
 	}
+	if criteria.Target.Distance > 0 {
+		req.DistanceBand = matchTolerance.distance
+	}
 	if criteria.ElevationGain != nil && criteria.ElevationGain.Shortcut == "" {
 		req.Ascent = criteria.ElevationGain.Metres
 		req.AscentBand = engine.AscentBand{Share: matchTolerance.elevationGain, FloorM: matchTolerance.elevationGainFloor}

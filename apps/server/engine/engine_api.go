@@ -110,6 +110,9 @@ type LoopRequest struct {
 	// AscentBand is how far a loop's elevation gain may be from Ascent to count as on target. A loop
 	// outside it is steered towards the target; the zero value steers nothing.
 	AscentBand AscentBand
+	// DistanceBand is how far a loop's length may be from Distance to count as on target, as a share of Distance;
+	// the zero value repairs nothing. The caller owns what counts as a match, so the engine is told it.
+	DistanceBand float64
 	// Effort, when set, makes the search size and score loops on their effort distance rather than their length, so
 	// that a target duration lands on the loop the ranking estimates at that duration.
 	Effort     *EffortTarget
@@ -332,8 +335,8 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 		}
 	}
 	lp := &loopParams{
-		distM: req.Distance, ascentM: req.Ascent, ascentBand: req.AscentBand, effort: req.Effort,
-		candidates: req.Candidates, seed: req.Seed,
+		distM: req.Distance, ascentM: req.Ascent, ascentBand: req.AscentBand, distanceBand: req.DistanceBand,
+		effort: req.Effort, candidates: req.Candidates, seed: req.Seed,
 		anchors: anchors, baseM: baseM, baseEffort: baseEffort, stats: req.Stats, forbidden: forbidden,
 	}
 	// A loop with an elevation gain to make heads for the highest ground around the start, rather than a random way.
@@ -354,9 +357,23 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	// cluster farther away: the summit source first, then a lollipop whose stem reaches the cluster. Waypoints and
 	// effort targets keep their own shape and ranking; both sources are for a plain length-and-gain request.
 	if ctx.Err() == nil && summitWanted(req, found) {
-		loops = append(loops, e.summitLoops(ctx, start, lp)...)
+		summits := e.summitPaths(ctx, start, lp)
+		for _, p := range summits {
+			loops = append(loops, e.describe(p.nodes, p.edges))
+		}
 		if ctx.Err() == nil && !routesMetGain(loops, req.Ascent, req.AscentBand) {
 			loops = append(loops, e.lollipopLoops(ctx, start, lp)...)
+			if ctx.Err() == nil && !routesMetGain(loops, req.Ascent, req.AscentBand) {
+				// The last gap: detour the candidates inside the length band through a summit near their path.
+				paths := make([]summitPath, 0, len(found)+len(summits))
+				for _, l := range found {
+					paths = append(paths, summitPath{nodes: l.nodes, edges: l.edges})
+				}
+				paths = append(paths, summits...)
+				for _, p := range e.repairPaths(ctx, paths, lp) {
+					loops = append(loops, e.describe(p.nodes, p.edges))
+				}
+			}
 		}
 	}
 	if err := ctx.Err(); err != nil {

@@ -30,6 +30,15 @@ func summitStart(t *testing.T, g *testGraph, at func(x, y int) int, x, y int) *E
 	return e
 }
 
+// summitRoutes describes the paths summitPaths returns, as the engine does before the generator ranks them.
+func summitRoutes(e *Engine, paths []summitPath) []*Route {
+	out := make([]*Route, 0, len(paths))
+	for _, p := range paths {
+		out = append(out, e.describe(p.nodes, p.edges))
+	}
+	return out
+}
+
 func TestSummitLoopsClimbThePeaks(t *testing.T) {
 	// Arrange
 	g, at := summitTestGraph()
@@ -41,7 +50,7 @@ func TestSummitLoopsClimbThePeaks(t *testing.T) {
 	lp := &loopParams{distM: 8000, ascentM: 180}
 
 	// Act
-	routes := e.summitLoops(context.Background(), start, lp)
+	routes := summitRoutes(e, e.summitPaths(context.Background(), start, lp))
 
 	// Assert
 	if len(routes) == 0 {
@@ -79,7 +88,7 @@ func TestSummitLoopsFindNothingOnFlatGround(t *testing.T) {
 	}
 
 	// Act
-	routes := e.summitLoops(context.Background(), start, &loopParams{distM: 3000, ascentM: 100})
+	routes := summitRoutes(e, e.summitPaths(context.Background(), start, &loopParams{distM: 3000, ascentM: 100}))
 
 	// Assert
 	if len(routes) != 0 {
@@ -98,8 +107,8 @@ func TestSummitLoopsAreDeterministic(t *testing.T) {
 	lp := &loopParams{distM: 8000, ascentM: 180}
 
 	// Act
-	first := e.summitLoops(context.Background(), start, lp)
-	second := e.summitLoops(context.Background(), start, lp)
+	first := summitRoutes(e, e.summitPaths(context.Background(), start, lp))
+	second := summitRoutes(e, e.summitPaths(context.Background(), start, lp))
 
 	// Assert
 	if len(first) != len(second) || len(first) == 0 {
@@ -165,7 +174,7 @@ func TestSummitLoopsStopWhenCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	if routes := e.summitLoops(ctx, start, &loopParams{distM: 8000, ascentM: 180}); len(routes) != 0 {
+	if routes := summitRoutes(e, e.summitPaths(ctx, start, &loopParams{distM: 8000, ascentM: 180})); len(routes) != 0 {
 		t.Errorf("routes = %d, want none", len(routes))
 	}
 }

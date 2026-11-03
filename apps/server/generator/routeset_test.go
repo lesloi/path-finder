@@ -123,6 +123,28 @@ func TestElevationGainTolerances(t *testing.T) {
 	}
 }
 
+func TestTheRepairedTwinRanksAheadOfTheOriginal(t *testing.T) {
+	c := criteria(func(c *contract.Criteria) {
+		c.Target = contract.Target{Distance: 16}
+		c.ElevationGain = &contract.ElevationGain{Metres: 500}
+	})
+	original := compose(withDistance(16.6), withGain(ptr(263)))
+	repaired := compose(withDistance(17.2), withGain(ptr(324)), withHeading(120))
+
+	plain, ok := classify(c, original, 500)
+	if !ok {
+		t.Fatal("the original candidate is not classified")
+	}
+	fixed, ok := classify(c, repaired, 500)
+	if !ok {
+		t.Fatal("the repaired candidate is not classified")
+	}
+
+	if fixed.score >= plain.score {
+		t.Errorf("repaired score = %v, original = %v: the closer gain did not rank ahead", fixed.score, plain.score)
+	}
+}
+
 func TestLollipopKeepsItsStemRetraceOutOfTheScore(t *testing.T) {
 	c := criteria(nil)
 	retraced := compose(func(c *candidate) {

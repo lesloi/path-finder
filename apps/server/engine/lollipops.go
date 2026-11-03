@@ -58,7 +58,8 @@ func (e *Engine) lollipopLoops(ctx context.Context, start uint32, lp *loopParams
 		// The local loop aims at its share of the length; a shorter local tour is kept too, and the composed
 		// lollipop's own length band decides whether it stops the source.
 		localLp := &loopParams{
-			distM: localL, ascentM: localA, ascentBand: lp.ascentBand, seed: lp.seed, forbidden: lp.forbidden,
+			distM: localL, ascentM: localA, ascentBand: lp.ascentBand, distanceBand: lp.distanceBand,
+			seed: lp.seed, forbidden: lp.forbidden,
 		}
 		local := e.lollipopLocal(ctx, base, localLp, s)
 		if len(local) == 0 {
@@ -103,7 +104,7 @@ func (e *Engine) lollipopLocal(ctx context.Context, base uint32, lp *loopParams,
 	if !inBand {
 		out = append(out, e.summitPaths(ctx, base, lp)...)
 	}
-	return out
+	return append(out, e.repairPaths(ctx, out, lp)...)
 }
 
 // pickHubs keeps the highest anchors that are far enough apart to be different clusters.

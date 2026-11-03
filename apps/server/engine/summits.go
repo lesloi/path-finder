@@ -73,19 +73,9 @@ func summitWanted(req LoopRequest, found []*loopResult) bool {
 		!circlesMetGain(found, req.Ascent, req.AscentBand)
 }
 
-// summitLoops returns up to summitTours loops through the high ground around start, for a gain target the circle
-// loops did not meet. It returns none when no usable summit rises summitMinClimb above the start within reach.
-func (e *Engine) summitLoops(ctx context.Context, start uint32, lp *loopParams) []*Route {
-	paths := e.summitPaths(ctx, start, lp)
-	out := make([]*Route, 0, len(paths))
-	for _, p := range paths {
-		out = append(out, e.describe(p.nodes, p.edges))
-	}
-	return out
-}
-
-// summitPaths is summitLoops before the loops are described: the lollipop composes a local tour with its stems,
-// so it needs the nodes and edges rather than only the measures.
+// summitPaths returns up to summitTours paths through the high ground around start, for a gain target the circle
+// loops did not meet. The lollipop composes a local tour with its stems, so the paths carry the nodes and edges
+// rather than only the measures.
 func (e *Engine) summitPaths(ctx context.Context, start uint32, lp *loopParams) []summitPath {
 	reach := math.Min(lp.distM/4, 8_000)
 	anchors := e.summitAnchors(start, reach, lp.forbidden)
