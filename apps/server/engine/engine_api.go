@@ -123,8 +123,9 @@ type LoopRequest struct {
 	// searches, so that a loop never goes through one.
 	Avoided []Circle
 	// Enough, when set, is called with the loops found so far after each new one, one call at a time
-	// and without retaining the slice. Returning true ends the search: the loops still being
-	// searched are dropped, so a caller that has what it needs spares the CPU.
+	// and without retaining the slice. Returning true ends the circle candidates: the loops still being
+	// searched are dropped, so a caller that has what it needs spares the CPU. A numeric gain the circles
+	// did not meet may still add the summit loops of Loops after them.
 	Enough func(found []*Route) bool
 	// Stats, when set, counts why candidates give no loop, for a diagnosis. Finding why costs extra
 	// searches, so the product leaves it nil.
@@ -295,8 +296,10 @@ func (e *Engine) Route(ctx context.Context, from, to Point) (*Route, error) {
 }
 
 // Loops generates req.Candidates loops that differ by their control points, each close to the target
-// distance, in no particular order. When ctx ends first it returns the loops finished so far,
-// possibly none, with ctx's error: the caller decides whether they are enough.
+// distance, in no particular order. A numeric gain target the circles did not meet also adds up to a few loops
+// through the high ground around the start, when there are no waypoints and no effort target. When ctx ends
+// first it returns the loops finished so far, possibly none, with ctx's error: the caller decides whether
+// they are enough.
 func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if req.Distance <= 0 || req.Candidates <= 0 {
 		return nil, errors.New("engine: loops need a positive distance and candidate count")
@@ -343,6 +346,11 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	for len(loops) < len(found) {
 		l := found[len(loops)]
 		loops = append(loops, e.describe(l.nodes, l.edges))
+	}
+	// A gain target the circles did not meet may be reachable through the summits around the start. Waypoints and
+	// effort targets keep their own shape and ranking; the summit source is for a plain length-and-gain request.
+	if ctx.Err() == nil && summitWanted(req, found) {
+		loops = append(loops, e.summitLoops(ctx, start, lp)...)
 	}
 	if err := ctx.Err(); err != nil {
 		return loops, err

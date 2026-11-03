@@ -136,6 +136,17 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   suggestion, it is offered alone in every case, as no loop through the waypoints is nearer. Only waypoints that make a route longer than the
   longest a request may ask for are refused, by the straight lines first and by the loop through them then. A waypoint is
   moved to the nearest way within 250 m, beyond which the criteria are refused, naming the waypoint by its number.
+- **When the circles miss a numeric gain, a summit source adds up to three loops through the high ground.** The
+  circles cannot chain more than 2–4 climbs, so from a low-relief start they top out well under a target a hilly trace
+  meets. The source takes up to 9 anchors, chosen from the highest usable node of each cell of a grid of 12 sectors and
+  2 rings around the start, within a quarter of the target length and 8 km; it routes the cheapest leg between every
+  pair, and a beam closes a tour back to the start on the length and the gain. It runs only for a plain
+  length-and-gain request (no waypoints, no duration target), after the circles, including when their search stopped
+  early on dry loops: the caller's `Enough` says the circles can stop, not that the gain is met. The gate is the gain,
+  not the whole request: a circle within the gain band but off the distance keeps the source off. On the 25 Bosses,
+  15.6 km and +500 m now finds a 17.1 km loop at +464 m where the circles topped at about 350 m; on a plateau with
+  60 m of relief, 16 km and +500 m stays at about 280 m, and the answer says so. The legs are capped at 60,000 settled
+  nodes each, which bounds a bad pair; the closure is the extra work after the circles.
 - **Avoided areas are circles that forbid the ways they touch, up to three per set of criteria.** A penalty, as the
   loop legs get for the ways of the earlier ones, would not keep a route out of a closed trail, which is what the
   user asks for. A way is forbidden when its straight line between nodes comes within the radius, so a long way
