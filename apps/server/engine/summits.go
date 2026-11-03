@@ -30,15 +30,35 @@ type summitLeg struct {
 	ok           bool
 }
 
-// circlesMetGain tells whether one of the loops the circles found is within the ascent band of the target. A
-// zero band accepts only the exact target: the caller that wants a tolerance sets one, as the generator does.
-func circlesMetGain(found []*loopResult, ascent float64, band AscentBand) bool {
-	if ascent <= 0 {
+// summitPath is a loop through the high ground as the engine routes it, before it is measured and described.
+type summitPath struct {
+	nodes, edges []uint32
+}
+
+// withinGain tells whether an ascent is within the band of a target. A zero target accepts any ascent; a zero
+// band accepts only the exact target, so a caller that wants a tolerance sets one, as the generator does.
+func withinGain(ascent, target float64, band AscentBand) bool {
+	if target <= 0 {
 		return true
 	}
-	bound := math.Max(band.Share*ascent, band.FloorM)
+	return math.Abs(ascent-target) <= math.Max(band.Share*target, band.FloorM)
+}
+
+// circlesMetGain tells whether one of the loops the circles found is within the ascent band of the target.
+func circlesMetGain(found []*loopResult, ascent float64, band AscentBand) bool {
 	for _, l := range found {
-		if math.Abs(l.ascent-ascent) <= bound {
+		if withinGain(l.ascent, ascent, band) {
+			return true
+		}
+	}
+	return false
+}
+
+// routesMetGain tells whether one of the routes sent is within the ascent band of the target. The lollipop source
+// reads it after the summit loops joined the circles, so it does not add a lollipop when a summit loop met the gain.
+func routesMetGain(routes []*Route, ascent float64, band AscentBand) bool {
+	for _, r := range routes {
+		if withinGain(r.Ascent, ascent, band) {
 			return true
 		}
 	}
@@ -56,6 +76,17 @@ func summitWanted(req LoopRequest, found []*loopResult) bool {
 // summitLoops returns up to summitTours loops through the high ground around start, for a gain target the circle
 // loops did not meet. It returns none when no usable summit rises summitMinClimb above the start within reach.
 func (e *Engine) summitLoops(ctx context.Context, start uint32, lp *loopParams) []*Route {
+	paths := e.summitPaths(ctx, start, lp)
+	out := make([]*Route, 0, len(paths))
+	for _, p := range paths {
+		out = append(out, e.describe(p.nodes, p.edges))
+	}
+	return out
+}
+
+// summitPaths is summitLoops before the loops are described: the lollipop composes a local tour with its stems,
+// so it needs the nodes and edges rather than only the measures.
+func (e *Engine) summitPaths(ctx context.Context, start uint32, lp *loopParams) []summitPath {
 	reach := math.Min(lp.distM/4, 8_000)
 	anchors := e.summitAnchors(start, reach, lp.forbidden)
 	if len(anchors) == 0 {
@@ -66,13 +97,10 @@ func (e *Engine) summitLoops(ctx context.Context, start uint32, lp *loopParams) 
 		return nil
 	}
 	tours := summitBeam(legs, len(anchors), lp.distM, lp.ascentM)
-	if len(tours) == 0 {
-		return nil
-	}
-	out := make([]*Route, 0, len(tours))
+	out := make([]summitPath, 0, len(tours))
 	for _, tour := range tours {
-		if r := e.summitRoute(ctx, start, anchors, tour, lp.forbidden); r != nil {
-			out = append(out, r)
+		if p, ok := e.summitTourPath(ctx, start, anchors, tour, lp.forbidden); ok {
+			out = append(out, p)
 		}
 	}
 	return out
@@ -272,9 +300,9 @@ func summitPathLess(a, b []int) bool {
 	return len(a) < len(b)
 }
 
-// summitRoute routes the legs of a tour, start to start, and describes the loop. A leg is routed alone, as in the
-// closure: avoiding the earlier legs would make the route longer than the length the beam chose.
-func (e *Engine) summitRoute(ctx context.Context, start uint32, anchors []uint32, tour summitTour, f *forbidden) *Route {
+// summitTourPath routes the legs of a tour, start to start. A leg is routed alone, as in the closure: avoiding the
+// earlier legs would make the route longer than the length the beam chose.
+func (e *Engine) summitTourPath(ctx context.Context, start uint32, anchors []uint32, tour summitTour, f *forbidden) (summitPath, bool) {
 	points := make([]uint32, 0, len(tour.path)+2)
 	points = append(points, start)
 	for _, j := range tour.path {
@@ -287,11 +315,11 @@ func (e *Engine) summitRoute(ctx context.Context, start uint32, anchors []uint32
 	var nodes, edges []uint32
 	for i := 1; i < len(points); i++ {
 		if points[i-1] == points[i] || ctx.Err() != nil {
-			return nil
+			return summitPath{}, false
 		}
 		r := s.route(ctx, e, e.prof.UpPerMeter, nil, lim, points[i-1], points[i])
 		if r == nil {
-			return nil
+			return summitPath{}, false
 		}
 		if len(nodes) == 0 {
 			nodes = append(nodes, r.nodes...)
@@ -301,7 +329,7 @@ func (e *Engine) summitRoute(ctx context.Context, start uint32, anchors []uint32
 		edges = append(edges, r.edges...)
 	}
 	if len(nodes) < 2 || len(edges) != len(nodes)-1 {
-		return nil
+		return summitPath{}, false
 	}
-	return e.describe(nodes, edges)
+	return summitPath{nodes: nodes, edges: edges}, true
 }

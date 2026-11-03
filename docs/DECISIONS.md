@@ -147,6 +147,20 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   15.6 km and +500 m now finds a 17.1 km loop at +464 m where the circles topped at about 350 m; on a plateau with
   60 m of relief, 16 km and +500 m stays at about 280 m, and the answer says so. The legs are capped at 60,000 settled
   nodes each, which bounds a bad pair; the closure is the extra work after the circles.
+- **A lollipop reaches a cluster farther than a circle's own reach: a stem, a local loop, the stem back.** It runs
+  after the summit source, only when no circle or summit loop met the gain, and only on a plain length-and-gain
+  request. The hubs are the 4 highest of up to 9 summit anchors within half the target less a minimal local loop (and
+  10 km), at least 1.5 km apart; the stem ends at the lowest usable node within 800 m of a hub (mode-checked, small
+  components and avoided areas left out), the foot of the cluster, and the local loop there is the circle first, then
+  the summit source when the circle misses the local gain. A composed loop longer than the target by more than a tenth,
+  or outside the gain band, does not stop the search; the source stops at the first one inside both, and returns at most
+  three. The stem's retrace is the shape, so the ranking does not penalise a lollipop's retrace, as it does not for a
+  direct loop; the local loop's own retrace is not separated. A lollipop whose local gain is short still fills the set
+  as a suggestion, and the closest gain says so. On a synthetic 8 km plain with a cluster 5 km out, the lollipop reaches
+  it; on the Yvelines starts near their hills, the summit source already reaches the high ground within a quarter of
+  the target, so the lollipop adds little there; it matters beyond that reach. Its local loop aims at the length and
+  the gain at once, which the sources sized to the whole request cannot reconcile once the stems take their share: the
+  repair step is where the two meet.
 - **Avoided areas are circles that forbid the ways they touch, up to three per set of criteria.** A penalty, as the
   loop legs get for the ways of the earlier ones, would not keep a route out of a closed trail, which is what the
   user asks for. A way is forbidden when its straight line between nodes comes within the radius, so a long way

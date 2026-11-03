@@ -246,7 +246,7 @@ func toCandidate(l *engine.Route) *candidate {
 	gain, loss := round(l.Ascent, 1), round(l.Descent, 1)
 	c := &candidate{
 		geometry: geometry, distance: round(l.Distance/1000, 3), elevationGain: &gain, elevationLoss: &loss,
-		unpavedShare: unpaved / total, technicalStretches: []contract.TechnicalStretch{},
+		unpavedShare: unpaved / total, technicalStretches: []contract.TechnicalStretch{}, lollipop: l.Lollipop,
 	}
 	// Each stretch starts where the previous ends, and the last ends at the route's distance, so
 	// they cover it without gaps. One that rounds to no length is dropped, and the stretches of one

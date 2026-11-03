@@ -67,6 +67,9 @@ type Route struct {
 	// no climb penalty, which DirectLoop also routes: no loop through them can be shorter. It is 0 when that chain
 	// could not be measured.
 	Shortest float64
+	// Lollipop marks a loop that reaches its high ground by a stem out and back: the stem's retrace is the shape, not
+	// a flaw, and the ranking does not penalise it. The local loop may still go back over its own steps.
+	Lollipop bool
 	// anchors are the nodes a direct loop went through, waypoints included, the start first and last, fingerprint is
 	// the graph they belong to, and mode the travel mode they were routed for. Loops reuses the chain of a direct
 	// loop this engine built, instead of routing the same waypoints a second time; all three stay unset for a loop.
@@ -347,10 +350,14 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 		l := found[len(loops)]
 		loops = append(loops, e.describe(l.nodes, l.edges))
 	}
-	// A gain target the circles did not meet may be reachable through the summits around the start. Waypoints and
-	// effort targets keep their own shape and ranking; the summit source is for a plain length-and-gain request.
+	// A gain target the circles did not meet may be reachable through the summits around the start, or through a
+	// cluster farther away: the summit source first, then a lollipop whose stem reaches the cluster. Waypoints and
+	// effort targets keep their own shape and ranking; both sources are for a plain length-and-gain request.
 	if ctx.Err() == nil && summitWanted(req, found) {
 		loops = append(loops, e.summitLoops(ctx, start, lp)...)
+		if ctx.Err() == nil && !routesMetGain(loops, req.Ascent, req.AscentBand) {
+			loops = append(loops, e.lollipopLoops(ctx, start, lp)...)
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		return loops, err
