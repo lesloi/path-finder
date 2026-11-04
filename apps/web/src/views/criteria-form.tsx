@@ -75,6 +75,7 @@ export function criteriaRequest(
     waypoints,
     avoidedAreas,
     repeats,
+    technical,
   }: {
     pace: number;
     start?: Position | undefined;
@@ -82,6 +83,8 @@ export function criteriaRequest(
     avoidedAreas?: AvoidedArea[] | undefined;
     /** Whether the engine may repeat a loop; it picks the number of laps itself. */
     repeats?: boolean | undefined;
+    /** Whether the routes may take the ways flagged technical (on foot, sac_scale T3). */
+    technical?: boolean | undefined;
   },
 ): RouteSetRequest | undefined {
   const distance = clamp(draft.distance, BOUNDS.distance.min, BOUNDS.distance.max);
@@ -108,6 +111,7 @@ export function criteriaRequest(
       ...(waypoints?.length && { waypoints }),
       ...(reachable?.length && { avoidedAreas: reachable }),
       ...(repeats === true && { repeats: true }),
+      ...(technical === true && { includeTechnical: true }),
     }
   );
 }
@@ -142,6 +146,7 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
     samePositions(request.waypoints ?? [], found.waypoints ?? []) &&
     sameAreas(request.avoidedAreas ?? [], found.avoidedAreas ?? []) &&
     (request.repeats === true) === (found.repeats === true) &&
+    (request.includeTechnical === true) === (found.includeTechnical === true) &&
     ('distance' in b || request.pace === found.pace)
   );
 }
@@ -197,6 +202,7 @@ export function CriteriaForm({
     waypoints,
     avoidedAreas,
     repeats: settings.repeats,
+    technical: settings.technical,
   });
   const field = request && invalidField(request);
 
@@ -381,6 +387,7 @@ function message(
     waypoints: t.waypointsError,
     avoidedAreas: t.avoidedAreasError,
     repeats: t.repeatsError,
+    includeTechnical: t.includeTechnicalError,
   };
   return messages[field];
 }

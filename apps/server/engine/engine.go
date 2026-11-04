@@ -73,6 +73,56 @@ type graph struct {
 	file          mapped
 }
 
+// hasEdgeWithout tells whether a node has a way that holds none of the flags and that the mode may use.
+func (g *graph) hasEdgeWithout(n uint32, flags uint8, mode Mode) bool {
+	bit := mode.Bit()
+	for e := g.off[n]; e < g.off[n+1]; e++ {
+		if ed := &g.edges[e]; ed.Flags&flags == 0 && ed.Modes&bit != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// roomNodes is how many nodes a way must reach without a flagged edge to count as room to start from.
+const roomNodes = 64
+
+// hasRoom tells whether a node leads, through ways that hold none of the flags and that the mode may use, to at
+// least roomNodes nodes: not to a pocket the flagged ways close off, where a start would find no loop. A node of a
+// component that is small on its own is not such a pocket: the flags did not close it, and a search may still answer.
+func (g *graph) hasRoom(n uint32, flags uint8, mode Mode) bool {
+	if !g.hasEdgeWithout(n, flags, mode) {
+		return false
+	}
+	if g.reaches(n, flags, mode) {
+		return true
+	}
+	return !g.reaches(n, 0, mode)
+}
+
+// reaches tells whether n leads to at least roomNodes nodes through the ways the mode may use and that hold none of
+// the flags.
+func (g *graph) reaches(n uint32, flags uint8, mode Mode) bool {
+	bit := mode.Bit()
+	seen := map[uint32]struct{}{n: {}}
+	queue := []uint32{n}
+	for len(queue) > 0 && len(seen) < roomNodes {
+		u := queue[0]
+		queue = queue[1:]
+		for e := g.off[u]; e < g.off[u+1]; e++ {
+			ed := &g.edges[e]
+			if ed.Flags&flags != 0 || ed.Modes&bit == 0 {
+				continue
+			}
+			if _, ok := seen[ed.To]; !ok {
+				seen[ed.To] = struct{}{}
+				queue = append(queue, ed.To)
+			}
+		}
+	}
+	return len(seen) >= roomNodes
+}
+
 func align16(n int) int { return (n + 15) &^ 15 }
 
 // fileID identifies the version of a file: a replaced file has another inode, a rewritten one another size or
@@ -350,11 +400,11 @@ func (e *Engine) usable(ed *edge) bool { return ed.Modes&e.mode.Bit() != 0 }
 // onto a node the mode cannot reach.
 func (e *Engine) nodeUsable(n uint32) bool { return e.g.nodeModes[e.mode].has(n) }
 
-// modeSkip is the filter that keeps a nearest-node search off the nodes the travel mode cannot reach, and off an
-// avoided area.
+// modeSkip is the filter that keeps a nearest-node search off the nodes the travel mode cannot reach, off an avoided
+// area, and off a pocket the ways the request leaves out close.
 func (e *Engine) modeSkip(f *forbidden) func(uint32) bool {
 	modes := e.g.nodeModes[e.mode]
-	return func(n uint32) bool { return !modes.has(n) || f.has(n) }
+	return func(n uint32) bool { return !modes.has(n) || !f.hasRoom(n) }
 }
 
 // spatial is a grid over the graph: the nodes of each cell, as numbers in one list, so that finding the
@@ -647,7 +697,8 @@ type searchLimits struct {
 	// maxSettled caps the nodes one search may settle (0 for no cap): a loop leg that needs more is not worth
 	// finding, and a huge search would also have to regrow its table, which cannot be interrupted.
 	maxSettled int
-	// forbidden, when set, is the ways a search must not use: those that touch an avoided area.
+	// forbidden, when set, is the ways a search must not use: those that touch an avoided area, and those holding a
+	// flag the request leaves out.
 	forbidden *forbidden
 }
 
@@ -740,7 +791,7 @@ func (s *searcher) route(ctx context.Context, cx *Engine, climb float32, avoid *
 		nu := &nodes[u]
 		for e := g.off[u]; e < g.off[u+1]; e++ {
 			ed := &edges[e]
-			if !cx.usable(ed) || lim.forbidden.holds(u, ed.To) {
+			if !cx.usable(ed) || lim.forbidden.skips(ed) || lim.forbidden.holds(u, ed.To) {
 				continue
 			}
 			nv := &nodes[ed.To]
@@ -1034,7 +1085,7 @@ func liftedNode(g *graph, sp *spatial, base uint32, reachM, lift float64, f *for
 		sign = -1
 	}
 	best, small, modes := base, g.small[mode], g.nodeModes[mode]
-	skip := func(n uint32) bool { return !modes.has(n) || small.has(n) || f.has(n) }
+	skip := func(n uint32) bool { return !modes.has(n) || small.has(n) || !f.hasRoom(n) }
 	for k := 0; k < 8; k++ {
 		a := float64(k) * math.Pi / 4
 		n, d, ok := sp.nearestWhere(g, lat+reachM*math.Sin(a)/metersPerDegree, lon+reachM*math.Cos(a)/(metersPerDegree*cosl), skip, maxSnapMeters)
@@ -1057,7 +1108,7 @@ func (e *Engine) terrainHeading(start uint32, reach float64, f *forbidden) (floa
 	var sum [sectors]float64
 	var count [sectors]int
 	e.sp.eachNodeWithin(e.g, Point{Lat: lat, Lon: lon}, cosl, reach, func(v uint32) {
-		if v == start || !e.nodeUsable(v) || e.g.small[e.mode].has(v) || f.has(v) {
+		if v == start || !e.nodeUsable(v) || e.g.small[e.mode].has(v) || f.blocks(v) {
 			return
 		}
 		nd := &e.g.nodes[v]
@@ -1102,7 +1153,7 @@ func circlePoints(g *graph, sp *spatial, slat, slon, rc, theta float64, jitter [
 	nodes := make([]uint32, 0, len(jitter))
 	small, modes := g.small[mode], g.nodeModes[mode]
 	reach := snapReach(rc)
-	skip := func(n uint32) bool { return !modes.has(n) || small.has(n) || f.has(n) }
+	skip := func(n uint32) bool { return !modes.has(n) || small.has(n) || !f.hasRoom(n) }
 	for j := range jitter {
 		phi := theta + math.Pi + 2*math.Pi*float64(j+1)/float64(len(jitter)+1)
 		x, y := cxm+rc*jitter[j]*math.Cos(phi), cym+rc*jitter[j]*math.Sin(phi)

@@ -15,7 +15,8 @@ _Avoid_: Origin, departure
 **Criteria**:
 Everything the user sets to ask for routes: start point, a target distance or a
 target duration, an optional target elevation gain, a surface preference,
-up to five optional waypoints and up to three optional avoided areas.
+up to five optional waypoints, up to three optional avoided areas, and whether technical stretches are
+allowed (set in the settings, not in the form).
 _Avoid_: Filters, query, search parameters
 
 **Waypoint**:
@@ -61,10 +62,10 @@ _Avoid_: Road type, terrain filter
 
 **Technical stretch**:
 A way tagged as asking for the hands, ropes or chains: on foot, `sac_scale` `demanding_mountain_hiking` (T3).
-T1 and T2 are ordinary hiking and trail running. T3 ways are part of the routes, with no switch in the criteria:
-a route that holds one carries the badge « passages techniques », and the elevation profile hatches where
-they are along the route. An untagged way is never flagged. Ways from
-`alpine_hiking` (T4) up are not in the graph at all, whatever the surface preference.
+T1 and T2 are ordinary hiking and trail running. The user allows them in the settings (« passages techniques
+(T3) », off by default): without it the search leaves T3 ways out, and with it a route that holds one carries the
+badge « passages techniques », and the elevation profile hatches where they are along the route. An untagged way is
+never flagged. Ways from `alpine_hiking` (T4) up are not in the graph at all, whatever the surface preference.
 _Avoid_: Dangerous, difficult, T3
 
 **Routing profile**:
@@ -163,8 +164,8 @@ _Avoid_: Sync, upload
 The user's preferences kept on the device: pace, language (English or French,
 the browser's until the user picks one), the unit of the pace (minutes per km until the user picks km/h), the last criteria (surface preference,
 elevation gain, whether the length is a distance or a duration, and that distance and duration),
-whether the engine may repeat a loop, and which POI categories the map shows. Lost if the user clears
-the site's data.
+whether the engine may repeat a loop, whether routes may take technical stretches, and which POI categories
+the map shows. Lost if the user clears the site's data.
 _Avoid_: Profile, account
 
 ### On the map

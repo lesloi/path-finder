@@ -66,7 +66,7 @@ func TestAnEdgeCrossingAnAreaIsForbiddenEvenWithBothEndsOutside(t *testing.T) {
 	g.connect(d, b, KindPath)
 	area := circleAt(g, 0, 500, 100)
 	e := openTest(t, g, false)
-	forbidden := newForbidden(e.g, []Circle{area}, Foot)
+	forbidden := newForbidden(e.g, []Circle{area}, Foot, 0)
 	// Act
 	r := newSearcher().route(context.Background(), e, 0, nil, searchLimits{forbidden: forbidden}, uint32(a), uint32(b))
 	// Assert
@@ -93,8 +93,8 @@ func TestAnAreaForbidsOnlyTheWaysOfTheModeItWasBuiltFor(t *testing.T) {
 		circleAt(g, 2000, 50, 60),
 	}
 	eng := openTest(t, g, false)
-	bike := newForbidden(eng.g, areas, Bike)
-	foot := newForbidden(eng.g, areas, Foot)
+	bike := newForbidden(eng.g, areas, Bike, 0)
+	foot := newForbidden(eng.g, areas, Foot, 0)
 
 	// Act and Assert: the long list and the scan of the nodes around an area both follow the mode.
 	if !bike.holds(uint32(a), uint32(b)) || foot.holds(uint32(a), uint32(b)) {
@@ -114,7 +114,7 @@ func TestAnAreaOnTheOnlyWayLeavesNoRoute(t *testing.T) {
 	at := g.grid(5, 1, flat)
 	area := circleAt(g, 0, 2*stepM, 30)
 	e := openTest(t, g, false)
-	forbidden := newForbidden(e.g, []Circle{area}, Foot)
+	forbidden := newForbidden(e.g, []Circle{area}, Foot, 0)
 	// Act
 	r := newSearcher().route(context.Background(), e, 0, nil, searchLimits{forbidden: forbidden}, uint32(at(0, 0)), uint32(at(4, 0)))
 	// Assert
@@ -129,7 +129,7 @@ func TestAStartInsideAnAreaMovesToTheNearestNodeOutside(t *testing.T) {
 	at := g.grid(21, 21, flat)
 	area := circleAt(g, 10*stepM, 10*stepM, 150)
 	e := openTest(t, g, false)
-	forbidden := newForbidden(e.g, []Circle{area}, Foot)
+	forbidden := newForbidden(e.g, []Circle{area}, Foot, 0)
 	// Act
 	node, err := e.snapStart(pointOf(g, at(10, 10)), forbidden)
 	// Assert
@@ -147,7 +147,7 @@ func TestWithoutAreasNothingIsForbidden(t *testing.T) {
 	g.grid(3, 3, flat)
 	e := openTest(t, g, false)
 	// Act
-	forbidden := newForbidden(e.g, nil, Foot)
+	forbidden := newForbidden(e.g, nil, Foot, 0)
 	// Assert
 	if forbidden != nil {
 		t.Error("an empty set of areas must cost the searches nothing")
@@ -168,7 +168,7 @@ func TestAVeryLongEdgeCrossingAnAreaFarFromBothEndsIsForbidden(t *testing.T) {
 	area := circleAt(g, 0, 3000, 100)
 	e := openTest(t, g, false)
 	// Act
-	forbidden := newForbidden(e.g, []Circle{area}, Foot)
+	forbidden := newForbidden(e.g, []Circle{area}, Foot, 0)
 	// Assert
 	if !forbidden.holds(uint32(a), uint32(b)) {
 		t.Error("the long way through the area is allowed")
@@ -186,9 +186,9 @@ func TestTheSameAreasShareOneForbiddenSetAcrossCalls(t *testing.T) {
 	other := circleAt(g, 300, 300, 50)
 	e := openTest(t, g, false)
 	// Act
-	first := e.g.forbiddenFor([]Circle{one}, Foot)
-	again := e.g.forbiddenFor([]Circle{one}, Foot)
-	changed := e.g.forbiddenFor([]Circle{other}, Foot)
+	first := e.g.forbiddenFor([]Circle{one}, Foot, 0)
+	again := e.g.forbiddenFor([]Circle{one}, Foot, 0)
+	changed := e.g.forbiddenFor([]Circle{other}, Foot, 0)
 	// Assert
 	if first != again {
 		t.Error("the set was built again for the same areas")

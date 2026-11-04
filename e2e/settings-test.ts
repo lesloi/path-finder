@@ -25,6 +25,18 @@ test.describe('the settings', () => {
     await expect(page.getByTestId('settings-repeats-yes')).toBeChecked();
   });
 
+  test('keep the technical stretches setting across a reload', async ({ page }) => {
+    await page.goto('/#/settings');
+
+    await expect(page.getByTestId('settings-technical-no')).toBeChecked();
+    await page.locator('label', { has: page.getByTestId('settings-technical-yes') }).click();
+    await expect(page.getByTestId('settings-technical-yes')).toBeChecked();
+
+    await page.reload();
+
+    await expect(page.getByTestId('settings-technical-yes')).toBeChecked();
+  });
+
   test('keep a forced theme across a reload', async ({ page }) => {
     await page.goto('/#/settings');
 

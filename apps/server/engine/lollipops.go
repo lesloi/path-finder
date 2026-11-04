@@ -140,7 +140,7 @@ func (e *Engine) lowestWithin(center uint32, reachM float64, f *forbidden) (uint
 	cosl := math.Cos(lat * rad)
 	best, bestElev, found := center, c.Elev, false
 	e.sp.eachNodeWithin(e.g, Point{Lat: lat, Lon: lon}, cosl, reachM, func(n uint32) {
-		if !e.nodeUsable(n) || e.g.small[e.mode].has(n) || f.has(n) {
+		if !e.nodeUsable(n) || e.g.small[e.mode].has(n) || f.blocks(n) {
 			return
 		}
 		if z := e.g.nodes[n].Elev; z < bestElev {

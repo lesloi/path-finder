@@ -11,6 +11,7 @@ const DEFAULTS = {
   basemap: 'minimal',
   poiLayers: { water: true, viewpoint: false, toilets: false, seasonal: true },
   repeats: false,
+  technical: false,
   lastCriteria: {
     target: 'distance',
     distance: 10,
@@ -38,6 +39,7 @@ describe('useSettings', () => {
       basemap: 'aerial',
       poiLayers: { water: false, viewpoint: true, toilets: false, seasonal: false },
       repeats: true,
+      technical: true,
       lastCriteria: {
         target: 'duration',
         distance: 21.1,
@@ -115,6 +117,21 @@ describe('useSettings', () => {
     expect(renderHook(() => useSettings()).result.current[0].repeats).toBe(false);
   });
 
+  it('keeps the technical stretches setting', () => {
+    localStorage.setItem(KEY, JSON.stringify({ technical: true }));
+
+    expect(renderHook(() => useSettings()).result.current[0].technical).toBe(true);
+  });
+
+  it.each([
+    ['a switch from the criteria of an earlier version', { lastCriteria: { includeTechnical: true } }],
+    ['a technical setting that is not a boolean', { technical: 'yes' }],
+  ])('falls back to no technical stretches on %s', (_, stored) => {
+    localStorage.setItem(KEY, JSON.stringify(stored));
+
+    expect(renderHook(() => useSettings()).result.current[0].technical).toBe(false);
+  });
+
   it('does not read the last activity or the units of an earlier version', () => {
     localStorage.setItem(KEY, JSON.stringify({ lastActivity: 'hike', units: 'imperial' }));
 
@@ -153,14 +170,6 @@ describe('useSettings', () => {
     const { result } = renderHook(() => useSettings());
 
     expect(result.current[0].lastCriteria).toEqual(DEFAULTS.lastCriteria);
-  });
-
-  it('drops the retired switch of the technical stretches', () => {
-    localStorage.setItem(KEY, JSON.stringify({ lastCriteria: { surface: 'unpaved', includeTechnical: true } }));
-    expect(renderHook(() => useSettings()).result.current[0].lastCriteria).toEqual({
-      ...DEFAULTS.lastCriteria,
-      surface: 'unpaved',
-    });
   });
 });
 

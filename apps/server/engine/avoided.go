@@ -11,15 +11,19 @@ type Circle struct {
 	RadiusM float64
 }
 
-// forbidden is what a set of avoided areas leaves out of one request's searches: the ways that touch an area,
-// and, to snap points, the nodes inside one. A nil *forbidden forbids nothing, so a request without areas
-// pays no more than a nil check. It is read only once built.
+// forbidden is what one request leaves out of its searches: the ways that touch an avoided area and those flagged
+// with skip, and, to snap points, the nodes inside an area or in a pocket the skipped ways close off. A nil
+// *forbidden forbids nothing, so a request that avoids nothing pays no more than a nil check. It is read only once
+// built.
 type forbidden struct {
 	g       *graph
 	circles []Circle
 	cosLat  []float64 // of each circle's centre, which a node test would otherwise compute again for every node
 	edges   *avoidSet
 	mode    Mode // the ways are those the mode may use: an area off a bike's ways does not forbid a foot's
+	// skip is the edge flags the request leaves out: a way holding one is not used, and a point on one snaps to the
+	// nearest way it may use. The zero value leaves out no way.
+	skip uint8
 }
 
 // has tells whether node n lies inside an area.
@@ -41,6 +45,37 @@ func (f *forbidden) has(n uint32) bool {
 // holds tells whether the way between nodes a and b is forbidden.
 func (f *forbidden) holds(a, b uint32) bool {
 	return f != nil && f.edges.contains(pairKey(a, b))
+}
+
+// skips tells whether the way of an edge holds a flag the request leaves out.
+func (f *forbidden) skips(ed *edge) bool {
+	return f != nil && f.skip != 0 && ed.Flags&f.skip != 0
+}
+
+// hasRoom tells whether a node is a place a search may start from: outside the areas, and with room to loop once
+// the skipped ways are left out. It is what snapping asks, so that a start point on a skipped way moves to the
+// nearest way it may use.
+func (f *forbidden) hasRoom(n uint32) bool {
+	if f == nil {
+		return true
+	}
+	if f.has(n) {
+		return false
+	}
+	return f.skip == 0 || f.g.hasRoom(n, f.skip, f.mode)
+}
+
+// blocks tells whether a node is out of a wide scan of candidate anchors: inside an area, or with no way the skipped
+// flags leave open. It is hasRoom without the pocket test, which a scan of thousands of nodes cannot afford, and the
+// few nodes it lets through are dropped when a leg to them finds no way.
+func (f *forbidden) blocks(n uint32) bool {
+	if f == nil {
+		return false
+	}
+	if f.has(n) {
+		return true
+	}
+	return f.skip != 0 && !f.g.hasEdgeWithout(n, f.skip, f.mode)
 }
 
 // longEdgeMeters is the length from which a way is looked for by itself and not through the nodes around an
@@ -67,17 +102,17 @@ func longEdgeList(off []uint32, edges []edge, n int) []longWay {
 // forbiddenFor is newForbidden, kept for the next call with the same areas: a request asks for its direct loop
 // and for its loops one after the other. The mode is part of what is kept: two requests of one graph may avoid the
 // same area on ways only one of them can use.
-func (g *graph) forbiddenFor(circles []Circle, mode Mode) *forbidden {
-	if len(circles) == 0 {
+func (g *graph) forbiddenFor(circles []Circle, mode Mode, skip uint8) *forbidden {
+	if len(circles) == 0 && skip == 0 {
 		return nil
 	}
 	g.forbiddenMu.Lock()
 	last := g.lastForbidden
 	g.forbiddenMu.Unlock()
-	if last != nil && last.mode == mode && slices.Equal(last.circles, circles) {
+	if last != nil && last.mode == mode && last.skip == skip && slices.Equal(last.circles, circles) {
 		return last
 	}
-	f := newForbidden(g, circles, mode)
+	f := newForbidden(g, circles, mode, skip)
 	g.forbiddenMu.Lock()
 	g.lastForbidden = f
 	g.forbiddenMu.Unlock()
@@ -85,12 +120,12 @@ func (g *graph) forbiddenFor(circles []Circle, mode Mode) *forbidden {
 }
 
 // newForbidden finds the ways that touch an area, by their straight line between nodes (a way has no other
-// geometry in the graph), or returns nil for no area. It only keeps the ways the mode may use.
-func newForbidden(g *graph, circles []Circle, mode Mode) *forbidden {
-	if len(circles) == 0 {
+// geometry in the graph), or returns nil when the request avoids nothing. It only keeps the ways the mode may use.
+func newForbidden(g *graph, circles []Circle, mode Mode, skip uint8) *forbidden {
+	if len(circles) == 0 && skip == 0 {
 		return nil
 	}
-	f := &forbidden{g: g, circles: slices.Clone(circles), cosLat: make([]float64, len(circles)), edges: newAvoidSet(), mode: mode}
+	f := &forbidden{g: g, circles: slices.Clone(circles), cosLat: make([]float64, len(circles)), edges: newAvoidSet(), mode: mode, skip: skip}
 	bit := mode.Bit()
 	long := g.long
 	for i, c := range circles {

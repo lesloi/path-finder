@@ -29,6 +29,8 @@ export type Criteria = {
   avoidedAreas?: AvoidedArea[];
   /** Whether the engine may run a loop several times; it picks the count, up to the contract's maximum. */
   repeats?: boolean;
+  /** Whether the routes may take the ways flagged technical (on foot, sac_scale T3). Never assumed. */
+  includeTechnical?: boolean;
 };
 
 /** A circle routes keep out of: its centre, and its radius in metres. */
@@ -53,6 +55,7 @@ export const CRITERIA_FIELDS = [
   'waypoints',
   'avoidedAreas',
   'repeats',
+  'includeTechnical',
 ] as const;
 export type CriteriaField = (typeof CRITERIA_FIELDS)[number];
 
@@ -109,7 +112,7 @@ function targetDistance(criteria: Criteria): number {
  */
 export function parseCriteria(body: unknown, { countElevationGain = true } = {}): Criteria {
   check(isObject(body), 'start', 'Criteria must be an object');
-  const { start, target, elevationGain, surface, pace, waypoints, avoidedAreas, repeats } = body;
+  const { start, target, elevationGain, surface, pace, waypoints, avoidedAreas, repeats, includeTechnical } = body;
 
   check(isPosition(start), 'start', 'start must be a longitude and a latitude');
 
@@ -135,6 +138,12 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
   check(isNumber(pace) && pace > 0, 'pace', 'pace must be a positive number');
 
   check(repeats === undefined || typeof repeats === 'boolean', 'repeats', 'repeats must be true or false');
+
+  check(
+    includeTechnical === undefined || typeof includeTechnical === 'boolean',
+    'includeTechnical',
+    'includeTechnical must be true or false',
+  );
 
   check(
     waypoints === undefined || (Array.isArray(waypoints) && waypoints.length <= MAX_WAYPOINTS),
@@ -180,6 +189,7 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
       waypoints.length > 0 && { waypoints: (waypoints as Position[]).map(([lon, lat]): Position => [lon, lat]) }),
     ...(areas.length > 0 && { avoidedAreas: areas }),
     ...(repeats === true && { repeats: true }),
+    ...(includeTechnical === true && { includeTechnical: true }),
   };
   let distance: number;
   try {

@@ -62,6 +62,16 @@ describe('SettingsView', () => {
     expect(saved().repeats).toBe(true);
   });
 
+  it('refuses technical stretches by default, and saves the choice', () => {
+    renderView();
+    expect(screen.getByTestId('settings-technical-no')).toBeChecked();
+
+    fireEvent.click(screen.getByTestId('settings-technical-yes'));
+
+    expect(screen.getByTestId('settings-technical-yes')).toBeChecked();
+    expect(saved().technical).toBe(true);
+  });
+
   it.each([
     ['credits', '#/credits'],
     ['privacy', '#/privacy'],

@@ -17,8 +17,9 @@ type fakeLooper struct {
 	loops []*engine.Route
 	err   error
 	got   engine.LoopRequest
-	// direct is the loop through the waypoints, and directErr why there is none.
+	// direct is the loop through the waypoints, gotDirect the request for it, and directErr why there is none.
 	direct      *engine.Route
+	gotDirect   engine.DirectLoopRequest
 	directErr   error
 	directCalls int
 	loopCalls   int
@@ -30,8 +31,9 @@ type fakeLooper struct {
 	batches  [][]*engine.Route
 }
 
-func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.DirectLoopRequest) (*engine.Route, error) {
+func (f *fakeLooper) DirectLoop(_ context.Context, req engine.DirectLoopRequest) (*engine.Route, error) {
 	f.directCalls++
+	f.gotDirect = req
 	return f.direct, f.directErr
 }
 
@@ -108,6 +110,45 @@ func TestGenerateAsksTheEngineForLoopsFromTheCriteria(t *testing.T) {
 	got.Enough = nil
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("request = %+v, want %+v", got, want)
+	}
+}
+
+func TestGenerateAllowsTechnicalWaysOnlyWhenTheCriteriaDo(t *testing.T) {
+	// Arrange
+	allowed := strings.Replace(body, `"pace":6`, `"pace":6,"includeTechnical":true`, 1)
+
+	// Act
+	refusedLooper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
+	if _, err := generate(t, refusedLooper, context.Background(), body); err != nil {
+		t.Fatal(err)
+	}
+	allowedLooper := &fakeLooper{loops: []*engine.Route{engineLoop(0)}}
+	if _, err := generate(t, allowedLooper, context.Background(), allowed); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	if refusedLooper.got.IncludeTechnical {
+		t.Error("the engine was allowed technical ways though the criteria refuse them")
+	}
+	if !allowedLooper.got.IncludeTechnical {
+		t.Error("the engine was not allowed technical ways though the criteria allow them")
+	}
+}
+
+func TestGenerateAllowsTechnicalWaysOnTheDirectLoopToo(t *testing.T) {
+	// Arrange
+	allowed := strings.Replace(withWaypoints(twoWaypoints), `"pace":6`, `"pace":6,"includeTechnical":true`, 1)
+	looper := &fakeLooper{direct: engineLoop(0), loops: []*engine.Route{engineLoop(120)}}
+
+	// Act
+	if _, err := generate(t, looper, context.Background(), allowed); err != nil {
+		t.Fatal(err)
+	}
+
+	// Assert
+	if !looper.gotDirect.IncludeTechnical {
+		t.Error("the direct loop was not allowed technical ways though the criteria allow them")
 	}
 }
 

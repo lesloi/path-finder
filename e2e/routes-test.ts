@@ -67,8 +67,10 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('routes-row-0-profile')).toBeVisible();
   });
 
-  test('badges the routes with a technical stretch', async ({ page }) => {
+  test('badges the routes with a technical stretch once the settings allow them', async ({ page }) => {
     const badge = page.locator('[data-testid^="routes-row-"][data-testid$="-technical"]');
+    await page.goto('/#/settings');
+    await page.locator('label', { has: page.getByTestId('settings-technical-yes') }).click();
     await page.goto('/');
     await openCriteria(page);
     await setStart(page, START);

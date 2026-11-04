@@ -107,7 +107,7 @@ func (e *Engine) summitAnchors(start uint32, reachM float64, f *forbidden) []uin
 	cosl := math.Cos(lat * rad)
 	best := make(map[int]uint32, summitRings*summitSectors)
 	e.sp.eachNodeWithin(e.g, Point{Lat: lat, Lon: lon}, cosl, reachM, func(n uint32) {
-		if n == start || !e.nodeUsable(n) || e.g.small[e.mode].has(n) || f.has(n) {
+		if n == start || !e.nodeUsable(n) || e.g.small[e.mode].has(n) || f.blocks(n) {
 			return
 		}
 		nd := e.g.nodes[n]
