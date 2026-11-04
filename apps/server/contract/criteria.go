@@ -11,7 +11,7 @@ import (
 // CriteriaError is a request body that is not valid criteria, with the field that failed.
 // Messages name the field, never its value: the server keeps no location.
 type CriteriaError struct {
-	Field   string // start, target, elevationGain, surface, pace, waypoints, avoidedAreas or repeats
+	Field   string // start, target, elevationGain, surface, pace, waypoints, avoidedAreas, repeats or includeTechnical
 	Message string
 	// Waypoint is the waypoint at fault, counted from 1, or 0 when none is singled out.
 	Waypoint int
@@ -54,6 +54,9 @@ type Criteria struct {
 	AvoidedAreas []AvoidedArea `json:"avoidedAreas,omitempty"`
 	// Repeats allows the engine to run a loop several times, up to contract.MaxLaps(). The count is the engine's.
 	Repeats bool `json:"repeats,omitempty"`
+	// IncludeTechnical allows the ways flagged technical (on foot, sac_scale T3). Without it they are left out: a hard
+	// rule, where a surface preference only weights. It is never assumed.
+	IncludeTechnical bool `json:"includeTechnical,omitempty"`
 }
 
 // AvoidedArea is a circle routes keep out of: its centre as longitude and latitude, and its radius in metres.
@@ -180,6 +183,14 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 			return fail("repeats", "repeats must be true or false")
 		}
 		c.Repeats = repeats
+	}
+
+	if v, present := obj["includeTechnical"]; present {
+		include, ok := v.(bool)
+		if !ok {
+			return fail("includeTechnical", "includeTechnical must be true or false")
+		}
+		c.IncludeTechnical = include
 	}
 
 	if raw, present := obj["waypoints"]; present {

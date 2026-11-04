@@ -103,13 +103,17 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   same surface. Runners and walkers share them: the owner decided against splitting the costs by activity, and the
   comparison with reference routes (#378) found no surface table to change. The profile is a surface preference within a
   travel mode: `paved` and `unpaved` key road cycling and gravel/MTB riding too (#380).
-- **Alpine ways (`sac_scale` T4 and up) are left out of walking; T3 stays in and is only flagged.** A surface
-  preference stays a weight, and there is no criterion to exclude anything: ways asking for more than hands, ropes or
-  chains have no place in a generator of running and hiking routes, and are dropped when the graph is built. T3 ways
-  are kept, and flagged so that a route holding one carries a badge, because the mountain massifs cannot be crossed
-  without them. An earlier switch to allow them, off by default, was removed: it hid every mountain route behind a
-  setting, and the badge tells what a route holds. A bike may still use a T4 path: its own gates are `bicycle`,
-  `motorroad` and `mtb:scale`.
+- **Alpine ways (`sac_scale` T4 and up) are left out of walking; T3 is opt-in from the settings.** Ways asking for
+  more than hands, ropes or chains have no place in a generator of running and hiking routes, and are dropped when the
+  graph is built. T3 ways are kept and flagged, and `includeTechnical` is a hard exclusion, unlike a surface
+  preference: without it a search skips them and moves a start point or waypoint on one to the nearest way it may
+  use; with it a route may hold one and carries the badge. A surface preference stays a weight, so it neither allows
+  nor refuses them. The switch lives in the settings, next to the repeated loops, because it is a lasting preference of the walker
+  rather than a property of one search, and it is off by default: a route set the user asked for never takes roped
+  ground unannounced. An earlier removal of the switch (#217) argued that it hid every mountain route behind a
+  setting; the owner reversed it because the badge only told afterwards, and a walker who wants to avoid technical
+  ground had no way to say so. A bike may still use a T4 path: its own gates are `bicycle`, `motorroad` and
+  `mtb:scale`.
 - **Loops go through 2–4 control points on a circle through the start point**, each leg avoiding what the
   earlier ones used, resized up to four times, then ranked on distance, overlap and elevation gain.
   A resizing also moves each point to the highest or lowest node around it when the gain is off the target

@@ -262,6 +262,7 @@ func TestTheSurfacePreferenceSteersTheSearch(t *testing.T) {
 		for seed := uint64(1); seed <= 5; seed++ {
 			loops, err := zones.Profile(name).Loops(context.Background(), engine.LoopRequest{
 				Start: engine.Point{Lat: standin.Start[1], Lon: standin.Start[0]}, Distance: 8000, Candidates: 10, Seed: seed,
+				IncludeTechnical: true, // the stand-in's unpaved ways are the technical ones
 			})
 			if err != nil {
 				t.Fatalf("%s: %v", name, err)
@@ -291,7 +292,7 @@ func TestTheSurfacePreferenceSteersTheSearch(t *testing.T) {
 
 func TestRoutesThroughTechnicalStretchesAreTold(t *testing.T) {
 	h := newServer(t)
-	code, routes, body := routeSets(t, h, `{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"unpaved","pace":6}`)
+	code, routes, body := routeSets(t, h, `{"start":[6.1294,45.8992],"target":{"distance":10},"surface":"unpaved","pace":6,"includeTechnical":true}`)
 	if code != 200 {
 		t.Fatalf("status %d: %s", code, body)
 	}

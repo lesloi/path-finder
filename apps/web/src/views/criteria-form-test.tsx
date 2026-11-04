@@ -55,6 +55,15 @@ describe('CriteriaForm', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ repeats: true }));
   });
 
+  it('carries the technical stretches setting', () => {
+    store({ technical: true });
+    const { onSubmit, submit } = setup();
+
+    submit();
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ includeTechnical: true }));
+  });
+
   it('offers to search again once routes were found', () => {
     setup({ searched: true });
 
@@ -326,6 +335,15 @@ describe('criteriaRequest', () => {
     expect(criteriaRequest(draft, { pace: 6, start: START, repeats: true })).toMatchObject({ repeats: true });
     expect(criteriaRequest(draft, { pace: 6, start: START, repeats: false })).not.toHaveProperty('repeats');
   });
+
+  it('carries whether the routes may take technical ways', () => {
+    const draft = { target: 'distance', distance: 10, duration: 60, level: 'any', gain: 0, surface: 'any' } as const;
+
+    expect(criteriaRequest(draft, { pace: 6, start: START, technical: true })).toMatchObject({
+      includeTechnical: true,
+    });
+    expect(criteriaRequest(draft, { pace: 6, start: START, technical: false })).not.toHaveProperty('includeTechnical');
+  });
 });
 
 describe('criteriaRequest and avoided areas', () => {
@@ -398,6 +416,7 @@ describe('criteriaChanged', () => {
     ['the elevation level', { elevationGain: 'hilly' as const }],
     ['the surface', { surface: 'paved' as const }],
     ['the repeat setting', { repeats: true }],
+    ['the technical stretches setting', { includeTechnical: true }],
   ])('sees a change of %s', (_, changes) => {
     expect(changed(changes)).toBe(true);
   });

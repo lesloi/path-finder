@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -56,13 +57,63 @@ func TestARouteTakesTheDirectTechnicalWayAndSaysSo(t *testing.T) {
 	}
 }
 
-func TestLoopsFromInsideATechnicalBlockAreMarkedTechnical(t *testing.T) {
+func TestSearchSkipsTechnicalWaysOnlyWhenAsked(t *testing.T) {
+	// Arrange: a direct technical way from a to b, and a longer detour through c that is allowed.
+	g := &testGraph{}
+	a, b, c := g.addNode(0, 0, 100), g.addNode(0, 400, 100), g.addNode(300, 200, 100)
+	g.connect(a, b, KindPath)
+	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
+	g.connect(a, c, KindPath)
+	g.connect(c, b, KindPath)
+	e := openTest(t, g, true)
+	s := searcherPool.Get().(*searcher)
+	defer searcherPool.Put(s)
+	ctx := context.Background()
+
+	// Act
+	allowed := s.route(ctx, e, 0, nil, searchLimits{}, uint32(a), uint32(b))
+	excluded := s.route(ctx, e, 0, nil, searchLimits{0, e.g.forbiddenFor(nil, Foot, EdgeTechnical)}, uint32(a), uint32(b))
+
+	// Assert
+	if allowed == nil || len(allowed.edges) != 1 || e.g.edges[allowed.edges[0]].Flags&EdgeTechnical == 0 {
+		t.Fatalf("with technical ways allowed, the route should take the direct one: %+v", allowed)
+	}
+	if excluded == nil || len(excluded.edges) != 2 {
+		t.Fatalf("with technical ways excluded, the route should take the detour: %+v", excluded)
+	}
+	if excluded.cost <= allowed.cost {
+		t.Errorf("the detour should cost more: %v <= %v", excluded.cost, allowed.cost)
+	}
+}
+
+func TestSearchFindsNoRouteWhenTheOnlyWayIsTechnical(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	a, b := g.addNode(0, 0, 100), g.addNode(0, 200, 100)
+	g.connect(a, b, KindPath)
+	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
+	e := openTest(t, g, false)
+	s := searcherPool.Get().(*searcher)
+	defer searcherPool.Put(s)
+
+	// Act
+	r := s.route(context.Background(), e, 0, nil, searchLimits{0, e.g.forbiddenFor(nil, Foot, EdgeTechnical)}, uint32(a), uint32(b))
+
+	// Assert
+	if r != nil {
+		t.Errorf("route = %+v, want none", r)
+	}
+}
+
+func TestLoopsFromInsideATechnicalBlockAreMarkedTechnicalWhenAllowed(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(21, 21, flat)
 	flagAround(g, at, 10, 10, 1) // every way out of the start is technical
+	req := loopRequest(g, at)
+	req.IncludeTechnical = true
 
 	// Act
-	loops, err := openTest(t, g, false).Loops(context.Background(), loopRequest(g, at))
+	loops, err := openTest(t, g, false).Loops(context.Background(), req)
 
 	// Assert
 	if err != nil {
@@ -75,6 +126,159 @@ func TestLoopsFromInsideATechnicalBlockAreMarkedTechnical(t *testing.T) {
 		if !l.Technical {
 			t.Fatalf("a loop from inside the technical block is not marked technical")
 		}
+	}
+}
+
+func TestLoopsAvoidTechnicalWaysAndMoveTheirStart(t *testing.T) {
+	// Arrange: every way out of the start is technical.
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	flagAround(g, at, 10, 10, 1)
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+	req.IncludeTechnical = true
+	if loops, err := e.Loops(context.Background(), req); err != nil || len(loops) == 0 || !loops[0].Technical {
+		t.Fatalf("the block should hold technical loops: %d loops, %v", len(loops), err)
+	}
+
+	// Act
+	req.IncludeTechnical = false
+	loops, err := e.Loops(context.Background(), req)
+
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loops) == 0 {
+		t.Fatal("no loop once the start moved to an allowed way")
+	}
+	for _, l := range loops {
+		if l.Technical {
+			t.Error("a loop holds a technical stretch though they were excluded")
+		}
+		if l.Points[0].Point == pointOf(g, at(10, 10)) {
+			t.Error("the start stayed on the technical way")
+		}
+	}
+}
+
+func TestDirectLoopAvoidsTechnicalWays(t *testing.T) {
+	// Arrange: a direct technical way from a to b, and a longer detour through c that is allowed.
+	g := &testGraph{}
+	a, b, c := g.addNode(0, 0, 100), g.addNode(0, 400, 100), g.addNode(300, 200, 100)
+	g.connect(a, b, KindPath)
+	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
+	g.connect(a, c, KindPath)
+	g.connect(c, b, KindPath)
+	e := openTest(t, g, false)
+	req := DirectLoopRequest{Start: pointOf(g, a), Waypoints: []Point{pointOf(g, b)}, IncludeTechnical: true}
+
+	// Act
+	allowed, err := e.DirectLoop(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.IncludeTechnical = false
+	excluded, err := e.DirectLoop(context.Background(), req)
+
+	// Assert
+	if !allowed.Technical {
+		t.Fatal("the direct way should be taken when technical ways are allowed")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if excluded.Technical {
+		t.Error("the detour should be taken when technical ways are excluded")
+	}
+	if excluded.Distance <= allowed.Distance {
+		t.Errorf("the detour should be longer: %v <= %v", excluded.Distance, allowed.Distance)
+	}
+}
+
+func TestAStartTooFarFromAnAllowedWayIsOffTheGraph(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	a, b := g.addNode(0, 0, 100), g.addNode(0, 200, 100)
+	g.connect(a, b, KindPath)
+	g.edges[a][0].Flags, g.edges[b][0].Flags = EdgeTechnical, EdgeTechnical
+	e := openTest(t, g, false)
+
+	// Act
+	_, err := e.Loops(context.Background(), LoopRequest{Start: pointOf(g, a), Distance: 1000, Candidates: 2})
+
+	// Assert
+	if err != ErrOffGraph {
+		t.Errorf("err = %v, want ErrOffGraph", err)
+	}
+}
+
+func TestHasRoomLeavesASmallIslandTheFlagsDidNotClose(t *testing.T) {
+	// Arrange: a small island of allowed ways, and the same island joined to a large one by a technical way.
+	island := &testGraph{}
+	islandA, islandB := island.addNode(0, 0, 100), island.addNode(0, 200, 100)
+	island.connect(islandA, islandB, KindPath)
+	open := openTest(t, island, false)
+
+	pocket := &testGraph{}
+	at := pocket.grid(21, 21, flat)
+	stubA, stubB := pocket.addNode(10*stepM+30, 10*stepM+40, 100), pocket.addNode(10*stepM+30, 10*stepM+70, 100)
+	pocket.connect(stubA, stubB, KindPath)
+	pocket.connect(stubA, at(10, 10), KindPath)
+	pocket.edges[stubA][len(pocket.edges[stubA])-1].Flags = EdgeTechnical
+	pocket.edges[at(10, 10)][len(pocket.edges[at(10, 10)])-1].Flags = EdgeTechnical
+	closed := openTest(t, pocket, false)
+
+	// Act and Assert: the flags closed the pocket, but not the island.
+	if !open.g.hasRoom(uint32(islandA), EdgeTechnical, Foot) {
+		t.Error("a small island the flags did not close should count as room")
+	}
+	if closed.g.hasRoom(uint32(stubA), EdgeTechnical, Foot) {
+		t.Error("a pocket the flags close should not count as room")
+	}
+}
+
+func TestAStartDoesNotSnapToAPocketTechnicalWaysCloseOff(t *testing.T) {
+	// Arrange: a stub of two nodes beside the start, joined to the lattice by one technical way.
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	stubA, stubB := g.addNode(10*stepM+30, 10*stepM+40, 100), g.addNode(10*stepM+30, 10*stepM+70, 100)
+	g.connect(stubA, stubB, KindPath)
+	g.connect(stubA, at(10, 10), KindPath)
+	g.edges[stubA][len(g.edges[stubA])-1].Flags = EdgeTechnical
+	g.edges[at(10, 10)][len(g.edges[at(10, 10)])-1].Flags = EdgeTechnical
+	flagAround(g, at, 10, 10, 1)
+	e := openTest(t, g, false)
+	req := loopRequest(g, at)
+	req.Start = pointOf(g, stubA)
+
+	// Act
+	loops, err := e.Loops(context.Background(), req)
+
+	// Assert
+	if err != nil || len(loops) == 0 {
+		t.Fatalf("loops = %d, err = %v: the start should move out of the pocket", len(loops), err)
+	}
+	if loops[0].Points[0].Point == pointOf(g, stubA) || loops[0].Points[0].Point == pointOf(g, stubB) {
+		t.Error("the start stayed in the pocket")
+	}
+}
+
+func TestCancellingStopsALoopSearchThatExcludesTechnicalWays(t *testing.T) {
+	// Arrange
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	flagAround(g, at, 4, 4, 2)
+	e := openTest(t, g, false)
+	done, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// Act
+	_, err := e.Loops(done, loopRequest(g, at))
+
+	// Assert
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("err = %v, want context.Canceled", err)
 	}
 }
 

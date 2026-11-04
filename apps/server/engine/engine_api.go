@@ -107,6 +107,10 @@ type LoopRequest struct {
 	Start    Point
 	Distance float64
 	Ascent   float64
+	// IncludeTechnical lets the loops take the ways flagged technical, and keeps a start point or waypoint on one.
+	// Without it they are left out: a hard rule, where a surface preference only weights. The zero value leaves them
+	// out, as the product does until the user allows them.
+	IncludeTechnical bool
 	// AscentBand is how far a loop's elevation gain may be from Ascent to count as on target. A loop
 	// outside it is steered towards the target; the zero value steers nothing.
 	AscentBand AscentBand
@@ -301,6 +305,18 @@ func (e *Engine) Route(ctx context.Context, from, to Point) (*Route, error) {
 	return e.describe(r.nodes, r.edges), nil
 }
 
+// technicalSkip is the edge flags a request leaves out: the technical ways of the engine's travel mode, unless it
+// allows them.
+func (e *Engine) technicalSkip(includeTechnical bool) uint8 {
+	if includeTechnical {
+		return 0
+	}
+	if e.mode == Bike {
+		return EdgeTechnicalBike
+	}
+	return EdgeTechnical
+}
+
 // Loops generates req.Candidates loops that differ by their control points, each close to the target
 // distance, in no particular order. A numeric gain target the circles did not meet also adds up to a few loops
 // through the high ground around the start, when there are no waypoints and no effort target. When ctx ends
@@ -313,7 +329,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if req.Effort != nil && req.Effort.Metres <= 0 {
 		return nil, errors.New("engine: an effort target needs a positive effort distance")
 	}
-	forbidden := e.g.forbiddenFor(req.Avoided, e.mode)
+	forbidden := e.g.forbiddenFor(req.Avoided, e.mode, e.technicalSkip(req.IncludeTechnical))
 	start, err := e.snapLoopStart(req.Start, forbidden)
 	if err != nil {
 		return nil, err
@@ -555,13 +571,15 @@ type DirectLoopRequest struct {
 	Start     Point
 	Waypoints []Point
 	Avoided   []Circle
+	// IncludeTechnical is LoopRequest.IncludeTechnical for the direct loop.
+	IncludeTechnical bool
 }
 
 // DirectLoop finds the cheapest loop from start through the waypoints in order and back, going back
 // over its steps where it must. It fails with ErrOffGraph for a start point off the ways, a
 // *WaypointError for a waypoint off them, and ErrNoRoute when they are not joined.
 func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route, error) {
-	forbidden := e.g.forbiddenFor(req.Avoided, e.mode)
+	forbidden := e.g.forbiddenFor(req.Avoided, e.mode, e.technicalSkip(req.IncludeTechnical))
 	src, err := e.snapStart(req.Start, forbidden)
 	if err != nil {
 		return nil, err

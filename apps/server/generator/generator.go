@@ -70,11 +70,12 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	stopAfter := cmpOr(g.StopAfter, defaultStopAfter)
 	candidates := cmpOr(g.Candidates, defaultCandidates)
 	req := engine.LoopRequest{
-		Start:      engine.Point{Lat: criteria.Start[1], Lon: criteria.Start[0]},
-		Distance:   km * 1000,
-		Candidates: candidates,
-		Seed:       g.seed(),
-		Avoided:    avoidedCircles(criteria.AvoidedAreas),
+		Start:            engine.Point{Lat: criteria.Start[1], Lon: criteria.Start[0]},
+		Distance:         km * 1000,
+		Candidates:       candidates,
+		Seed:             g.seed(),
+		Avoided:          avoidedCircles(criteria.AvoidedAreas),
+		IncludeTechnical: criteria.IncludeTechnical,
 	}
 	if criteria.Target.Distance > 0 {
 		req.DistanceBand = matchTolerance.distance
@@ -335,7 +336,12 @@ func throughWaypoints(ctx context.Context, looper Looper, c contract.Criteria, p
 	if crowFlies(c.Start, c.Waypoints)/1000 > contract.MaxDistanceKm() {
 		return nil, nil, tooLong
 	}
-	direct, err := looper.DirectLoop(ctx, engine.DirectLoopRequest{Start: engine.Point{Lat: c.Start[1], Lon: c.Start[0]}, Waypoints: points, Avoided: avoided})
+	direct, err := looper.DirectLoop(ctx, engine.DirectLoopRequest{
+		Start:            engine.Point{Lat: c.Start[1], Lon: c.Start[0]},
+		Waypoints:        points,
+		Avoided:          avoided,
+		IncludeTechnical: c.IncludeTechnical,
+	})
 	var waypoint *engine.WaypointError
 	switch {
 	case errors.As(err, &waypoint):
