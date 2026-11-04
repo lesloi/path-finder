@@ -4,6 +4,7 @@
 # agent
 .claude/launch.json
 .claude/worktrees/
+.openchamber/
 prototypes/
 
 # secrets
