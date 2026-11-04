@@ -54,6 +54,8 @@ export type Settings = {
   /** Which categories of points of interest the map shows. */
   poiLayers: PoiLayers;
   lastCriteria: LastCriteria;
+  /** Whether the engine may run a loop several times; it chooses the count itself. */
+  repeats: boolean;
 };
 
 const KEY = 'path-finder.settings';
@@ -111,7 +113,7 @@ function parse(raw: string | null): Settings {
   } catch {
     stored = {};
   }
-  const { pace, language, paceUnit, theme, basemap, poiLayers, lastCriteria } = isObject(stored) ? stored : {};
+  const { pace, language, paceUnit, theme, basemap, poiLayers, lastCriteria, repeats } = isObject(stored) ? stored : {};
   return {
     pace: isPace(pace) ? pace : DEFAULT_PACE,
     ...((language === 'fr' || language === 'en') && { language }),
@@ -120,6 +122,7 @@ function parse(raw: string | null): Settings {
     basemap: BASEMAPS.includes(basemap as Basemap) ? (basemap as Basemap) : DEFAULT_BASEMAP,
     poiLayers: parsePoiLayers(poiLayers),
     lastCriteria: parseLastCriteria(lastCriteria),
+    repeats: typeof repeats === 'boolean' ? repeats : false,
   };
 }
 

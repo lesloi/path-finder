@@ -74,11 +74,14 @@ export function criteriaRequest(
     start,
     waypoints,
     avoidedAreas,
+    repeats,
   }: {
     pace: number;
     start?: Position | undefined;
     waypoints?: Position[] | undefined;
     avoidedAreas?: AvoidedArea[] | undefined;
+    /** Whether the engine may repeat a loop; it picks the number of laps itself. */
+    repeats?: boolean | undefined;
   },
 ): RouteSetRequest | undefined {
   const distance = clamp(draft.distance, BOUNDS.distance.min, BOUNDS.distance.max);
@@ -104,6 +107,7 @@ export function criteriaRequest(
       pace,
       ...(waypoints?.length && { waypoints }),
       ...(reachable?.length && { avoidedAreas: reachable }),
+      ...(repeats === true && { repeats: true }),
     }
   );
 }
@@ -137,6 +141,7 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
     request.surface === found.surface &&
     samePositions(request.waypoints ?? [], found.waypoints ?? []) &&
     sameAreas(request.avoidedAreas ?? [], found.avoidedAreas ?? []) &&
+    (request.repeats === true) === (found.repeats === true) &&
     ('distance' in b || request.pace === found.pace)
   );
 }
@@ -186,7 +191,13 @@ export function CriteriaForm({
   const level = draft.level;
   const change = (changes: Partial<Draft>) => setDraft({ ...draft, ...changes });
 
-  const request = criteriaRequest(draft, { pace: settings.pace, start, waypoints, avoidedAreas });
+  const request = criteriaRequest(draft, {
+    pace: settings.pace,
+    start,
+    waypoints,
+    avoidedAreas,
+    repeats: settings.repeats,
+  });
   const field = request && invalidField(request);
 
   const sections: Record<Criterion, { title: string; content: ReactNode }> = {
@@ -369,6 +380,7 @@ function message(
     pace: t.paceError,
     waypoints: t.waypointsError,
     avoidedAreas: t.avoidedAreasError,
+    repeats: t.repeatsError,
   };
   return messages[field];
 }

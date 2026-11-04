@@ -20,6 +20,8 @@ type limits struct {
 	DurationMinutes  struct{ Min, Max float64 } `json:"durationMinutes"`
 	MaxGainMetres    float64                    `json:"maxElevationGainMetres"`
 	MaxWaypoints     int                        `json:"maxWaypoints"`
+	MaxLaps          int                        `json:"maxLaps"`
+	MinLapDistanceKm float64                    `json:"minLapDistanceKm"`
 	MaxAvoidedAreas  int                        `json:"maxAvoidedAreas"`
 	AvoidedRadius    struct{ Min, Max float64 } `json:"avoidedAreaRadiusMetres"`
 	ClimbPerEffortKm float64                    `json:"climbPerEffortKm"`
@@ -87,15 +89,17 @@ type RouteSet struct {
 // Route is one route of a route set. A geometry point is longitude, latitude and, with elevation
 // data, the height in metres.
 type Route struct {
-	Geometry          [][]float64      `json:"geometry"`
-	Distance          float64          `json:"distance"` // kilometres
-	ElevationGain     *float64         `json:"elevationGain,omitempty"`
-	ElevationLoss     *float64         `json:"elevationLoss,omitempty"`
-	EstimatedDuration float64          `json:"estimatedDuration"` // minutes
-	Kind              string           `json:"kind"`              // match or suggestion
-	UnpavedShare      float64          `json:"unpavedShare"`
-	Surfaces          []SurfaceStretch `json:"surfaces"`
-	Technical         bool             `json:"technical"` // holds a technical stretch
+	Geometry          [][]float64 `json:"geometry"`
+	Distance          float64     `json:"distance"` // kilometres
+	ElevationGain     *float64    `json:"elevationGain,omitempty"`
+	ElevationLoss     *float64    `json:"elevationLoss,omitempty"`
+	EstimatedDuration float64     `json:"estimatedDuration"` // minutes
+	Kind              string      `json:"kind"`              // match or suggestion
+	// Laps is how many times the route runs its loop, from 2 up; absent for a loop run once.
+	Laps         int              `json:"laps,omitempty"`
+	UnpavedShare float64          `json:"unpavedShare"`
+	Surfaces     []SurfaceStretch `json:"surfaces"`
+	Technical    bool             `json:"technical"` // holds a technical stretch
 	// TechnicalStretches locates them; empty, never null, for a route with none.
 	TechnicalStretches []TechnicalStretch `json:"technicalStretches"`
 }

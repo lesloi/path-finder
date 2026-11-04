@@ -10,6 +10,7 @@
       "elevationLoss": 240,
       "estimatedDuration": 62,
       "kind": "match",
+      "laps": 5,
       "unpavedShare": 0.4,
       "surfaces": [
         {

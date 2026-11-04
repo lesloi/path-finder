@@ -7,6 +7,8 @@ export const MAX_TARGET_DISTANCE = contract.maxDistanceKm;
 export const TARGET_DURATION = { min: contract.durationMinutes.min, max: contract.durationMinutes.max };
 export const MAX_TARGET_ELEVATION_GAIN = contract.maxElevationGainMetres;
 export const MAX_WAYPOINTS = contract.maxWaypoints;
+export const MAX_LAPS = contract.maxLaps;
+export const MIN_LAP_DISTANCE = contract.minLapDistanceKm;
 export const MAX_AVOIDED_AREAS = contract.maxAvoidedAreas;
 export const AVOIDED_AREA_RADIUS = {
   min: contract.avoidedAreaRadiusMetres.min,

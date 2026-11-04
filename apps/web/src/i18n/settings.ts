@@ -14,6 +14,10 @@ export const settingsText = {
     minimal: 'Minimal',
     aerial: 'Aerial photo',
     basemapFailed: 'This map background could not be loaded.',
+    routes: 'Routes',
+    repeats: 'Suggest repeated loops',
+    no: 'No',
+    yes: 'Yes',
     about: 'About',
   },
   fr: {
@@ -29,6 +33,10 @@ export const settingsText = {
     minimal: 'Épuré',
     aerial: 'Photo aérienne',
     basemapFailed: "Ce fond de carte n'a pas pu être chargé.",
+    routes: 'Parcours',
+    repeats: 'Suggérer des boucles',
+    no: 'Non',
+    yes: 'Oui',
     about: 'À propos',
   },
 } satisfies Record<Language, unknown>;

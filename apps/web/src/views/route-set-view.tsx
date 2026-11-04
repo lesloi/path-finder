@@ -23,6 +23,7 @@ import {
 import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
   ImportedMarker,
+  LapsMarker,
   RouteFigures,
   routeTitle,
   SurfaceShare,
@@ -219,8 +220,13 @@ function RouteRow({
   const gain = route.elevationGain === undefined ? undefined : formatHeight(route.elevationGain, language);
   const shares = surfaceShares(route, language);
   const surface = `${t.paved} ${shares.paved} · ${t.unpaved} ${shares.unpaved}`;
+  const laps =
+    route.laps !== undefined && route.laps > 1
+      ? t.lapOf(route.laps, formatDistance(route.distance / route.laps, language))
+      : undefined;
   const name = [
     routeTitle(route, language, index, count),
+    ...(laps ? [laps] : []),
     distance,
     ...(gain ? [`${t.elevationGain} ${gain}`] : []),
     `${t.estimatedDuration} ${duration}`,
@@ -279,6 +285,7 @@ function RouteRow({
             </span>
           </span>
           {route.technical && <TechnicalMarker text={t.technical} testId={`routes-row-${index}-technical`} />}
+          <LapsMarker route={route} language={language} testId={`routes-row-${index}-laps`} compact />
         </span>
         {/* The empty width of the row: where the route climbs, at a glance. */}
         <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
@@ -384,6 +391,7 @@ function RouteDetail({
         <RouteFigures route={route} language={language} className="flex-1" />
       </div>
       {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" />}
+      <LapsMarker route={route} language={language} testId="route-laps" />
       <ElevationProfile
         testId="route-profile"
         route={route}

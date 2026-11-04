@@ -10,6 +10,7 @@ const DEFAULTS = {
   theme: 'system',
   basemap: 'minimal',
   poiLayers: { water: true, viewpoint: false, toilets: false, seasonal: true },
+  repeats: false,
   lastCriteria: {
     target: 'distance',
     distance: 10,
@@ -36,6 +37,7 @@ describe('useSettings', () => {
       theme: 'dark',
       basemap: 'aerial',
       poiLayers: { water: false, viewpoint: true, toilets: false, seasonal: false },
+      repeats: true,
       lastCriteria: {
         target: 'duration',
         distance: 21.1,
@@ -96,6 +98,21 @@ describe('useSettings', () => {
     const { result } = renderHook(() => useSettings());
 
     expect(result.current[0].pace).toBe(6);
+  });
+
+  it('keeps the repeat setting', () => {
+    localStorage.setItem(KEY, JSON.stringify({ repeats: true }));
+
+    expect(renderHook(() => useSettings()).result.current[0].repeats).toBe(true);
+  });
+
+  it.each([
+    ['a lap maximum from an earlier version', { laps: 5 }],
+    ['a repeat setting that is not a boolean', { repeats: 'yes' }],
+  ])('falls back to no repeats on %s', (_, stored) => {
+    localStorage.setItem(KEY, JSON.stringify(stored));
+
+    expect(renderHook(() => useSettings()).result.current[0].repeats).toBe(false);
   });
 
   it('does not read the last activity or the units of an earlier version', () => {

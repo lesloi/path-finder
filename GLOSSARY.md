@@ -109,13 +109,26 @@ One generated loop, with its geometry, distance, elevation gain, surface breakdo
 _Avoid_: Trace, track, itinerary, path
 
 **Route name**:
-The label of a route in its GPX export: a word and the distance, such as
-"Itinéraire · 12,3 km", in the user's language. It never names where the route starts.
+The label of a route in its GPX export: a word, the distance and, when the route repeats its loop,
+the lap count, such as "Itinéraire · 16,2 km · ×5", in the user's language. It never names where
+the route starts.
 _Avoid_: Title
 
 **Loop**:
-A route that ends at its start point. The only route shape for now.
+A route that ends at its start point, run once. A **repeated route** runs the same loop several
+times.
 _Avoid_: Round trip, circuit
+
+**Lap**:
+One circuit of a repeated route, from the start point back to it. The route says how many laps it
+runs (`×5`); the repeat is explicit, never a loop that goes back over its steps without saying so.
+_Avoid_: Repeat, tour (as a shape)
+
+**Repeated route**:
+A route that runs the same loop a number of times, so a small area can still give a long or hilly
+outing. The user allows repeats in the settings and the engine picks the number of laps; the
+distance and the elevation gain are those of all the laps together.
+_Avoid_: Multi-loop, circuit repeat
 
 **Point-to-point route**:
 A route that ends at a finish point other than its start point. Not offered yet.
@@ -123,7 +136,8 @@ _Avoid_: One-way, parcours, traversée
 
 **Route set**:
 The three to five routes generated for one set of criteria: matches first, then
-suggestions. Routes are never saved, so a route set is gone when the user asks again or
+suggestions. A route runs its loop once or, when the engine repeats it, several times; each says
+its lap count. Routes are never saved, so a route set is gone when the user asks again or
 leaves the app.
 _Avoid_: Results, search results
 
@@ -148,7 +162,9 @@ _Avoid_: Sync, upload
 **Settings**:
 The user's preferences kept on the device: pace, language (English or French,
 the browser's until the user picks one), the unit of the pace (minutes per km until the user picks km/h), the last criteria (surface preference,
-elevation gain, whether the length is a distance or a duration, and that distance and duration), and which POI categories the map shows. Lost if the user clears the site's data.
+elevation gain, whether the length is a distance or a duration, and that distance and duration),
+whether the engine may repeat a loop, and which POI categories the map shows. Lost if the user clears
+the site's data.
 _Avoid_: Profile, account
 
 ### On the map

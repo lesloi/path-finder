@@ -86,6 +86,89 @@ type candidate struct {
 	// lollipop marks a loop that reaches its high ground by a stem out and back: the stem's retrace is the shape,
 	// not a flaw, so the ranking does not penalise it.
 	lollipop bool
+	// laps is how many times the route runs this loop, from 2 up; 0 for a loop run once. circuit is the loop alone,
+	// which the ranking compares on: the repeated part is the shape, not a retrace, and two lap counts of the same
+	// loop cover the same ground.
+	laps    int
+	circuit [][]float64
+}
+
+// repeated returns the route run laps times: the total measures, the geometry and the stretches repeated. The
+// loop itself is kept for the ranking.
+func (c *candidate) repeated(laps int) *candidate {
+	if laps < 2 {
+		return c
+	}
+	out := *c
+	out.laps = laps
+	out.circuit = c.geometry
+	out.geometry = repeatGeometry(c.geometry, laps)
+	out.distance = round(c.distance*float64(laps), 3)
+	if c.elevationGain != nil {
+		gain := round(*c.elevationGain*float64(laps), 1)
+		out.elevationGain = &gain
+	}
+	if c.elevationLoss != nil {
+		loss := round(*c.elevationLoss*float64(laps), 1)
+		out.elevationLoss = &loss
+	}
+	out.surfaces = repeatSurfaces(c.surfaces, c.distance, out.distance, laps)
+	out.technicalStretches = repeatTechnical(c.technicalStretches, c.distance, laps)
+	return &out
+}
+
+// repeatGeometry runs a closed loop laps times, without repeating the point where one lap ends and the next starts.
+func repeatGeometry(geometry [][]float64, laps int) [][]float64 {
+	out := make([][]float64, 0, len(geometry)*laps)
+	out = append(out, geometry...)
+	first := 0
+	if n := len(geometry); n > 1 && samePoint(geometry[n-1], geometry[0]) {
+		first = 1
+	}
+	for lap := 1; lap < laps; lap++ {
+		out = append(out, geometry[first:]...)
+	}
+	return out
+}
+
+func samePoint(a, b []float64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// repeatSurfaces repeats the surface stretches of one lap over the whole route, merging the seam.
+func repeatSurfaces(list []contract.SurfaceStretch, lap, total float64, laps int) []contract.SurfaceStretch {
+	out := make([]contract.SurfaceStretch, 0, len(list)*laps)
+	for k := 0; k < laps; k++ {
+		offset := lap * float64(k)
+		for i, s := range list {
+			from, to := round(s.From+offset, 3), round(s.To+offset, 3)
+			if k == laps-1 && i == len(list)-1 {
+				to = total
+			}
+			out = appendSurface(out, s.Surface, from, to)
+		}
+	}
+	return out
+}
+
+// repeatTechnical repeats the technical stretches of one lap over the whole route, merging the seam.
+func repeatTechnical(list []contract.TechnicalStretch, lap float64, laps int) []contract.TechnicalStretch {
+	out := make([]contract.TechnicalStretch, 0, len(list)*laps)
+	for k := 0; k < laps; k++ {
+		offset := lap * float64(k)
+		for _, s := range list {
+			out = appendTechnical(out, round(s.From+offset, 3), round(s.To+offset, 3))
+		}
+	}
+	return out
 }
 
 // effortDistance is the distance weighted by the slope of each stretch, in kilometres.
@@ -212,7 +295,13 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 		}
 		score += weight * r.relative
 	}
-	visits := cellsAlong(cand.geometry, c.Start, radius)
+	// A repeated route is compared on its loop: the repeated part is the shape, not a retrace, and two lap counts of
+	// the same loop cover the same ground.
+	shape := cand.geometry
+	if cand.circuit != nil {
+		shape = cand.circuit
+	}
+	visits := cellsAlong(shape, c.Start, radius)
 	score += surfaceMismatch(c.Surface, cand.unpavedShare)
 	// Going back over its steps is what a single access leaves the direct loop, and what a stem leaves a lollipop,
 	// not a flaw to rank it down for.
@@ -229,7 +318,7 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	}
 	return ranked{route: contract.Route{
 		Geometry: cand.geometry, Distance: cand.distance, ElevationGain: cand.elevationGain,
-		ElevationLoss: cand.elevationLoss, EstimatedDuration: estimated, Kind: kind,
+		ElevationLoss: cand.elevationLoss, EstimatedDuration: estimated, Kind: kind, Laps: cand.laps,
 		UnpavedShare: cand.unpavedShare, Surfaces: cand.surfaces, Technical: cand.technical,
 		TechnicalStretches: cand.technicalStretches,
 	}, score: score, tier: worst, cells: cells, direct: cand.direct}, true

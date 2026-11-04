@@ -11,7 +11,7 @@ import (
 // CriteriaError is a request body that is not valid criteria, with the field that failed.
 // Messages name the field, never its value: the server keeps no location.
 type CriteriaError struct {
-	Field   string // start, target, elevationGain, surface, pace, waypoints or avoidedAreas
+	Field   string // start, target, elevationGain, surface, pace, waypoints, avoidedAreas or repeats
 	Message string
 	// Waypoint is the waypoint at fault, counted from 1, or 0 when none is singled out.
 	Waypoint int
@@ -52,6 +52,8 @@ type Criteria struct {
 	Waypoints [][2]float64 `json:"waypoints,omitempty"` // longitude, latitude
 	// AvoidedAreas no route goes through.
 	AvoidedAreas []AvoidedArea `json:"avoidedAreas,omitempty"`
+	// Repeats allows the engine to run a loop several times, up to contract.MaxLaps(). The count is the engine's.
+	Repeats bool `json:"repeats,omitempty"`
 }
 
 // AvoidedArea is a circle routes keep out of: its centre as longitude and latitude, and its radius in metres.
@@ -172,6 +174,14 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 	}
 	c.Pace = pace
 
+	if v, present := obj["repeats"]; present {
+		repeats, ok := v.(bool)
+		if !ok {
+			return fail("repeats", "repeats must be true or false")
+		}
+		c.Repeats = repeats
+	}
+
 	if raw, present := obj["waypoints"]; present {
 		list, ok := raw.([]any)
 		if !ok || len(list) > bounds.MaxWaypoints {
@@ -262,3 +272,10 @@ func HillyMatchPerKm() float64 { return bounds.HillyMatchPerKm }
 
 // MaxDistanceKm is the longest route a request may ask for, and the longest the waypoints may make one.
 func MaxDistanceKm() float64 { return bounds.MaxDistanceKm }
+
+// MaxLaps is the most times the engine may repeat a loop when the user allows it.
+func MaxLaps() int { return bounds.MaxLaps }
+
+// MinLapDistanceKm is the shortest loop a repeated route may be cut into: under it, the loop search's
+// control points snap so far from the circle that a lap can no longer reach the length it is asked for.
+func MinLapDistanceKm() float64 { return bounds.MinLapDistanceKm }

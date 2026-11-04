@@ -356,6 +356,20 @@ describe('RouteSetView', () => {
     });
   });
 
+  it('says the laps of a repeated route, with the length of one', () => {
+    render(<View list={[route({ laps: 3 })]} />);
+
+    const marker = screen.getByTestId('routes-row-0-laps');
+    expect(marker).toHaveTextContent('×3');
+    expect(marker).toHaveAccessibleName('3 laps of 4.1 km');
+  });
+
+  it('says nothing of laps for a loop run once', () => {
+    render(<View list={[route()]} />);
+
+    expect(screen.queryByTestId('routes-row-0-laps')).not.toBeInTheDocument();
+  });
+
   describe('the detail', () => {
     const open = (index = 0) => {
       render(<View open />);
@@ -387,6 +401,12 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('route-climb')).toHaveTextContent('340 m');
       expect(screen.getByTestId('route-descent')).toHaveTextContent('352 m');
       expect(screen.getByTestId('route-duration')).toHaveTextContent('1 h 25');
+    });
+
+    it('says the laps of a repeated route', () => {
+      render(<View open list={[route({ laps: 3 })]} />);
+
+      expect(screen.getByTestId('route-laps')).toHaveTextContent('3 laps of 4.1 km');
     });
 
     it('shows no climb or descent for a route without elevation gain', () => {
@@ -555,6 +575,20 @@ describe('RouteSetView', () => {
         const gpx = await files![0].text();
         expect(gpx).toContain('<trkpt');
         expect(gpx).toContain('OpenStreetMap');
+      });
+
+      it('names a repeated route after its laps', async () => {
+        const share = vi.fn(() => Promise.resolve());
+        vi.stubGlobal('navigator', { ...navigator, canShare: () => true, share });
+        render(<View open list={[route({ laps: 3 })]} />);
+
+        fireEvent.click(screen.getByTestId('route-export'));
+
+        const [{ files }] = share.mock.calls[0] as unknown as [ShareData];
+        expect(files![0].name).toMatch(/^Running-12km_340m-x3-\d{14}\.gpx$/);
+        const gpx = await files![0].text();
+        expect(gpx).toContain('· ×3');
+        expect(gpx).toContain('3 laps of 4.1 km');
       });
     });
   });

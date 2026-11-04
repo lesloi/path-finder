@@ -173,6 +173,40 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   a synthetic square with a 150 m summit 200 m off, a 16 km/0 m loop becomes 16.4 km/+150 m; on a low-relief start,
   the repaired candidate gains about 60 m per summit but the ranking kept the shorter original, and the 25 Bosses
   17.8 km/+512 m is over the band and is not repaired: it stays a suggestion with the closest gain.
+- **A route may repeat its loop when the user allows repeats in the settings, and the engine chooses the count.** The
+  consent is a lasting permission, not a per-search criterion, so it lives with the pace and the units, and every request
+  carries it as a boolean; the cap (10) is the contract's, and the engine's to spend. A request too short to cut into
+  laps simply keeps its loop. The engine searches the natural loops first, unchanged; only
+  when no returned loop is within the match band
+  of a numeric gain, the target is a distance, and the user allows repeats does it search a shorter loop at distance/N and
+  gain/N, repeat each loop N times, and rank the repeated routes beside the natural ones. The first N is the target gain
+  divided by the highest gain the natural loops made, capped by the contract's maximum and by `minLapDistanceKm` (1.5 km):
+  under that, the 400 m snap reach of the loop search's control points dominates and a lap can no longer be aimed at its
+  length. The full loop's gain does not predict the lap's: on a low-relief start, a 15 km loop made 270 m
+  while a 6 km lap made 87, so the estimate was corrected: after each lap search, the gain the lap actually made gives
+  the next count, `N = ceil(target gain / lap gain)`, and the search runs again, up to four lap searches. The count never
+  goes down: each lap's gain can only take it up by at least one. When the estimate passes the contract's maximum, the
+  maximum is tried once, as its shorter lap can climb more than the one just measured; the walk stops after four lap
+  searches, when a lap gains nothing, when the next count would not rise, or when the context ends. It is a heuristic,
+  not a search for the best count: a count it steps over can be the one that matches. Each repeat search gets 40 candidates and a 25-loop stop,
+  while the natural search keeps its 100 and 60, so a request is bounded at about 260 loop candidates (100 natural, four
+  times 40); their wall time includes the summit and repair sources at each lap scale. A 16 km/+500 m request on a
+  low-relief start, with its four lap searches, answered in 97 ms on the v9 graph in the dev server; the harness across starts and the
+  hardest requests remains the precondition for calling the budget settled. When the last count still misses, the answer
+  carries the closest gain; the walk promises no route. A ladder of every count
+  was rejected: it costs several times the budget, and the timeout, not the terrain, would pick N. When the natural
+  search returns no loop at all, the shortest lap allowed is tried once, as the whole loop may be out of the graph's
+  reach where a shorter one is not. A repeat is
+  made on
+  one loop: the geometry, the surfaces and the technical stretches are repeated (the seam point is not duplicated), the
+  totals are multiplied, and the ranking still measures retrace and diversity on the single lap, so the repeated part is
+  the shape, not a retrace, and two counts of one loop cover the same ground (only one survives). A loop through
+  waypoints is repeated whole, at the count that best fits its length and the maximum, and only as one direct candidate;
+  the answers for a direct loop that already overshoots stay as they were. The contract names the shape: `repeats` in the
+  criteria (the user's consent), `laps` on a route (absent for a loop run once); the route list, the detail and the GPX name, description and
+  file name (`-x5`) carry it. A duration target and a plain length keep the natural loops; the direct loop through
+  waypoints is the exception, as the waypoints fix its length.
+
 - **A suggestion ranks the elevation gain three times the distance.** The user who sets a gain cares more about it
   than about a kilometre, and the set was showing the shortest suggestion first with a gain far from the target. The
   weight is 3, the smallest that clears the noise in both measured directions: 306 m at 18.8 km ranks 0.09 ahead of

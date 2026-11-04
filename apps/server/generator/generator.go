@@ -40,6 +40,13 @@ type Generator struct {
 const (
 	defaultCandidates = 100
 	defaultStopAfter  = 60
+	// repeatCandidates and repeatStopAfter bound one loop search for a shorter loop. The loop costs less per
+	// candidate, but the request already paid for the natural search and stays within the server's budget.
+	repeatCandidates = 40
+	repeatStopAfter  = 25
+	// repeatSearches bound how many short loops one request tries: each lap's measured gain gives the next count,
+	// which can take a few steps on a low relief before the count reaches the floor.
+	repeatSearches = 4
 )
 
 // Generate reads the criteria from body and returns the routes of a route set. It reports
@@ -61,10 +68,11 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	}
 	limit := cmpOr(g.MaxRoutes, maxRoutes)
 	stopAfter := cmpOr(g.StopAfter, defaultStopAfter)
+	candidates := cmpOr(g.Candidates, defaultCandidates)
 	req := engine.LoopRequest{
 		Start:      engine.Point{Lat: criteria.Start[1], Lon: criteria.Start[0]},
 		Distance:   km * 1000,
-		Candidates: cmpOr(g.Candidates, defaultCandidates),
+		Candidates: candidates,
 		Seed:       g.seed(),
 		Avoided:    avoidedCircles(criteria.AvoidedAreas),
 	}
@@ -86,7 +94,8 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 			},
 		}
 	}
-	// The loop straight through the waypoints is a candidate of its own.
+	// The loop straight through the waypoints is a candidate of its own: run once, or as many times as best meets
+	// the criteria when the user allows repeats. It is one candidate, so the ranking still has one direct loop.
 	set := newRanking(criteria, km)
 	enough := limit
 	// directOver tells whether the waypoints already make a route beyond the match bound: every loop through them is
@@ -102,7 +111,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		}
 		req.Direct = directRoute
 		if direct != nil {
-			set.add(direct)
+			set.add(g.bestDirect(criteria, direct, set))
 			if set.holdsADirectSuggestion() {
 				// It keeps a place in the set (see ranking.routes), so one match fewer fills it.
 				enough = limit - 1
@@ -121,30 +130,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 			}
 		}
 	}
-	// Stops searching once the route set cannot get any bigger, or no longer does: more loops would only cost CPU.
-	var converted, best, lastGain int
-	addLoops := func(found []*engine.Route) {
-		for ; converted < len(found); converted++ {
-			if c := toCandidate(found[converted]); c != nil {
-				set.add(c)
-			}
-		}
-	}
-	req.Enough = func(found []*engine.Route) bool {
-		addLoops(found)
-		matches := 0
-		for _, r := range set.routes(limit) {
-			if r.Kind == "match" {
-				matches++
-			}
-		}
-		if matches > best {
-			best, lastGain = matches, len(found)
-		}
-		return matches >= enough || len(found)-lastGain >= stopAfter
-	}
-
-	loops, err := looper.Loops(ctx, req)
+	loops, err := g.search(ctx, looper, req, set, 1, candidates, stopAfter, enough, limit)
 	switch {
 	case errors.Is(err, engine.ErrOffGraph), errors.Is(err, engine.ErrNoLoop), errors.Is(err, engine.ErrNoRoute):
 		// Nothing more to offer from here: the direct loop through the waypoints, if any, or an empty
@@ -153,12 +139,180 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 	case err != nil && ctx.Err() == nil:
 		return nil, err
 	}
-	addLoops(loops)
+	g.repeat(ctx, looper, req, criteria, km, loops, set, enough, limit)
 	routes := set.routes(limit)
 	if ctx.Err() != nil && len(routes) == 0 {
 		return nil, ctx.Err()
 	}
 	return routeSet(criteria, routes), nil
+}
+
+// search runs one loop request and adds its loops to the set, repeated laps times. It stops the engine once the set
+// has enough matches, or once a run of loops adds none, and returns the loops it was given.
+func (g *Generator) search(ctx context.Context, looper Looper, req engine.LoopRequest, set *ranking, laps, candidates, stopAfter, enough, limit int) ([]*engine.Route, error) {
+	req.Candidates = candidates
+	converted, best, lastGain := 0, 0, 0
+	add := func(found []*engine.Route) {
+		for ; converted < len(found); converted++ {
+			c := toCandidate(found[converted])
+			if c == nil {
+				continue
+			}
+			if laps > 1 {
+				c = c.repeated(laps)
+			}
+			set.add(c)
+		}
+	}
+	req.Enough = func(found []*engine.Route) bool {
+		add(found)
+		matches := countMatches(set, limit)
+		if matches > best {
+			best, lastGain = matches, len(found)
+		}
+		return matches >= enough || len(found)-lastGain >= stopAfter
+	}
+	loops, err := looper.Loops(ctx, req)
+	add(loops)
+	return loops, err
+}
+
+// countMatches is how many routes of the set meet the criteria.
+func countMatches(set *ranking, limit int) int {
+	n := 0
+	for _, r := range set.routes(limit) {
+		if r.Kind == "match" {
+			n++
+		}
+	}
+	return n
+}
+
+// bestDirect picks the loop through the waypoints, run once or repeated, that best meets the criteria: the ranking
+// would keep only one of the counts anyway, as they cover the same ground.
+func (g *Generator) bestDirect(c contract.Criteria, base *candidate, r *ranking) *candidate {
+	if !c.Repeats || base.distance <= 0 {
+		return base
+	}
+	maxLaps := contract.MaxLaps()
+	if byDistance := int(contract.MaxDistanceKm() / base.distance); byDistance < maxLaps {
+		maxLaps = byDistance
+	}
+	best, bestTier, bestScore := base, tierOut, math.Inf(1)
+	for laps := 1; laps <= maxLaps; laps++ {
+		cand := base
+		if laps > 1 {
+			cand = base.repeated(laps)
+		}
+		entry, ok := classify(c, cand, r.radius)
+		if !ok {
+			continue
+		}
+		if entry.tier < bestTier || entry.tier == bestTier && entry.score < bestScore {
+			best, bestTier, bestScore = cand, entry.tier, entry.score
+		}
+	}
+	return best
+}
+
+// repeat searches loops short enough to run several times when the gain a plain loop makes is out of reach. The
+// count comes from the gain the natural loops did make, capped by the user's maximum and by the shortest lap the
+// loop search can aim at; one more count is tried when the first misses. A duration target and a route through
+// waypoints keep their own shape.
+func (g *Generator) repeat(ctx context.Context, looper Looper, natural engine.LoopRequest, c contract.Criteria, km float64, loops []*engine.Route, set *ranking, enough, limit int) {
+	if !c.Repeats || len(c.Waypoints) > 0 || c.Target.Distance <= 0 ||
+		c.ElevationGain == nil || c.ElevationGain.Shortcut != "" {
+		return
+	}
+	if countMatches(set, limit) > 0 || gainWithin(loops, c.ElevationGain.Metres) {
+		return
+	}
+	bestGain := 0.0
+	for _, l := range loops {
+		bestGain = max(bestGain, l.Ascent)
+	}
+	// The natural loops all climb nothing: repeating them cannot make the gain either. With none at all, the whole
+	// loop may be out of reach where a shorter one is not, so the shortest lap allowed is tried once.
+	if bestGain <= 0 && len(loops) > 0 {
+		return
+	}
+	capLaps := contract.MaxLaps()
+	if byFloor := int(km / contract.MinLapDistanceKm()); byFloor < capLaps {
+		capLaps = byFloor
+	}
+	if capLaps < 2 {
+		return
+	}
+	n := capLaps
+	if bestGain > 0 {
+		n = min(max(int(math.Ceil(c.ElevationGain.Metres/bestGain)), 2), capLaps)
+	}
+	candidates := min(cmpOr(g.Candidates, defaultCandidates), repeatCandidates)
+	stopAfter := min(cmpOr(g.StopAfter, defaultStopAfter), repeatStopAfter)
+	// The first count comes from the gain the full loops made, which is only a guess: a short lap climbs less than
+	// the whole loop it is cut from. Each lap search then gives the gain the lap actually made, and the next count
+	// is what that gain needs to reach the target, so the count follows the terrain down to the floor.
+	for attempt := 0; attempt < repeatSearches && n <= capLaps; attempt++ {
+		if ctx.Err() != nil || countMatches(set, limit) >= enough {
+			return
+		}
+		req := g.repeatRequest(natural, c, km, n, candidates)
+		// A repeat search that fails leaves the natural routes as the answer: it is a bonus, not the request.
+		loops, _ := g.search(ctx, looper, req, set, n, candidates, stopAfter, enough, limit)
+		if countMatches(set, limit) > 0 {
+			return
+		}
+		lapGain := 0.0
+		for _, l := range loops {
+			lapGain = max(lapGain, l.Ascent)
+		}
+		if lapGain <= 0 {
+			return
+		}
+		next := int(math.Ceil(c.ElevationGain.Metres / lapGain))
+		if next <= n {
+			next = n + 1
+		}
+		if next > capLaps {
+			// The lap gained too little to reach the target in the most laps allowed, but the largest count is still
+			// worth one try: its shorter lap can climb more than the one just measured.
+			next = capLaps
+		}
+		if next <= n {
+			return
+		}
+		n = next
+	}
+}
+
+// repeatRequest asks for a loop short enough to run laps times, at its share of the distance, the gain and the
+// tolerance: the whole route then carries the tolerance of the criteria.
+func (g *Generator) repeatRequest(natural engine.LoopRequest, c contract.Criteria, km float64, laps, candidates int) engine.LoopRequest {
+	req := natural
+	req.Distance = km * 1000 / float64(laps)
+	req.Ascent = c.ElevationGain.Metres / float64(laps)
+	req.AscentBand = engine.AscentBand{
+		Share:  matchTolerance.elevationGain,
+		FloorM: matchTolerance.elevationGainFloor / float64(laps),
+	}
+	req.DistanceBand = matchTolerance.distance
+	req.Effort = nil
+	req.Waypoints = nil
+	req.Direct = nil
+	req.Candidates = candidates
+	req.Seed = g.seed()
+	return req
+}
+
+// gainWithin tells whether one of the natural loops already meets the target gain.
+func gainWithin(loops []*engine.Route, target float64) bool {
+	bound := matchGainBound(target)
+	for _, l := range loops {
+		if math.Abs(l.Ascent-target) <= bound {
+			return true
+		}
+	}
+	return false
 }
 
 // avoidedCircles is the areas of the criteria as the engine takes them.

@@ -803,5 +803,90 @@
     "expect": {
       "field": "avoidedAreas"
     }
+  },
+  {
+    "name": "accepts repeated loops",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "repeats": true
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "any",
+        "pace": 6,
+        "repeats": true
+      }
+    }
+  },
+  {
+    "name": "accepts repeated loops with waypoints",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "waypoints": [[6.15, 45.9]],
+      "repeats": true
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "any",
+        "pace": 6,
+        "waypoints": [[6.15, 45.9]],
+        "repeats": true
+      }
+    }
+  },
+  {
+    "name": "leaves repeated loops out when they are refused",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "repeats": false
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "any",
+        "pace": 6
+      }
+    }
+  },
+  {
+    "name": "refuses a repeat setting that is not a boolean",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "repeats": "yes"
+    },
+    "expect": {
+      "field": "repeats"
+    }
   }
 ]
