@@ -274,7 +274,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const map = useRef<MapHandle>(null);
   const [mapView, setMapView] = useState<MapView>({ bearing: 0, rotated: false, movedAway: false });
   const pageWasOpen = useRef(pageOpen);
-  const [{ basemap, pace, paceUnit, poiLayers }, update] = useSettings();
+  const [{ basemap, pace, paceUnit, poiLayers, repeats }, update] = useSettings();
   const browser = useRouteBrowser();
   // Clearing leaves nothing on screen: a status says it, for those who cannot see the list go.
   const [cleared, setCleared] = useState(false);
@@ -308,7 +308,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const selected = desktop ? browser.selected : (browser.selected ?? 0);
   const dockRoute = desktop ? atPace?.routes[selected ?? -1] : undefined;
   const dockShown = Boolean(dockRoute);
-  const current = criteriaRequest(draft[0], { pace, start, waypoints, avoidedAreas });
+  const current = criteriaRequest(draft[0], { pace, start, waypoints, avoidedAreas, repeats });
   // Every search keeps the criteria it was made with, whichever button asked for it.
   const search = (request: RouteSetRequest) => {
     setCleared(false);
@@ -811,7 +811,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           <CriteriaBar
             language={language}
             summary={criteriaSummary(
-              criteriaRequest(draft[0], { pace, start: start ?? NO_START, waypoints, avoidedAreas })!,
+              criteriaRequest(draft[0], {
+                pace,
+                start: start ?? NO_START,
+                waypoints,
+                avoidedAreas,
+                repeats,
+              })!,
               language,
             )}
             start={start && formatPosition(start, language)}

@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, FileUp, Mountain } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, FileUp, Mountain, Repeat2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { SURFACE_CLASSES } from '../components/index.ts';
@@ -117,6 +117,36 @@ export function TechnicalMarker({
     <span data-testid={testId} className={`flex items-center gap-1 text-sm font-semibold text-ink ${className}`}>
       <Mountain size={14} aria-hidden className="text-technical" />
       {text}
+    </span>
+  );
+}
+
+/** The laps of a route, with the length of one: "5 tours de 3,2 km". Nothing for a loop run once. */
+export function LapsMarker({
+  route,
+  language,
+  testId,
+  compact = false,
+  className = '',
+}: {
+  route: Route;
+  language: Language;
+  testId: string;
+  /** The count alone, where a row has no room for the lap's length. */
+  compact?: boolean;
+  className?: string;
+}) {
+  if (route.laps === undefined || route.laps < 2) return null;
+  const t = routesText[language];
+  const label = t.lapOf(route.laps, formatDistance(route.distance / route.laps, language));
+  return (
+    <span
+      data-testid={testId}
+      aria-label={label}
+      className={`flex items-center gap-1 text-sm font-semibold text-ink ${className}`}
+    >
+      <Repeat2 size={14} aria-hidden className="flex-none text-accent" />
+      {compact ? t.laps(route.laps) : label}
     </span>
   );
 }

@@ -22,6 +22,8 @@ export type Route = {
   /** Minutes. */
   estimatedDuration: number;
   kind: 'match' | 'suggestion';
+  /** How many times the route runs its loop, from 2 up; absent for a loop run once. */
+  laps?: number;
   unpavedShare: number;
   surfaces: SurfaceStretch[];
   /** Holds a technical stretch: a way where the hands, ropes or chains are needed. */
@@ -57,6 +59,7 @@ function parseRoute(value: unknown): Route | undefined {
     elevationLoss,
     estimatedDuration,
     kind,
+    laps,
     unpavedShare,
     surfaces,
     technical,
@@ -67,6 +70,11 @@ function parseRoute(value: unknown): Route | undefined {
   if (elevationGain !== undefined && !isNumber(elevationGain)) return undefined;
   if (elevationLoss !== undefined && !isNumber(elevationLoss)) return undefined;
   if (kind !== 'match' && kind !== 'suggestion') return undefined;
+  let lapsCount: number | undefined;
+  if (laps !== undefined) {
+    if (!isNumber(laps) || !Number.isInteger(laps) || laps < 2) return undefined;
+    lapsCount = laps;
+  }
   if (typeof technical !== 'boolean') return undefined;
   const validSurfaces =
     Array.isArray(surfaces) &&
@@ -89,6 +97,7 @@ function parseRoute(value: unknown): Route | undefined {
     ...(elevationLoss !== undefined && { elevationLoss }),
     estimatedDuration,
     kind,
+    ...(lapsCount !== undefined && { laps: lapsCount }),
     unpavedShare,
     surfaces: (surfaces as SurfaceStretch[]).map(({ surface, from, to }) => ({ surface, from, to })),
     technical,

@@ -51,7 +51,13 @@ describe('the contract with the server', () => {
 
     expect(parsed?.routes).toHaveLength(2);
     expect(parsed?.closestElevationGain).toBe(250);
-    expect(parsed?.routes[0]).toMatchObject({ kind: 'match', elevationGain: 250, elevationLoss: 240, distance: 10.2 });
+    expect(parsed?.routes[0]).toMatchObject({
+      kind: 'match',
+      elevationGain: 250,
+      elevationLoss: 240,
+      distance: 10.2,
+      laps: 5,
+    });
     expect(parsed?.routes[0]?.geometry[0]).toEqual([6.1294, 45.8992, 450.5]);
     expect(parsed?.routes[1]).toMatchObject({ kind: 'suggestion' });
     expect(parsed?.routes[1]).not.toHaveProperty('elevationGain');

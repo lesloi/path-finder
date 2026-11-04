@@ -41,14 +41,25 @@ describe('SettingsView', () => {
     expect(screen.getAllByRole('combobox')[0]).toBe(screen.getByTestId('settings-theme'));
   });
 
-  it('shows the display and about groups in this order, and no pace', () => {
+  it('shows the display, routes and about groups in this order, and no pace', () => {
     renderView();
 
     expect(screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)).toEqual([
       en.display,
+      en.routes,
       en.about,
     ]);
     expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('allows repeats, off by default, and saves the choice', () => {
+    renderView();
+    expect(screen.getByTestId('settings-repeats-no')).toBeChecked();
+
+    fireEvent.click(screen.getByTestId('settings-repeats-yes'));
+
+    expect(screen.getByTestId('settings-repeats-yes')).toBeChecked();
+    expect(saved().repeats).toBe(true);
   });
 
   it.each([

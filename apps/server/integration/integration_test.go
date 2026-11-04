@@ -136,6 +136,31 @@ func TestRouteSetsForBothActivitiesAndTargets(t *testing.T) {
 	}
 }
 
+func TestRouteSetsAcceptRepeatedLoops(t *testing.T) {
+	h := newServer(t)
+	code, routes, body := routeSets(t, h, criteria(`{"distance":9}`, `,"elevationGain":1200,"repeats":true`))
+	if code != 200 || len(routes) == 0 {
+		t.Fatalf("status %d, %d routes: %s", code, len(routes), body[:min(len(body), 200)])
+	}
+	repeated := false
+	for i, r := range routes {
+		if r.Laps > contract.MaxLaps() {
+			t.Errorf("route %d runs %d laps, over the maximum", i, r.Laps)
+		}
+		repeated = repeated || r.Laps > 1
+		first, last := r.Geometry[0], r.Geometry[len(r.Geometry)-1]
+		if first[0] != last[0] || first[1] != last[1] {
+			t.Errorf("route %d: first %v, last %v: a loop", i, first, last)
+		}
+		if end := r.Surfaces[len(r.Surfaces)-1].To; end != r.Distance {
+			t.Errorf("route %d: stretches end at %v km, the route at %v", i, end, r.Distance)
+		}
+	}
+	if !repeated {
+		t.Errorf("no route runs several laps: %s", body[:min(len(body), 400)])
+	}
+}
+
 func TestAStartFarFromAnyWayHasNoRoutes(t *testing.T) {
 	h := newServer(t)
 	body := strings.Replace(criteria(`{"distance":10}`, ""), "[6.1294,45.8992]", "[2.35,48.85]", 1)

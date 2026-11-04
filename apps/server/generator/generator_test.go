@@ -25,6 +25,9 @@ type fakeLooper struct {
 	// enoughAt is the number of loops after which Enough said to stop, when the loops are given to it one by one; 0 if never.
 	enoughAt  int
 	askEnough bool
+	// requests records every loop request, and batches the loops each call returns, when they differ.
+	requests []engine.LoopRequest
+	batches  [][]*engine.Route
 }
 
 func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.DirectLoopRequest) (*engine.Route, error) {
@@ -34,16 +37,21 @@ func (f *fakeLooper) DirectLoop(_ context.Context, _ engine.DirectLoopRequest) (
 
 func (f *fakeLooper) Loops(_ context.Context, req engine.LoopRequest) ([]*engine.Route, error) {
 	f.got = req
+	f.requests = append(f.requests, req)
 	f.loopCalls++
+	loops := f.loops
+	if f.loopCalls <= len(f.batches) {
+		loops = f.batches[f.loopCalls-1]
+	}
 	if f.askEnough {
-		for i := range f.loops {
-			if req.Enough(f.loops[:i+1]) {
+		for i := range loops {
+			if req.Enough(loops[:i+1]) {
 				f.enoughAt = i + 1
-				return f.loops[:i+1], f.err
+				return loops[:i+1], f.err
 			}
 		}
 	}
-	return f.loops, f.err
+	return loops, f.err
 }
 
 // engineLoop is a loop as the engine returns it: positions around the start point.

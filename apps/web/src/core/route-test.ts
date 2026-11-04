@@ -61,6 +61,16 @@ describe('parseRouteSet', () => {
     expect(parseRouteSet({ routes: [route] })).toEqual({ routes: [route] });
   });
 
+  it('reads the laps of a repeated route', () => {
+    const repeated = { ...route, laps: 5 };
+
+    expect(parseRouteSet({ routes: [repeated] })).toEqual({ routes: [repeated] });
+  });
+
+  it.each([[1], [2.5], ['5']])('refuses a route with %s laps', (laps) => {
+    expect(parseRouteSet({ routes: [{ ...route, laps }] })).toBeUndefined();
+  });
+
   it.each([
     ['a gain that is not a number', '296'],
     ['a gain that is NaN', Number.NaN],

@@ -27,6 +27,8 @@ export type Criteria = {
   waypoints?: Position[];
   /** Circles no route goes through. */
   avoidedAreas?: AvoidedArea[];
+  /** Whether the engine may run a loop several times; it picks the count, up to the contract's maximum. */
+  repeats?: boolean;
 };
 
 /** A circle routes keep out of: its centre, and its radius in metres. */
@@ -50,6 +52,7 @@ export const CRITERIA_FIELDS = [
   'pace',
   'waypoints',
   'avoidedAreas',
+  'repeats',
 ] as const;
 export type CriteriaField = (typeof CRITERIA_FIELDS)[number];
 
@@ -106,7 +109,7 @@ function targetDistance(criteria: Criteria): number {
  */
 export function parseCriteria(body: unknown, { countElevationGain = true } = {}): Criteria {
   check(isObject(body), 'start', 'Criteria must be an object');
-  const { start, target, elevationGain, surface, pace, waypoints, avoidedAreas } = body;
+  const { start, target, elevationGain, surface, pace, waypoints, avoidedAreas, repeats } = body;
 
   check(isPosition(start), 'start', 'start must be a longitude and a latitude');
 
@@ -130,6 +133,8 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
   );
   check(SURFACES.includes(surface as Criteria['surface']), 'surface', 'Unknown surface preference');
   check(isNumber(pace) && pace > 0, 'pace', 'pace must be a positive number');
+
+  check(repeats === undefined || typeof repeats === 'boolean', 'repeats', 'repeats must be true or false');
 
   check(
     waypoints === undefined || (Array.isArray(waypoints) && waypoints.length <= MAX_WAYPOINTS),
@@ -174,6 +179,7 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
     ...(waypoints !== undefined &&
       waypoints.length > 0 && { waypoints: (waypoints as Position[]).map(([lon, lat]): Position => [lon, lat]) }),
     ...(areas.length > 0 && { avoidedAreas: areas }),
+    ...(repeats === true && { repeats: true }),
   };
   let distance: number;
   try {

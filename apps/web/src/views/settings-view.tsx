@@ -73,6 +73,21 @@ export function SettingsView({ language }: { language: Language }) {
           />
         </SettingRow>
       </div>
+      <h2 className={GROUP_TITLE}>{t.routes}</h2>
+      <div className={LIST}>
+        <SettingRow label={t.repeats}>
+          <SegmentedControl
+            testId="settings-repeats"
+            label={t.repeats}
+            value={settings.repeats ? 'yes' : 'no'}
+            options={[
+              { value: 'no', label: t.no },
+              { value: 'yes', label: t.yes },
+            ]}
+            onChange={(value) => update({ repeats: value === 'yes' })}
+          />
+        </SettingRow>
+      </div>
       <h2 className={GROUP_TITLE}>{t.about}</h2>
       <nav className={LIST}>
         {[

@@ -46,6 +46,15 @@ describe('CriteriaForm', () => {
     });
   });
 
+  it('carries the repeat setting', () => {
+    store({ repeats: true });
+    const { onSubmit, submit } = setup();
+
+    submit();
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ repeats: true }));
+  });
+
   it('offers to search again once routes were found', () => {
     setup({ searched: true });
 
@@ -310,6 +319,13 @@ describe('criteriaRequest', () => {
       waypoints: [[6.1, 45.9]],
     });
   });
+
+  it('carries whether the engine may repeat a loop', () => {
+    const draft = { target: 'distance', distance: 10, duration: 60, level: 'any', gain: 0, surface: 'any' } as const;
+
+    expect(criteriaRequest(draft, { pace: 6, start: START, repeats: true })).toMatchObject({ repeats: true });
+    expect(criteriaRequest(draft, { pace: 6, start: START, repeats: false })).not.toHaveProperty('repeats');
+  });
 });
 
 describe('criteriaRequest and avoided areas', () => {
@@ -381,6 +397,7 @@ describe('criteriaChanged', () => {
     ['the elevation gain', { elevationGain: 400 }],
     ['the elevation level', { elevationGain: 'hilly' as const }],
     ['the surface', { surface: 'paved' as const }],
+    ['the repeat setting', { repeats: true }],
   ])('sees a change of %s', (_, changes) => {
     expect(changed(changes)).toBe(true);
   });

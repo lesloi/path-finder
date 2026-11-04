@@ -13,6 +13,18 @@ test.describe('the settings', () => {
     await expect(page.getByTestId('settings-pace-unit-km/h')).toBeChecked();
   });
 
+  test('keep the repeat setting across a reload', async ({ page }) => {
+    await page.goto('/#/settings');
+
+    await expect(page.getByTestId('settings-repeats-no')).toBeChecked();
+    await page.locator('label', { has: page.getByTestId('settings-repeats-yes') }).click();
+    await expect(page.getByTestId('settings-repeats-yes')).toBeChecked();
+
+    await page.reload();
+
+    await expect(page.getByTestId('settings-repeats-yes')).toBeChecked();
+  });
+
   test('keep a forced theme across a reload', async ({ page }) => {
     await page.goto('/#/settings');
 

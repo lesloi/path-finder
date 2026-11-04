@@ -107,6 +107,31 @@ describe('gpxExport', () => {
     expect(gpxExport(route, DAY, french, PACE).fileName).toBe('Running-12km_340m-20260928120000.gpx');
   });
 
+  it('keeps a peak on every lap when the track is simplified', () => {
+    // Three laps of a straight line, each with a sharp peak in the middle, over the point cap.
+    const track = Array.from({ length: 3_000 }, (_, k): [number, number, number] => {
+      const lap = Math.floor(k / 1_000);
+      const into = k % 1_000;
+      return [6.1294, 45.8992 + (into / 1_000 + lap) * 0.01, into === 500 ? 700 : 450];
+    });
+
+    const gpx = parse(
+      gpxExport({ geometry: track, distance: 30, estimatedDuration: 200, laps: 3 }, DAY, french, PACE).content,
+    );
+    const heights = [...gpx.querySelectorAll('trkpt > ele')].map((element) => Number(element.textContent));
+    expect(heights.length).toBeLessThanOrEqual(MAX_GPX_POINTS);
+    expect(Math.max(...heights)).toBe(700);
+  });
+
+  it('says the laps in the name, the description and the file name', () => {
+    const { fileName, content } = gpxExport({ ...route, laps: 3 }, DAY, french, PACE);
+    const gpx = parse(content);
+
+    expect(gpx.querySelector('trk > name')?.textContent).toBe('Itinéraire · 12,3 km · ×3');
+    expect(gpx.querySelector('trk > desc')?.textContent).toContain('3 tours de 4,1 km');
+    expect(fileName).toBe('Running-12km_340m-x3-20260928120000.gpx');
+  });
+
   it('follows the language of the settings', () => {
     const { content } = gpxExport(route, DAY, { paceUnit: 'min/km', language: 'en' }, PACE);
 

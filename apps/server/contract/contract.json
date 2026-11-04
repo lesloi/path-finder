@@ -5,6 +5,8 @@
   "durationMinutes": { "min": 15, "max": 360 },
   "maxElevationGainMetres": 2500,
   "maxWaypoints": 5,
+  "maxLaps": 10,
+  "minLapDistanceKm": 1.5,
   "maxAvoidedAreas": 3,
   "avoidedAreaRadiusMetres": { "min": 50, "max": 1500 },
   "climbPerEffortKm": 400,

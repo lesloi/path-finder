@@ -1,4 +1,4 @@
-import { commonText, criteriaText, LINKS, type Language } from '../i18n/index.ts';
+import { commonText, criteriaText, LINKS, routesText, type Language } from '../i18n/index.ts';
 import { poiLabel, waypointPoiAt, waypointPoiKey, type Poi, type WaypointPois } from './poi.ts';
 import { boundsAround, nearestOnRoute, waypointsOnRoute } from './route.ts';
 import type { Position } from './coordinates.ts';
@@ -16,6 +16,8 @@ export type GpxRoute = {
   elevationGain?: number;
   /** Minutes. */
   estimatedDuration: number;
+  /** How many times the route runs its loop, from 2 up; absent for a loop run once. */
+  laps?: number;
   /** Whether the route is run the other way, which changes the order its waypoints are met in. */
   reversed?: boolean | undefined;
 };
@@ -61,12 +63,19 @@ export function gpxExport(
   /** Minutes per km, the one the estimated duration was computed at. */
   pace: number,
 ): { fileName: string; content: string } {
-  const name = `${commonText[language].gpxTrackName} · ${formatDistance(route.distance, language)}`;
+  const laps = route.laps !== undefined && route.laps > 1 ? routesText[language].laps(route.laps) : '';
+  const name = `${commonText[language].gpxTrackName} · ${formatDistance(route.distance, language)}${laps ? ` · ${laps}` : ''}`;
   const minutes = Math.round(route.estimatedDuration);
   const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
-  const points = simplify(route.geometry, MAX_GPX_POINTS).map(trackPoint).join('\n');
+  // The heights are why the track goes on a watch: a repeated climb must not flatten when the points are cut.
+  const repeated = route.laps !== undefined && route.laps > 1;
+  const points = simplify(route.geometry, MAX_GPX_POINTS, repeated).map(trackPoint).join('\n');
   const climb = route.elevationGain === undefined ? [] : [`+${formatHeight(route.elevationGain, language)}`];
-  const description = `${[...climb, duration].join(' · ')} (${formatPace(pace, paceUnit, language)})`;
+  const lap =
+    route.laps !== undefined && route.laps > 1
+      ? routesText[language].lapOf(route.laps, formatDistance(route.distance / route.laps, language))
+      : undefined;
+  const description = `${[...climb, duration, ...(lap ? [lap] : [])].join(' · ')} (${formatPace(pace, paceUnit, language)})`;
   const waypointPoints = waypointsOnRoute(route.geometry, waypoints, route.reversed)
     .map(({ number, position: [lon, lat], height }) => {
       const poi = waypointPoiAt(waypointPois, waypoints[number - 1]!);
@@ -130,8 +139,8 @@ function trackPoint([lon, lat, ele]: [number, number, number?]): string {
   return `<trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${height}</trkpt>`;
 }
 
-/** Such as "Running-12km_340m-20260928120000". */
-function fileName({ distance, elevationGain }: GpxRoute, exportedAt: Date): string {
+/** Such as "Running-12km_340m-x5-20260928120000". */
+function fileName({ distance, elevationGain, laps }: GpxRoute, exportedAt: Date): string {
   // The device's local time, as the user reads it on their watch.
   const pad = (n: number) => `${n}`.padStart(2, '0');
   const [date, time] = [
@@ -140,7 +149,8 @@ function fileName({ distance, elevationGain }: GpxRoute, exportedAt: Date): stri
   ];
   const length = `${Math.round(distance)}km`;
   const climb = elevationGain === undefined ? '' : `_${Math.round(elevationGain)}m`;
-  return `${TRAVEL_MODE.label}-${length}${climb}-${date}${time}`;
+  const repeated = laps !== undefined && laps > 1 ? `-x${laps}` : '';
+  return `${TRAVEL_MODE.label}-${length}${climb}${repeated}-${date}${time}`;
 }
 
 /** Douglas–Peucker, with a tolerance doubled from 1 m until at most `max` points are left. */

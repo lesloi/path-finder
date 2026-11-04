@@ -67,7 +67,7 @@ func TestRouteSetMatchesTheWebAppsSample(t *testing.T) {
 	routes := []Route{
 		{
 			Geometry: [][]float64{{6.1294, 45.8992, 450.5}, {6.13, 45.9, 455}}, Distance: 10.2,
-			ElevationGain: &gain, ElevationLoss: &loss, EstimatedDuration: 62, Kind: "match",
+			ElevationGain: &gain, ElevationLoss: &loss, EstimatedDuration: 62, Kind: "match", Laps: 5,
 			UnpavedShare: 0.4, Technical: true,
 			Surfaces:           []SurfaceStretch{{"paved", 0, 6.12}, {"unpaved", 6.12, 10.2}},
 			TechnicalStretches: []TechnicalStretch{{4.5, 7.8}},
