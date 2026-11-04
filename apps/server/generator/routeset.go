@@ -28,6 +28,11 @@ var (
 	suggestionTolerance = tolerance{0.25, 0.5, 100}
 	// wideTolerance only fills a set that suggestions leave short of minRoutes. Not measured yet.
 	wideTolerance = tolerance{0.35, 0.75, 150}
+	// gainRankWeight is how many times the elevation gain's relative gap counts against the distance's in the
+	// ranking of a route. A user who sets a gain cares more about it than about a kilometre: on a low-relief
+	// 16 km / +500 m request, a weight of 3 puts the closer 306 m at 18.8 km ahead of the shorter 263 m at 15.9 km
+	// (margin 0.09); a weight of 2 left them 0.009 apart, inside the retrace and surface noise.
+	gainRankWeight = 3.0
 )
 
 // tier is how far a route is from a criterion: a match, a suggestion, a wide suggestion, or out of reach.
@@ -201,7 +206,11 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 			}
 		}
 		worst = max(worst, r.tier)
-		score += r.relative
+		weight := 1.0
+		if i > 0 && c.ElevationGain != nil && c.ElevationGain.Shortcut == "" {
+			weight = gainRankWeight
+		}
+		score += weight * r.relative
 	}
 	visits := cellsAlong(cand.geometry, c.Start, radius)
 	score += surfaceMismatch(c.Surface, cand.unpavedShare)

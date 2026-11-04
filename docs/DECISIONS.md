@@ -173,6 +173,18 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   a synthetic square with a 150 m summit 200 m off, a 16 km/0 m loop becomes 16.4 km/+150 m; on a low-relief start,
   the repaired candidate gains about 60 m per summit but the ranking kept the shorter original, and the 25 Bosses
   17.8 km/+512 m is over the band and is not repaired: it stays a suggestion with the closest gain.
+- **A suggestion ranks the elevation gain three times the distance.** The user who sets a gain cares more about it
+  than about a kilometre, and the set was showing the shortest suggestion first with a gain far from the target. The
+  weight is 3, the smallest that clears the noise in both measured directions: 306 m at 18.8 km ranks 0.09 ahead of
+  263 m at 15.9 km (a weight of 2 left 0.009, inside the retrace and surface noise), while 283 m at 19.9 km stays
+  behind 271 m at 16.0 km, because 12 m do not buy 3.9 km; both pairs are pinned by tests. The retrace and surface
+  still order genuinely close candidates, a retrace difference of about a tenth reorders, and the weight is for a
+  numeric gain only: the flat and hilly shortcut checks keep their weight, a kind of terrain and not a number. The
+  tolerances, the match and suggestion meanings, and the closest gain are unchanged; only the order in the set and
+  which suggestions fill it move, and a suggestion up to the 25 % distance tolerance can now lead a nearer one. The
+  gain counts three times the distance, not always first. The 25 Bosses match (464 m) and its 806 m suggestion
+  (512 m) keep their order. The engine's own loop score weights the distance 3 and the gain 2, the opposite; it
+  proposes and the generator selects.
 - **Avoided areas are circles that forbid the ways they touch, up to three per set of criteria.** A penalty, as the
   loop legs get for the ways of the earlier ones, would not keep a route out of a closed trail, which is what the
   user asks for. A way is forbidden when its straight line between nodes comes within the radius, so a long way

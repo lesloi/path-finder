@@ -123,6 +123,69 @@ func TestElevationGainTolerances(t *testing.T) {
 	}
 }
 
+func TestTheGainWeightHasItsLimit(t *testing.T) {
+	c := criteria(func(c *contract.Criteria) {
+		c.Target = contract.Target{Distance: 16}
+		c.ElevationGain = &contract.ElevationGain{Metres: 500}
+	})
+	nearer := compose(withDistance(19.9), withGain(ptr(283)), withHeading(120))
+	shorter := compose(withDistance(16.0), withGain(ptr(271)))
+
+	nearerEntry, ok := classify(c, nearer, 500)
+	if !ok {
+		t.Fatal("the closer gain is not classified")
+	}
+	shorterEntry, ok := classify(c, shorter, 500)
+	if !ok {
+		t.Fatal("the shorter route is not classified")
+	}
+	if shorterEntry.score >= nearerEntry.score {
+		t.Errorf("shorter score = %v, closer gain = %v: 12 m should not buy 3.9 km", shorterEntry.score, nearerEntry.score)
+	}
+}
+
+func TestTheWeightLeavesTheShortcutsAlone(t *testing.T) {
+	c := criteria(func(c *contract.Criteria) {
+		c.Target = contract.Target{Distance: 10}
+		c.ElevationGain = &contract.ElevationGain{Shortcut: "hilly"}
+	})
+	entry, ok := classify(c, compose(withGain(ptr(60))), 500)
+	if !ok {
+		t.Fatal("the hilly candidate is not classified")
+	}
+	// The hilly check's relative gap is 0.4; the distance is exact. A shortcut is a kind of terrain, not a
+	// number, so its gap is not weighted.
+	if math.Abs(entry.score-0.4) > 1e-9 {
+		t.Errorf("score = %v, want 0.4 (the hilly gap, unweighted)", entry.score)
+	}
+}
+
+func TestTheCloserGainRanksAheadOfTheDistance(t *testing.T) {
+	c := criteria(func(c *contract.Criteria) {
+		c.Target = contract.Target{Distance: 16}
+		c.ElevationGain = &contract.ElevationGain{Metres: 500}
+	})
+	nearer := compose(withDistance(18.8), withGain(ptr(306)), withHeading(120))
+	shorter := compose(withDistance(15.9), withGain(ptr(263)))
+
+	nearerEntry, ok := classify(c, nearer, 500)
+	if !ok {
+		t.Fatal("the closer gain is not classified")
+	}
+	shorterEntry, ok := classify(c, shorter, 500)
+	if !ok {
+		t.Fatal("the shorter route is not classified")
+	}
+	if nearerEntry.score >= shorterEntry.score {
+		t.Errorf("closer gain score = %v, shorter score = %v: the gain was not ranked above the distance", nearerEntry.score, shorterEntry.score)
+	}
+
+	r := build(c, nearer, shorter)
+	if len(r) != 2 || *r[0].ElevationGain != 306 {
+		t.Errorf("routes = %+v, want the closer gain first", r)
+	}
+}
+
 func TestTheRepairedTwinRanksAheadOfTheOriginal(t *testing.T) {
 	c := criteria(func(c *contract.Criteria) {
 		c.Target = contract.Target{Distance: 16}
@@ -366,10 +429,10 @@ func TestRanking(t *testing.T) {
 	c := criteria(nil)
 	r := build(c,
 		compose(withHeading(0), withDistance(10.6)),
-		compose(withHeading(120), withDistance(9.8), withGain(ptr(305))),
+		compose(withHeading(120), withDistance(9.8)),
 		compose(withHeading(240), withDistance(10.2)),
 	)
-	equal(t, distances(r), []float64{10.2, 9.8, 10.6}, "distances")
+	equal(t, distances(r), []float64{9.8, 10.2, 10.6}, "distances")
 
 	r = build(c, compose(withHeading(0), withDistance(7.6)), compose(withHeading(120), withDistance(11.2)))
 	equal(t, distances(r), []float64{11.2, 7.6}, "suggestion distances")
