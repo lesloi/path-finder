@@ -593,6 +593,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     <CriteriaFields
       start={start}
       place={place}
+      desktop={desktop}
       // Nothing to set on a desktop before there is a start point to route from.
       criteriaShown={!desktop || Boolean(start)}
       startUncovered={startUncovered}
@@ -839,7 +840,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               })!,
               language,
             )}
-            start={start && formatPosition(start, language)}
+            start={start && (place ?? formatPosition(start, language))}
             onClick={() => setLayerOpen(true)}
           />
           <BottomSheet
@@ -1002,6 +1003,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 function CriteriaFields({
   start,
   place,
+  desktop,
   criteriaShown,
   startUncovered,
   language,
@@ -1023,6 +1025,7 @@ function CriteriaFields({
 }: {
   start?: Position | undefined;
   place?: string | undefined;
+  desktop: boolean;
   criteriaShown: boolean;
   startUncovered: boolean;
   language: Language;
@@ -1048,6 +1051,7 @@ function CriteriaFields({
       <StartPointField
         start={start}
         place={place}
+        desktop={desktop}
         language={language}
         picking={picking}
         mapCenter={mapCenter}
@@ -1108,6 +1112,7 @@ type SearchStatus = 'idle' | 'failed' | 'answered';
 function StartPointField({
   start,
   place,
+  desktop,
   language,
   picking = false,
   mapCenter,
@@ -1118,6 +1123,7 @@ function StartPointField({
 }: {
   start?: Position;
   place?: string;
+  desktop: boolean;
   language: Language;
   picking?: boolean;
   /** Where the map looks, so that the nearest place comes first; absent before it loads. */
@@ -1130,7 +1136,10 @@ function StartPointField({
   children?: ReactNode;
 }) {
   const t = criteriaText[language];
-  const shown = start ? formatPosition(start, language) : '';
+  const coordinates = start ? formatPosition(start, language) : '';
+  // A phone shows the name typed when the start point came from one, where a narrow field has room for either that or
+  // the coordinates. A desktop keeps the coordinates, to copy, and names the place beside them.
+  const shown = place !== undefined && !desktop ? place : coordinates;
   const [draft, setDraft] = useState(shown);
   const [unreadable, setUnreadable] = useState(false);
   const [places, setPlaces] = useState<Place[]>([]);
@@ -1156,7 +1165,9 @@ function StartPointField({
   const listId = useId();
   const placeId = useId();
   const optionId = (index: number) => `${listId}-${index}`;
-  const describedBy = [place && placeId, picking && noteId].filter((id): id is string => Boolean(id)).join(' ');
+  const describedBy = [place && desktop && placeId, picking && noteId]
+    .filter((id): id is string => Boolean(id))
+    .join(' ');
 
   function cancel() {
     generation.current += 1;
@@ -1207,7 +1218,7 @@ function StartPointField({
 
   function accept(position: Position, found?: string) {
     cancel();
-    setDraft(formatPosition(position, language));
+    setDraft(found !== undefined && !desktop ? found : formatPosition(position, language));
     setUnreadable(false);
     setOpen(false);
     setPlaces([]);
@@ -1300,7 +1311,7 @@ function StartPointField({
             <label className="flex-none text-sm text-ink-2" htmlFor={inputId}>
               {t.startPoint}
             </label>
-            {place && (
+            {place && desktop && (
               <span className="flex min-w-0 items-baseline gap-1 text-sm text-ink-2">
                 <span aria-hidden>·</span>
                 <span id={placeId} data-testid="criteria-start-place" className="truncate">

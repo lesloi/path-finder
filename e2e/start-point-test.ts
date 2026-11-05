@@ -61,15 +61,20 @@ test.describe('the start point', () => {
     await expect(startPoint(page)).toHaveValue('45.8326° N · 6.8652° E');
   });
 
-  test('is set from an address found by its name, which stays beside the coordinates', async ({ page }) => {
+  test('is set from an address found by its name, shown as the name on a phone', async ({ page, isMobile }) => {
     await page.goto('/');
     await openCriteria(page);
 
     await startPoint(page).fill('Chamonix');
     await page.getByTestId('criteria-start-place-0').click();
 
-    await expect(startPoint(page)).toHaveValue('45.9240° N · 6.8692° E');
-    await expect(page.getByTestId('criteria-start-place')).toHaveText('Chamonix');
+    if (isMobile) {
+      await expect(startPoint(page)).toHaveValue('Chamonix');
+      await expect(page.getByTestId('criteria-start-place')).toHaveCount(0);
+    } else {
+      await expect(startPoint(page)).toHaveValue('45.9240° N · 6.8692° E');
+      await expect(page.getByTestId('criteria-start-place')).toHaveText('Chamonix');
+    }
   });
 
   test('asks the geocoder nothing for coordinates typed on the device', async ({ page }) => {

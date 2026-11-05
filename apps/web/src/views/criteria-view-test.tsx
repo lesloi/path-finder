@@ -196,6 +196,7 @@ describe('CriteriaView', () => {
       fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
       fireEvent.keyDown(field(), { key: 'Enter' });
 
+      expect(field()).toHaveValue('45.8000° N · 6.2000° E');
       expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
     });
   });
@@ -892,6 +893,35 @@ describe('CriteriaView', () => {
       await search('Chamonix');
 
       expect(screen.getByTestId('criteria-start-no-place')).toHaveTextContent(en.placeSearchFailed);
+    });
+
+    it('shows the name in the field on a phone, where the text was the input', async () => {
+      stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      await search('Chamonix');
+
+      fireEvent.click(screen.getByTestId('criteria-start-place-0'));
+
+      expect(field()).toHaveValue('Chamonix');
+      expect(screen.queryByTestId('criteria-start-place')).not.toBeInTheDocument();
+      expect(markers.at(-1)).toMatchObject({ position: [6.869242, 45.924044], shown: true });
+      expect(screen.getByTestId('criteria-bar')).toHaveTextContent('Chamonix');
+      expect(screen.getByTestId('criteria-bar')).not.toHaveTextContent('45.9240');
+    });
+
+    it('goes back to the coordinates when a phone gets coordinates instead', async () => {
+      stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      await search('Chamonix');
+      fireEvent.click(screen.getByTestId('criteria-start-place-0'));
+
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(field()).toHaveValue('45.8000° N · 6.2000° E');
+      expect(screen.getByTestId('criteria-bar')).toHaveTextContent('45.8000');
     });
 
     it('keeps the start point when an address is left without a pick', async () => {
