@@ -682,6 +682,16 @@ describe('StartPointMap', () => {
         expect(labels('route-badges')).toEqual(['14,0 km\n+340 m', '12,5 km']);
       });
 
+      it('adds the laps of a repeated route', () => {
+        renderRoutes({
+          routes: [out],
+          summaries: [{ distance: 14, elevationGain: 340, laps: 3 }],
+          language: 'fr',
+        });
+
+        expect(labels('route-badges')).toEqual(['14,0 km\n+340 m\n3 tours']);
+      });
+
       it('marks the distance along the selected route only once its detail is open', () => {
         const set = [out];
         const view = renderRoutes({ routes: set, summaries, selectedRoute: 0 });

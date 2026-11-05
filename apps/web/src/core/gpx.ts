@@ -20,6 +20,8 @@ export type GpxRoute = {
   laps?: number;
   /** Whether the route is run the other way, which changes the order its waypoints are met in. */
   reversed?: boolean | undefined;
+  /** A track the user loaded from a GPX file: its name is kept, and it is never named after the app. */
+  imported?: { name?: string } | undefined;
 };
 
 // Cycling (#131) will be a travel mode that chooses this; only running is generated for now.
@@ -64,7 +66,8 @@ export function gpxExport(
   pace: number,
 ): { fileName: string; content: string } {
   const laps = route.laps !== undefined && route.laps > 1 ? routesText[language].laps(route.laps) : '';
-  const name = `${commonText[language].gpxTrackName} · ${formatDistance(route.distance, language)}${laps ? ` · ${laps}` : ''}`;
+  const generated = `${commonText[language].gpxTrackName} · ${formatDistance(route.distance, language)}${laps ? ` · ${laps}` : ''}`;
+  const name = route.imported ? (route.imported.name ?? routesText[language].importedTrack) : generated;
   const minutes = Math.round(route.estimatedDuration);
   const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
   // The heights are why the track goes on a watch: a repeated climb must not flatten when the points are cut.
@@ -139,8 +142,9 @@ function trackPoint([lon, lat, ele]: [number, number, number?]): string {
   return `<trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${height}</trkpt>`;
 }
 
-/** Such as "Running-12km_340m-x5-20260928120000". */
-function fileName({ distance, elevationGain, laps }: GpxRoute, exportedAt: Date): string {
+/** Such as "Running-12km_340m-x5-20260928120000", or the name of the trace for an imported track. */
+function fileName(route: GpxRoute, exportedAt: Date): string {
+  const { distance, elevationGain, laps } = route;
   // The device's local time, as the user reads it on their watch.
   const pad = (n: number) => `${n}`.padStart(2, '0');
   const [date, time] = [
@@ -150,7 +154,9 @@ function fileName({ distance, elevationGain, laps }: GpxRoute, exportedAt: Date)
   const length = `${Math.round(distance)}km`;
   const climb = elevationGain === undefined ? '' : `_${Math.round(elevationGain)}m`;
   const repeated = laps !== undefined && laps > 1 ? `-x${laps}` : '';
-  return `${TRAVEL_MODE.label}-${length}${climb}${repeated}-${date}${time}`;
+  const generated = `${TRAVEL_MODE.label}-${length}${climb}${repeated}`;
+  const trace = (route.imported?.name ?? '').replace(/[\\/:*?"<>|]+/g, '-').trim() || 'trace';
+  return `${route.imported ? trace : generated}-${date}${time}`;
 }
 
 /** Douglas–Peucker, with a tolerance doubled from 1 m until at most `max` points are left. */

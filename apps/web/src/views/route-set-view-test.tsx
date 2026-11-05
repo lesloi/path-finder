@@ -360,8 +360,14 @@ describe('RouteSetView', () => {
     render(<View list={[route({ laps: 3 })]} />);
 
     const marker = screen.getByTestId('routes-row-0-laps');
-    expect(marker).toHaveTextContent('×3');
+    expect(marker).toHaveTextContent('3 laps');
     expect(marker).toHaveAccessibleName('3 laps of 4.1 km');
+  });
+
+  it('says the laps in the language of the settings', () => {
+    render(<View language="fr" list={[route({ laps: 3 })]} />);
+
+    expect(screen.getByTestId('routes-row-0-laps')).toHaveTextContent('3 tours');
   });
 
   it('says nothing of laps for a loop run once', () => {
@@ -587,7 +593,7 @@ describe('RouteSetView', () => {
         const [{ files }] = share.mock.calls[0] as unknown as [ShareData];
         expect(files![0].name).toMatch(/^Running-12km_340m-x3-\d{14}\.gpx$/);
         const gpx = await files![0].text();
-        expect(gpx).toContain('· ×3');
+        expect(gpx).toContain('· 3 laps');
         expect(gpx).toContain('3 laps of 4.1 km');
       });
     });

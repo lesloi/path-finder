@@ -107,6 +107,16 @@ describe('gpxExport', () => {
     expect(gpxExport(route, DAY, french, PACE).fileName).toBe('Running-12km_340m-20260928120000.gpx');
   });
 
+  it('names an imported track after itself, or as a trace when it has no name', () => {
+    const named = gpxExport({ ...route, imported: { name: 'Sunday loop' } }, DAY, french, PACE);
+    expect(parse(named.content).querySelector('trk > name')?.textContent).toBe('Sunday loop');
+    expect(named.fileName).toBe('Sunday loop-20260928120000.gpx');
+
+    const unnamed = gpxExport({ ...route, imported: {} }, DAY, french, PACE);
+    expect(parse(unnamed.content).querySelector('trk > name')?.textContent).toBe('Trace importée');
+    expect(unnamed.fileName).toBe('trace-20260928120000.gpx');
+  });
+
   it('keeps a peak on every lap when the track is simplified', () => {
     // Three laps of a straight line, each with a sharp peak in the middle, over the point cap.
     const track = Array.from({ length: 3_000 }, (_, k): [number, number, number] => {
@@ -127,7 +137,7 @@ describe('gpxExport', () => {
     const { fileName, content } = gpxExport({ ...route, laps: 3 }, DAY, french, PACE);
     const gpx = parse(content);
 
-    expect(gpx.querySelector('trk > name')?.textContent).toBe('Itinéraire · 12,3 km · ×3');
+    expect(gpx.querySelector('trk > name')?.textContent).toBe('Itinéraire · 12,3 km · 3 tours');
     expect(gpx.querySelector('trk > desc')?.textContent).toContain('3 tours de 4,1 km');
     expect(fileName).toBe('Running-12km_340m-x3-20260928120000.gpx');
   });
