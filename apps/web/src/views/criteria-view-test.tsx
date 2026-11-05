@@ -40,6 +40,28 @@ function stubFetch(routeSets: (...args: never[]) => Promise<Response>) {
   );
 }
 
+// Two places as the Géoplateforme names them, for the start point field.
+const chamonix = {
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates: [6.869242, 45.924044] },
+  properties: { label: 'Chamonix 74400 Chamonix-Mont-Blanc', name: 'Chamonix', context: '74, Haute-Savoie' },
+};
+const chamonixSud = {
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates: [6.88, 45.91] },
+  properties: { label: 'Chamonix Sud 74400 Chamonix-Mont-Blanc', name: 'Chamonix Sud', context: '74, Haute-Savoie' },
+};
+const places = (...features: unknown[]) => ({ type: 'FeatureCollection', features });
+
+// The geocoding service, which most tests never ask: any other request is refused, as for the coverage.
+function stubGeocoder(answer: () => Promise<Response>) {
+  const geocoder = vi.fn<(url: string) => Promise<Response>>(answer);
+  vi.stubGlobal('fetch', (url: string) =>
+    url.startsWith('https://data.geopf.fr/geocodage/search') ? geocoder(url) : Promise.reject(new Error('No coverage')),
+  );
+  return geocoder;
+}
+
 // The map's code loads once, then every render has it at once, as in a session that has opened the map.
 beforeAll(async () => {
   const { unmount } = render(<LazyStartPointMap onStartChange={vi.fn()} />);
@@ -174,6 +196,7 @@ describe('CriteriaView', () => {
       fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
       fireEvent.keyDown(field(), { key: 'Enter' });
 
+      expect(field()).toHaveValue('45.8000° N · 6.2000° E');
       expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
     });
   });
@@ -701,11 +724,11 @@ describe('CriteriaView', () => {
       expect(field()).toHaveValue('45.8000° N · 6.2000° E');
     });
 
-    it('says in a toast when typed coordinates cannot be read, and keeps the start point', () => {
+    it('says in a toast when a body of coordinates cannot be read, and keeps the start point', () => {
       onDesktop();
       render(<CriteriaView language="en" />);
 
-      fireEvent.change(field(), { target: { value: 'Paris' } });
+      fireEvent.change(field(), { target: { value: '45, 200' } });
       fireEvent.blur(field());
 
       expect(field()).toHaveAttribute('aria-invalid', 'true');
@@ -717,7 +740,7 @@ describe('CriteriaView', () => {
       vi.useFakeTimers();
       onDesktop();
       render(<CriteriaView language="en" />);
-      fireEvent.change(field(), { target: { value: 'Paris' } });
+      fireEvent.change(field(), { target: { value: '45, 200' } });
       fireEvent.keyDown(field(), { key: 'Enter' });
       act(() => vi.advanceTimersByTime(5_000));
 
@@ -745,6 +768,190 @@ describe('CriteriaView', () => {
 
       expect(screen.getByTestId('criteria-title')).toHaveTextContent('Path finder');
       expect(screen.queryByTestId('criteria-sheet')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('the place search', () => {
+    const search = async (text: string) => {
+      fireEvent.change(field(), { target: { value: text } });
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+    };
+
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('sets the start point from a place found by its name, and keeps the name', async () => {
+      onDesktop();
+      const geocoder = stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+
+      expect(field()).toHaveAttribute('role', 'combobox');
+      expect(field()).toHaveAccessibleName(en.startPoint);
+      await search('Chamonix');
+
+      expect(field()).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('listbox')).toHaveAccessibleName(en.placeResults);
+      expect(screen.getByTestId('criteria-start-place-0')).toHaveTextContent('Chamonix');
+      const url = new URL(geocoder.mock.calls[0]![0]);
+      expect(url.searchParams.get('q')).toBe('Chamonix');
+      // The map centre comes with the query, so that the place nearest the view comes first.
+      expect(url.searchParams.get('lat')).toBe('45');
+      expect(url.searchParams.get('lon')).toBe('6');
+
+      fireEvent.click(screen.getByTestId('criteria-start-place-0'));
+
+      expect(field()).toHaveValue('45.9240° N · 6.8692° E');
+      expect(field()).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByTestId('criteria-start-place')).toHaveTextContent('Chamonix');
+      expect(markers.at(-1)).toMatchObject({ position: [6.869242, 45.924044], shown: true });
+      expect(map().easedTo).toMatchObject({ center: [6.869242, 45.924044] });
+    });
+
+    it('picks the place under the arrows with Enter', async () => {
+      onDesktop();
+      stubGeocoder(() => Promise.resolve(Response.json(places(chamonix, chamonixSud))));
+      render(<CriteriaView language="en" />);
+      await search('Chamonix');
+
+      fireEvent.keyDown(field(), { key: 'ArrowDown' });
+      expect(field()).toHaveAttribute('aria-activedescendant', screen.getByTestId('criteria-start-place-1').id);
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(field()).toHaveValue('45.9100° N · 6.8800° E');
+      expect(screen.getByTestId('criteria-start-place')).toHaveTextContent('Chamonix Sud');
+    });
+
+    it('reads coordinates on the device, and asks the geocoder nothing', async () => {
+      onDesktop();
+      const geocoder = stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+
+      await search('45.8, 6.2');
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(geocoder).not.toHaveBeenCalled();
+      expect(field()).toHaveValue('45.8000° N · 6.2000° E');
+      expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8], shown: true });
+    });
+
+    it('waits for three characters holding a letter before asking', async () => {
+      onDesktop();
+      const geocoder = stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+
+      await search('Ch');
+      await search('75002');
+
+      expect(geocoder).not.toHaveBeenCalled();
+    });
+
+    it('asks again at once when Enter comes while a search is in flight', async () => {
+      onDesktop();
+      const geocoder = stubGeocoder(() => new Promise<Response>(() => {}));
+      render(<CriteriaView language="en" />);
+      await search('Chamonix');
+
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(geocoder).toHaveBeenCalledTimes(2);
+    });
+
+    it('drops an answer older than the text', async () => {
+      onDesktop();
+      const answers: ((response: Response) => void)[] = [];
+      stubGeocoder(() => new Promise<Response>((resolve) => answers.push(resolve)));
+      render(<CriteriaView language="en" />);
+
+      await search('Chamo');
+      await search('Chamonix');
+      await act(async () => answers[0]!(Response.json(places(chamonix))));
+
+      expect(screen.queryByTestId('criteria-start-place-0')).not.toBeInTheDocument();
+
+      await act(async () => answers[1]!(Response.json(places(chamonixSud))));
+
+      expect(screen.getByTestId('criteria-start-place-0')).toHaveTextContent('Chamonix Sud');
+    });
+
+    it('says when no place matches', async () => {
+      onDesktop();
+      stubGeocoder(() => Promise.resolve(Response.json(places())));
+      render(<CriteriaView language="en" />);
+
+      await search('Chamonix');
+
+      expect(screen.getByTestId('criteria-start-no-place')).toHaveTextContent(en.noPlace);
+    });
+
+    it('says when the search failed', async () => {
+      onDesktop();
+      stubGeocoder(() => Promise.reject(new Error('No network')));
+      render(<CriteriaView language="en" />);
+
+      await search('Chamonix');
+
+      expect(screen.getByTestId('criteria-start-no-place')).toHaveTextContent(en.placeSearchFailed);
+    });
+
+    it('shows the name in the field on a phone, where the text was the input', async () => {
+      stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      await search('Chamonix');
+
+      fireEvent.click(screen.getByTestId('criteria-start-place-0'));
+
+      expect(field()).toHaveValue('Chamonix');
+      expect(screen.queryByTestId('criteria-start-place')).not.toBeInTheDocument();
+      expect(markers.at(-1)).toMatchObject({ position: [6.869242, 45.924044], shown: true });
+      expect(screen.getByTestId('criteria-bar')).toHaveTextContent('Chamonix');
+      expect(screen.getByTestId('criteria-bar')).not.toHaveTextContent('45.9240');
+    });
+
+    it('goes back to the coordinates when a phone gets coordinates instead', async () => {
+      stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      await search('Chamonix');
+      fireEvent.click(screen.getByTestId('criteria-start-place-0'));
+
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+
+      expect(field()).toHaveValue('45.8000° N · 6.2000° E');
+      expect(screen.getByTestId('criteria-bar')).toHaveTextContent('45.8000');
+    });
+
+    it('keeps the start point when an address is left without a pick', async () => {
+      onDesktop();
+      stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+      setStartPoint();
+      await search('Chamonix');
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+
+      fireEvent.blur(field());
+
+      expect(field()).toHaveValue('45.8000° N · 6.2000° E');
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('criteria-start-place')).not.toBeInTheDocument();
+      expect(markers.at(-1)).toMatchObject({ position: [6.2, 45.8] });
+    });
+
+    it('forgets the place name when the start point comes from the map', async () => {
+      onDesktop();
+      stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+      await search('Chamonix');
+      fireEvent.click(screen.getByTestId('criteria-start-place-0'));
+
+      fireEvent.click(screen.getByTestId('criteria-start-pick'));
+      act(() => map().fire('click', { lngLat: { lng: 6.2, lat: 45.8 } }));
+
+      expect(screen.queryByTestId('criteria-start-place')).not.toBeInTheDocument();
+      expect(field()).toHaveValue('45.8000° N · 6.2000° E');
     });
   });
 
