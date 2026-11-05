@@ -16,7 +16,10 @@ describe.each(languages)('legal pages in %s', (language) => {
     expect(screen.getByTestId('credits-page-odbl')).toHaveAttribute('href', LINKS.odbl);
     expect(screen.getByTestId('credits-page')).toHaveTextContent(/Plan IGN/);
     expect(screen.getByTestId('credits-page')).toHaveTextContent(/BD ALTI/);
-    expect(screen.getByTestId('credits-page-licence')).toHaveAttribute('href', LINKS.licence);
+    expect(screen.getByTestId('credits-page')).toHaveTextContent(/Base Adresse Nationale/);
+    for (const licence of screen.getAllByTestId('credits-page-licence')) {
+      expect(licence).toHaveAttribute('href', LINKS.licence);
+    }
     expect(screen.getByTestId('credits-page-source')).toHaveAttribute('href', LINKS.source);
     expect(screen.getByTestId('credits-page-agpl')).toBeInTheDocument();
   });
@@ -87,7 +90,7 @@ describe.each(languages)('legal pages in %s', (language) => {
     render(<PrivacyPolicyPage language={language} />);
 
     expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(
-      { en: 'Last updated: 28 September 2026.', fr: 'Dernière mise à jour : 28 septembre 2026.' }[language],
+      { en: 'Last updated: 5 November 2026.', fr: 'Dernière mise à jour : 5 novembre 2026.' }[language],
     );
   });
 });

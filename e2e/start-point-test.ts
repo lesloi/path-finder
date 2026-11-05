@@ -61,6 +61,37 @@ test.describe('the start point', () => {
     await expect(startPoint(page)).toHaveValue('45.8326° N · 6.8652° E');
   });
 
+  test('is set from an address found by its name, shown as the name on a phone', async ({ page, isMobile }) => {
+    await page.goto('/');
+    await openCriteria(page);
+
+    await startPoint(page).fill('Chamonix');
+    await page.getByTestId('criteria-start-place-0').click();
+
+    if (isMobile) {
+      await expect(startPoint(page)).toHaveValue('Chamonix');
+      await expect(page.getByTestId('criteria-start-place')).toHaveCount(0);
+    } else {
+      await expect(startPoint(page)).toHaveValue('45.9240° N · 6.8692° E');
+      await expect(page.getByTestId('criteria-start-place')).toHaveText('Chamonix');
+    }
+  });
+
+  test('asks the geocoder nothing for coordinates typed on the device', async ({ page }) => {
+    const searches: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().startsWith('https://data.geopf.fr/geocodage/')) searches.push(request.url());
+    });
+    await page.goto('/');
+    await openCriteria(page);
+
+    await startPoint(page).fill('45.8326, 6.8652');
+    await startPoint(page).press('Enter');
+
+    await expect(startPoint(page)).toHaveValue('45.8326° N · 6.8652° E');
+    expect(searches).toEqual([]);
+  });
+
   test('falls back to the map when the location is denied', async ({ page }) => {
     // Without a granted permission, headless Chromium dismisses the prompt: the location is denied.
     await page.goto('/');

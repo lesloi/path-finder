@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [6.869242, 45.924044] },
+      "properties": {
+        "label": "Chamonix 74400 Chamonix-Mont-Blanc",
+        "score": 0.9484845454545454,
+        "type": "locality",
+        "name": "Chamonix",
+        "postcode": "74400",
+        "citycode": "74056",
+        "city": "Chamonix-Mont-Blanc",
+        "context": "74, Haute-Savoie, Auvergne-Rhône-Alpes"
+      }
+    }
+  ],
+  "query": "Chamonix"
+}

@@ -17,6 +17,19 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
 - **Points of interest are static tiles** (grid at zoom 10) built from our own OSM extract. A tile
   reveals only a ~30 km area and is cacheable; a `bbox` endpoint or Overpass would reveal exactly what
   the user looks at.
+- **The start point is searched by address or place name through the IGN Géoplateforme.**
+  `data.geopf.fr/geocodage/search` answers addresses (BAN), towns and places (BD TOPO), which a point
+  picked on the map cannot name. The browser asks it directly: it is the same host as the tiles,
+  already the only third party, so the CSP and the end-to-end guard need no other. What someone types
+  is a place they care about, so the privacy policy names it beside the viewed area, the request
+  carries the map centre (only the area IGN already sees), and the label stays in memory. Coordinates
+  are read on the device and never sent, as is any text that reads as one. Each client address keeps
+  its own 50 requests per second, which a server proxy would share. A self-hosted index from our
+  extract would keep the text on the device but holds few addresses: OSM carries some house numbers,
+  unevenly, where the BAN names every one; serving the BAN whole needs a stateful database beside a
+  binary that has none. Revisit if the service closes, moves behind a key, or if a start point outside
+  France matters: IGN geocodes metropolitan France and the overseas departments only, where a graph
+  built elsewhere would have no places.
 
 ## Backend
 
