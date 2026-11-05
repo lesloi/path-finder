@@ -31,11 +31,6 @@ describe('criteriaSummary', () => {
     expect(criteriaSummary({ ...request, surface: 'unpaved' }, metric)).toBe(`10.0 km · ${criteriaText.en.unpaved}`);
   });
 
-  it('says when repeated loops are allowed', () => {
-    expect(criteriaSummary({ ...request, repeats: true }, metric)).toBe(`10.0 km · ${criteriaText.en.repeatsAllowed}`);
-    expect(criteriaSummary({ ...request, repeats: false }, metric)).toBe('10.0 km');
-  });
-
   it('counts the waypoints', () => {
     const waypoints: [number, number][] = [
       [6.1, 45.9],

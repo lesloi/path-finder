@@ -21,6 +21,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
 
@@ -51,9 +52,12 @@ import {
   maxRadiusAround,
   formatPosition,
   isCovered,
+  isPlaceQuery,
   parsePosition,
   reverseRoute,
   routesAtPace,
+  searchPlaces,
+  type Place,
   type Position,
   type RouteSetRequest,
   kmBetween,
@@ -235,6 +239,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Kept here: the form is mounted in the column or in the sheet, whichever the screen shows.
   const draft = useCriteriaDraft();
   const [start, setStart] = useState<Position>();
+  // The name of the place the start point was found from, if it was: shown beside the coordinates, kept here for this
+  // visit only, and dropped as soon as the start point comes from anywhere else.
+  const [place, setPlace] = useState<string>();
   const [locating, setLocating] = useState(false);
   const locateTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Where the server can route; unknown until it says, or if it cannot: then the server's own refusal stands.
@@ -447,10 +454,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     setWaypoints(moved);
   }
 
-  function changeStart(position: Position) {
+  function changeStart(position: Position, place?: string) {
     // Routes from another start point would be stale.
     if (start && (start[0] !== position[0] || start[1] !== position[1])) browser.drop();
     setStart(position);
+    // The name always comes from this call: a start point set anywhere but by a search has none, and clears it.
+    setPlace(place);
     setMode((current) => (current === 'pick' ? undefined : current));
   }
 
@@ -458,6 +467,12 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   function moveStart(position: Position) {
     setFocus(position);
     changeStart(position);
+  }
+
+  // A place found by its name moves the map there too, and its name stays beside the coordinates.
+  function changePlace(position: Position, place: string) {
+    setFocus(position);
+    changeStart(position, place);
   }
 
   // The track is read here, in the browser: the file goes nowhere. It is shown as a route set of one, whose request
@@ -577,6 +592,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const criteriaFields = (
     <CriteriaFields
       start={start}
+      place={place}
+      desktop={desktop}
       // Nothing to set on a desktop before there is a start point to route from.
       criteriaShown={!desktop || Boolean(start)}
       startUncovered={startUncovered}
@@ -616,6 +633,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         ) : undefined
       }
       onStartChange={moveStart}
+      onPlaceChange={changePlace}
+      mapCenter={() => map.current?.center()}
       onUnreadable={() => warn('unreadable')}
       onPick={() => {
         setMode(picking ? undefined : 'pick');
@@ -821,7 +840,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               })!,
               language,
             )}
-            start={start && formatPosition(start, language)}
+            start={start && (place ?? formatPosition(start, language))}
             onClick={() => setLayerOpen(true)}
           />
           <BottomSheet
@@ -983,6 +1002,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 // The start point and the criteria, in the left column of a desktop or in the layer of a phone.
 function CriteriaFields({
   start,
+  place,
+  desktop,
   criteriaShown,
   startUncovered,
   language,
@@ -994,6 +1015,8 @@ function CriteriaFields({
   waypointList,
   avoidedList,
   onStartChange,
+  onPlaceChange,
+  mapCenter,
   onUnreadable,
   onPick,
   locating,
@@ -1001,6 +1024,8 @@ function CriteriaFields({
   onSubmit,
 }: {
   start?: Position | undefined;
+  place?: string | undefined;
+  desktop: boolean;
   criteriaShown: boolean;
   startUncovered: boolean;
   language: Language;
@@ -1012,6 +1037,8 @@ function CriteriaFields({
   waypointList: ReactNode;
   avoidedList: ReactNode;
   onStartChange: (start: Position) => void;
+  onPlaceChange: (start: Position, place: string) => void;
+  mapCenter: () => Position | undefined;
   onUnreadable: () => void;
   onPick: () => void;
   locating: boolean;
@@ -1023,9 +1050,13 @@ function CriteriaFields({
     <>
       <StartPointField
         start={start}
+        place={place}
+        desktop={desktop}
         language={language}
         picking={picking}
+        mapCenter={mapCenter}
         onStartChange={onStartChange}
+        onPlaceChange={onPlaceChange}
         onUnreadable={onUnreadable}
       >
         <button
@@ -1071,60 +1102,203 @@ function CriteriaFields({
   );
 }
 
-// The start point as coordinates, to copy, or to type or paste to set it. Only coordinates:
-// naming the place would send it to a geocoding service.
+// How long typing pauses before the geocoder is asked: every keystroke would send a prefix, and a pause settles it.
+const PLACE_SEARCH_DELAY = 250;
+
+type SearchStatus = 'idle' | 'failed' | 'answered';
+
+// The start point as coordinates, to copy, or to type or paste to set it; or an address or place name, which the
+// Géoplateforme turns into coordinates. Coordinates are read here and never sent: they are not a search.
 function StartPointField({
   start,
+  place,
+  desktop,
   language,
   picking = false,
+  mapCenter,
   onStartChange,
+  onPlaceChange,
   onUnreadable,
   children,
 }: {
   start?: Position;
+  place?: string;
+  desktop: boolean;
   language: Language;
   picking?: boolean;
+  /** Where the map looks, so that the nearest place comes first; absent before it loads. */
+  mapCenter?: () => Position | undefined;
   onStartChange: (start: Position) => void;
+  onPlaceChange: (start: Position, place: string) => void;
   /** Coordinates that cannot be read were typed: the view says so in a toast. */
   onUnreadable: () => void;
   /** Buttons at the end of the field. */
   children?: ReactNode;
 }) {
   const t = criteriaText[language];
-  const shown = start ? formatPosition(start, language) : '';
+  const coordinates = start ? formatPosition(start, language) : '';
+  // A phone shows the name typed when the start point came from one, where a narrow field has room for either that or
+  // the coordinates. A desktop keeps the coordinates, to copy, and names the place beside them.
+  const shown = place !== undefined && !desktop ? place : coordinates;
   const [draft, setDraft] = useState(shown);
   const [unreadable, setUnreadable] = useState(false);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const [status, setStatus] = useState<SearchStatus>('idle');
   const [shownBefore, setShownBefore] = useState(shown);
-  // A new start point, from the map or the location, replaces what is typed.
+  // The search the field is on: an answer older than the last change of text, or a closing list, is dropped.
+  const generation = useRef(0);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const request = useRef<AbortController | undefined>(undefined);
+  // A new start point, from the map, the location or a place, replaces what is typed and closes the list.
   if (shown !== shownBefore) {
     setShownBefore(shown);
     setDraft(shown);
     setUnreadable(false);
+    setOpen(false);
+    setPlaces([]);
+    setStatus('idle');
   }
   const inputId = useId();
   const noteId = useId();
+  const listId = useId();
+  const placeId = useId();
+  const optionId = (index: number) => `${listId}-${index}`;
+  const describedBy = [place && desktop && placeId, picking && noteId]
+    .filter((id): id is string => Boolean(id))
+    .join(' ');
 
-  function reset() {
-    setDraft(shown);
-    setUnreadable(false);
+  function cancel() {
+    generation.current += 1;
+    clearTimeout(timer.current);
+    request.current?.abort();
   }
 
-  function commit() {
-    // Enter then a blur would say it twice.
-    if (unreadable) return;
-    if (draft.trim() === '' || draft === shown) return reset();
-    const position = parsePosition(draft);
-    if (!position) {
+  // Gone with the field: its answer has no one left to reach.
+  useEffect(
+    () => () => {
+      generation.current += 1;
+      clearTimeout(timer.current);
+      request.current?.abort();
+    },
+    [],
+  );
+
+  function reset() {
+    cancel();
+    setDraft(shown);
+    setUnreadable(false);
+    setOpen(false);
+    setPlaces([]);
+    setStatus('idle');
+  }
+
+  function close() {
+    cancel();
+    setOpen(false);
+    setPlaces([]);
+    setStatus('idle');
+  }
+
+  async function lookup(text: string) {
+    const token = ++generation.current;
+    clearTimeout(timer.current);
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    const found = await searchPlaces(text, { signal: controller.signal, near: mapCenter?.() });
+    // Another request replaced this one, or the list was closed: its answer is stale.
+    if (generation.current !== token) return;
+    setStatus(found === undefined ? 'failed' : 'answered');
+    setPlaces(found ?? []);
+    setActive(0);
+    setOpen(true);
+  }
+
+  function accept(position: Position, found?: string) {
+    cancel();
+    setDraft(found !== undefined && !desktop ? found : formatPosition(position, language));
+    setUnreadable(false);
+    setOpen(false);
+    setPlaces([]);
+    setStatus('idle');
+    if (found === undefined) onStartChange(position);
+    else onPlaceChange(position, found);
+  }
+
+  function change(value: string) {
+    setDraft(value);
+    setUnreadable(false);
+    setOpen(false);
+    setPlaces([]);
+    setStatus('idle');
+    cancel();
+    const text = value.trim();
+    if (isPlaceQuery(text)) timer.current = setTimeout(() => void lookup(text), PLACE_SEARCH_DELAY);
+  }
+
+  // Enter picks the place under the arrows, searches, or reads coordinates; a blur only sets what it can read.
+  function submit() {
+    const text = draft.trim();
+    if (text === '' || text === shown) return reset();
+    if (open) {
+      if (places.length > 0) accept(places[active]!.position, places[active]!.label);
+      return;
+    }
+    if (!isPlaceQuery(text)) {
+      const position = parsePosition(text);
+      if (position) return accept(position);
       setUnreadable(true);
       return onUnreadable();
     }
-    // Written back the usual way, even when it is the start point already.
-    setDraft(formatPosition(position, language));
-    onStartChange(position);
+    void lookup(text);
+  }
+
+  function commit() {
+    // Enter already said it cannot be read, and a blur would say it twice.
+    if (unreadable) return;
+    cancel();
+    const text = draft.trim();
+    if (text === '' || text === shown) return reset();
+    if (!isPlaceQuery(text)) {
+      const position = parsePosition(text);
+      if (position) return accept(position);
+      setUnreadable(true);
+      return onUnreadable();
+    }
+    // An address left without a pick was only a search.
+    reset();
+  }
+
+  function keyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      return submit();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      return open ? close() : reset();
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!open) {
+        if (places.length > 0) setOpen(true);
+        return;
+      }
+      if (places.length === 0) return;
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      setActive((current) => Math.min(Math.max(current + step, 0), places.length - 1));
+      return;
+    }
+    if (open && (event.key === 'Home' || event.key === 'End')) {
+      event.preventDefault();
+      if (places.length > 0) setActive(event.key === 'Home' ? 0 : places.length - 1);
+    }
   }
 
   return (
-    <div>
+    <div className="relative">
       <div
         className={
           'flex items-center gap-1 rounded-md bg-surface-2 pr-1 focus-within:ring-2 focus-within:ring-accent ' +
@@ -1133,34 +1307,85 @@ function StartPointField({
       >
         <span className="ml-3 size-4 flex-none rounded-full border-4 border-start bg-white" />
         <div className="flex min-h-14 min-w-0 flex-1 flex-col justify-center px-3 py-2">
-          <label className="text-sm text-ink-2" htmlFor={inputId}>
-            {t.startPoint}
-          </label>
+          <div className="flex min-w-0 items-baseline gap-1">
+            <label className="flex-none text-sm text-ink-2" htmlFor={inputId}>
+              {t.startPoint}
+            </label>
+            {place && desktop && (
+              <span className="flex min-w-0 items-baseline gap-1 text-sm text-ink-2">
+                <span aria-hidden>·</span>
+                <span id={placeId} data-testid="criteria-start-place" className="truncate">
+                  {place}
+                </span>
+              </span>
+            )}
+          </div>
           <input
             id={inputId}
             data-testid="criteria-start"
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            aria-activedescendant={open && places.length > 0 ? optionId(active) : undefined}
+            aria-describedby={describedBy === '' ? undefined : describedBy}
             className="w-full bg-transparent outline-none placeholder:text-ink-2"
             value={draft}
-            placeholder={t.coordinates}
+            placeholder={t.startPlaceholder}
             autoComplete="off"
             spellCheck={false}
             aria-invalid={unreadable}
-            {...(picking && { 'aria-describedby': noteId })}
-            onChange={(event) => {
-              setDraft(event.target.value);
-              setUnreadable(false);
-            }}
+            onChange={(event) => change(event.target.value)}
             // Selected at once, to copy or to replace.
             onFocus={(event) => event.target.select()}
             onBlur={commit}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') commit();
-              if (event.key === 'Escape') reset();
-            }}
+            onKeyDown={keyDown}
           />
         </div>
         {children}
       </div>
+      {open && (
+        <ul
+          id={listId}
+          role="listbox"
+          aria-label={t.placeResults}
+          className={
+            'absolute top-full right-0 left-0 z-20 mt-1 max-h-80 overflow-y-auto rounded-lg border border-border ' +
+            'bg-surface p-2 shadow-float'
+          }
+        >
+          {places.length === 0 ? (
+            <li role="presentation" data-testid="criteria-start-no-place" className="px-3 py-2 text-sm text-ink-2">
+              {status === 'failed' ? t.placeSearchFailed : t.noPlace}
+            </li>
+          ) : (
+            places.map((option, index) => (
+              <li
+                key={`${option.position[0]},${option.position[1]},${index}`}
+                id={optionId(index)}
+                role="option"
+                aria-selected={index === active}
+                data-testid={`criteria-start-place-${index}`}
+                // The input keeps the focus: a click on an option must not blur it, which would close the list first.
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseMove={() => setActive(index)}
+                onClick={() => accept(option.position, option.label)}
+                className={
+                  'flex min-h-touch cursor-pointer flex-col justify-center rounded-md px-3 py-1.5 ' +
+                  (index === active ? 'bg-surface-2' : '')
+                }
+              >
+                <span className="truncate text-sm font-medium text-ink">{option.label}</span>
+                {option.context && <span className="truncate text-xs text-ink-2">{option.context}</span>}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+      <p role="status" data-testid="criteria-start-status" className="sr-only">
+        {open &&
+          (places.length > 0 ? t.placeCount(places.length) : status === 'failed' ? t.placeSearchFailed : t.noPlace)}
+      </p>
       {picking && (
         <p id={noteId} data-testid="criteria-pick-note" className="mt-1 px-3 text-sm text-ink-2">
           {t.clickMap}
