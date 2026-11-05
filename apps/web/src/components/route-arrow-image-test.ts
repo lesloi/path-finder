@@ -13,8 +13,8 @@ describe('routeArrowImage', () => {
     expect([...data.slice(tip, tip + 4)]).toEqual([255, 255, 255, 255]);
   });
 
-  it('has a shaft behind the head', () => {
-    expect(alpha(8, height / 2)).toBe(255);
+  it('is a chevron, not a dash: its legs join nowhere before the tip', () => {
+    expect(alpha(Math.round(width / 3), height / 2)).toBe(0);
   });
 
   it('is transparent in the corners', () => {
@@ -22,9 +22,9 @@ describe('routeArrowImage', () => {
     expect(alpha(width - 1, height - 1)).toBe(0);
   });
 
-  it('points right: the tip is solid where the tail ends are empty', () => {
+  it('points right: the tip is solid where its legs begin', () => {
     expect(alpha(width - 6, height / 2)).toBe(255);
-    expect(alpha(4, 2)).toBe(0);
-    expect(alpha(4, height - 3)).toBe(0);
+    expect(alpha(4, 4)).toBe(255);
+    expect(alpha(4, height - 4)).toBe(255);
   });
 });
