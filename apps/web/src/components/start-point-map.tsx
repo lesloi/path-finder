@@ -42,7 +42,7 @@ import {
   type WaypointPoi,
   veilPolygon,
 } from '../core/index.ts';
-import { commonText, criteriaText, type Language } from '../i18n/index.ts';
+import { commonText, criteriaText, routesText, type Language } from '../i18n/index.ts';
 import { requestPoiTile } from '../state/index.ts';
 import { basemapStyle, veilPaint } from './basemap-style.ts';
 import { DISTANCE_MARKER_RATIO, distanceMarkerImage } from './distance-marker-image.ts';
@@ -192,8 +192,8 @@ export type MapHandle = {
   highlightArea: (index: number | undefined) => void;
 };
 
-/** What the map writes on a route: its distance and, when known, its elevation gain. */
-export type RouteSummary = { distance: number; elevationGain?: number };
+/** What the map writes on a route: its distance, its elevation gain when known, and its laps when repeated. */
+export type RouteSummary = { distance: number; elevationGain?: number; laps?: number };
 
 // The south-west and north-east corners around some positions.
 function boundsOf(geometries: Position[][]): [Position, Position] {
@@ -1020,6 +1020,7 @@ export function StartPointMap({
           const summary = summaries?.[index];
           const label = summary ? [formatDistance(summary.distance, language)] : [];
           if (summary?.elevationGain !== undefined) label.push(`+${formatHeight(summary.elevationGain, language)}`);
+          if (summary?.laps !== undefined && summary.laps > 1) label.push(routesText[language].laps(summary.laps));
           const selected = index === selectedRoute;
           // As for the lines, with none selected every tag keeps its route's colour.
           const filled = selected || selectedRoute === undefined;

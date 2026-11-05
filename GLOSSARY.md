@@ -111,7 +111,7 @@ _Avoid_: Trace, track, itinerary, path
 
 **Route name**:
 The label of a route in its GPX export: a word, the distance and, when the route repeats its loop,
-the lap count, such as "Itinéraire · 16,2 km · ×5", in the user's language. It never names where
+the lap count, such as "Itinéraire · 16,2 km · 3 tours", in the user's language. It never names where
 the route starts.
 _Avoid_: Title
 
@@ -122,12 +122,12 @@ _Avoid_: Round trip, circuit
 
 **Lap**:
 One circuit of a repeated route, from the start point back to it. The route says how many laps it
-runs (`×5`); the repeat is explicit, never a loop that goes back over its steps without saying so.
-_Avoid_: Repeat, tour (as a shape)
+runs (`3 laps`); the repeat is explicit, never a loop that goes back over its steps without saying so.
+_Avoid_: Repeat
 
 **Repeated route**:
 A route that runs the same loop a number of times, so a small area can still give a long or hilly
-outing. The user allows repeats in the settings and the engine picks the number of laps; the
+outing. The user allows multiple laps in the settings and the engine picks their number; the
 distance and the elevation gain are those of all the laps together.
 _Avoid_: Multi-loop, circuit repeat
 
@@ -164,7 +164,7 @@ _Avoid_: Sync, upload
 The user's preferences kept on the device: pace, language (English or French,
 the browser's until the user picks one), the unit of the pace (minutes per km until the user picks km/h), the last criteria (surface preference,
 elevation gain, whether the length is a distance or a duration, and that distance and duration),
-whether the engine may repeat a loop, whether routes may take technical stretches, and which POI categories
+whether the engine may run a loop several times, whether routes may take technical stretches, and which POI categories
 the map shows. Lost if the user clears the site's data.
 _Avoid_: Profile, account
 

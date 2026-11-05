@@ -62,6 +62,15 @@ describe('SettingsView', () => {
     expect(saved().repeats).toBe(true);
   });
 
+  it.each([
+    ['fr', 'Autoriser plusieurs tours'],
+    ['en', 'Allow multiple laps'],
+  ] as const)('names the repeat setting after the laps it allows, in %s', (language, label) => {
+    renderView(language);
+
+    expect(screen.getByTestId('settings-repeats')).toHaveAccessibleName(label);
+  });
+
   it('refuses technical stretches by default, and saves the choice', () => {
     renderView();
     expect(screen.getByTestId('settings-technical-no')).toBeChecked();

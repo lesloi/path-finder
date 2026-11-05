@@ -194,7 +194,7 @@ export const legalText = {
           {
             list: [
               {
-                text: 'Itinéraires et points d’intérêt issus des données © contributeurs OpenStreetMap, disponibles sous licence {odbl}.',
+                text: 'Parcours et points d’intérêt issus des données © contributeurs OpenStreetMap, disponibles sous licence {odbl}.',
                 links: { odbl: 'ODbL' },
               },
               {
@@ -228,7 +228,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Pas de compte, pas de cookie, pas de mesure d’audience, pas de pistage. Vos réglages restent dans votre navigateur. Notre serveur calcule les itinéraires et n’en garde rien.',
+              text: 'Pas de compte, pas de cookie, pas de mesure d’audience, pas de pistage. Vos réglages restent dans votre navigateur. Notre serveur calcule les parcours et n’en garde rien.',
             },
           },
         ],
@@ -239,7 +239,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Vos réglages (allure et son unité, langue, derniers critères, calques de la carte) sont enregistrés dans le stockage de votre navigateur. Les itinéraires ne sont jamais enregistrés. Nous ne recevons ni les uns ni les autres. Effacer les données du site dans votre navigateur les supprime.',
+              text: 'Vos réglages (allure et son unité, langue, derniers critères, calques de la carte) sont enregistrés dans le stockage de votre navigateur. Les parcours ne sont jamais enregistrés. Nous ne recevons ni les uns ni les autres. Effacer les données du site dans votre navigateur les supprime.',
             },
           },
         ],
@@ -261,17 +261,17 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Quand vous demandez des itinéraires, notre serveur reçoit vos critères (coordonnées du point de départ, allure, distance ou durée visée, dénivelé, préférence de revêtement) et, comme pour toute connexion, votre adresse IP. Il s’en sert uniquement pour calculer les itinéraires et les oublie dès la réponse envoyée. Il n’écrit aucun journal contenant une position ou une adresse IP.',
+              text: 'Quand vous demandez des parcours, notre serveur reçoit vos critères (coordonnées du point de départ, allure, distance ou durée visée, dénivelé, préférence de revêtement) et, comme pour toute connexion, votre adresse IP. Il s’en sert uniquement pour calculer les parcours et les oublie dès la réponse envoyée. Il n’écrit aucun journal contenant une position ou une adresse IP.',
             },
           },
           {
             paragraph: {
-              text: 'À l’ouverture, l’application demande aussi à notre serveur dans quelles zones il peut calculer des itinéraires, pour griser les autres sur la carte. Cette requête ne contient rien sur vous : votre adresse IP, comme pour toute connexion, et aucune position.',
+              text: 'À l’ouverture, l’application demande aussi à notre serveur dans quelles zones il peut calculer des parcours, pour griser les autres sur la carte. Cette requête ne contient rien sur vous : votre adresse IP, comme pour toute connexion, et aucune position.',
             },
           },
           {
             paragraph: {
-              text: 'À partir du zoom 11, la carte demande aussi à notre serveur les tuiles des points d’intérêt (eau potable, points de vue, toilettes) de la zone affichée. Approcher le bouton d’export d’un itinéraire en fait autant pour la zone autour de l’itinéraire, afin de placer son eau potable dans le fichier GPX. Une tuile couvre environ 30 km : la requête révèle donc cette zone à notre serveur, avec votre adresse IP, comme pour toute connexion. Ces requêtes ne sont jamais journalisées.',
+              text: 'À partir du zoom 11, la carte demande aussi à notre serveur les tuiles des points d’intérêt (eau potable, points de vue, toilettes) de la zone affichée. Approcher le bouton d’export d’un parcours en fait autant pour la zone autour du parcours, afin de placer son eau potable dans le fichier GPX. Une tuile couvre environ 30 km : la requête révèle donc cette zone à notre serveur, avec votre adresse IP, comme pour toute connexion. Ces requêtes ne sont jamais journalisées.',
             },
           },
           {

@@ -220,7 +220,7 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   the shape, not a retrace, and two counts of one loop cover the same ground (only one survives). A loop through
   waypoints is repeated whole, at the count that best fits its length and the maximum, and only as one direct candidate;
   the answers for a direct loop that already overshoots stay as they were. The contract names the shape: `repeats` in the
-  criteria (the user's consent), `laps` on a route (absent for a loop run once); the route list, the detail and the GPX name, description and
+  criteria (the user's consent), `laps` on a route (absent for a loop run once); the route list, the detail, the map tag and the GPX name, description and
   file name (`-x5`) carry it. A duration target and a plain length keep the natural loops; the direct loop through
   waypoints is the exception, as the waypoints fix its length.
 

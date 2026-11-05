@@ -1519,6 +1519,22 @@ describe('CriteriaView', () => {
       expect(badges().features).toHaveLength(1);
     });
 
+    it('gives the map the laps of a repeated route', async () => {
+      onDesktop();
+      ask(answer(route(0, { laps: 3 })));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      map().project = () => ({ x: 400, y: 300 });
+      await submit();
+      await screen.findByTestId('routes-count');
+      await settle();
+      const badges = () =>
+        (map().sources['route-badges'] as unknown as { data: { features: { properties: { label: string } }[] } }).data
+          .features;
+
+      expect(badges()[0]?.properties.label).toBe('10.0 km\n+300 m\n3 laps');
+    });
+
     it('only previews the route of a row the pointer is on, on the map', async () => {
       onDesktop();
       ask(answer(route(0), route(1)));

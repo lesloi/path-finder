@@ -137,7 +137,7 @@ describe('gpxExport', () => {
     const { fileName, content } = gpxExport({ ...route, laps: 3 }, DAY, french, PACE);
     const gpx = parse(content);
 
-    expect(gpx.querySelector('trk > name')?.textContent).toBe('Itinéraire · 12,3 km · ×3');
+    expect(gpx.querySelector('trk > name')?.textContent).toBe('Itinéraire · 12,3 km · 3 tours');
     expect(gpx.querySelector('trk > desc')?.textContent).toContain('3 tours de 4,1 km');
     expect(fileName).toBe('Running-12km_340m-x3-20260928120000.gpx');
   });

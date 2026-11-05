@@ -300,7 +300,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     [routeSet, directed, pace],
   );
   const summaries = useMemo(
-    () => directed?.map(({ distance, elevationGain }) => ({ distance, elevationGain })),
+    () => directed?.map(({ distance, elevationGain, laps }) => ({ distance, elevationGain, laps })),
     [directed],
   );
   const routesShown = Boolean(routeSet);
