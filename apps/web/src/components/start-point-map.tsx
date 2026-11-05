@@ -184,6 +184,8 @@ export type MapHandle = {
   reframe: () => void;
   /** Moves the map to a position, at the zoom it has. */
   centerOn: (position: Position) => void;
+  /** Where the map looks, for a search that would rather find a place near it, or none before it loads. */
+  center: () => Position | undefined;
   /** Sets the pin of a waypoint apart, larger and in the accent colour: the one the user points at in a list. */
   highlightWaypoint: (index: number | undefined) => void;
   /** Sets the circle and the number of an avoided area apart, the one the user points at in the list. */
@@ -1118,6 +1120,10 @@ export function StartPointMap({
     // The framing below runs again.
     reframe: () => setReframes((count) => count + 1),
     centerOn: (center) => mapRef.current?.easeTo({ center }),
+    center: () => {
+      const center = mapRef.current?.getCenter();
+      return center ? [center.lng, center.lat] : undefined;
+    },
     highlightWaypoint: setHighlightedWaypoint,
     highlightArea: setHighlightedArea,
   }));

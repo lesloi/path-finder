@@ -10,6 +10,7 @@ export * from './gpx-import.ts';
 export * from './gpx-save.ts';
 export * from './pace.ts';
 export * from './page-title.ts';
+export * from './place-search.ts';
 export * from './poi.ts';
 export * from './route.ts';
 export * from './theme.ts';
