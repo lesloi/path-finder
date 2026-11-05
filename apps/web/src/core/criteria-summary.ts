@@ -4,7 +4,7 @@ import { formatDistance, formatDuration, formatHeight } from './units.ts';
 
 /** What the user asked for in a line, such as "10.0 km · Hilly · Unpaved". The start point is left out. */
 export function criteriaSummary(
-  { target, elevationGain, surface, waypoints, repeats }: RouteSetRequest,
+  { target, elevationGain, surface, waypoints }: RouteSetRequest,
   language: Language,
 ): string {
   const t = criteriaText[language];
@@ -16,7 +16,6 @@ export function criteriaSummary(
       elevationGain === 'flat' ? t.flat : elevationGain === 'hilly' ? t.hilly : formatHeight(elevationGain, language),
     );
   }
-  if (repeats === true) parts.push(t.repeatsAllowed);
   if (surface !== 'any') parts.push(t[surface]);
   if (waypoints?.length) parts.push(t.waypointCount(waypoints.length));
   return parts.join(' · ');
