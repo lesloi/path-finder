@@ -787,6 +787,7 @@ describe('CriteriaView', () => {
       render(<CriteriaView language="en" />);
 
       expect(field()).toHaveAttribute('role', 'combobox');
+      expect(field()).toHaveAccessibleName(en.startPoint);
       await search('Chamonix');
 
       expect(field()).toHaveAttribute('aria-expanded', 'true');
