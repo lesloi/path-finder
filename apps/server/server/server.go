@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"net/netip"
 	"os"
@@ -155,9 +156,17 @@ func (a *app) checkBuild(next http.Handler) http.Handler {
 	})
 }
 
-// readBody reads the request body, whole, and refuses what is not JSON. The handler then reads it from memory.
+// readBody reads the request body, whole. It refuses a body that is not JSON, and a request whose
+// Content-Type is not application/json (parameters allowed): a browser sends text/plain cross-origin
+// without a preflight, so requiring the media type is what stops a third-party page from making visitors'
+// browsers generate routes. It stays after the rate limiter, so a refused request still spends a token:
+// junk is metered rather than admitted for free. The handler then reads the body from memory.
 func readBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mediaType != "application/json" {
+			refuse(w, http.StatusBadRequest, contract.CodeInvalidJSON)
+			return
+		}
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<16))
 		// Never the error's message: a JSON syntax error quotes the body, which holds the start point.
 		if err != nil || !json.Valid(body) {

@@ -65,6 +65,7 @@ func serverOn(t *testing.T, dir string) http.Handler {
 func routeSets(t *testing.T, h http.Handler, body string) (int, []contract.Route, string) {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/route-sets", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	var answer struct {
@@ -178,7 +179,15 @@ func TestRefusals(t *testing.T) {
 	if code, _, out := routeSets(t, h, `{"start":`); code != 400 || !strings.Contains(out, "invalid-json") {
 		t.Errorf("broken JSON: %d %s", code, out)
 	}
+	plain := httptest.NewRequest(http.MethodPost, "/api/v1/route-sets", strings.NewReader(criteria(`{"distance":10}`, "")))
+	plain.Header.Set("Content-Type", "text/plain")
+	plainRec := httptest.NewRecorder()
+	h.ServeHTTP(plainRec, plain)
+	if plainRec.Code != 400 || !strings.Contains(plainRec.Body.String(), "invalid-json") {
+		t.Errorf("a text/plain body: %d %s", plainRec.Code, plainRec.Body.String())
+	}
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/route-sets", strings.NewReader(criteria(`{"distance":10}`, "")))
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Api-Version", "build-0")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
