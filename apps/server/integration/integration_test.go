@@ -401,6 +401,17 @@ func TestWaypointRefusalsNameAFieldOrANumberNeverAPosition(t *testing.T) {
 	})
 }
 
+func TestARefusedPaceIsNeverAnEmptyAnswer(t *testing.T) {
+	h := newServer(t)
+	body := strings.Replace(criteria(`{"distance":10}`, ""), `"pace":6`, `"pace":1e308`, 1)
+
+	code, _, out := routeSets(t, h, body)
+
+	if code != http.StatusBadRequest || strings.TrimSpace(out) != `{"error":"invalid-criteria","field":"pace"}` {
+		t.Errorf("status %d: %q, want a 400 naming the pace", code, out)
+	}
+}
+
 func TestRoutesKeepOutOfAnAvoidedArea(t *testing.T) {
 	// Arrange
 	h := newServer(t)

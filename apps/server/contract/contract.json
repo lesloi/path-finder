@@ -3,6 +3,7 @@
   "maxDistanceKm": 50,
   "minDistanceKm": 2,
   "durationMinutes": { "min": 15, "max": 360 },
+  "paceMinutesPerKm": { "min": 3, "max": 12 },
   "maxElevationGainMetres": 2500,
   "maxWaypoints": 5,
   "maxLaps": 10,

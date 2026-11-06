@@ -94,12 +94,23 @@ describe('useSettings', () => {
     ['a pace per activity', { run: 5.5, hike: 12 }],
     ['a pace that is not positive', 0],
     ['a pace that is not finite', null],
+    ['a pace under the bound', 2.9],
+    ['a pace over the bound', 12.1],
+    ['a pace too large to be a number', 1e308],
   ])('falls back to the default pace on %s', (_, pace) => {
     localStorage.setItem(KEY, JSON.stringify({ pace }));
 
     const { result } = renderHook(() => useSettings());
 
     expect(result.current[0].pace).toBe(6);
+  });
+
+  it.each([3, 12])('keeps a pace on the bound, %s min/km', (pace) => {
+    localStorage.setItem(KEY, JSON.stringify({ pace }));
+
+    const { result } = renderHook(() => useSettings());
+
+    expect(result.current[0].pace).toBe(pace);
   });
 
   it('keeps the repeat setting', () => {
