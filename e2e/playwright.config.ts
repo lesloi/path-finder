@@ -33,8 +33,10 @@ export default defineConfig({
       PORT: String(PORT),
       WEB_ROOT: join(import.meta.dirname, '../apps/web/dist'),
       DATA_DIR: GRAPH_DIR,
-      // Two projects run side by side: more than one generation at once must not get a 429.
-      LOOP_LIMIT: '4',
+      // A full run, and its repeats, ask for many route sets from one address: the production rate limit would refuse
+      // them. The limiter is covered by the server's tests, not here. The generation cap keeps its default, one search
+      // per CPU, which already follows the workers the runner starts.
+      RATE_LIMIT: '1000',
       // The same loops for the same criteria: what the tests find on the stand-in graph does not depend on chance.
       SEARCH_SEED: '7',
     },
