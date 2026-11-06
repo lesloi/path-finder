@@ -551,6 +551,9 @@ func TestCoverageAnswersTheCellsOfTheSource(t *testing.T) {
 	if rec.Header().Get("Cache-Control") != "no-cache" {
 		t.Errorf("Cache-Control = %q", rec.Header().Get("Cache-Control"))
 	}
+	if rec.Header().Get("ETag") == "" {
+		t.Error("no ETag")
+	}
 }
 
 func TestCoverageOfNothingIsAnEmptyList(t *testing.T) {
@@ -559,6 +562,95 @@ func TestCoverageOfNothingIsAnEmptyList(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/coverage", nil))
 	if got := strings.TrimSpace(rec.Body.String()); got != `{"cells":[]}` {
 		t.Errorf("body %s", got)
+	}
+	etag := rec.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("no ETag for an empty coverage")
+	}
+	again := do(h, http.MethodGet, "/api/v1/coverage", "", "", map[string]string{"If-None-Match": etag})
+	if again.Code != http.StatusNotModified {
+		t.Errorf("status %d for the empty coverage revalidated, want 304", again.Code)
+	}
+}
+
+// The validator of an answer is the same while its cells are, so that a reload that leaves the
+// coverage alone does not make every client fetch it again.
+func TestCoverageKeepsTheSameValidatorForTheSameCells(t *testing.T) {
+	cells := [][4]float64{{6, 45.8, 6.1, 45.9}}
+	h := newServer(t, func(c *Config) { c.Coverage = coverageFunc(func() [][4]float64 { return cells }) })
+
+	first := do(h, http.MethodGet, "/api/v1/coverage", "", "", nil)
+	second := do(h, http.MethodGet, "/api/v1/coverage", "", "", nil)
+
+	if first.Code != http.StatusOK || second.Code != http.StatusOK {
+		t.Fatalf("status %d and %d", first.Code, second.Code)
+	}
+	etag := first.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("no ETag")
+	}
+	if got := second.Header().Get("ETag"); got != etag {
+		t.Errorf("ETag = %q on the second answer, want %q", got, etag)
+	}
+	if first.Body.String() != second.Body.String() {
+		t.Error("the body changed though the cells did not")
+	}
+
+	// The validator comes from the answer itself, so a restarted server keeps it for the same cells.
+	restarted := newServer(t, func(c *Config) { c.Coverage = coverageFunc(func() [][4]float64 { return cells }) })
+	if got := do(restarted, http.MethodGet, "/api/v1/coverage", "", "", nil).Header().Get("ETag"); got != etag {
+		t.Errorf("ETag after a restart = %q, want %q", got, etag)
+	}
+}
+
+func TestCoverageValidatorChangesWithTheCells(t *testing.T) {
+	cells := [][4]float64{{6, 45.8, 6.1, 45.9}}
+	h := newServer(t, func(c *Config) { c.Coverage = coverageFunc(func() [][4]float64 { return cells }) })
+
+	before := do(h, http.MethodGet, "/api/v1/coverage", "", "", nil)
+	cells = [][4]float64{{-2.6, 48, -2.5, 48.1}}
+	after := do(h, http.MethodGet, "/api/v1/coverage", "", "", nil)
+
+	if before.Header().Get("ETag") == after.Header().Get("ETag") {
+		t.Errorf("ETag = %q for both coverages", before.Header().Get("ETag"))
+	}
+	if got := strings.TrimSpace(after.Body.String()); got != `{"cells":[[-2.6,48,-2.5,48.1]]}` {
+		t.Errorf("body %s", got)
+	}
+}
+
+func TestCoverageAnswersNotModifiedToItsValidator(t *testing.T) {
+	h := newServer(t, func(c *Config) {
+		c.Coverage = coverageFunc(func() [][4]float64 { return [][4]float64{{6, 45.8, 6.1, 45.9}} })
+	})
+	first := do(h, http.MethodGet, "/api/v1/coverage", "", "", nil)
+	etag := first.Header().Get("ETag")
+
+	for _, header := range []string{etag, "W/" + etag, `"other", ` + etag, "*"} {
+		r := do(h, http.MethodGet, "/api/v1/coverage", "", "", map[string]string{"If-None-Match": header})
+		if r.Code != http.StatusNotModified {
+			t.Errorf("If-None-Match %q: status %d, want 304", header, r.Code)
+		}
+		if r.Body.Len() != 0 {
+			t.Errorf("If-None-Match %q: body %q, want none", header, r.Body.String())
+		}
+		if got := r.Header().Get("ETag"); got != etag {
+			t.Errorf("If-None-Match %q: ETag %q, want %q", header, got, etag)
+		}
+		if got := r.Header().Get("Content-Type"); got != "" {
+			t.Errorf("If-None-Match %q: Content-Type %q on a 304", header, got)
+		}
+		if got := r.Header().Get("Cache-Control"); got != "no-cache" {
+			t.Errorf("If-None-Match %q: Cache-Control %q on a 304", header, got)
+		}
+	}
+
+	stale := do(h, http.MethodGet, "/api/v1/coverage", "", "", map[string]string{"If-None-Match": `"other"`})
+	if stale.Code != http.StatusOK {
+		t.Errorf("a stale validator: status %d, want 200", stale.Code)
+	}
+	if got := strings.TrimSpace(stale.Body.String()); got != `{"cells":[[6,45.8,6.1,45.9]]}` {
+		t.Errorf("a stale validator: body %s", got)
 	}
 }
 

@@ -340,6 +340,32 @@ func TestCoverageIsTheSampleAnswer(t *testing.T) {
 	}
 }
 
+// The cells of the served graph do not change between requests, so the answer is revalidated rather
+// than sent again whole.
+func TestCoverageIsRevalidated(t *testing.T) {
+	h := newServer(t)
+	first := httptest.NewRecorder()
+	h.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/api/v1/coverage", nil))
+	if first.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", first.Code, first.Body)
+	}
+	etag := first.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("no ETag")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/coverage", nil)
+	req.Header.Set("If-None-Match", etag)
+	again := httptest.NewRecorder()
+	h.ServeHTTP(again, req)
+	if again.Code != http.StatusNotModified {
+		t.Errorf("status %d, want 304", again.Code)
+	}
+	if again.Body.Len() != 0 {
+		t.Errorf("body %q on a 304", again.Body.String())
+	}
+}
+
 func TestCoverageRefusesAStaleBuild(t *testing.T) {
 	h := newServer(t)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/coverage", nil)
