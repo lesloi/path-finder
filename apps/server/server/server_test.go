@@ -84,8 +84,17 @@ func do(h http.Handler, method, path, body, remote string, headers map[string]st
 	return reply{rec}
 }
 
+// postHeaders posts JSON with the media type the route requires, plus any extra header.
+func postHeaders(h http.Handler, body, remote string, headers map[string]string) reply {
+	all := map[string]string{"Content-Type": "application/json"}
+	for k, v := range headers {
+		all[k] = v
+	}
+	return do(h, http.MethodPost, "/api/v1/route-sets", body, remote, all)
+}
+
 func post(h http.Handler, body string) reply {
-	return do(h, http.MethodPost, "/api/v1/route-sets", body, "", nil)
+	return postHeaders(h, body, "", nil)
 }
 
 func TestEveryAnswerSendsTheSecurityHeaders(t *testing.T) {
@@ -120,6 +129,36 @@ func TestRouteSetsAnswerTheClosestGain(t *testing.T) {
 	r := post(h, `{"start":[2,48]}`)
 	if r.Code != http.StatusOK || strings.TrimSpace(r.Body.String()) != `{"routes":[],"closestElevationGain":296}` {
 		t.Errorf("got %d %s", r.Code, r.Body.String())
+	}
+}
+
+func TestRouteSetsRequireAJSONContentType(t *testing.T) {
+	h := newServer(t, nil)
+	cases := map[string]struct {
+		headers  map[string]string
+		body     string
+		want     int
+		wantCode string
+	}{
+		"application/json":        {map[string]string{"Content-Type": "application/json"}, `{"start":[2.35,48.85]}`, 200, ""},
+		"with a charset":          {map[string]string{"Content-Type": "application/json; charset=utf-8"}, `{"start":[2.35,48.85]}`, 200, ""},
+		"text/plain":              {map[string]string{"Content-Type": "text/plain"}, `{"start":[2.35,48.85]}`, 400, "invalid-json"},
+		"no content type":         {nil, `{"start":[2.35,48.85]}`, 400, "invalid-json"},
+		"a malformed media type":  {map[string]string{"Content-Type": "application/json; charset"}, `{"start":[2.35,48.85]}`, 400, "invalid-json"},
+		"another JSON media type": {map[string]string{"Content-Type": "application/json-patch+json"}, `{"start":[2.35,48.85]}`, 400, "invalid-json"},
+		"a body that is not JSON": {map[string]string{"Content-Type": "application/json"}, `{"start":[2.35,48.85`, 400, "invalid-json"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			r := do(h, http.MethodPost, "/api/v1/route-sets", tc.body, "", tc.headers)
+
+			if r.Code != tc.want {
+				t.Errorf("status = %d, want %d", r.Code, tc.want)
+			}
+			if tc.wantCode != "" && (r.errorCode(t) != tc.wantCode || strings.Contains(r.Body.String(), "2.35")) {
+				t.Errorf("body = %s, want %q without the start point", r.Body.String(), tc.wantCode)
+			}
+		})
 	}
 }
 
@@ -178,7 +217,7 @@ func TestStaleBuildMustReload(t *testing.T) {
 		"no header":     {nil, 200},
 	}
 	for name, tc := range cases {
-		r := do(h, http.MethodPost, "/api/v1/route-sets", `{}`, "", tc.headers)
+		r := postHeaders(h, `{}`, "", tc.headers)
 		if r.Code != tc.want {
 			t.Errorf("%s: got %d, want %d", name, r.Code, tc.want)
 		}
@@ -190,7 +229,7 @@ func TestStaleBuildMustReload(t *testing.T) {
 
 func TestRateLimitCountsPerAddress(t *testing.T) {
 	h := newServer(t, func(c *Config) { c.Limits = true })
-	from := func(remote string) reply { return do(h, http.MethodPost, "/api/v1/route-sets", `{}`, remote, nil) }
+	from := func(remote string) reply { return postHeaders(h, `{}`, remote, nil) }
 	for i := 0; i < 60; i++ {
 		if r := from("198.51.100.1:1000"); r.Code != 200 {
 			t.Fatalf("request %d: got %d", i+1, r.Code)
@@ -287,7 +326,7 @@ func TestClientAddressIsTheConnectionUnlessAProxyIsTrusted(t *testing.T) {
 			if forwarded != "" {
 				headers["X-Forwarded-For"] = forwarded
 			}
-			do(h, http.MethodPost, "/api/v1/route-sets", `{}`, remote, headers)
+			postHeaders(h, `{}`, remote, headers)
 			return seen
 		}
 	}
@@ -401,7 +440,7 @@ func TestStaticFilesAreCachedByKind(t *testing.T) {
 
 func TestWithoutABuiltWebAppAnyBuildIsAccepted(t *testing.T) {
 	h := New(Config{WebRoot: t.TempDir(), Generator: generatorFunc(okGenerator)})
-	r := do(h, http.MethodPost, "/api/v1/route-sets", `{}`, "", map[string]string{"X-Api-Version": "build-0"})
+	r := postHeaders(h, `{}`, "", map[string]string{"X-Api-Version": "build-0"})
 	if r.Code != 200 {
 		t.Errorf("no build-id file: got %d", r.Code)
 	}
@@ -455,6 +494,7 @@ func TestASlowUploadDoesNotHoldAGenerationSlot(t *testing.T) {
 	h := newServer(t, func(c *Config) { c.Limits = true; c.LoopLimit = 1 })
 	pipe, writer := io.Pipe()
 	slow := httptest.NewRequest(http.MethodPost, "/api/v1/route-sets", pipe)
+	slow.Header.Set("Content-Type", "application/json")
 	done := make(chan struct{})
 	go func() {
 		h.ServeHTTP(httptest.NewRecorder(), slow)
