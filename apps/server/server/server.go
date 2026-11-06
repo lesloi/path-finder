@@ -111,8 +111,9 @@ func New(cfg Config) http.Handler {
 }
 
 type app struct {
-	cfg     Config
-	buildID string
+	cfg           Config
+	buildID       string
+	coverageCache coverageCache
 }
 
 // contentSecurityPolicy is the Content-Security-Policy of every answer. The only third party is the Géoplateforme, for the map: its
@@ -238,13 +239,10 @@ func (a *app) routeSets(w http.ResponseWriter, r *http.Request) {
 }
 
 // coverage answers the cells where the graph served has a way. Nothing in it is about the user.
-func (a *app) coverage(w http.ResponseWriter, _ *http.Request) {
-	cells := a.cfg.Coverage.Coverage()
-	if cells == nil {
-		cells = [][4]float64{}
-	}
-	w.Header().Set("Cache-Control", "no-cache") // the data can be reloaded: ask again, the answer is small
-	writeJSON(w, http.StatusOK, contract.Coverage{Cells: cells})
+func (a *app) coverage(w http.ResponseWriter, r *http.Request) {
+	// The data changes with a reload: ask again, and the ETag makes that a cheap 304.
+	w.Header().Set("Cache-Control", "no-cache")
+	a.coverageCache.get(a.cfg.Coverage.Coverage()).serve(w, r)
 }
 
 // readBuildID returns the ID written by each web app build, or none when the web app is not built.
