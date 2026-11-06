@@ -395,7 +395,12 @@ export function StartPointMap({
   const closeBubble = () => bubbleRef.current?.remove();
   // The bubble over an avoided area: its radius and its removal. Its content is React, so that the slider follows
   // the area as it changes; the popup itself belongs to the map.
-  const [areaBubble, setAreaBubble] = useState<{ index: number; host: HTMLElement; button: HTMLElement }>();
+  const [areaBubble, setAreaBubble] = useState<{
+    index: number;
+    host: HTMLElement;
+    button: HTMLElement;
+    at: Position;
+  }>();
   const areaPopup = useRef<Popup>(undefined);
   const closeAreaBubble = useEffectEvent((back = false) => {
     const button = areaBubble?.button;
@@ -413,12 +418,17 @@ export function StartPointMap({
       .setLngLat(at)
       .setDOMContent(host)
       .addTo(mapRef.current!);
-    setAreaBubble({ index, host, button });
+    setAreaBubble({ index, host, button, at });
   });
   const toggleAreaBubble = useEffectEvent((index: number, at: Position, button: HTMLElement) => {
     if (areaBubble?.index === index) closeAreaBubble();
     else openAreaBubble(index, at, button);
   });
+  // The bubble's content is React's, drawn after the popup was placed with an empty host: placing it again now that its
+  // size is known lets MapLibre choose the side it opens on, and keeps the bubble on screen.
+  useEffect(() => {
+    if (areaBubble) areaPopup.current?.setLngLat(areaBubble.at);
+  }, [areaBubble]);
   // Escape puts the bubble away, as it does a popover, before the view acts on the key.
   useEffect(() => {
     if (!areaBubble) return;
