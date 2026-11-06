@@ -171,9 +171,9 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 	}
 	c.Surface = surface
 
-	pace, ok := number(obj["pace"])
-	if !ok || pace <= 0 {
-		return fail("pace", "pace must be a positive number")
+	pace, ok := within(obj["pace"], bounds.PaceMinutesPerKm.Min, bounds.PaceMinutesPerKm.Max)
+	if !ok {
+		return fail("pace", "pace out of bounds")
 	}
 	c.Pace = pace
 

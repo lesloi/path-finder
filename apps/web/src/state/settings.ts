@@ -4,6 +4,7 @@ import {
   MAX_TARGET_DISTANCE,
   MAX_TARGET_ELEVATION_GAIN,
   MIN_TARGET_DISTANCE,
+  PACE_MINUTES_PER_KM,
   SURFACES,
   TARGET_DURATION,
   type Criteria,
@@ -73,11 +74,11 @@ export const DEFAULT_CRITERIA: LastCriteria = {
 };
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
-const isPace = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
 const inRange =
   (min: number, max: number) =>
   (value: unknown): value is number =>
     typeof value === 'number' && value >= min && value <= max;
+const isPace = inRange(PACE_MINUTES_PER_KM.min, PACE_MINUTES_PER_KM.max);
 const isGain = inRange(0, MAX_TARGET_ELEVATION_GAIN);
 const isDistance = inRange(MIN_TARGET_DISTANCE, MAX_TARGET_DISTANCE);
 const isDuration = inRange(TARGET_DURATION.min, TARGET_DURATION.max);

@@ -5,6 +5,10 @@ import type { Criteria } from './criteria.ts';
 export const MIN_TARGET_DISTANCE = contract.minDistanceKm;
 export const MAX_TARGET_DISTANCE = contract.maxDistanceKm;
 export const TARGET_DURATION = { min: contract.durationMinutes.min, max: contract.durationMinutes.max };
+export const PACE_MINUTES_PER_KM = {
+  min: contract.paceMinutesPerKm.min,
+  max: contract.paceMinutesPerKm.max,
+};
 export const MAX_TARGET_ELEVATION_GAIN = contract.maxElevationGainMetres;
 export const MAX_WAYPOINTS = contract.maxWaypoints;
 export const MAX_LAPS = contract.maxLaps;
