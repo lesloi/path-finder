@@ -7,6 +7,7 @@ import {
   MAX_AVOIDED_AREAS,
   MAX_WAYPOINTS,
   MIN_TARGET_DISTANCE,
+  PACE_MINUTES_PER_KM,
   SURFACES,
   TARGET_DURATION,
 } from './limits.ts';
@@ -135,7 +136,7 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
     'Target elevation gain out of bounds',
   );
   check(SURFACES.includes(surface as Criteria['surface']), 'surface', 'Unknown surface preference');
-  check(isNumber(pace) && pace > 0, 'pace', 'pace must be a positive number');
+  check(within(pace, PACE_MINUTES_PER_KM.min, PACE_MINUTES_PER_KM.max), 'pace', 'pace out of bounds');
 
   check(repeats === undefined || typeof repeats === 'boolean', 'repeats', 'repeats must be true or false');
 

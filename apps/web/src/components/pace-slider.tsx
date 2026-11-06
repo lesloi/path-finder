@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 
+import { PACE_MINUTES_PER_KM } from '../contract/index.ts';
 import type { Language } from '../i18n/index.ts';
 import { formatPace, invertPace, paceFromSeconds, paceSeconds, type PaceUnit } from '../core/index.ts';
 import { Slider } from './slider.tsx';
 
-// From 3:00 to 12:00 per km in seconds per km, and what that is in km/h.
+// The contract's pace bounds, in seconds per km, and what they are in km/h.
 const RANGE = {
-  'min/km': { min: 180, max: 720, step: 5 },
-  'km/h': { min: 5, max: 20, step: 0.5 },
+  'min/km': { min: PACE_MINUTES_PER_KM.min * 60, max: PACE_MINUTES_PER_KM.max * 60, step: 5 },
+  'km/h': { min: 60 / PACE_MINUTES_PER_KM.max, max: 60 / PACE_MINUTES_PER_KM.min, step: 0.5 },
 };
 
 /** A pace as a slider, in minutes per km or in km/h, which changes as the slider moves. */

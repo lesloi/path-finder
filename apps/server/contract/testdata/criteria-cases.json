@@ -316,6 +316,90 @@
     }
   },
   {
+    "name": "a pace under 3 minutes per km",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 2.9833333333333334
+    },
+    "expect": {
+      "field": "pace"
+    }
+  },
+  {
+    "name": "accepts 3 minutes per km",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 3
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "any",
+        "pace": 3
+      }
+    }
+  },
+  {
+    "name": "accepts 12 minutes per km",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 12
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "any",
+        "pace": 12
+      }
+    }
+  },
+  {
+    "name": "a pace over 12 minutes per km",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 12.016666666666667
+    },
+    "expect": {
+      "field": "pace"
+    }
+  },
+  {
+    "name": "a pace too large to be a number",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 1e308
+    },
+    "expect": {
+      "field": "pace"
+    }
+  },
+  {
     "name": "a number given as a string",
     "body": {
       "start": [6.1294, 45.8992],

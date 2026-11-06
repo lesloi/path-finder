@@ -20,9 +20,16 @@ type refusal struct {
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		// Marshalling before the status keeps a failure from becoming an empty answer with the
+		// status meant for the body. As a bug's answer, it carries no message.
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+	_, _ = w.Write(append(encoded, '\n'))
 }
 
 func refuse(w http.ResponseWriter, status int, code string) {
