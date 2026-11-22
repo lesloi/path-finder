@@ -60,9 +60,17 @@ export function RoutePace({
     );
   }
   return (
-    <div data-testid="routes-pace" className="flex items-center gap-2 text-sm text-ink-2">
+    <div data-testid="routes-pace" className="flex items-center gap-0.5 text-sm text-ink-2">
       {pencil}
-      <span className="flex min-h-touch items-center">{t.estimatedPace(formatPace(pace, paceUnit, language))}</span>
+      <span className="-ml-1 flex min-h-touch items-center">
+        {/* The row is tight: the figures read alone where the desktop column is narrow, and the full label stays for
+            assistive technology. */}
+        <span className="sr-only">{t.estimatedPace(formatPace(pace, paceUnit, language))}</span>
+        <span aria-hidden>
+          <span className="desktop:hidden">{t.paceShort(formatPace(pace, paceUnit, language))}</span>
+          <span className="hidden desktop:inline">{formatPace(pace, paceUnit, language)}</span>
+        </span>
+      </span>
     </div>
   );
 }

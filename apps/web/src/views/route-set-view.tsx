@@ -194,11 +194,11 @@ export function RouteSetView({
       <div className="-mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
         <RoutePace paceUnit={paceUnit} language={language} pace={pace} onChange={onPaceChange} />
         {sortable && (
-          <div data-testid="routes-sort-box" className="flex items-center gap-1.5">
+          <div data-testid="routes-sort-box" className="flex items-center gap-0.5">
             <button
               type="button"
               data-testid="routes-sort-direction"
-              className={`${ICON_BUTTON} aria-pressed:text-accent`}
+              className={`${ICON_BUTTON} -mr-1 aria-pressed:text-accent`}
               {...tip(descending ? t.sortDescending : t.sortAscending, 'bottom-start')}
               aria-label={descending ? t.sortDescending : t.sortAscending}
               aria-pressed={descending}
