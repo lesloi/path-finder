@@ -209,7 +209,7 @@ export function RouteSetView({
               type="button"
               data-testid="routes-sort-direction"
               className="group -mr-1 grid size-touch flex-none place-items-center rounded-full text-ink aria-pressed:text-accent"
-              {...tip(descending ? t.sortDescending : t.sortAscending, 'bottom-start')}
+              {...tip(descending ? t.sortDescending : t.sortAscending, 'bottom-end')}
               aria-label={descending ? t.sortDescending : t.sortAscending}
               aria-pressed={descending}
               // Without a handler the arrow only says which way the list runs.
