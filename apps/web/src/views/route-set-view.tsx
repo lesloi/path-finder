@@ -45,7 +45,8 @@ const SWIPE_PX = 50;
 /** The box of a route's row; the placeholder of the results draws the same. */
 export const ROUTE_ROW_BOX = 'flex min-h-13 w-full flex-col gap-2 rounded-md border border-l-4 border-border p-2';
 
-const TEXT_BUTTON = 'flex min-h-touch items-center gap-1 rounded-full px-2 text-sm text-accent hover:bg-surface-2';
+const TEXT_BUTTON = 'group flex min-h-touch items-center text-sm text-accent';
+const TEXT_BUTTON_HOVER = 'flex items-center gap-1 rounded-full px-2 py-1 group-hover:bg-surface-2';
 
 // The words of the route set: its own, and the labels it shares with the criteria.
 const words = (language: Language) => ({ ...criteriaText[language], ...routesText[language] });
@@ -188,8 +189,10 @@ export function RouteSetView({
           </span>
         )}
         <button type="button" data-testid="routes-clear" className={`${TEXT_BUTTON} ml-auto`} onClick={onClear}>
-          <Trash2 size={18} aria-hidden />
-          {t.clearRoutes}
+          <span className={TEXT_BUTTON_HOVER}>
+            <Trash2 size={18} aria-hidden />
+            {t.clearRoutes}
+          </span>
         </button>
       </div>
       <div className="-mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
@@ -441,8 +444,10 @@ function RouteDetail({
           {t.routes}
         </button>
         <button type="button" data-testid="route-reverse" className={TEXT_BUTTON} onClick={onReverse}>
-          <ArrowLeftRight size={18} aria-hidden />
-          {t.reverseRoute}
+          <span className={TEXT_BUTTON_HOVER}>
+            <ArrowLeftRight size={18} aria-hidden />
+            {t.reverseRoute}
+          </span>
         </button>
         {!route.imported && (
           <strong data-testid="route-position" aria-label={routeTitle(route, language, selected, routes.length)}>

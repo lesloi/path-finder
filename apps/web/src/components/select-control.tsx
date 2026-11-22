@@ -121,14 +121,20 @@ export function SelectControl<Value extends string>({
         onKeyDown={onKeyDown}
         onKeyUp={(event) => event.key === ' ' && event.preventDefault()}
         className={
-          'flex min-h-touch cursor-pointer items-center text-sm font-medium text-ink ' +
+          'group flex min-h-touch cursor-pointer items-center text-sm font-medium text-ink ' +
           'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ' +
           (plain
             ? 'gap-1 rounded-sm'
             : 'rounded-md border border-border bg-surface-2 ' + (compact ? 'gap-2 px-2' : 'gap-3 px-4'))
         }
       >
-        <span className="flex items-center gap-2">
+        <span
+          className={
+            plain
+              ? '-mx-1 flex items-center gap-2 rounded-sm px-1 py-0.5 transition-colors group-hover:bg-surface-2'
+              : 'flex items-center gap-2'
+          }
+        >
           {current?.icon}
           {current?.label}
         </span>
