@@ -205,20 +205,21 @@ export function RouteSetView({
         />
         {sortable && !editingPace && (
           <div data-testid="routes-sort-box" className="flex items-center gap-0.5">
-            <button
-              type="button"
-              data-testid="routes-sort-direction"
-              className="group -mr-1 grid size-touch flex-none place-items-center rounded-full text-ink aria-pressed:text-accent"
-              {...tip(descending ? t.sortDescending : t.sortAscending, 'bottom-end')}
-              aria-label={descending ? t.sortDescending : t.sortAscending}
-              aria-pressed={descending}
-              // Without a handler the arrow only says which way the list runs.
-              {...(onReverseSort ? { onClick: onReverseSort } : { disabled: true })}
-            >
-              <span className="grid size-8 place-items-center rounded-full group-hover:bg-surface-2">
-                {descending ? <ArrowDown size={18} aria-hidden /> : <ArrowUp size={18} aria-hidden />}
-              </span>
-            </button>
+            {onReverseSort && (
+              <button
+                type="button"
+                data-testid="routes-sort-direction"
+                className="group -mr-1 grid size-touch flex-none place-items-center rounded-full text-ink aria-pressed:text-accent"
+                {...tip(descending ? t.sortDescending : t.sortAscending, 'bottom-end')}
+                aria-label={descending ? t.sortDescending : t.sortAscending}
+                aria-pressed={descending}
+                onClick={onReverseSort}
+              >
+                <span className="grid size-8 place-items-center rounded-full group-hover:bg-surface-2">
+                  {descending ? <ArrowDown size={18} aria-hidden /> : <ArrowUp size={18} aria-hidden />}
+                </span>
+              </button>
+            )}
             <SelectControl
               testId="routes-sort"
               label={t.sortBy}
