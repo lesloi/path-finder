@@ -131,7 +131,7 @@ export function SelectControl<Value extends string>({
         <span
           className={
             plain
-              ? '-mx-1 flex items-center gap-2 rounded-sm px-1 py-0.5 transition-colors group-hover:bg-surface-2'
+              ? '-mx-1 flex items-center gap-2 rounded-sm px-1 py-0.5 transition-colors group-hover:bg-border'
               : 'flex items-center gap-2'
           }
         >
