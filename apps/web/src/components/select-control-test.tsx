@@ -35,6 +35,15 @@ const press = (key: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(b
 const activeOption = () => document.getElementById(button().getAttribute('aria-activedescendant')!)!;
 
 describe('SelectControl', () => {
+  it('opens its list over the page when detached, so a scrolling panel cannot clip it', () => {
+    render(<SelectControl testId="pick" label="Letter" value="a" options={options} onChange={vi.fn()} detached />);
+    fireEvent.click(button());
+
+    const list = screen.getByRole('listbox');
+    expect(list.parentElement).toBe(document.body);
+    expect(screen.getByTestId('pick-b')).toBeInTheDocument();
+  });
+
   it('names itself, is described, and shows the current option with its icon while closed', () => {
     render(<Harness initial="a" />);
 

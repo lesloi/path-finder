@@ -226,6 +226,7 @@ export function RouteSetView({
               compact
               plain
               chevron={false}
+              detached
               options={[
                 { value: 'relevance', label: t.sortRelevance },
                 { value: 'distance', label: t.sortDistance },
