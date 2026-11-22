@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 
 import { SelectControl } from './select-control.tsx';
@@ -10,7 +10,15 @@ const options = [
 ];
 
 /** The select with its own state, as a view holds it. */
-function Harness({ initial = 'a', onChange }: { initial?: string; onChange?: (value: string) => void }) {
+function Harness({
+  initial = 'a',
+  onChange,
+  detached = false,
+}: {
+  initial?: string;
+  onChange?: (value: string) => void;
+  detached?: boolean;
+}) {
   const [value, setValue] = useState(initial);
   return (
     <>
@@ -21,6 +29,7 @@ function Harness({ initial = 'a', onChange }: { initial?: string; onChange?: (va
         value={value}
         options={options}
         describedBy="why"
+        detached={detached}
         onChange={(picked) => {
           setValue(picked);
           onChange?.(picked);
@@ -33,8 +42,51 @@ function Harness({ initial = 'a', onChange }: { initial?: string; onChange?: (va
 const button = () => screen.getByTestId('pick');
 const press = (key: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(button(), { key, ...init });
 const activeOption = () => document.getElementById(button().getAttribute('aria-activedescendant')!)!;
+const rectAt = (top: number) =>
+  ({ x: 200, y: top, top, bottom: top + 44, left: 200, right: 300, width: 100, height: 44 }) as DOMRect;
+
+afterEach(() => vi.restoreAllMocks());
 
 describe('SelectControl', () => {
+  it('opens its list over the page when detached, so a scrolling panel cannot clip it', () => {
+    render(<SelectControl testId="pick" label="Letter" value="a" options={options} onChange={vi.fn()} detached />);
+    fireEvent.click(button());
+
+    const list = screen.getByRole('listbox');
+    expect(list.parentElement).toBe(document.body);
+    expect(screen.getByTestId('pick-b')).toBeInTheDocument();
+  });
+
+  it('keeps a detached list against its button as the panel scrolls, and closes once it leaves the screen', () => {
+    render(<Harness detached />);
+    const rect = vi.spyOn(button(), 'getBoundingClientRect').mockReturnValue(rectAt(100));
+    fireEvent.click(button());
+    const list = screen.getByRole('listbox');
+    expect(list.style.top).toBe('152px');
+
+    rect.mockReturnValue(rectAt(300));
+    act(() => void document.dispatchEvent(new Event('scroll')));
+    expect(list.style.top).toBe('352px');
+
+    rect.mockReturnValue(rectAt(800));
+    act(() => void document.dispatchEvent(new Event('scroll')));
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('closes a detached list when the window resizes, and picks an option otherwise', () => {
+    const onChange = vi.fn();
+    render(<Harness detached onChange={onChange} />);
+    fireEvent.click(button());
+    act(() => void window.dispatchEvent(new Event('resize')));
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+
+    fireEvent.click(button());
+    fireEvent.click(screen.getByTestId('pick-b'));
+
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('b');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
   it('names itself, is described, and shows the current option with its icon while closed', () => {
     render(<Harness initial="a" />);
 

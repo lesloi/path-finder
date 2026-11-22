@@ -55,6 +55,7 @@ import {
   isPlaceQuery,
   parsePosition,
   reverseRoute,
+  routeOrder,
   routesAtPace,
   searchPlaces,
   type Place,
@@ -303,6 +304,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     () => directed?.map(({ distance, elevationGain, laps }) => ({ distance, elevationGain, laps })),
     [directed],
   );
+  // How the list shows the routes; the map keeps the order of the route set, which gives each its colour.
+  const order = useMemo(
+    () => (atPace ? routeOrder(atPace.routes, browser.sort, browser.descending) : []),
+    [atPace, browser.sort, browser.descending],
+  );
   const routesShown = Boolean(routeSet);
   const listShown = desktop && (loading || Boolean(routeSet));
   // Without a search there is nothing to look at behind the form: it cannot stay hidden.
@@ -547,6 +553,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         routes={atPace.routes}
         closestElevationGain={routeSet.closestElevationGain}
         pace={atPace.pace}
+        sort={browser.sort}
+        onSortChange={browser.setSort}
+        descending={browser.descending}
+        onReverseSort={browser.reverseSort}
         snapshot={browser.snapshot}
         selected={selected}
         detail={browser.detail}
@@ -913,7 +923,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           paceUnit={paceUnit}
           pace={atPace.pace}
           route={dockRoute}
-          index={selected}
+          index={Math.max(0, order.indexOf(selected))}
           count={atPace.routes.length}
           onClose={deselect}
           onReverse={() => browser.toggleReversed(selected)}

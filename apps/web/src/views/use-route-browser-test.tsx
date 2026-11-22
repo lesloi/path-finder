@@ -85,6 +85,21 @@ describe('useRouteBrowser', () => {
     expect(result.current.selected).toBeUndefined();
   });
 
+  it.each([
+    ['a new request', (r: ReturnType<typeof useRouteBrowser>) => r.ask(request)],
+    ['an imported track', (r: ReturnType<typeof useRouteBrowser>) => r.showImported(request, route)],
+    ['the routes being dropped', (r: ReturnType<typeof useRouteBrowser>) => r.drop()],
+  ])('lists the routes by relevance again, from the largest down, with %s', async (_, reset) => {
+    const { result } = await browse();
+    act(() => result.current.setSort('distance'));
+    act(() => result.current.reverseSort());
+    expect(result.current).toMatchObject({ sort: 'distance', descending: false });
+
+    act(() => reset(result.current));
+
+    expect(result.current).toMatchObject({ sort: 'relevance', descending: true });
+  });
+
   it('forgets the place pointed at when the detail opens or closes', async () => {
     const { result } = await browse();
     act(() => result.current.setHover([6, 45]));

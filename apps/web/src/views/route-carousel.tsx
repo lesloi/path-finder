@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, type ReactNode } from 'react';
+import { isValidElement, useEffect, useEffectEvent, useRef, type ReactNode } from 'react';
 
 import { centredCard } from '../core/index.ts';
 
@@ -84,7 +84,8 @@ export function RouteCarousel({
       }}
     >
       {children.map((card, index) => (
-        <li key={index} className="w-[88%] flex-none snap-center">
+        // The child's key follows the route when the list is sorted: its DOM node moves rather than remounts.
+        <li key={(isValidElement(card) && card.key) || index} className="w-[88%] flex-none snap-center">
           {card}
         </li>
       ))}

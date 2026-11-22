@@ -12,11 +12,14 @@ export function RoutePace({
   language,
   pace,
   onChange,
+  onEditingChange,
 }: {
   paceUnit: PaceUnit;
   language: Language;
   pace: number;
   onChange?: (pace: number) => void;
+  /** Says whether the slider is open, so the row around it can make room. */
+  onEditingChange?: (editing: boolean) => void;
 }) {
   const t = { ...criteriaText[language], ...routesText[language] };
   const [editing, setEditing] = useState(false);
@@ -28,25 +31,33 @@ export function RoutePace({
     if (editing) editor.current?.querySelector('input')?.focus();
     else if (wasEditing.current) edit.current?.focus();
     wasEditing.current = editing;
-  }, [editing]);
+    onEditingChange?.(editing);
+  }, [editing, onEditingChange]);
   const pencil = onChange && (
     <button
       type="button"
       ref={edit}
       data-testid="routes-pace-edit"
       // `relative` keeps the button above the slider, which is pulled up over its lower part.
-      className="relative grid size-touch flex-none place-items-center rounded-full text-ink hover:bg-surface-2 aria-pressed:text-accent"
+      className="group relative grid size-touch flex-none place-items-center rounded-full text-ink aria-pressed:text-accent"
       {...tip(t.editPace, 'bottom-start')}
       aria-pressed={editing}
       onClick={() => setEditing(!editing)}
     >
-      <Pencil size={18} aria-hidden />
+      {/* The hover stays on the icon: the text sits under the right of the target, which must stay 44 px. */}
+      <span className="grid size-8 place-items-center rounded-full group-hover:bg-surface-2">
+        <Pencil size={18} aria-hidden />
+      </span>
     </button>
   );
   // The pencil stays where it is: before the pace, which the slider then spans the width under.
   if (editing && onChange) {
     return (
-      <div ref={editor} data-testid="routes-pace" className="text-sm text-ink-2 [&_output]:text-lg [&_input]:-mt-3">
+      <div
+        ref={editor}
+        data-testid="routes-pace"
+        className="w-full text-sm text-ink-2 [&_output]:text-lg [&_input]:-mt-3"
+      >
         <PaceSlider
           label={t.pace}
           pace={pace}
@@ -60,9 +71,17 @@ export function RoutePace({
     );
   }
   return (
-    <div data-testid="routes-pace" className="flex items-center gap-2 text-sm text-ink-2">
+    <div data-testid="routes-pace" className="flex items-center gap-0.5 text-sm text-ink-2">
       {pencil}
-      <span className="flex min-h-touch items-center">{t.estimatedPace(formatPace(pace, paceUnit, language))}</span>
+      <span className="-ml-1 flex min-h-touch items-center">
+        {/* The row is tight: the figures read alone where the desktop column is narrow, and the full label stays for
+            assistive technology. */}
+        <span className="sr-only">{t.estimatedPace(formatPace(pace, paceUnit, language))}</span>
+        <span aria-hidden>
+          <span className="desktop:hidden">{t.paceShort(formatPace(pace, paceUnit, language))}</span>
+          <span className="hidden desktop:inline">{formatPace(pace, paceUnit, language)}</span>
+        </span>
+      </span>
     </div>
   );
 }

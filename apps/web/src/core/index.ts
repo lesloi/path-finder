@@ -13,5 +13,6 @@ export * from './page-title.ts';
 export * from './place-search.ts';
 export * from './poi.ts';
 export * from './route.ts';
+export * from './route-sort.ts';
 export * from './theme.ts';
 export * from './units.ts';

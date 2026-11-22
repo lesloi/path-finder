@@ -43,6 +43,31 @@ test.describe('the route set', () => {
     await expect(page.getByTestId('routes-row-0-distance')).toHaveText(/^\d+\.\d km$/);
   });
 
+  test('sorts the routes by elevation gain, reverses it, then back by relevance', async ({ page }) => {
+    await findRoutes(page);
+    const ranked = await page.getByTestId('routes-row-0').getAttribute('aria-label');
+    const gains = async () =>
+      (await page.locator('[data-testid^="routes-row-"][data-testid$="-gain"]').allTextContents()).map((text) =>
+        Number(text.replace(/\D/g, '')),
+      );
+
+    await page.getByTestId('routes-sort').click();
+    await page.getByTestId('routes-sort-gain').click();
+    const descending = await gains();
+    expect(descending.length).toBeGreaterThan(1);
+    expect(descending).toEqual([...descending].sort((a, b) => b - a));
+
+    await page.getByTestId('routes-sort-direction').click();
+    await expect(page.getByTestId('routes-sort-direction')).toHaveAttribute('aria-pressed', 'false');
+    const ascending = await gains();
+    expect(ascending).toEqual([...ascending].sort((a, b) => a - b));
+
+    await page.getByTestId('routes-sort').click();
+    await page.getByTestId('routes-sort-relevance').click();
+    await page.getByTestId('routes-sort-direction').click();
+    await expect(page.getByTestId('routes-row-0')).toHaveAttribute('aria-label', ranked!);
+  });
+
   test('asks again by itself when the server is busy, and shows the routes', async ({ page }) => {
     let requests = 0;
     await page.route('**/api/v1/route-sets', (route) => {

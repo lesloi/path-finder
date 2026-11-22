@@ -1,5 +1,5 @@
-import { ArrowLeft, ArrowLeftRight, ArrowUpRight, ChevronRight, Clock, Trash2 } from 'lucide-react';
-import { useRef, type PointerEvent } from 'react';
+import { ArrowDown, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpRight, ChevronRight, Clock, Trash2 } from 'lucide-react';
+import { useMemo, useRef, useState, type PointerEvent } from 'react';
 
 import {
   ElevationProfile,
@@ -7,17 +7,21 @@ import {
   ProfileSparkline,
   routeBorder,
   RouteThumbnail,
+  SelectControl,
   SurfaceBar,
+  tip,
   useDesktop,
 } from '../components/index.ts';
 import {
   formatDistance,
   formatDuration,
   formatHeight,
+  routeOrder,
   type Position,
   type WaypointPois,
   type MapSnapshot,
   type Route,
+  type RouteSort,
   type PaceUnit,
 } from '../core/index.ts';
 import { criteriaText, routesText, type Language } from '../i18n/index.ts';
@@ -41,7 +45,8 @@ const SWIPE_PX = 50;
 /** The box of a route's row; the placeholder of the results draws the same. */
 export const ROUTE_ROW_BOX = 'flex min-h-13 w-full flex-col gap-2 rounded-md border border-l-4 border-border p-2';
 
-const TEXT_BUTTON = 'flex min-h-touch items-center gap-1 rounded-full px-2 text-sm text-accent hover:bg-surface-2';
+const TEXT_BUTTON = 'group flex min-h-touch items-center text-sm text-accent';
+const TEXT_BUTTON_HOVER = 'flex items-center gap-1 rounded-full px-2 py-1 group-hover:bg-surface-2';
 
 // The words of the route set: its own, and the labels it shares with the criteria.
 const words = (language: Language) => ({ ...criteriaText[language], ...routesText[language] });
@@ -52,13 +57,17 @@ const words = (language: Language) => ({ ...criteriaText[language], ...routesTex
  * alone: the route selected has its detail in the dock (`RouteDock`), and pointing at a row only previews its
  * route. `onSelect` hears the route shown in the carousel, the list or the detail, `onHover` a place the user
  * points at on the elevation profile. The durations of the routes are at `pace`; `onPaceChange`, when given,
- * lets the user change it in the list. `onClear` forgets the route set.
+ * lets the user change it in the list. `sort` orders the list, from the largest figure down unless `descending` is
+ * false; `onSortChange`, when given, lets the user pick the figure, and `onReverseSort` the order. `onClear` forgets
+ * the route set.
  */
 export function RouteSetView({
   language,
   paceUnit,
   routes,
   pace,
+  sort = 'relevance',
+  descending = true,
   snapshot,
   selected,
   detail,
@@ -66,6 +75,8 @@ export function RouteSetView({
   onPreview,
   onDetailChange,
   onPaceChange,
+  onSortChange,
+  onReverseSort,
   onClear,
   onReverse,
   onHover,
@@ -78,6 +89,10 @@ export function RouteSetView({
   routes: Route[];
   /** Minutes per km, which the durations of the routes are estimated at. */
   pace: number;
+  /** How the list orders its routes: the API ranks them by relevance, the default. */
+  sort?: RouteSort;
+  /** From the largest figure down, as the list starts; false goes from the smallest up. */
+  descending?: boolean;
   /** What the map showed for these routes, to draw their thumbnails over. */
   snapshot?: MapSnapshot;
   /** Undefined while the user has picked none, as on a desktop at first. */
@@ -90,6 +105,10 @@ export function RouteSetView({
   onDetailChange: (detail: boolean) => void;
   /** Absent when the pace cannot change the routes' durations alone, such as by duration. */
   onPaceChange?: (pace: number) => void;
+  /** Absent when the list cannot be reordered. */
+  onSortChange?: (sort: RouteSort) => void;
+  /** Absent when the order cannot be reversed. */
+  onReverseSort?: () => void;
   onClear: () => void;
   /** The user asks to run the route at this index the other way. */
   onReverse: (index: number) => void;
@@ -101,19 +120,27 @@ export function RouteSetView({
   closestElevationGain?: number | undefined;
 }) {
   const desktop = useDesktop();
+  // The pace editor takes the row: the list sorts once it closes.
+  const [editingPace, setEditingPace] = useState(false);
+  // The routes the API ranked, or the same from the largest or smallest distance, gain or duration.
+  const order = useMemo(() => routeOrder(routes, sort, descending), [routes, sort, descending]);
+  // The place of the route selected in the list, which may differ from its place in the route set.
+  const position = selected === undefined ? undefined : order.indexOf(selected);
 
   if (detail && !desktop) {
+    const at = Math.max(0, position ?? 0);
     return (
       <RouteDetail
         language={language}
         paceUnit={paceUnit}
-        routes={routes}
+        routes={order.map((index) => routes[index]!)}
         pace={pace}
         snapshot={snapshot}
-        selected={selected ?? 0}
-        onSelect={onSelect}
+        selected={at}
+        source={order[at] ?? 0}
+        onSelect={(index) => onSelect(order[index]!)}
         onBack={() => onDetailChange(false)}
-        onReverse={() => onReverse(selected ?? 0)}
+        onReverse={() => onReverse(order[at]!)}
         onHover={onHover}
         waypoints={waypoints}
         waypointPois={waypointPois}
@@ -122,24 +149,29 @@ export function RouteSetView({
   }
 
   const t = words(language);
-  const rows = routes.map((route, index) => (
-    <RouteRow
-      key={index}
-      route={route}
-      snapshot={snapshot}
-      index={index}
-      count={routes.length}
-      selected={index === selected}
-      language={language}
-      desktop={desktop}
-      // A tap opens the detail of the route on the card in the middle, and brings another card there; a click on
-      // a desktop selects the route.
-      onOpen={() => (!desktop && index === selected ? onDetailChange(true) : onSelect(index))}
-      // The focus on a card of a phone selects it; a desktop only previews a row, until a click selects it.
-      onPreview={() => (desktop ? onPreview?.(index) : onSelect(index))}
-      onPreviewEnd={desktop ? () => onPreview?.(undefined) : undefined}
-    />
-  ));
+  const rows = order.map((source, index) => {
+    const route = routes[source]!;
+    return (
+      <RouteRow
+        key={source}
+        route={route}
+        snapshot={snapshot}
+        index={index}
+        colorIndex={source}
+        count={routes.length}
+        selected={source === selected}
+        language={language}
+        desktop={desktop}
+        // A tap opens the detail of the route on the card in the middle, and brings another card there; a click on
+        // a desktop selects the route.
+        onOpen={() => (!desktop && index === position ? onDetailChange(true) : onSelect(source))}
+        // The focus on a card of a phone selects it; a desktop only previews a row, until a click selects it.
+        onPreview={() => (desktop ? onPreview?.(source) : onSelect(source))}
+        onPreviewEnd={desktop ? () => onPreview?.(undefined) : undefined}
+      />
+    );
+  });
+  const sortable = onSortChange !== undefined && routes.length > 1;
   return (
     <>
       <div className="flex items-center justify-between gap-2 -mt-2 -mb-5">
@@ -150,19 +182,62 @@ export function RouteSetView({
             t.routeCount(routes.length)
           )}
         </strong>
-        {!desktop && selected !== undefined && (
+        {!desktop && position !== undefined && (
           // Said again as the carousel moves; the cards alone do not tell which one is in the middle.
           <span data-testid="routes-position" className="sr-only" aria-live="polite">
-            {t.route(selected + 1, routes.length)}
+            {t.route(position + 1, routes.length)}
           </span>
         )}
         <button type="button" data-testid="routes-clear" className={`${TEXT_BUTTON} ml-auto`} onClick={onClear}>
-          <Trash2 size={18} aria-hidden />
-          {t.clearRoutes}
+          <span className={TEXT_BUTTON_HOVER}>
+            <Trash2 size={18} aria-hidden />
+            {t.clearRoutes}
+          </span>
         </button>
       </div>
-      <div className="-mb-2">
-        <RoutePace paceUnit={paceUnit} language={language} pace={pace} onChange={onPaceChange} />
+      <div className="-mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
+        <RoutePace
+          paceUnit={paceUnit}
+          language={language}
+          pace={pace}
+          onChange={onPaceChange}
+          onEditingChange={setEditingPace}
+        />
+        {sortable && !editingPace && (
+          <div data-testid="routes-sort-box" className="flex items-center gap-0.5">
+            {onReverseSort && (
+              <button
+                type="button"
+                data-testid="routes-sort-direction"
+                className="group -mr-1 grid size-touch flex-none place-items-center rounded-full text-ink aria-pressed:text-accent"
+                {...tip(descending ? t.sortDescending : t.sortAscending, 'bottom-end')}
+                aria-label={descending ? t.sortDescending : t.sortAscending}
+                aria-pressed={descending}
+                onClick={onReverseSort}
+              >
+                <span className="grid size-8 place-items-center rounded-full group-hover:bg-surface-2">
+                  {descending ? <ArrowDown size={18} aria-hidden /> : <ArrowUp size={18} aria-hidden />}
+                </span>
+              </button>
+            )}
+            <SelectControl
+              testId="routes-sort"
+              label={t.sortBy}
+              value={sort}
+              compact
+              plain
+              chevron={false}
+              detached
+              options={[
+                { value: 'relevance', label: t.sortRelevance },
+                { value: 'distance', label: t.sortDistance },
+                { value: 'gain', label: t.sortGain },
+                { value: 'duration', label: t.sortDuration },
+              ]}
+              onChange={onSortChange}
+            />
+          </div>
+        )}
       </div>
       {closestElevationGain !== undefined && (
         <p
@@ -174,12 +249,10 @@ export function RouteSetView({
       )}
       {desktop ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0" data-testid="routes-list">
-          {rows.map((row, index) => (
-            <li key={index}>{row}</li>
-          ))}
+          {rows}
         </ul>
       ) : (
-        <RouteCarousel testId="routes-list" selected={selected} onSelect={onSelect}>
+        <RouteCarousel testId="routes-list" selected={position} onSelect={(index) => onSelect(order[index]!)}>
           {rows}
         </RouteCarousel>
       )}
@@ -191,6 +264,7 @@ function RouteRow({
   route,
   snapshot,
   index,
+  colorIndex,
   count,
   selected,
   language,
@@ -201,7 +275,10 @@ function RouteRow({
 }: {
   route: Route;
   snapshot?: MapSnapshot;
+  /** Its place in the list, which names it. */
   index: number;
+  /** Its place in the route set, which gives it its colour on the map. */
+  colorIndex: number;
   count: number;
   selected: boolean;
   language: Language;
@@ -239,7 +316,7 @@ function RouteRow({
       data-testid={`routes-row-${index}`}
       data-selected={selected ? '' : undefined}
       aria-current={selected ? 'true' : undefined}
-      className={`${ROUTE_ROW_BOX} text-left ${routeBorder(index)} hover:bg-surface-2 data-selected:bg-surface-2`}
+      className={`${ROUTE_ROW_BOX} text-left ${routeBorder(colorIndex)} hover:bg-surface-2 data-selected:bg-surface-2`}
       aria-label={name}
       onPointerDown={() => (pressed.current = true)}
       onPointerCancel={() => (pressed.current = false)}
@@ -263,7 +340,7 @@ function RouteRow({
         </span>
       )}
       <span className="flex w-full items-center gap-3">
-        <RouteThumbnail geometry={route.geometry} index={index} {...(snapshot && { snapshot })} />
+        <RouteThumbnail geometry={route.geometry} index={colorIndex} {...(snapshot && { snapshot })} />
         <span className="flex min-w-0 flex-none flex-col gap-1">
           <strong data-testid={`routes-row-${index}-distance`} className="text-lg">
             {distance}
@@ -288,7 +365,7 @@ function RouteRow({
           <LapsMarker route={route} language={language} testId={`routes-row-${index}-laps`} compact />
         </span>
         {/* The empty width of the row: where the route climbs, at a glance. */}
-        <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={index} />
+        <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={colorIndex} />
         <ChevronRight size={18} aria-hidden className="ml-auto flex-none text-ink-2" />
       </span>
       {!route.imported && (
@@ -305,6 +382,7 @@ function RouteDetail({
   pace,
   snapshot,
   selected,
+  source,
   onSelect,
   onBack,
   onReverse,
@@ -319,6 +397,8 @@ function RouteDetail({
   pace: number;
   snapshot?: MapSnapshot;
   selected: number;
+  /** The place of the route in the route set, which gives it its colour on the map. */
+  source: number;
   onSelect: (index: number) => void;
   onBack: () => void;
   onReverse: () => void;
@@ -366,8 +446,10 @@ function RouteDetail({
           {t.routes}
         </button>
         <button type="button" data-testid="route-reverse" className={TEXT_BUTTON} onClick={onReverse}>
-          <ArrowLeftRight size={18} aria-hidden />
-          {t.reverseRoute}
+          <span className={TEXT_BUTTON_HOVER}>
+            <ArrowLeftRight size={18} aria-hidden />
+            {t.reverseRoute}
+          </span>
         </button>
         {!route.imported && (
           <strong data-testid="route-position" aria-label={routeTitle(route, language, selected, routes.length)}>
@@ -385,7 +467,7 @@ function RouteDetail({
         <RouteThumbnail
           testId="route-thumbnail"
           geometry={route.geometry}
-          index={selected}
+          index={source}
           {...(snapshot && { snapshot })}
         />
         <RouteFigures route={route} language={language} className="flex-1" />
