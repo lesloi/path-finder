@@ -20,8 +20,9 @@ export function useRouteBrowser() {
   const [hover, setHover] = useState<Position>();
   // The routes the user runs the other way, by their place in the route set.
   const [reversed, setReversed] = useState<ReadonlySet<number>>(new Set());
-  // How the list orders its routes: every new route set starts by relevance, as the API ranked it.
+  // How the list orders its routes: every new route set starts by relevance, and from the largest figure down.
   const [sort, setSort] = useState<RouteSort>('relevance');
+  const [descending, setDescending] = useState(true);
   const [mapSnapshot, setSnapshot] = useState<MapSnapshot>();
   // Kept while the route set does, so the map's effects only run for a new one.
   const geometries = useMemo(
@@ -62,6 +63,8 @@ export function useRouteBrowser() {
     reversed,
     sort,
     setSort,
+    descending,
+    reverseSort: () => setDescending((current) => !current),
     toggleReversed: (index: number) => {
       // The place pointed at belongs to the profile of the other direction.
       setHover(undefined);
@@ -81,6 +84,7 @@ export function useRouteBrowser() {
       setPreview(undefined);
       setReversed(new Set());
       setSort('relevance');
+      setDescending(true);
       setSheet('collapsed');
       find(request);
     },
@@ -91,6 +95,7 @@ export function useRouteBrowser() {
       setPreview(undefined);
       setReversed(new Set());
       setSort('relevance');
+      setDescending(true);
       setSheet('collapsed');
       show(request, [route]);
     },
@@ -101,6 +106,7 @@ export function useRouteBrowser() {
       setSelected(undefined);
       setPreview(undefined);
       setSort('relevance');
+      setDescending(true);
       setSheet('collapsed');
       setHover(undefined);
     },

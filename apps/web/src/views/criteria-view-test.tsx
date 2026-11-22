@@ -1498,7 +1498,7 @@ describe('CriteriaView', () => {
 
     it('names the route clicked by its place in the sorted list, in the dock', async () => {
       onDesktop();
-      ask(answer(route(0, { elevationGain: 500 }), route(1, { elevationGain: 100 })));
+      ask(answer(route(0, { elevationGain: 100 }), route(1, { elevationGain: 500 })));
       render(<CriteriaView language="en" />);
       act(() => map().fire('style.load'));
       await submit();

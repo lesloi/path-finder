@@ -85,14 +85,15 @@ describe('useRouteBrowser', () => {
     expect(result.current.selected).toBeUndefined();
   });
 
-  it('lists the routes by relevance again with a new request', async () => {
+  it('lists the routes by relevance again, from the largest down, with a new request', async () => {
     const { result } = await browse();
     act(() => result.current.setSort('distance'));
-    expect(result.current.sort).toBe('distance');
+    act(() => result.current.reverseSort());
+    expect(result.current).toMatchObject({ sort: 'distance', descending: false });
 
     act(() => result.current.ask(request));
 
-    expect(result.current.sort).toBe('relevance');
+    expect(result.current).toMatchObject({ sort: 'relevance', descending: true });
   });
 
   it('forgets the place pointed at when the detail opens or closes', async () => {

@@ -305,7 +305,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     [directed],
   );
   // How the list shows the routes; the map keeps the order of the route set, which gives each its colour.
-  const order = useMemo(() => (atPace ? routeOrder(atPace.routes, browser.sort) : []), [atPace, browser.sort]);
+  const order = useMemo(
+    () => (atPace ? routeOrder(atPace.routes, browser.sort, browser.descending) : []),
+    [atPace, browser.sort, browser.descending],
+  );
   const routesShown = Boolean(routeSet);
   const listShown = desktop && (loading || Boolean(routeSet));
   // Without a search there is nothing to look at behind the form: it cannot stay hidden.
@@ -552,6 +555,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         pace={atPace.pace}
         sort={browser.sort}
         onSortChange={browser.setSort}
+        descending={browser.descending}
+        onReverseSort={browser.reverseSort}
         snapshot={browser.snapshot}
         selected={selected}
         detail={browser.detail}

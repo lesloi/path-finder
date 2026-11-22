@@ -1,14 +1,16 @@
-import { ArrowLeft, ArrowLeftRight, ArrowUpDown, ArrowUpRight, ChevronRight, Clock, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpRight, ChevronRight, Clock, Trash2 } from 'lucide-react';
 import { useMemo, useRef, type PointerEvent } from 'react';
 
 import {
   ElevationProfile,
   hint,
+  ICON_BUTTON,
   ProfileSparkline,
   routeBorder,
   RouteThumbnail,
   SelectControl,
   SurfaceBar,
+  tip,
   useDesktop,
 } from '../components/index.ts';
 import {
@@ -55,8 +57,9 @@ const words = (language: Language) => ({ ...criteriaText[language], ...routesTex
  * alone: the route selected has its detail in the dock (`RouteDock`), and pointing at a row only previews its
  * route. `onSelect` hears the route shown in the carousel, the list or the detail, `onHover` a place the user
  * points at on the elevation profile. The durations of the routes are at `pace`; `onPaceChange`, when given,
- * lets the user change it in the list. `sort` orders the list, `onSortChange`, when given, lets the user change
- * it. `onClear` forgets the route set.
+ * lets the user change it in the list. `sort` orders the list, from the largest figure down unless `descending` is
+ * false; `onSortChange`, when given, lets the user pick the figure, and `onReverseSort` the order. `onClear` forgets
+ * the route set.
  */
 export function RouteSetView({
   language,
@@ -64,6 +67,7 @@ export function RouteSetView({
   routes,
   pace,
   sort = 'relevance',
+  descending = true,
   snapshot,
   selected,
   detail,
@@ -72,6 +76,7 @@ export function RouteSetView({
   onDetailChange,
   onPaceChange,
   onSortChange,
+  onReverseSort,
   onClear,
   onReverse,
   onHover,
@@ -86,6 +91,8 @@ export function RouteSetView({
   pace: number;
   /** How the list orders its routes: the API ranks them by relevance, the default. */
   sort?: RouteSort;
+  /** From the largest figure down, as the list starts; false goes from the smallest up. */
+  descending?: boolean;
   /** What the map showed for these routes, to draw their thumbnails over. */
   snapshot?: MapSnapshot;
   /** Undefined while the user has picked none, as on a desktop at first. */
@@ -100,6 +107,8 @@ export function RouteSetView({
   onPaceChange?: (pace: number) => void;
   /** Absent when the list cannot be reordered. */
   onSortChange?: (sort: RouteSort) => void;
+  /** Absent when the order cannot be reversed. */
+  onReverseSort?: () => void;
   onClear: () => void;
   /** The user asks to run the route at this index the other way. */
   onReverse: (index: number) => void;
@@ -111,8 +120,8 @@ export function RouteSetView({
   closestElevationGain?: number | undefined;
 }) {
   const desktop = useDesktop();
-  // The routes the API ranked, or the same from the smallest distance, gain or duration up.
-  const order = useMemo(() => routeOrder(routes, sort), [routes, sort]);
+  // The routes the API ranked, or the same from the largest or smallest distance, gain or duration.
+  const order = useMemo(() => routeOrder(routes, sort, descending), [routes, sort, descending]);
   // The place of the route selected in the list, which may differ from its place in the route set.
   const position = selected === undefined ? undefined : order.indexOf(selected);
 
@@ -186,7 +195,18 @@ export function RouteSetView({
         <RoutePace paceUnit={paceUnit} language={language} pace={pace} onChange={onPaceChange} />
         {sortable && (
           <div data-testid="routes-sort-box" className="flex items-center gap-1.5">
-            <ArrowUpDown size={16} aria-hidden className="flex-none text-ink-2" />
+            <button
+              type="button"
+              data-testid="routes-sort-direction"
+              className={`${ICON_BUTTON} aria-pressed:text-accent`}
+              {...tip(descending ? t.sortDescending : t.sortAscending, 'bottom-start')}
+              aria-label={descending ? t.sortDescending : t.sortAscending}
+              aria-pressed={descending}
+              // Without a handler the arrow only says which way the list runs.
+              {...(onReverseSort ? { onClick: onReverseSort } : { disabled: true })}
+            >
+              {descending ? <ArrowDown size={18} aria-hidden /> : <ArrowUp size={18} aria-hidden />}
+            </button>
             <SelectControl
               testId="routes-sort"
               label={t.sortBy}

@@ -20,8 +20,8 @@ function route(overrides: Partial<Route> = {}): Route {
 }
 
 describe('routeOrder', () => {
-  it('lists every route once, in the order it was given, for relevance', () => {
-    expect(routeOrder([route(), route(), route()], 'relevance')).toEqual([0, 1, 2]);
+  it('lists every route once, in the order the API ranked for relevance descending', () => {
+    expect(routeOrder([route(), route(), route()], 'relevance', true)).toEqual([0, 1, 2]);
   });
 
   it('puts the shortest route first by distance', () => {
@@ -58,5 +58,30 @@ describe('routeOrder', () => {
     const routes = [route({ distance: 10 }), route({ distance: 8 }), route({ distance: 10 }), route({ distance: 8 })];
 
     expect(routeOrder(routes, 'distance')).toEqual([1, 3, 0, 2]);
+  });
+
+  it('puts the longest route first when descending, from the API order for relevance', () => {
+    const routes = [route({ distance: 12 }), route({ distance: 8 }), route({ distance: 10 })];
+
+    expect(routeOrder(routes, 'distance', true)).toEqual([0, 2, 1]);
+    expect(routeOrder(routes, 'relevance', true)).toEqual([0, 1, 2]);
+  });
+
+  it('reverses the API order for relevance when ascending', () => {
+    expect(routeOrder([route(), route(), route()], 'relevance', false)).toEqual([2, 1, 0]);
+  });
+
+  it('still puts a route without elevation gain last when descending', () => {
+    const { elevationGain, ...flat } = route({ elevationGain: 50 });
+    expect(elevationGain).toBe(50);
+    const routes = [flat, route({ elevationGain: 900 }), route({ elevationGain: 300 })];
+
+    expect(routeOrder(routes, 'gain', true)).toEqual([1, 2, 0]);
+  });
+
+  it('keeps equal routes in the order they were given when descending', () => {
+    const routes = [route({ distance: 10 }), route({ distance: 8 }), route({ distance: 10 }), route({ distance: 8 })];
+
+    expect(routeOrder(routes, 'distance', true)).toEqual([0, 2, 1, 3]);
   });
 });

@@ -82,6 +82,7 @@ function View({
   const [selected, setSelected] = useState(0);
   const [detail, setDetail] = useState(open);
   const [sort, setSort] = useState<RouteSort>('relevance');
+  const [descending, setDescending] = useState(true);
   return (
     <RouteSetView
       language={language}
@@ -90,6 +91,8 @@ function View({
       pace={pace}
       sort={sort}
       onSortChange={onSortChange ?? setSort}
+      descending={descending}
+      onReverseSort={() => setDescending(!descending)}
       selected={selected}
       detail={detail}
       onSelect={(index) => {
@@ -177,26 +180,26 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('routes-sort-relevance')).toHaveAttribute('aria-selected', 'true');
     });
 
-    it('puts the shortest route first when sorted by distance', () => {
+    it('puts the longest route first when sorted by distance', () => {
       render(<View />);
 
       fireEvent.click(screen.getByTestId('routes-sort'));
       fireEvent.click(screen.getByTestId('routes-sort-distance'));
 
-      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('9.0 km');
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('12.3 km');
       expect(screen.getByTestId('routes-row-1')).toHaveTextContent('10.5 km');
-      expect(screen.getByTestId('routes-row-2')).toHaveTextContent('12.3 km');
+      expect(screen.getByTestId('routes-row-2')).toHaveTextContent('9.0 km');
     });
 
-    it('puts the flattest route first when sorted by elevation gain', () => {
+    it('puts the highest climb first when sorted by elevation gain', () => {
       render(<View />);
 
       fireEvent.click(screen.getByTestId('routes-sort'));
       fireEvent.click(screen.getByTestId('routes-sort-gain'));
 
-      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('80 m');
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('520 m');
       expect(screen.getByTestId('routes-row-1')).toHaveTextContent('340 m');
-      expect(screen.getByTestId('routes-row-2')).toHaveTextContent('520 m');
+      expect(screen.getByTestId('routes-row-2')).toHaveTextContent('80 m');
     });
 
     it('puts a route without elevation gain after the others', () => {
@@ -209,7 +212,7 @@ describe('RouteSetView', () => {
       expect(screen.queryByTestId('routes-row-1-gain')).not.toBeInTheDocument();
     });
 
-    it('puts the quickest route first when sorted by estimated duration', () => {
+    it('puts the slowest route first when sorted by estimated duration', () => {
       const list = [
         route({ estimatedDuration: 80 }),
         route({ estimatedDuration: 50 }),
@@ -220,9 +223,26 @@ describe('RouteSetView', () => {
       fireEvent.click(screen.getByTestId('routes-sort'));
       fireEvent.click(screen.getByTestId('routes-sort-duration'));
 
-      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('50 min');
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('1 h 20');
       expect(screen.getByTestId('routes-row-1')).toHaveTextContent('1 h 05');
-      expect(screen.getByTestId('routes-row-2')).toHaveTextContent('1 h 20');
+      expect(screen.getByTestId('routes-row-2')).toHaveTextContent('50 min');
+    });
+
+    it('starts from the largest down, and the arrow reverses the order', () => {
+      render(<View />);
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-distance'));
+      const direction = screen.getByTestId('routes-sort-direction');
+
+      expect(direction).toHaveAccessibleName(en.sortDescending);
+      expect(direction).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('12.3 km');
+
+      fireEvent.click(direction);
+
+      expect(direction).toHaveAccessibleName(en.sortAscending);
+      expect(direction).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('9.0 km');
     });
 
     it('goes back to the order the API ranked, the most relevant', () => {
@@ -244,7 +264,7 @@ describe('RouteSetView', () => {
       render(<View onSelect={onSelect} />);
 
       fireEvent.click(screen.getByTestId('routes-sort'));
-      fireEvent.click(screen.getByTestId('routes-sort-distance'));
+      fireEvent.click(screen.getByTestId('routes-sort-gain'));
       fireEvent.click(screen.getByTestId('routes-row-0'));
 
       expect(onSelect).toHaveBeenCalledExactlyOnceWith(1);
@@ -272,9 +292,9 @@ describe('RouteSetView', () => {
       fireEvent.click(screen.getByTestId('routes-row-0'));
 
       expect(screen.getByTestId('route-position')).toHaveTextContent('1/3');
-      expect(screen.getByTestId('route-distance')).toHaveTextContent('10.5 km');
+      expect(screen.getByTestId('route-distance')).toHaveTextContent('9.0 km');
       fireEvent.click(screen.getByTestId('route-reverse'));
-      expect(onReverse).toHaveBeenCalledExactlyOnceWith(2);
+      expect(onReverse).toHaveBeenCalledExactlyOnceWith(1);
     });
 
     it('says the sort in the language of the settings', () => {
