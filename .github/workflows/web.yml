@@ -25,7 +25,7 @@ jobs:
     # 8 minutes). The tag must match the `@playwright/test` version of the lockfile; a mismatch fails with an explicit error.
     # `--ipc=host`: the default 64 MB of shared memory crashes Chromium.
     container:
-      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      image: mcr.microsoft.com/playwright:v1.65.1-noble
       options: --ipc=host
     env:
       # The workspace belongs to another user than the container's root, so Go would refuse to read its Git status.
