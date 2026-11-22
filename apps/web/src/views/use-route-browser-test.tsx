@@ -85,6 +85,16 @@ describe('useRouteBrowser', () => {
     expect(result.current.selected).toBeUndefined();
   });
 
+  it('lists the routes by relevance again with a new request', async () => {
+    const { result } = await browse();
+    act(() => result.current.setSort('distance'));
+    expect(result.current.sort).toBe('distance');
+
+    act(() => result.current.ask(request));
+
+    expect(result.current.sort).toBe('relevance');
+  });
+
   it('forgets the place pointed at when the detail opens or closes', async () => {
     const { result } = await browse();
     act(() => result.current.setHover([6, 45]));

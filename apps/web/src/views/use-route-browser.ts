@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { useToastTimeout, type SheetState } from '../components/index.ts';
-import type { MapSnapshot, Position, Route, RouteSetRequest } from '../core/index.ts';
+import type { MapSnapshot, Position, Route, RouteSetRequest, RouteSort } from '../core/index.ts';
 import { useRouteSet, type Refusal } from '../state/index.ts';
 
 /**
@@ -20,6 +20,8 @@ export function useRouteBrowser() {
   const [hover, setHover] = useState<Position>();
   // The routes the user runs the other way, by their place in the route set.
   const [reversed, setReversed] = useState<ReadonlySet<number>>(new Set());
+  // How the list orders its routes: every new route set starts by relevance, as the API ranked it.
+  const [sort, setSort] = useState<RouteSort>('relevance');
   const [mapSnapshot, setSnapshot] = useState<MapSnapshot>();
   // Kept while the route set does, so the map's effects only run for a new one.
   const geometries = useMemo(
@@ -58,6 +60,8 @@ export function useRouteBrowser() {
     geometries,
     directedGeometries,
     reversed,
+    sort,
+    setSort,
     toggleReversed: (index: number) => {
       // The place pointed at belongs to the profile of the other direction.
       setHover(undefined);
@@ -76,6 +80,7 @@ export function useRouteBrowser() {
       setSelected(undefined);
       setPreview(undefined);
       setReversed(new Set());
+      setSort('relevance');
       setSheet('collapsed');
       find(request);
     },
@@ -85,6 +90,7 @@ export function useRouteBrowser() {
       setSelected(0);
       setPreview(undefined);
       setReversed(new Set());
+      setSort('relevance');
       setSheet('collapsed');
       show(request, [route]);
     },
@@ -94,6 +100,7 @@ export function useRouteBrowser() {
       setReversed(new Set());
       setSelected(undefined);
       setPreview(undefined);
+      setSort('relevance');
       setSheet('collapsed');
       setHover(undefined);
     },

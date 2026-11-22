@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { useState } from 'react';
 
 import { expectNamedControls } from '../accessible-names.ts';
-import type { Route } from '../core/index.ts';
+import type { Route, RouteSort } from '../core/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
 import { RouteSetView } from './route-set-view.tsx';
 
@@ -58,6 +58,7 @@ function View({
   onPaceChange,
   onClear = () => {},
   onReverse = () => {},
+  onSortChange,
   pace = 6,
   open = false,
   waypoints,
@@ -72,6 +73,7 @@ function View({
   onPaceChange?: (pace: number) => void;
   onClear?: () => void;
   onReverse?: (index: number) => void;
+  onSortChange?: (sort: RouteSort) => void;
   pace?: number;
   open?: boolean;
   waypoints?: [number, number][];
@@ -79,12 +81,15 @@ function View({
 }) {
   const [selected, setSelected] = useState(0);
   const [detail, setDetail] = useState(open);
+  const [sort, setSort] = useState<RouteSort>('relevance');
   return (
     <RouteSetView
       language={language}
       paceUnit={paceUnit}
       routes={list}
       pace={pace}
+      sort={sort}
+      onSortChange={onSortChange ?? setSort}
       selected={selected}
       detail={detail}
       onSelect={(index) => {
@@ -104,6 +109,10 @@ function View({
 }
 
 const en = routesText.en;
+const sortLabel = (sort: RouteSort) =>
+  (({ relevance: 'sortRelevance', distance: 'sortDistance', gain: 'sortGain', duration: 'sortDuration' }) as const)[
+    sort
+  ];
 const swipe = (from: [number, number], to: [number, number]) => {
   const detail = screen.getByTestId('route-detail');
   fireEvent.pointerDown(detail, { clientX: from[0], clientY: from[1], pointerType: 'touch' });
@@ -154,6 +163,134 @@ describe('RouteSetView', () => {
 
       expect(screen.getByTestId('routes-count')).toHaveTextContent('3 routes');
       expect(within(screen.getByTestId('routes-list')).getAllByRole('button')).toHaveLength(3);
+    });
+
+    it('offers the four sorts, the most relevant first', () => {
+      render(<View />);
+
+      expect(screen.getByTestId('routes-sort')).toHaveAccessibleName(en.sortBy);
+      fireEvent.click(screen.getByTestId('routes-sort'));
+
+      for (const sort of ['relevance', 'distance', 'gain', 'duration'] as const) {
+        expect(screen.getByTestId(`routes-sort-${sort}`)).toHaveTextContent(en[sortLabel(sort)]);
+      }
+      expect(screen.getByTestId('routes-sort-relevance')).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('puts the shortest route first when sorted by distance', () => {
+      render(<View />);
+
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-distance'));
+
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('9.0 km');
+      expect(screen.getByTestId('routes-row-1')).toHaveTextContent('10.5 km');
+      expect(screen.getByTestId('routes-row-2')).toHaveTextContent('12.3 km');
+    });
+
+    it('puts the flattest route first when sorted by elevation gain', () => {
+      render(<View />);
+
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-gain'));
+
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('80 m');
+      expect(screen.getByTestId('routes-row-1')).toHaveTextContent('340 m');
+      expect(screen.getByTestId('routes-row-2')).toHaveTextContent('520 m');
+    });
+
+    it('puts a route without elevation gain after the others', () => {
+      render(<View list={[withoutElevation(), route()]} />);
+
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-gain'));
+
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('12.3 km');
+      expect(screen.queryByTestId('routes-row-1-gain')).not.toBeInTheDocument();
+    });
+
+    it('puts the quickest route first when sorted by estimated duration', () => {
+      const list = [
+        route({ estimatedDuration: 80 }),
+        route({ estimatedDuration: 50 }),
+        route({ estimatedDuration: 65 }),
+      ];
+      render(<View list={list} />);
+
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-duration'));
+
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('50 min');
+      expect(screen.getByTestId('routes-row-1')).toHaveTextContent('1 h 05');
+      expect(screen.getByTestId('routes-row-2')).toHaveTextContent('1 h 20');
+    });
+
+    it('goes back to the order the API ranked, the most relevant', () => {
+      render(<View />);
+
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-distance'));
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-relevance'));
+
+      expect(screen.getByTestId('routes-row-0')).toHaveTextContent('12.3 km');
+      expect(screen.getByTestId('routes-row-1')).toHaveTextContent('9.0 km');
+      expect(screen.getByTestId('routes-row-2')).toHaveTextContent('10.5 km');
+    });
+
+    it('selects the route a sorted row holds, not the place of the row', () => {
+      onDesktop();
+      const onSelect = vi.fn();
+      render(<View onSelect={onSelect} />);
+
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-distance'));
+      fireEvent.click(screen.getByTestId('routes-row-0'));
+
+      expect(onSelect).toHaveBeenCalledExactlyOnceWith(1);
+      expect(screen.getByTestId('routes-row-0')).toHaveAttribute('data-selected');
+    });
+
+    it('counts the place of a sorted route in the list, not in the API order', () => {
+      render(<View />);
+
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-gain'));
+
+      expect(screen.getByTestId('routes-position')).toHaveTextContent('Route 2 of 3');
+      fireEvent.focus(screen.getByTestId('routes-row-2'));
+      expect(screen.getByTestId('routes-position')).toHaveTextContent('Route 3 of 3');
+    });
+
+    it('opens the detail of the sorted route, and reverses that route', () => {
+      const onReverse = vi.fn();
+      render(<View onReverse={onReverse} />);
+
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-gain'));
+      fireEvent.click(screen.getByTestId('routes-row-0'));
+      fireEvent.click(screen.getByTestId('routes-row-0'));
+
+      expect(screen.getByTestId('route-position')).toHaveTextContent('1/3');
+      expect(screen.getByTestId('route-distance')).toHaveTextContent('10.5 km');
+      fireEvent.click(screen.getByTestId('route-reverse'));
+      expect(onReverse).toHaveBeenCalledExactlyOnceWith(2);
+    });
+
+    it('says the sort in the language of the settings', () => {
+      render(<View language="fr" />);
+
+      expect(screen.getByTestId('routes-sort')).toHaveTextContent('Pertinence');
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      expect(screen.getByTestId('routes-sort-distance')).toHaveTextContent('Distance');
+      expect(screen.getByTestId('routes-sort-gain')).toHaveTextContent('Dénivelé');
+      expect(screen.getByTestId('routes-sort-duration')).toHaveTextContent('Durée estimée');
+    });
+
+    it('offers no sort for a single route', () => {
+      render(<View list={[route()]} />);
+
+      expect(screen.queryByTestId('routes-sort')).not.toBeInTheDocument();
     });
 
     it('shows the distance, the elevation gain and the estimated duration of a route', () => {

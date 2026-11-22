@@ -1496,6 +1496,23 @@ describe('CriteriaView', () => {
       expect(map().fits).toBe(fits);
     });
 
+    it('names the route clicked by its place in the sorted list, in the dock', async () => {
+      onDesktop();
+      ask(answer(route(0, { elevationGain: 500 }), route(1, { elevationGain: 100 })));
+      render(<CriteriaView language="en" />);
+      act(() => map().fire('style.load'));
+      await submit();
+      await screen.findByTestId('routes-count');
+      await settle();
+      fireEvent.click(screen.getByTestId('routes-sort'));
+      fireEvent.click(screen.getByTestId('routes-sort-gain'));
+
+      fireEvent.click(screen.getByTestId('routes-row-0'));
+
+      expect(screen.getByTestId('route-position')).toHaveTextContent(routesText.en.route(1, 2));
+      expect(screen.getByTestId('route-distance')).toHaveTextContent('11.0 km');
+    });
+
     it('draws every route, the selected one marked with its distances', async () => {
       onDesktop();
       ask(answer(route(0), route(1)));
