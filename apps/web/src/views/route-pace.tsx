@@ -53,7 +53,11 @@ export function RoutePace({
   // The pencil stays where it is: before the pace, which the slider then spans the width under.
   if (editing && onChange) {
     return (
-      <div ref={editor} data-testid="routes-pace" className="text-sm text-ink-2 [&_output]:text-lg [&_input]:-mt-3">
+      <div
+        ref={editor}
+        data-testid="routes-pace"
+        className="w-full text-sm text-ink-2 [&_output]:text-lg [&_input]:-mt-3"
+      >
         <PaceSlider
           label={t.pace}
           pace={pace}
