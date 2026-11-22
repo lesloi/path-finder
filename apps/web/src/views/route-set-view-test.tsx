@@ -491,6 +491,19 @@ describe('RouteSetView', () => {
       expect(screen.getByTestId('routes-pace-edit')).toHaveFocus();
     });
 
+    it('hides the sort while the pace is edited, and brings it back', () => {
+      render(<View onPaceChange={vi.fn()} />);
+      fireEvent.click(screen.getByTestId('routes-pace-edit'));
+
+      expect(screen.queryByTestId('routes-sort')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('routes-sort-direction')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('routes-pace-edit'));
+
+      expect(screen.getByTestId('routes-sort')).toBeInTheDocument();
+      expect(screen.getByTestId('routes-sort-direction')).toBeInTheDocument();
+    });
+
     it('only says the pace when it cannot be changed here', () => {
       render(<View onPaceChange={undefined} />);
 

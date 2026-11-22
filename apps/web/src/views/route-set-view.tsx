@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowLeft, ArrowLeftRight, ArrowUp, ArrowUpRight, ChevronRight, Clock, Trash2 } from 'lucide-react';
-import { useMemo, useRef, type PointerEvent } from 'react';
+import { useMemo, useRef, useState, type PointerEvent } from 'react';
 
 import {
   ElevationProfile,
@@ -119,6 +119,8 @@ export function RouteSetView({
   closestElevationGain?: number | undefined;
 }) {
   const desktop = useDesktop();
+  // The pace editor takes the row: the list sorts once it closes.
+  const [editingPace, setEditingPace] = useState(false);
   // The routes the API ranked, or the same from the largest or smallest distance, gain or duration.
   const order = useMemo(() => routeOrder(routes, sort, descending), [routes, sort, descending]);
   // The place of the route selected in the list, which may differ from its place in the route set.
@@ -191,8 +193,14 @@ export function RouteSetView({
         </button>
       </div>
       <div className="-mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
-        <RoutePace paceUnit={paceUnit} language={language} pace={pace} onChange={onPaceChange} />
-        {sortable && (
+        <RoutePace
+          paceUnit={paceUnit}
+          language={language}
+          pace={pace}
+          onChange={onPaceChange}
+          onEditingChange={setEditingPace}
+        />
+        {sortable && !editingPace && (
           <div data-testid="routes-sort-box" className="flex items-center gap-0.5">
             <button
               type="button"
@@ -213,6 +221,7 @@ export function RouteSetView({
               label={t.sortBy}
               value={sort}
               compact
+              plain
               chevron={false}
               options={[
                 { value: 'relevance', label: t.sortRelevance },

@@ -12,11 +12,14 @@ export function RoutePace({
   language,
   pace,
   onChange,
+  onEditingChange,
 }: {
   paceUnit: PaceUnit;
   language: Language;
   pace: number;
   onChange?: (pace: number) => void;
+  /** Says whether the slider is open, so the row around it can make room. */
+  onEditingChange?: (editing: boolean) => void;
 }) {
   const t = { ...criteriaText[language], ...routesText[language] };
   const [editing, setEditing] = useState(false);
@@ -28,7 +31,8 @@ export function RoutePace({
     if (editing) editor.current?.querySelector('input')?.focus();
     else if (wasEditing.current) edit.current?.focus();
     wasEditing.current = editing;
-  }, [editing]);
+    onEditingChange?.(editing);
+  }, [editing, onEditingChange]);
   const pencil = onChange && (
     <button
       type="button"

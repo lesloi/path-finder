@@ -18,6 +18,7 @@ export function SelectControl<Value extends string>({
   describedBy,
   compact = false,
   chevron = true,
+  plain = false,
 }: {
   label: string;
   value: Value;
@@ -31,6 +32,8 @@ export function SelectControl<Value extends string>({
   compact?: boolean;
   /** The arrow that says the list opens; off where another arrow beside it would double it. */
   chevron?: boolean;
+  /** The text alone, with no border or background: a control that reads as part of the row. */
+  plain?: boolean;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -118,9 +121,11 @@ export function SelectControl<Value extends string>({
         onKeyDown={onKeyDown}
         onKeyUp={(event) => event.key === ' ' && event.preventDefault()}
         className={
-          'flex min-h-touch cursor-pointer items-center rounded-md border border-border bg-surface-2 text-sm ' +
-          'font-medium text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ' +
-          (compact ? 'gap-2 px-2' : 'gap-3 px-4')
+          'flex min-h-touch cursor-pointer items-center text-sm font-medium text-ink ' +
+          'focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ' +
+          (plain
+            ? 'gap-1 rounded-sm'
+            : 'rounded-md border border-border bg-surface-2 ' + (compact ? 'gap-2 px-2' : 'gap-3 px-4'))
         }
       >
         <span className="flex items-center gap-2">
