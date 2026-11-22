@@ -97,10 +97,22 @@ describe('gpxExport', () => {
     });
   });
 
-  it('names the track after the route', () => {
+  it('names the track after the route, with the day of the export', () => {
     const { content } = gpxExport(route, DAY, french, PACE);
 
-    expect(parse(content).querySelector('trk > name')?.textContent).toBe('Itinéraire · 12,3 km');
+    expect(parse(content).querySelector('trk > name')?.textContent).toBe('Itinéraire · 12,3 km · 28/09/2026');
+  });
+
+  it('writes the day of the export as the device reads it', () => {
+    const { content } = gpxExport(route, new Date(2026, 0, 5, 23, 59), french, PACE);
+
+    expect(parse(content).querySelector('trk > name')?.textContent).toBe('Itinéraire · 12,3 km · 05/01/2026');
+  });
+
+  it('writes the day in the order the language does', () => {
+    const { content } = gpxExport(route, DAY, { paceUnit: 'min/km', language: 'en' }, PACE);
+
+    expect(parse(content).querySelector('trk > name')?.textContent).toContain('· 09/28/2026');
   });
 
   it('names the file after the distance, the elevation gain, and the day and time', () => {
@@ -137,7 +149,7 @@ describe('gpxExport', () => {
     const { fileName, content } = gpxExport({ ...route, laps: 3 }, DAY, french, PACE);
     const gpx = parse(content);
 
-    expect(gpx.querySelector('trk > name')?.textContent).toBe('Itinéraire · 12,3 km · 3 tours');
+    expect(gpx.querySelector('trk > name')?.textContent).toBe('Itinéraire · 12,3 km · 3 tours · 28/09/2026');
     expect(gpx.querySelector('trk > desc')?.textContent).toContain('3 tours de 4,1 km');
     expect(fileName).toBe('Running-12km_340m-x3-20260928120000.gpx');
   });
@@ -145,7 +157,7 @@ describe('gpxExport', () => {
   it('follows the language of the settings', () => {
     const { content } = gpxExport(route, DAY, { paceUnit: 'min/km', language: 'en' }, PACE);
 
-    expect(parse(content).querySelector('trk > name')?.textContent).toBe('Route · 12.3 km');
+    expect(parse(content).querySelector('trk > name')?.textContent).toBe('Route · 12.3 km · 09/28/2026');
   });
 
   it('writes one GPX 1.1 track with a height on every point and no timestamp on them', () => {
