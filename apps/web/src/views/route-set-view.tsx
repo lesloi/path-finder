@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowLeftRight, ArrowUpRight, ChevronRight, Clock, Trash2 } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, ArrowUpDown, ArrowUpRight, ChevronRight, Clock, Trash2 } from 'lucide-react';
 import { useMemo, useRef, type PointerEvent } from 'react';
 
 import {
@@ -182,15 +182,16 @@ export function RouteSetView({
           {t.clearRoutes}
         </button>
       </div>
-      <div className="-mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+      <div className="-mb-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5">
         <RoutePace paceUnit={paceUnit} language={language} pace={pace} onChange={onPaceChange} />
         {sortable && (
-          <div data-testid="routes-sort-box" className="flex items-center gap-2 text-sm text-ink-2">
-            <span>{t.sortBy}</span>
+          <div data-testid="routes-sort-box" className="flex items-center gap-1.5">
+            <ArrowUpDown size={16} aria-hidden className="flex-none text-ink-2" />
             <SelectControl
               testId="routes-sort"
               label={t.sortBy}
               value={sort}
+              compact
               options={[
                 { value: 'relevance', label: t.sortRelevance },
                 { value: 'distance', label: t.sortDistance },

@@ -16,6 +16,7 @@ export function SelectControl<Value extends string>({
   onChange,
   testId,
   describedBy,
+  compact = false,
 }: {
   label: string;
   value: Value;
@@ -25,6 +26,8 @@ export function SelectControl<Value extends string>({
   testId?: string;
   /** The id of the element that says more about the select, such as an error. */
   describedBy?: string;
+  /** Tighter padding, for a control that sits in a row of its own rather than a settings row. */
+  compact?: boolean;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -112,8 +115,9 @@ export function SelectControl<Value extends string>({
         onKeyDown={onKeyDown}
         onKeyUp={(event) => event.key === ' ' && event.preventDefault()}
         className={
-          'flex min-h-touch cursor-pointer items-center gap-3 rounded-md border border-border bg-surface-2 px-4 ' +
-          'text-sm font-medium text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none'
+          'flex min-h-touch cursor-pointer items-center rounded-md border border-border bg-surface-2 text-sm ' +
+          'font-medium text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none ' +
+          (compact ? 'gap-2 px-2' : 'gap-3 px-4')
         }
       >
         <span className="flex items-center gap-2">
