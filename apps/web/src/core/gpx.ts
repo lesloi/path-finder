@@ -41,7 +41,7 @@ export const MAX_GPX_POINTS = 2_000;
 
 /**
  * The GPX export of a route, built on the device: a GPX 1.1 file with one track named after
- * the route and its pace, in a file such as "Running-12km_340m-20260928120000.gpx".
+ * the route, its pace and the day of the export, in a file such as "Running-12km_340m-20260928120000.gpx".
  */
 export function gpxExport(
   route: GpxRoute,
@@ -66,7 +66,14 @@ export function gpxExport(
   pace: number,
 ): { fileName: string; content: string } {
   const laps = route.laps !== undefined && route.laps > 1 ? routesText[language].laps(route.laps) : '';
-  const generated = `${commonText[language].gpxTrackName} · ${formatDistance(route.distance, language)}${laps ? ` · ${laps}` : ''}`;
+  const generated = [
+    commonText[language].gpxTrackName,
+    formatDistance(route.distance, language),
+    laps,
+    exportedDay(exportedAt, language),
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const name = route.imported ? (route.imported.name ?? routesText[language].importedTrack) : generated;
   const minutes = Math.round(route.estimatedDuration);
   const duration = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
@@ -142,14 +149,23 @@ function trackPoint([lon, lat, ele]: [number, number, number?]): string {
   return `<trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${height}</trkpt>`;
 }
 
+const pad2 = (n: number) => `${n}`.padStart(2, '0');
+
+/** The device's local day of the export, written as the language does: "28/09/2026" in French, "09/28/2026" in English. */
+const exportedDay = (exportedAt: Date, language: Language) =>
+  new Intl.DateTimeFormat(language === 'en' ? 'en-US' : language, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(exportedAt);
+
 /** Such as "Running-12km_340m-x5-20260928120000", or the name of the trace for an imported track. */
 function fileName(route: GpxRoute, exportedAt: Date): string {
   const { distance, elevationGain, laps } = route;
   // The device's local time, as the user reads it on their watch.
-  const pad = (n: number) => `${n}`.padStart(2, '0');
   const [date, time] = [
-    `${exportedAt.getFullYear()}${pad(exportedAt.getMonth() + 1)}${pad(exportedAt.getDate())}`,
-    `${pad(exportedAt.getHours())}${pad(exportedAt.getMinutes())}${pad(exportedAt.getSeconds())}`,
+    `${exportedAt.getFullYear()}${pad2(exportedAt.getMonth() + 1)}${pad2(exportedAt.getDate())}`,
+    `${pad2(exportedAt.getHours())}${pad2(exportedAt.getMinutes())}${pad2(exportedAt.getSeconds())}`,
   ];
   const length = `${Math.round(distance)}km`;
   const climb = elevationGain === undefined ? '' : `_${Math.round(elevationGain)}m`;
