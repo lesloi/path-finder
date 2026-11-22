@@ -4,7 +4,6 @@ import { useMemo, useRef, type PointerEvent } from 'react';
 import {
   ElevationProfile,
   hint,
-  ICON_BUTTON,
   ProfileSparkline,
   routeBorder,
   RouteThumbnail,
@@ -198,20 +197,23 @@ export function RouteSetView({
             <button
               type="button"
               data-testid="routes-sort-direction"
-              className={`${ICON_BUTTON} -mr-1 aria-pressed:text-accent`}
+              className="group -mr-1 grid size-touch flex-none place-items-center rounded-full text-ink aria-pressed:text-accent"
               {...tip(descending ? t.sortDescending : t.sortAscending, 'bottom-start')}
               aria-label={descending ? t.sortDescending : t.sortAscending}
               aria-pressed={descending}
               // Without a handler the arrow only says which way the list runs.
               {...(onReverseSort ? { onClick: onReverseSort } : { disabled: true })}
             >
-              {descending ? <ArrowDown size={18} aria-hidden /> : <ArrowUp size={18} aria-hidden />}
+              <span className="grid size-8 place-items-center rounded-full group-hover:bg-surface-2">
+                {descending ? <ArrowDown size={18} aria-hidden /> : <ArrowUp size={18} aria-hidden />}
+              </span>
             </button>
             <SelectControl
               testId="routes-sort"
               label={t.sortBy}
               value={sort}
               compact
+              chevron={false}
               options={[
                 { value: 'relevance', label: t.sortRelevance },
                 { value: 'distance', label: t.sortDistance },

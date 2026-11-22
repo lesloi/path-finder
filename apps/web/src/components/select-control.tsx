@@ -17,6 +17,7 @@ export function SelectControl<Value extends string>({
   testId,
   describedBy,
   compact = false,
+  chevron = true,
 }: {
   label: string;
   value: Value;
@@ -28,6 +29,8 @@ export function SelectControl<Value extends string>({
   describedBy?: string;
   /** Tighter padding, for a control that sits in a row of its own rather than a settings row. */
   compact?: boolean;
+  /** The arrow that says the list opens; off where another arrow beside it would double it. */
+  chevron?: boolean;
 }) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -124,11 +127,13 @@ export function SelectControl<Value extends string>({
           {current?.icon}
           {current?.label}
         </span>
-        <ChevronDown
-          size={16}
-          aria-hidden
-          className={`flex-none text-ink-2 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
+        {chevron && (
+          <ChevronDown
+            size={16}
+            aria-hidden
+            className={`flex-none text-ink-2 transition-transform ${open ? 'rotate-180' : ''}`}
+          />
+        )}
       </button>
       {open && (
         <ul
