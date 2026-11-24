@@ -267,6 +267,12 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   asks for, as a distance target already accepts the match tolerance. The cost of the search (climb penalty,
   landmarks) is a separate model and does not change. Revisit if a target duration still misses often on the hard
   starts (#324).
+- **A route with an end point is the cheapest way from the start through the waypoints to the end, and nothing
+  more.** The loop search has no point-to-point counterpart, so no detour brings the route nearer the target
+  distance: it is offered whatever its length, as a suggestion when it is out of the tolerances, and the
+  target only ranks it. It cannot repeat laps (a lap ends where it starts), and an end beyond the longest route
+  in a straight line is refused. Revisit once users ask for a longer way to the same finish: a detour search
+  would need its own control points, between the start and the end instead of on a circle.
 
 ## Elevation
 

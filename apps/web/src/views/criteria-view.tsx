@@ -8,6 +8,7 @@ import {
   LocateFixed,
   MapPinCheck,
   MapPinPlus,
+  X,
   Navigation2,
   Scan,
   Settings,
@@ -252,10 +253,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   // Where the map moves to: the device location, or typed coordinates.
   const [focus, setFocus] = useState<Position>();
   // What a tap on the map is for: the start point (`pick`, from the crosshair) or a waypoint (`place`); one at a time.
-  const [mode, setMode] = useState<'pick' | 'place' | 'avoid'>();
+  const [mode, setMode] = useState<'pick' | 'place' | 'avoid' | 'finish'>();
   const picking = mode === 'pick';
   const placing = mode === 'place';
   const avoiding = mode === 'avoid';
+  const finishing = mode === 'finish';
+  // Where the route finishes when it is not a loop back to the start: kept here for this visit, as the waypoints are.
+  const [end, setEnd] = useState<Position>();
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
   // The circles routes keep out of: kept here too, for this visit only, as the waypoints are.
@@ -321,13 +325,13 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const selected = desktop ? browser.selected : (browser.selected ?? 0);
   const dockRoute = desktop ? atPace?.routes[selected ?? -1] : undefined;
   const dockShown = Boolean(dockRoute);
-  const current = criteriaRequest(draft[0], { pace, start, waypoints, avoidedAreas, repeats, technical });
+  const current = criteriaRequest(draft[0], { pace, start, end, waypoints, avoidedAreas, repeats, technical });
   // Every search keeps the criteria it was made with, whichever button asked for it.
   const search = (request: RouteSetRequest) => {
     setCleared(false);
     // The routes would be found out of sight.
     setListFolded(false);
-    setMode((current) => (current === 'place' || current === 'avoid' ? undefined : current));
+    setMode((current) => (current === 'place' || current === 'avoid' || current === 'finish' ? undefined : current));
     draft[2]();
     browser.ask(request);
   };
@@ -391,7 +395,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
 
   // The routes found are not dropped when the waypoints change: they are told stale, as for any other criterion, but
   // the route selected goes, as its dock numbers the waypoints it was found with.
-  function toggleMode(next: 'place' | 'avoid') {
+  function toggleMode(next: 'place' | 'avoid' | 'finish') {
     if (mode === next) return setMode(undefined);
     deselect();
     setRefused(undefined);
@@ -399,9 +403,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   }
   const togglePlacing = () => toggleMode('place');
   const toggleAvoiding = () => toggleMode('avoid');
+  const toggleFinishing = () => toggleMode('finish');
 
   // The points no area may hold or touch.
-  const points = [...(start ? [start] : []), ...waypoints];
+  const points = [...(start ? [start] : []), ...waypoints, ...(end ? [end] : [])];
 
   function addAvoidedArea(center: Position) {
     if (avoidedAreas.length >= MAX_AVOIDED_AREAS) return;
@@ -443,6 +448,20 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     setWaypoints([...waypoints, position]);
     // The last one ends placing on its own.
     if (waypoints.length + 1 >= MAX_WAYPOINTS) setMode(undefined);
+  }
+
+  function changeEnd(position: Position) {
+    if (avoidedAreas.some((area) => areaContains(area, position))) return setRefused('inArea');
+    setRefused(undefined);
+    deselect();
+    setEnd(position);
+    setMode(undefined);
+  }
+
+  function clearEnd() {
+    deselect();
+    setEnd(undefined);
+    setMode((current) => (current === 'finish' ? undefined : current));
   }
 
   function removeWaypoint(index: number) {
@@ -609,6 +628,10 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       startUncovered={startUncovered}
       language={language}
       picking={picking}
+      end={end}
+      finishing={finishing}
+      onFinishToggle={toggleFinishing}
+      onEndClear={clearEnd}
       waypoints={waypoints}
       avoidedAreas={avoidedAreas}
       draft={draft}
@@ -694,6 +717,9 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
         {...(desktop && { onBackgroundClick: deselect })}
         onSnapshot={browser.setSnapshot}
         onStartChange={changeStart}
+        end={end}
+        finishing={finishing}
+        onEndChange={changeEnd}
         waypoints={waypoints}
         avoidedAreas={avoidedAreas}
         avoiding={avoiding}
@@ -843,6 +869,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
               criteriaRequest(draft[0], {
                 pace,
                 start: start ?? NO_START,
+                end,
                 waypoints,
                 avoidedAreas,
                 repeats,
@@ -963,6 +990,22 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
             </button>
           </div>
         )}
+        {finishing && (
+          <div
+            data-testid="criteria-end-bar"
+            className="flex items-center gap-3 rounded-md bg-surface py-1 pr-1 pl-4 text-ink-2 shadow-float"
+          >
+            {desktop ? t.placeEnd : t.placeEndTouch}
+            <button
+              type="button"
+              data-testid="criteria-end-cancel"
+              className="min-h-touch rounded-full px-3 font-semibold text-accent"
+              onClick={() => setMode(undefined)}
+            >
+              {t.cancelPick}
+            </button>
+          </div>
+        )}
         {avoiding && (
           <div
             data-testid="criteria-avoided-bar"
@@ -1018,6 +1061,10 @@ function CriteriaFields({
   startUncovered,
   language,
   picking,
+  end,
+  finishing,
+  onFinishToggle,
+  onEndClear,
   waypoints,
   avoidedAreas,
   draft,
@@ -1040,6 +1087,10 @@ function CriteriaFields({
   startUncovered: boolean;
   language: Language;
   picking: boolean;
+  end: Position | undefined;
+  finishing: boolean;
+  onFinishToggle: () => void;
+  onEndClear: () => void;
   waypoints: Position[];
   avoidedAreas: AvoidedArea[];
   draft: ReturnType<typeof useCriteriaDraft>;
@@ -1090,10 +1141,42 @@ function CriteriaFields({
           <LocateIcon locating={locating} />
         </button>
       </StartPointField>
+      {criteriaShown && start && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-semibold text-ink-2">{t.endPoint}</h2>
+          <div className="flex items-center gap-2">
+            <span data-testid="criteria-end" className="min-w-0 flex-1 truncate text-sm text-ink">
+              {end ? formatPosition(end, language) : t.endLoop}
+            </span>
+            <button
+              type="button"
+              data-testid="criteria-end-pick"
+              className={`${ICON_BUTTON} aria-pressed:text-accent`}
+              {...tip(t.chooseEnd, 'bottom-end')}
+              aria-pressed={finishing}
+              onClick={onFinishToggle}
+            >
+              <MapPinCheck size={20} aria-hidden />
+            </button>
+            {end && (
+              <button
+                type="button"
+                data-testid="criteria-end-clear"
+                className={ICON_BUTTON}
+                {...tip(t.clearEnd, 'bottom-end')}
+                onClick={onEndClear}
+              >
+                <X size={20} aria-hidden />
+              </button>
+            )}
+          </div>
+        </section>
+      )}
       {criteriaShown ? (
         <CriteriaForm
           language={language}
           start={start}
+          end={end}
           startUncovered={startUncovered}
           waypoints={waypoints}
           avoidedAreas={avoidedAreas}

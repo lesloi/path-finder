@@ -48,6 +48,17 @@ func TestGenerateRefusesAnEndPointNoWayJoins(t *testing.T) {
 	}
 }
 
+func TestGenerateOffersAPointToPointRouteFarFromTheTargetAsASuggestion(t *testing.T) {
+	looper := &fakeLooper{direct: engineLoop(0)}
+	request := `{"start":[6.1294,45.8992],"end":[6.2,45.95],"target":{"distance":30},"surface":"any","pace":6}`
+
+	routes, err := generate(t, looper, context.Background(), request)
+
+	if err != nil || len(routes) != 1 || routes[0].Kind != "suggestion" {
+		t.Errorf("routes = %+v, err = %v, want the route to the end point as a suggestion", routes, err)
+	}
+}
+
 func TestGenerateRefusesAnEndPointOffTheWays(t *testing.T) {
 	looper := &fakeLooper{directErr: engine.ErrEndOffGraph}
 

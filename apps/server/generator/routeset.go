@@ -272,7 +272,8 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 	// The direct loop is offered beyond the target: the waypoints set its length, and no detour shortens it, so
 	// nothing can do better on any criterion. Short of the target the loops through the waypoints, with their
 	// detours, make up for it. Generate decides on the same test whether to search loops at all.
-	beyond := cand.direct && overshoots(c, cand)
+	// A route to an end point is the one the ways give, whatever the target: no detour search brings it nearer.
+	beyond := cand.direct && (c.End != nil || overshoots(c, cand))
 	// A numeric gain is the one criterion a route may miss and still be offered, as a last suggestion: the
 	// length is what the user asked, and the route set reports the closest gain. A shortcut is a kind of
 	// terrain, not a number to approximate, so an out-of-tier shortcut is still dropped.

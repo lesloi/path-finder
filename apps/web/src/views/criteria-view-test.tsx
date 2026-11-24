@@ -2499,6 +2499,38 @@ describe('CriteriaView', () => {
       expect(banner()).toBeInTheDocument();
     });
 
+    it('asks for a route to the end point tapped on the map, and for a loop once it is cleared', () => {
+      const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => new Promise(() => {}));
+      stubFetch(fetchMock);
+      render(<CriteriaView language="en" />);
+      setStart();
+
+      fireEvent.click(screen.getByTestId('criteria-end-pick'));
+      place(6.25, 45.85);
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+      const toEnd = lastRequest(fetchMock);
+      fireEvent.click(screen.getByTestId('criteria-end-clear'));
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      expect(toEnd.end).toEqual([6.25, 45.85]);
+      expect(lastRequest(fetchMock)).not.toHaveProperty('end');
+    });
+
+    it('stops setting the end point when its banner is cancelled, and when the search starts', () => {
+      stubFetch(() => new Promise(() => {}));
+      render(<CriteriaView language="en" />);
+      setStart();
+      fireEvent.click(screen.getByTestId('criteria-end-pick'));
+      expect(screen.getByTestId('criteria-end-bar')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('criteria-end-cancel'));
+      expect(screen.queryByTestId('criteria-end-bar')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('criteria-end-pick'));
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      expect(screen.queryByTestId('criteria-end-bar')).not.toBeInTheDocument();
+    });
+
     it('does not move the start point while placing', () => {
       render(<CriteriaView language="en" />);
       startPlacing();

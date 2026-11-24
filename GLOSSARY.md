@@ -8,8 +8,8 @@ pick one and export it to a GPS watch.
 ### Asking for routes
 
 **Start point**:
-Where every generated route begins and ends, set from the device location or by picking a
-spot on the map.
+Where every generated route begins, and ends too unless the user sets an **end point**. Set from the device
+location or by picking a spot on the map.
 _Avoid_: Origin, departure
 
 **Criteria**:
@@ -18,6 +18,11 @@ target duration, an optional target elevation gain, a surface preference,
 up to five optional waypoints, up to three optional avoided areas, and whether technical stretches are
 allowed (set in the settings, not in the form).
 _Avoid_: Filters, query, search parameters
+
+**End point**:
+Where a **point-to-point route** finishes. Optional: without one, routes are loops that end at the start point.
+Set by picking a spot on the map; the user can go back to a loop by clearing it.
+_Avoid_: Destination, arrival
 
 **Waypoint**:
 A point a route must pass through between its start and its end, in the order of the list,
@@ -133,7 +138,8 @@ distance and the elevation gain are those of all the laps together.
 _Avoid_: Multi-loop, circuit repeat
 
 **Point-to-point route**:
-A route that ends at a finish point other than its start point. Not offered yet.
+A route that ends at the **end point** instead of its start point. It is the cheapest way through the
+waypoints, with no detour to reach the target distance, so it is often a suggestion; it never repeats laps.
 _Avoid_: One-way, parcours, traversée
 
 **Route set**:
