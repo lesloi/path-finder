@@ -655,7 +655,11 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       endOpen={endOpen}
       onEndOpen={() => setEndOpen(true)}
       finishing={finishing}
-      onFinishToggle={toggleFinishing}
+      onFinishToggle={() => {
+        toggleFinishing();
+        // The layer covers the map the end point is tapped on, as it does for the start point.
+        setLayerOpen(false);
+      }}
       onEndClear={clearEnd}
       onEndTyped={(position) => {
         setFocus(position);

@@ -2750,6 +2750,21 @@ describe('CriteriaView', () => {
     });
   });
 
+  describe('the end point on a phone', () => {
+    it('closes the criteria layer to tap the end point on the map, as for the start point', () => {
+      render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByTestId('criteria-end-add'));
+
+      fireEvent.click(screen.getByTestId('criteria-end-pick'));
+
+      expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-end-bar')).toBeInTheDocument();
+    });
+  });
+
   describe('waypoints on a phone', () => {
     const placeThenOpenCriteria = (count: number) => {
       fireEvent.click(screen.getByTestId('criteria-bar'));
