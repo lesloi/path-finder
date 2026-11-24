@@ -814,6 +814,7 @@ describe('CriteriaView', () => {
       stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
       render(<CriteriaView language="en" />);
       setStartPoint();
+      fireEvent.click(screen.getByTestId('criteria-end-add'));
       const endField = () => screen.getByTestId('criteria-end');
 
       fireEvent.change(endField(), { target: { value: 'Chamonix' } });
@@ -2529,6 +2530,7 @@ describe('CriteriaView', () => {
       render(<CriteriaView language="en" />);
       setStart();
 
+      fireEvent.click(screen.getByTestId('criteria-end-add'));
       fireEvent.click(screen.getByTestId('criteria-end-pick'));
       place(6.25, 45.85);
       fireEvent.click(screen.getByTestId('criteria-submit'));
@@ -2540,10 +2542,25 @@ describe('CriteriaView', () => {
       expect(lastRequest(fetchMock)).not.toHaveProperty('end');
     });
 
+    it('asks for the end point field, which takes the focus, and folds it back to a loop', () => {
+      render(<CriteriaView language="en" />);
+      setStart();
+      expect(screen.queryByTestId('criteria-end')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('criteria-end-add'));
+      expect(screen.getByTestId('criteria-end')).toHaveFocus();
+      expect(screen.queryByTestId('criteria-end-add')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('criteria-end-clear'));
+
+      expect(screen.queryByTestId('criteria-end')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-end-add')).toBeInTheDocument();
+    });
+
     it('stops setting the end point when its banner is cancelled, and when the search starts', () => {
       stubFetch(() => new Promise(() => {}));
       render(<CriteriaView language="en" />);
       setStart();
+      fireEvent.click(screen.getByTestId('criteria-end-add'));
       fireEvent.click(screen.getByTestId('criteria-end-pick'));
       expect(screen.getByTestId('criteria-end-bar')).toBeInTheDocument();
 

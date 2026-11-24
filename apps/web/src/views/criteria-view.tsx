@@ -263,6 +263,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const [end, setEnd] = useState<Position>();
   // The name of the place the end point was found from, as for the start point.
   const [endPlace, setEndPlace] = useState<string>();
+  // The field of the end point is asked for, not always there: a loop is the usual route.
+  const [endOpen, setEndOpen] = useState(false);
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
   // The circles routes keep out of: kept here too, for this visit only, as the waypoints are.
@@ -480,6 +482,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     deselect();
     setEnd(undefined);
     setEndPlace(undefined);
+    setEndOpen(false);
     setMode((current) => (current === 'finish' ? undefined : current));
   }
 
@@ -649,6 +652,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       picking={picking}
       end={end}
       endPlace={endPlace}
+      endOpen={endOpen}
+      onEndOpen={() => setEndOpen(true)}
       finishing={finishing}
       onFinishToggle={toggleFinishing}
       onEndClear={clearEnd}
@@ -1088,6 +1093,8 @@ function CriteriaFields({
   picking,
   end,
   endPlace,
+  endOpen,
+  onEndOpen,
   finishing,
   onFinishToggle,
   onEndClear,
@@ -1117,6 +1124,8 @@ function CriteriaFields({
   picking: boolean;
   end: Position | undefined;
   endPlace: string | undefined;
+  endOpen: boolean;
+  onEndOpen: () => void;
   finishing: boolean;
   onFinishToggle: () => void;
   onEndClear: () => void;
@@ -1172,9 +1181,21 @@ function CriteriaFields({
           <LocateIcon locating={locating} />
         </button>
       </StartPointField>
-      {criteriaShown && start && (
+      {criteriaShown && start && !end && !endOpen && (
+        <button
+          type="button"
+          data-testid="criteria-end-add"
+          className="flex min-h-touch items-center gap-2 rounded-md text-sm font-semibold text-ink-2 hover:text-ink"
+          onClick={onEndOpen}
+        >
+          <Flag size={16} aria-hidden />
+          {t.addEnd}
+        </button>
+      )}
+      {criteriaShown && start && (end || endOpen) && (
         <StartPointField
           kind="end"
+          autoFocus={!end}
           start={end}
           place={endPlace}
           desktop={desktop}
@@ -1185,7 +1206,7 @@ function CriteriaFields({
           onPlaceChange={onEndPlace}
           onUnreadable={onUnreadable}
         >
-          {end && (
+          {(end || endOpen) && (
             <button
               type="button"
               data-testid="criteria-end-clear"
@@ -1240,6 +1261,7 @@ type SearchStatus = 'idle' | 'failed' | 'answered';
 // Géoplateforme turns into coordinates. Coordinates are read here and never sent: they are not a search.
 function StartPointField({
   kind = 'start',
+  autoFocus = false,
   start,
   place,
   desktop,
@@ -1253,6 +1275,8 @@ function StartPointField({
 }: {
   /** The end point is a field of its own, with the same ways to set it. */
   kind?: 'start' | 'end';
+  /** The field takes the focus as it appears: it was asked for. */
+  autoFocus?: boolean;
   start?: Position;
   place?: string;
   desktop: boolean;
@@ -1460,6 +1484,7 @@ function StartPointField({
           <input
             id={inputId}
             data-testid={id}
+            autoFocus={autoFocus}
             role="combobox"
             aria-expanded={open}
             aria-controls={listId}
