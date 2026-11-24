@@ -24,8 +24,8 @@ export type Route = {
   kind: 'match' | 'suggestion';
   /** How many times the route runs its loop, from 2 up; absent for a loop run once. */
   laps?: number;
-  /** Which reference ways to the end point the route is; absent for any other route. */
-  references?: Reference[];
+  /** The shortest or the fastest way to the end point; absent for any other route. */
+  direct?: true;
   unpavedShare: number;
   surfaces: SurfaceStretch[];
   /** Holds a technical stretch: a way where the hands, ropes or chains are needed. */
@@ -52,19 +52,6 @@ const isNumber = (value: unknown): value is number => typeof value === 'number' 
 const isPoint = (value: unknown): value is number[] =>
   Array.isArray(value) && (value.length === 2 || value.length === 3) && value.every(isNumber);
 
-export const REFERENCES = ['shortest', 'fastest'] as const;
-export type Reference = (typeof REFERENCES)[number];
-
-function parseReferences(value: unknown): Reference[] | undefined | null {
-  if (value === undefined) return undefined;
-  const valid =
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every((item) => REFERENCES.includes(item as Reference)) &&
-    new Set(value).size === value.length;
-  return valid ? (value as Reference[]) : null;
-}
-
 function parseRoute(value: unknown): Route | undefined {
   if (!isObject(value)) return undefined;
   const {
@@ -75,14 +62,13 @@ function parseRoute(value: unknown): Route | undefined {
     estimatedDuration,
     kind,
     laps,
-    references,
+    direct,
     unpavedShare,
     surfaces,
     technical,
     technicalStretches,
   } = value;
-  const referenceList = parseReferences(references);
-  if (referenceList === null) return undefined;
+  if (direct !== undefined && direct !== true) return undefined;
   if (!Array.isArray(geometry) || !geometry.every(isPoint)) return undefined;
   if (!isNumber(distance) || !isNumber(estimatedDuration) || !isNumber(unpavedShare)) return undefined;
   if (elevationGain !== undefined && !isNumber(elevationGain)) return undefined;
@@ -116,7 +102,7 @@ function parseRoute(value: unknown): Route | undefined {
     estimatedDuration,
     kind,
     ...(lapsCount !== undefined && { laps: lapsCount }),
-    ...(referenceList && { references: referenceList }),
+    ...(direct && { direct }),
     unpavedShare,
     surfaces: (surfaces as SurfaceStretch[]).map(({ surface, from, to }) => ({ surface, from, to })),
     technical,

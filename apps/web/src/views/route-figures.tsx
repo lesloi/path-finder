@@ -138,7 +138,7 @@ export function DirectMarker({
   labelled?: boolean;
   className?: string;
 }) {
-  if (!route.references?.length) return null;
+  if (!route.direct) return null;
   const label = routesText[language].directWay;
   return (
     <span

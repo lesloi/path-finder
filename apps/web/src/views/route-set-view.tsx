@@ -347,9 +347,12 @@ function RouteRow({
       <span className="flex w-full items-center gap-3">
         <RouteThumbnail geometry={route.geometry} index={colorIndex} {...(snapshot && { snapshot })} />
         <span className="flex min-w-0 flex-none flex-col gap-1">
-          <strong data-testid={`routes-row-${index}-distance`} className="text-lg">
-            {distance}
-          </strong>
+          <span className="flex items-center gap-2">
+            <strong data-testid={`routes-row-${index}-distance`} className="text-lg">
+              {distance}
+            </strong>
+            <DirectMarker route={route} language={language} testId={`routes-row-${index}-direct`} />
+          </span>
           <span className="flex items-center gap-3 text-sm text-ink-2">
             {gain && (
               <span
@@ -368,7 +371,6 @@ function RouteRow({
           </span>
           {route.technical && <TechnicalMarker text={t.technical} testId={`routes-row-${index}-technical`} />}
           <LapsMarker route={route} language={language} testId={`routes-row-${index}-laps`} compact />
-          <DirectMarker route={route} language={language} testId={`routes-row-${index}-references`} />
         </span>
         {/* The empty width of the row: where the route climbs, at a glance. */}
         <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={colorIndex} />
@@ -453,18 +455,16 @@ function RouteDetail({
           <ArrowLeft size={18} aria-hidden />
           {t.routes}
         </button>
-        <button
-          type="button"
-          data-testid="route-reverse"
-          className={TEXT_BUTTON}
-          disabled={!reversible}
-          onClick={onReverse}
-        >
-          <span className={TEXT_BUTTON_HOVER}>
-            <ArrowLeftRight size={18} aria-hidden />
-            {t.reverseRoute}
-          </span>
-        </button>
+        {reversible ? (
+          <button type="button" data-testid="route-reverse" className={TEXT_BUTTON} onClick={onReverse}>
+            <span className={TEXT_BUTTON_HOVER}>
+              <ArrowLeftRight size={18} aria-hidden />
+              {t.reverseRoute}
+            </span>
+          </button>
+        ) : (
+          <span />
+        )}
         {!route.imported && (
           <strong data-testid="route-position" aria-label={routeTitle(route, language, selected, routes.length)}>
             {selected + 1}/{routes.length}
@@ -488,7 +488,7 @@ function RouteDetail({
       </div>
       {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" />}
       <LapsMarker route={route} language={language} testId="route-laps" />
-      <DirectMarker route={route} language={language} testId="route-references" labelled />
+      <DirectMarker route={route} language={language} testId="route-direct" labelled />
       <ElevationProfile
         testId="route-profile"
         route={route}

@@ -538,30 +538,30 @@ describe('RouteSetView', () => {
   });
 
   it('marks a direct way with one icon, named for those who cannot see it', () => {
-    render(<View list={[route({ references: ['shortest', 'fastest'] })]} />);
+    render(<View list={[route({ direct: true })]} />);
 
-    const marker = screen.getByTestId('routes-row-0-references');
+    const marker = screen.getByTestId('routes-row-0-direct');
     expect(marker).toHaveAccessibleName(en.directWay);
     expect(marker).toHaveAttribute('data-tip', en.directWay);
     expect(marker.textContent).toBe('');
   });
 
   it('says in words that the opened route is a direct way', () => {
-    render(<View open list={[route({ references: ['fastest'] })]} />);
+    render(<View open list={[route({ direct: true })]} />);
 
-    expect(screen.getByTestId('route-references')).toHaveTextContent(en.directWay);
+    expect(screen.getByTestId('route-direct')).toHaveTextContent(en.directWay);
   });
 
   it('marks no reference on a route that is none', () => {
     render(<View list={[route()]} />);
 
-    expect(screen.queryByTestId('routes-row-0-references')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('routes-row-0-direct')).not.toBeInTheDocument();
   });
 
-  it('turns the reverse button off for routes that are no loops', () => {
+  it('takes the reverse button away for routes that are no loops', () => {
     render(<View open reversible={false} list={[route()]} />);
 
-    expect(screen.getByTestId('route-reverse')).toBeDisabled();
+    expect(screen.queryByTestId('route-reverse')).not.toBeInTheDocument();
   });
 
   it('says the laps in the language of the settings', () => {

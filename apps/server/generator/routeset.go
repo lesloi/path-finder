@@ -83,8 +83,8 @@ type candidate struct {
 	// direct marks the loop straight through the waypoints. Its length is set by them, not by the target, and it
 	// goes back over its steps where the graph offers no other way: it is not held to either.
 	direct bool
-	// references tells which reference ways to the end point this route is, when it is one: see contract.Route.
-	references []string
+	// reference marks the shortest or the fastest way to the end point: see contract.Route.Direct.
+	reference bool
 	// lollipop marks a loop that reaches its high ground by a stem out and back: the stem's retrace is the shape,
 	// not a flaw, so the ranking does not penalise it.
 	lollipop bool
@@ -330,7 +330,7 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 		Geometry: cand.geometry, Distance: cand.distance, ElevationGain: cand.elevationGain,
 		ElevationLoss: cand.elevationLoss, EstimatedDuration: estimated, Kind: kind, Laps: cand.laps,
 		UnpavedShare: cand.unpavedShare, Surfaces: cand.surfaces, Technical: cand.technical,
-		TechnicalStretches: cand.technicalStretches, References: cand.references,
+		TechnicalStretches: cand.technicalStretches, Direct: cand.reference,
 	}, score: score, tier: worst, cells: cells, direct: cand.direct}, true
 }
 

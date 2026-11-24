@@ -98,9 +98,8 @@ type Route struct {
 	Kind              string      `json:"kind"`              // match or suggestion
 	// Laps is how many times the route runs its loop, from 2 up; absent for a loop run once.
 	Laps int `json:"laps,omitempty"`
-	// References tells which reference ways to the end point the route is: "shortest" and "fastest", both when one
-	// route is both; absent for any other route.
-	References   []string         `json:"references,omitempty"`
+	// Direct marks the shortest or the fastest way to the end point; absent for any other route.
+	Direct       bool             `json:"direct,omitempty"`
 	UnpavedShare float64          `json:"unpavedShare"`
 	Surfaces     []SurfaceStretch `json:"surfaces"`
 	Technical    bool             `json:"technical"` // holds a technical stretch

@@ -65,21 +65,22 @@ export function RouteDock({
               {title}
             </strong>
           </span>
-          <button
-            type="button"
-            data-testid="route-reverse"
-            className={ICON_BUTTON}
-            {...tip(t.reverseRoute, 'bottom-end')}
-            disabled={!reversible}
-            onClick={onReverse}
-          >
-            <ArrowLeftRight size={18} aria-hidden />
-          </button>
+          {reversible && (
+            <button
+              type="button"
+              data-testid="route-reverse"
+              className={ICON_BUTTON}
+              {...tip(t.reverseRoute, 'bottom-end')}
+              onClick={onReverse}
+            >
+              <ArrowLeftRight size={18} aria-hidden />
+            </button>
+          )}
         </div>
         <RouteFigures route={route} language={language} compact />
         {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" className="justify-center" />}
         <LapsMarker route={route} language={language} testId="route-laps" className="justify-center" />
-        <DirectMarker route={route} language={language} testId="route-references" labelled className="justify-center" />
+        <DirectMarker route={route} language={language} testId="route-direct" labelled className="justify-center" />
         <SurfaceShare route={route} language={language} />
         {/* Under the rest, whatever its height. */}
         {canExport(route) && (

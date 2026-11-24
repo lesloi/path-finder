@@ -248,12 +248,12 @@ func referenceWays(ctx context.Context, looper Looper, wayTo engine.DirectLoopRe
 		}
 	}
 	if found[engine.ReferenceShortest] {
-		shortest.references = append(shortest.references, "shortest")
+		shortest.reference = true
 	}
 	if found[engine.ReferenceFastest] {
-		fastest.references = append(fastest.references, "fastest")
+		fastest.reference = true
 	}
-	return slices.DeleteFunc(ways, func(w *candidate) bool { return w != preferred && len(w.references) == 0 })
+	return slices.DeleteFunc(ways, func(w *candidate) bool { return w != preferred && !w.reference })
 }
 
 func waypointPoints(list [][2]float64) []engine.Point {

@@ -67,14 +67,14 @@ describe('parseRouteSet', () => {
     expect(parseRouteSet({ routes: [repeated] })).toEqual({ routes: [repeated] });
   });
 
-  it('reads which reference ways a route is', () => {
-    const reference = { ...route, references: ['shortest', 'fastest'] };
+  it('reads a direct way', () => {
+    const direct = { ...route, direct: true };
 
-    expect(parseRouteSet({ routes: [reference] })).toEqual({ routes: [reference] });
+    expect(parseRouteSet({ routes: [direct] })).toEqual({ routes: [direct] });
   });
 
-  it.each([['shortest'], [['quickest']], [['fastest', 'fastest']]])('refuses the references %j', (references) => {
-    expect(parseRouteSet({ routes: [{ ...route, references }] })).toBeUndefined();
+  it.each([[false], ['yes'], [1]])('refuses a route that is direct: %j', (direct) => {
+    expect(parseRouteSet({ routes: [{ ...route, direct }] })).toBeUndefined();
   });
 
   it.each([[1], [2.5], ['5']])('refuses a route with %s laps', (laps) => {

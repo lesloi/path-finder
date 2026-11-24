@@ -275,10 +275,10 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   length band do the rest, so surface preference, gain and duration act as they do for a loop. It cannot repeat laps
   (a lap ends where it starts) and the summit and lollipop sources are left out: both are shaped around the start. An
   end beyond the longest route in a straight line is refused.
-- **A route with an end point offers up to three direct ways, whatever the target, and labels two of them.** They are
+- **A route with an end point offers up to three direct ways, whatever the target, and marks two of them as direct (`direct` in the route).** They are
   the cheapest for the surface preference, the shortest (every way costs its length) and the fastest (its length plus
   8 m per metre of ascent, which is the profile's climb cost and Naismith's rule); the same way found twice is one
-  route, and a way that is neither labelled is dropped. The route labelled `shortest` is the one of least distance and the one labelled `fastest` the one of least
+  route, and a way that is neither is dropped. The shortest is the one of least distance and the fastest the one of least
   effort distance, the figure the shown duration is read from, so no label contradicts the numbers beside it. The
   preferred way is not the shortest (it detours from main roads), which is why the label is not left to it. The three
   are not compared to one another for duplicates, since the shortest and the fastest often share most of their
