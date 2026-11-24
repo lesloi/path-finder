@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, FileUp, Mountain, MoveRight, Repeat2 } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, FileUp, Mountain, Repeat2, Route as RouteIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { hint, SURFACE_CLASSES } from '../components/index.ts';
@@ -148,7 +148,7 @@ export function DirectMarker({
       role="img"
       className={`flex items-center gap-1 text-sm font-semibold text-ink ${className}`}
     >
-      <MoveRight size={14} aria-hidden className="flex-none text-accent" />
+      <RouteIcon size={14} aria-hidden className="flex-none text-accent" />
       {labelled && label}
     </span>
   );
