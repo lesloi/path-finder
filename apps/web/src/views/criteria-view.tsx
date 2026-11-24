@@ -1206,6 +1206,16 @@ function CriteriaFields({
           onPlaceChange={onEndPlace}
           onUnreadable={onUnreadable}
         >
+          <button
+            type="button"
+            data-testid="criteria-end-pick"
+            className={`${ICON_BUTTON} aria-pressed:text-accent`}
+            {...tip(t.chooseEnd, 'bottom-end')}
+            aria-pressed={finishing}
+            onClick={onFinishToggle}
+          >
+            <Crosshair size={20} aria-hidden />
+          </button>
           {(end || endOpen) && (
             <button
               type="button"
@@ -1217,16 +1227,6 @@ function CriteriaFields({
               <X size={20} aria-hidden />
             </button>
           )}
-          <button
-            type="button"
-            data-testid="criteria-end-pick"
-            className={`${ICON_BUTTON} aria-pressed:text-accent`}
-            {...tip(t.chooseEnd, 'bottom-end')}
-            aria-pressed={finishing}
-            onClick={onFinishToggle}
-          >
-            <Crosshair size={20} aria-hidden />
-          </button>
         </StartPointField>
       )}
       {criteriaShown ? (
