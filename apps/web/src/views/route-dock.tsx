@@ -4,14 +4,7 @@ import { DOCK, ElevationProfile, hint, ICON_BUTTON, tip } from '../components/in
 import { elevationProfile, type PaceUnit, type Position, type Route, type WaypointPois } from '../core/index.ts';
 import { routesText, type Language } from '../i18n/index.ts';
 import { canExport, RouteExportButton } from './route-export-button.tsx';
-import {
-  LapsMarker,
-  ReferenceMarker,
-  RouteFigures,
-  routeTitle,
-  SurfaceShare,
-  TechnicalMarker,
-} from './route-figures.tsx';
+import { LapsMarker, DirectMarker, RouteFigures, routeTitle, SurfaceShare, TechnicalMarker } from './route-figures.tsx';
 import { RouteStepStrip } from './route-step-strip.tsx';
 
 /**
@@ -28,6 +21,7 @@ export function RouteDock({
   count,
   onClose,
   onReverse,
+  reversible = true,
   onHover,
   waypoints,
   waypointPois,
@@ -42,6 +36,8 @@ export function RouteDock({
   count: number;
   onClose: () => void;
   onReverse: () => void;
+  /** False for a route that is no loop: its end is not its start, so running it backwards is no route. */
+  reversible?: boolean;
   onHover: (position: Position | undefined) => void;
   /** The points the route was asked to go through, shown on its profile and kept in its GPX file. */
   waypoints?: Position[] | undefined;
@@ -74,6 +70,7 @@ export function RouteDock({
             data-testid="route-reverse"
             className={ICON_BUTTON}
             {...tip(t.reverseRoute, 'bottom-end')}
+            disabled={!reversible}
             onClick={onReverse}
           >
             <ArrowLeftRight size={18} aria-hidden />
@@ -82,13 +79,7 @@ export function RouteDock({
         <RouteFigures route={route} language={language} compact />
         {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" className="justify-center" />}
         <LapsMarker route={route} language={language} testId="route-laps" className="justify-center" />
-        <ReferenceMarker
-          route={route}
-          language={language}
-          testId="route-references"
-          labelled
-          className="justify-center"
-        />
+        <DirectMarker route={route} language={language} testId="route-references" labelled className="justify-center" />
         <SurfaceShare route={route} language={language} />
         {/* Under the rest, whatever its height. */}
         {canExport(route) && (

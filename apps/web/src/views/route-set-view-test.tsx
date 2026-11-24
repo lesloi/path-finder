@@ -58,6 +58,7 @@ function View({
   onPaceChange,
   onClear = () => {},
   onReverse = () => {},
+  reversible,
   onSortChange,
   pace = 6,
   open = false,
@@ -73,6 +74,7 @@ function View({
   onPaceChange?: (pace: number) => void;
   onClear?: () => void;
   onReverse?: (index: number) => void;
+  reversible?: boolean;
   onSortChange?: (sort: RouteSort) => void;
   pace?: number;
   open?: boolean;
@@ -104,6 +106,7 @@ function View({
       onPaceChange={onPaceChange}
       onClear={onClear}
       onReverse={onReverse}
+      {...(reversible !== undefined && { reversible })}
       onHover={onHover}
       {...(waypoints && { waypoints })}
       {...(closestElevationGain !== undefined && { closestElevationGain })}
@@ -534,24 +537,31 @@ describe('RouteSetView', () => {
     expect(marker).toHaveAccessibleName('3 laps of 4.1 km');
   });
 
-  it('marks the shortest and the fastest way with an icon each, named for those who cannot see it', () => {
+  it('marks a direct way with one icon, named for those who cannot see it', () => {
     render(<View list={[route({ references: ['shortest', 'fastest'] })]} />);
 
     const marker = screen.getByTestId('routes-row-0-references');
-    expect(marker).toHaveAccessibleName(`${en.shortestWay}, ${en.fastestWay}`);
+    expect(marker).toHaveAccessibleName(en.directWay);
+    expect(marker).toHaveAttribute('data-tip', en.directWay);
     expect(marker.textContent).toBe('');
   });
 
-  it('says in words which reference way the opened route is', () => {
+  it('says in words that the opened route is a direct way', () => {
     render(<View open list={[route({ references: ['fastest'] })]} />);
 
-    expect(screen.getByTestId('route-references')).toHaveTextContent(en.fastestWay);
+    expect(screen.getByTestId('route-references')).toHaveTextContent(en.directWay);
   });
 
   it('marks no reference on a route that is none', () => {
     render(<View list={[route()]} />);
 
     expect(screen.queryByTestId('routes-row-0-references')).not.toBeInTheDocument();
+  });
+
+  it('turns the reverse button off for routes that are no loops', () => {
+    render(<View open reversible={false} list={[route()]} />);
+
+    expect(screen.getByTestId('route-reverse')).toBeDisabled();
   });
 
   it('says the laps in the language of the settings', () => {

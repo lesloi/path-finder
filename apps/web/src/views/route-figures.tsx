@@ -1,7 +1,7 @@
-import { ArrowDownRight, ArrowUpRight, FileUp, Mountain, Repeat2, Ruler, Zap } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, FileUp, Mountain, MoveRight, Repeat2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { SURFACE_CLASSES } from '../components/index.ts';
+import { hint, SURFACE_CLASSES } from '../components/index.ts';
 import { formatDistance, formatDuration, formatHeight, type Route } from '../core/index.ts';
 import type { Language } from '../i18n/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
@@ -121,13 +121,11 @@ export function TechnicalMarker({
   );
 }
 
-const REFERENCE_ICONS = { shortest: Ruler, fastest: Zap } as const;
-
 /**
- * Which reference ways to the end point a route is: the shortest, the fastest, or both. An icon each, named for those
- * who cannot see it; with `labelled` the words come beside them, where there is room.
+ * The mark of a direct way to the end point, the shortest or the fastest of them: one icon, whichever it is. With
+ * `labelled` the word comes beside it, where there is room; without, the tip of the other figures says it.
  */
-export function ReferenceMarker({
+export function DirectMarker({
   route,
   language,
   testId,
@@ -141,25 +139,17 @@ export function ReferenceMarker({
   className?: string;
 }) {
   if (!route.references?.length) return null;
-  const t = routesText[language];
-  const names = route.references.map((reference) => (reference === 'shortest' ? t.shortestWay : t.fastestWay));
+  const label = routesText[language].directWay;
   return (
     <span
       data-testid={testId}
+      {...(labelled ? {} : hint(label, 'top-start'))}
+      aria-label={label}
       role="img"
-      aria-label={names.join(', ')}
-      title={names.join(', ')}
-      className={`flex items-center gap-2 text-sm font-semibold text-ink ${className}`}
+      className={`flex items-center gap-1 text-sm font-semibold text-ink ${className}`}
     >
-      {route.references.map((reference, i) => {
-        const Icon = REFERENCE_ICONS[reference];
-        return (
-          <span key={reference} aria-hidden className="flex items-center gap-1">
-            <Icon size={14} className="flex-none text-accent" />
-            {labelled && names[i]}
-          </span>
-        );
-      })}
+      <MoveRight size={14} aria-hidden className="flex-none text-accent" />
+      {labelled && label}
     </span>
   );
 }

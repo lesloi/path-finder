@@ -613,6 +613,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           settingsLink.current?.focus();
         }}
         onReverse={browser.toggleReversed}
+        reversible={!routeSet.request.end}
         onHover={browser.setHover}
         waypoints={routeSet.request.waypoints}
         waypointPois={waypointPois}
@@ -988,6 +989,7 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
           count={atPace.routes.length}
           onClose={deselect}
           onReverse={() => browser.toggleReversed(selected)}
+          reversible={!routeSet?.request.end}
           onHover={browser.setHover}
           waypoints={routeSet?.request.waypoints}
           waypointPois={waypointPois}

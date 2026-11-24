@@ -168,7 +168,7 @@ export const criteriaText = {
     elevationGainError: (max: number, unit: string) => `Le dénivelé doit être compris entre 0 et ${max} ${unit}.`,
     startError: 'Choisissez un point de départ.',
     endPoint: 'Arrivée',
-    addEnd: 'Ajouter une arrivée',
+    addEnd: 'Ajouter un point d’arrivée',
     endLoop: 'Identique au départ : une boucle',
     chooseEnd: 'Choisir l’arrivée sur la carte',
     clearEnd: 'Revenir à une boucle',
