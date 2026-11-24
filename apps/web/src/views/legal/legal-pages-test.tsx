@@ -90,7 +90,7 @@ describe.each(languages)('legal pages in %s', (language) => {
     render(<PrivacyPolicyPage language={language} />);
 
     expect(screen.getByTestId('privacy-policy-page')).toHaveTextContent(
-      { en: 'Last updated: 5 November 2026.', fr: 'Dernière mise à jour : 5 novembre 2026.' }[language],
+      { en: 'Last updated: 24 November 2026.', fr: 'Dernière mise à jour : 24 novembre 2026.' }[language],
     );
   });
 });

@@ -10,7 +10,7 @@ type Block = { paragraph: Paragraph } | { list: Paragraph[] };
 export type Section = { id: string; title?: string; blocks: Block[] };
 
 /** Where the privacy policy was last updated, as a UTC calendar day. */
-export const PRIVACY_POLICY_UPDATED = '2026-11-05';
+export const PRIVACY_POLICY_UPDATED = '2026-11-24';
 
 /** The "Last updated" line of the privacy policy, with the day written as the language does (28 September 2026). */
 export function privacyUpdatedLine(language: Language): string {
