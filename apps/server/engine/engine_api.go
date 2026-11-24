@@ -21,6 +21,8 @@ const maxWaypointSnapMeters = 250
 var (
 	// ErrOffGraph means a point is too far from any way of the graph.
 	ErrOffGraph = errors.New("engine: point is off the graph")
+	// ErrEndOffGraph means the end point of a point-to-point route is too far from any way of the graph.
+	ErrEndOffGraph = errors.New("engine: end point is off the graph")
 	// ErrNoRoute means no route was found between two points.
 	ErrNoRoute = errors.New("engine: no route found")
 	// ErrNoLoop means no loop was found from the start point.
@@ -570,7 +572,9 @@ func (e *Engine) shortestLoopForLoops(ctx context.Context, start Point, waypoint
 type DirectLoopRequest struct {
 	Start     Point
 	Waypoints []Point
-	Avoided   []Circle
+	// End makes the route finish there instead of coming back to Start: a point-to-point route, not a loop.
+	End     *Point
+	Avoided []Circle
 	// IncludeTechnical is LoopRequest.IncludeTechnical for the direct loop.
 	IncludeTechnical bool
 }
@@ -584,6 +588,9 @@ func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route,
 	if err != nil {
 		return nil, err
 	}
+	if req.End != nil {
+		return e.directPath(ctx, src, req, forbidden)
+	}
 	anchors, nodes, edges, err := e.routeAnchors(ctx, src, req.Waypoints, false, forbidden)
 	if err != nil {
 		return nil, err
@@ -591,6 +598,33 @@ func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route,
 	r := e.describe(nodes, edges)
 	r.anchors, r.fingerprint, r.mode = anchors, e.g.fingerprint, e.mode
 	r.Shortest = e.shortestLoopForLoops(ctx, req.Start, req.Waypoints, forbidden)
+	return r, nil
+}
+
+// directPath is DirectLoop for a request with an end point: the cheapest route from src through the waypoints to the
+// end. It fails with ErrEndOffGraph for an end off the ways. Its Shortest is the shortest length of such a route.
+func (e *Engine) directPath(ctx context.Context, src uint32, req DirectLoopRequest, f *forbidden) (*Route, error) {
+	snapped, err := e.snapWaypoints(req.Waypoints, false, f)
+	if err != nil {
+		return nil, err
+	}
+	end, err := e.snapStart(*req.End, f)
+	if err != nil {
+		return nil, ErrEndOffGraph
+	}
+	anchors := collapse(append(append([]uint32{src}, snapped...), end))
+	if len(anchors) < 2 {
+		r := e.describe([]uint32{src}, nil)
+		r.anchors, r.fingerprint, r.mode = anchors, e.g.fingerprint, e.mode
+		return r, nil
+	}
+	nodes, edges, err := e.routeChain(ctx, anchors, f)
+	if err != nil {
+		return nil, err
+	}
+	r := e.describe(nodes, edges)
+	r.anchors, r.fingerprint, r.mode = anchors, e.g.fingerprint, e.mode
+	r.Shortest = shortestLoop(ctx, e, anchors, f)
 	return r, nil
 }
 

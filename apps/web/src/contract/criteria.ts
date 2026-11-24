@@ -18,6 +18,8 @@ export type Position = [number, number];
 /** Distances in kilometres, durations in minutes, elevation gain in metres. */
 export type Criteria = {
   start: Position;
+  /** Where the route finishes. Without it the route is a loop that ends at the start. */
+  end?: Position;
   target: { distance: number } | { duration: number };
   /** A target in metres, or the flat or hilly shortcut. Without one, elevation gain does not count. */
   elevationGain?: number | 'flat' | 'hilly';
@@ -39,6 +41,19 @@ export type AvoidedArea = { center: Position; radius: number };
 
 export const METRES_PER_DEGREE = 111_194.9;
 
+/** Kilometres of straight lines from the start through the waypoints to the end, or back to the start. */
+function crowFliesKm(start: Position, waypoints: Position[], end: Position | undefined): number {
+  const points = [start, ...waypoints, end ?? start];
+  let metres = 0;
+  for (let i = 1; i < points.length; i++) {
+    const [a, b] = [points[i - 1]!, points[i]!];
+    const dy = (b[1] - a[1]) * METRES_PER_DEGREE;
+    const dx = (b[0] - a[0]) * METRES_PER_DEGREE * Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180);
+    metres += Math.hypot(dx, dy);
+  }
+  return metres / 1000;
+}
+
 /** Whether a position is inside an area, as the server tells it. */
 export function areaContains({ center, radius }: AvoidedArea, [lon, lat]: Position): boolean {
   const dy = (lat - center[1]) * METRES_PER_DEGREE;
@@ -49,6 +64,7 @@ export function areaContains({ center, radius }: AvoidedArea, [lon, lat]: Positi
 /** The criteria fields `parseCriteria` checks, so a form can say which one is wrong. */
 export const CRITERIA_FIELDS = [
   'start',
+  'end',
   'target',
   'elevationGain',
   'surface',
@@ -113,7 +129,7 @@ function targetDistance(criteria: Criteria): number {
  */
 export function parseCriteria(body: unknown, { countElevationGain = true } = {}): Criteria {
   check(isObject(body), 'start', 'Criteria must be an object');
-  const { start, target, elevationGain, surface, pace, waypoints, avoidedAreas, repeats, includeTechnical } = body;
+  const { start, end, target, elevationGain, surface, pace, waypoints, avoidedAreas, repeats, includeTechnical } = body;
 
   check(isPosition(start), 'start', 'start must be a longitude and a latitude');
 
@@ -138,7 +154,10 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
   check(SURFACES.includes(surface as Criteria['surface']), 'surface', 'Unknown surface preference');
   check(within(pace, PACE_MINUTES_PER_KM.min, PACE_MINUTES_PER_KM.max), 'pace', 'pace out of bounds');
 
+  check(end === undefined || isPosition(end), 'end', 'end must be a longitude and a latitude');
   check(repeats === undefined || typeof repeats === 'boolean', 'repeats', 'repeats must be true or false');
+  // A lap starts where it ends: a route that finishes elsewhere has no loop to repeat.
+  check(!(repeats === true && end !== undefined), 'repeats', 'a route with an end point cannot repeat its loop');
 
   check(
     includeTechnical === undefined || typeof includeTechnical === 'boolean',
@@ -176,11 +195,19 @@ export function parseCriteria(body: unknown, { countElevationGain = true } = {})
       'avoidedAreas',
       'a waypoint is inside an avoided area',
     );
+    check(end === undefined || !areaContains(parsed, end), 'avoidedAreas', 'the end is inside an avoided area');
     areas.push(parsed);
   }
 
+  check(
+    end === undefined || crowFliesKm(start, (waypoints as Position[] | undefined) ?? [], end) <= MAX_TARGET_DISTANCE,
+    'end',
+    'end is too far from the start',
+  );
+
   const criteria: Criteria = {
     start: [start[0], start[1]],
+    ...(end !== undefined && { end: [end[0], end[1]] as Position }),
     target: parsedTarget,
     ...(countElevationGain &&
       elevationGain !== undefined && { elevationGain: elevationGain as Criteria['elevationGain'] }),

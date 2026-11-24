@@ -11,7 +11,7 @@ import (
 // CriteriaError is a request body that is not valid criteria, with the field that failed.
 // Messages name the field, never its value: the server keeps no location.
 type CriteriaError struct {
-	Field   string // start, target, elevationGain, surface, pace, waypoints, avoidedAreas, repeats or includeTechnical
+	Field   string // start, end, target, elevationGain, surface, pace, waypoints, avoidedAreas, repeats or includeTechnical
 	Message string
 	// Waypoint is the waypoint at fault, counted from 1, or 0 when none is singled out.
 	Waypoint int
@@ -43,7 +43,9 @@ func (g ElevationGain) MarshalJSON() ([]byte, error) {
 // Criteria of a route set. Distances are in kilometres, durations in minutes, elevation gain in
 // metres, and pace in minutes per kilometre on flat ground.
 type Criteria struct {
-	Start         [2]float64     `json:"start"` // longitude, latitude
+	Start [2]float64 `json:"start"` // longitude, latitude
+	// End is where a point-to-point route finishes. Without it the route is a loop that ends at Start.
+	End           *[2]float64    `json:"end,omitempty"` // longitude, latitude
 	Target        Target         `json:"target"`
 	ElevationGain *ElevationGain `json:"elevationGain,omitempty"`
 	Surface       string         `json:"surface"`
@@ -93,6 +95,24 @@ func (c Criteria) TargetDistanceKm() (float64, error) {
 		return 0, fmt.Errorf("target duration leaves %v km, under %v km", distance, bounds.MinDistanceKm)
 	}
 	return distance, nil
+}
+
+// crowFliesKm is the length of the straight lines from the start through the waypoints to the end, or back to the
+// start for a loop.
+func (c Criteria) crowFliesKm() float64 {
+	finish := c.Start
+	if c.End != nil {
+		finish = *c.End
+	}
+	points := append(append([][2]float64{c.Start}, c.Waypoints...), finish)
+	var metres float64
+	for i := 1; i < len(points); i++ {
+		a, b := points[i-1], points[i]
+		dy := (b[1] - a[1]) * geo.MetersPerDegree
+		dx := (b[0] - a[0]) * geo.MetersPerDegree * math.Cos((a[1]+b[1])/2*math.Pi/180)
+		metres += math.Hypot(dx, dy)
+	}
+	return metres / 1000
 }
 
 func fail(field, message string) (Criteria, error) {
@@ -177,10 +197,22 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 	}
 	c.Pace = pace
 
+	if v, present := obj["end"]; present {
+		end, ok := position(v)
+		if !ok {
+			return fail("end", "end must be a longitude and a latitude")
+		}
+		c.End = &end
+	}
+
 	if v, present := obj["repeats"]; present {
 		repeats, ok := v.(bool)
 		if !ok {
 			return fail("repeats", "repeats must be true or false")
+		}
+		// A lap starts where it ends: a route that finishes elsewhere has no loop to repeat.
+		if repeats && c.End != nil {
+			return fail("repeats", "a route with an end point cannot repeat its loop")
 		}
 		c.Repeats = repeats
 	}
@@ -225,8 +257,16 @@ func ParseCriteria(body []byte, countElevationGain bool) (Criteria, error) {
 					return Criteria{}, &CriteriaError{Field: "avoidedAreas", Message: "a waypoint is inside an avoided area", Area: i + 1}
 				}
 			}
+			if c.End != nil && area.contains(*c.End) {
+				return Criteria{}, &CriteriaError{Field: "avoidedAreas", Message: "the end is inside an avoided area", Area: i + 1}
+			}
 			c.AvoidedAreas = append(c.AvoidedAreas, area)
 		}
+	}
+
+	// No route is shorter than the straight lines through its points.
+	if c.End != nil && c.crowFliesKm() > bounds.MaxDistanceKm {
+		return fail("end", "end is too far from the start")
 	}
 
 	if countElevationGain {

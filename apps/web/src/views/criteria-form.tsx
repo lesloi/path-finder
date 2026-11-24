@@ -380,6 +380,7 @@ function message(
   const t = criteriaText[language];
   const messages: Record<CriteriaField, string> = {
     start: t.startError,
+    end: t.endError,
     target: target === 'distance' ? t.distanceError(distance.min, distance.max, 'km') : t.durationError,
     elevationGain: t.elevationGainError(gain.max, 'm'),
     surface: t.surfaceError,

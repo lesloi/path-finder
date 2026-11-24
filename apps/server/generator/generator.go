@@ -84,6 +84,9 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		req.Ascent = criteria.ElevationGain.Metres
 		req.AscentBand = engine.AscentBand{Share: matchTolerance.elevationGain, FloorM: matchTolerance.elevationGainFloor}
 	}
+	if criteria.End != nil {
+		return g.pointToPoint(ctx, looper, criteria, km, req)
+	}
 	// A target duration is an effort distance: the search aims at it with the same curve the ranking estimates the
 	// duration with, so that a hilly loop is shorter than the flat prior rather than too slow.
 	if criteria.Target.Duration > 0 {
@@ -146,6 +149,49 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		return nil, ctx.Err()
 	}
 	return routeSet(criteria, routes), nil
+}
+
+// pointToPoint offers the cheapest route from the start through the waypoints to the end. There is no loop to search
+// for and none to repeat: the route is what the ways give, and the ranking says how far it is from the target.
+func (g *Generator) pointToPoint(ctx context.Context, looper Looper, c contract.Criteria, km float64, req engine.LoopRequest) (any, error) {
+	end := engine.Point{Lat: c.End[1], Lon: c.End[0]}
+	direct, err := looper.DirectLoop(ctx, engine.DirectLoopRequest{
+		Start:            req.Start,
+		Waypoints:        waypointPoints(c.Waypoints),
+		End:              &end,
+		Avoided:          req.Avoided,
+		IncludeTechnical: c.IncludeTechnical,
+	})
+	var waypoint *engine.WaypointError
+	switch {
+	case errors.As(err, &waypoint):
+		return nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoint is too far from a way", Waypoint: waypoint.Index}
+	case errors.Is(err, engine.ErrEndOffGraph):
+		return nil, &contract.CriteriaError{Field: "end", Message: "end point is too far from a way"}
+	case errors.Is(err, engine.ErrOffGraph):
+		return nil, &contract.CriteriaError{Field: "start", Message: "start point is too far from a way"}
+	case errors.Is(err, engine.ErrNoRoute):
+		return nil, &contract.CriteriaError{Field: "end", Message: "end point is not joined to the start by a way"}
+	case err != nil:
+		return nil, err
+	}
+	set := newRanking(c, km)
+	if cand := toCandidate(direct); cand != nil {
+		if cand.distance > contract.MaxDistanceKm() {
+			return nil, &contract.CriteriaError{Field: "end", Message: "end makes too long a route"}
+		}
+		cand.direct = true
+		set.add(g.bestDirect(c, cand, set))
+	}
+	return routeSet(c, set.routes(cmpOr(g.MaxRoutes, maxRoutes))), nil
+}
+
+func waypointPoints(list [][2]float64) []engine.Point {
+	var points []engine.Point
+	for _, w := range list {
+		points = append(points, engine.Point{Lat: w[1], Lon: w[0]})
+	}
+	return points
 }
 
 // search runs one loop request and adds its loops to the set, repeated laps times. It stops the engine once the set
