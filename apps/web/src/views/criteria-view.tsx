@@ -4,6 +4,7 @@ import {
   ChevronRight,
   CircleCheck,
   Crosshair,
+  Flag,
   LoaderCircle,
   LocateFixed,
   MapPinCheck,
@@ -1142,35 +1143,41 @@ function CriteriaFields({
         </button>
       </StartPointField>
       {criteriaShown && start && (
-        <section className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-ink-2">{t.endPoint}</h2>
-          <div className="flex items-center gap-2">
-            <span data-testid="criteria-end" className="min-w-0 flex-1 truncate text-sm text-ink">
+        <div
+          className={
+            'flex items-center gap-1 rounded-md bg-surface-2 pr-1 ' +
+            `${finishing ? 'ring-2 ring-accent ring-inset' : ''}`
+          }
+        >
+          <Flag size={16} aria-hidden className="ml-3 flex-none text-ink" />
+          <div className="flex min-h-14 min-w-0 flex-1 flex-col justify-center px-3 py-2">
+            <span className="text-sm text-ink-2">{t.endPoint}</span>
+            <span data-testid="criteria-end" className={`truncate ${end ? '' : 'text-ink-2'}`}>
               {end ? formatPosition(end, language) : t.endLoop}
             </span>
+          </div>
+          {end && (
             <button
               type="button"
-              data-testid="criteria-end-pick"
-              className={`${ICON_BUTTON} aria-pressed:text-accent`}
-              {...tip(t.chooseEnd, 'bottom-end')}
-              aria-pressed={finishing}
-              onClick={onFinishToggle}
+              data-testid="criteria-end-clear"
+              className={ICON_BUTTON}
+              {...tip(t.clearEnd, 'bottom-end')}
+              onClick={onEndClear}
             >
-              <MapPinCheck size={20} aria-hidden />
+              <X size={20} aria-hidden />
             </button>
-            {end && (
-              <button
-                type="button"
-                data-testid="criteria-end-clear"
-                className={ICON_BUTTON}
-                {...tip(t.clearEnd, 'bottom-end')}
-                onClick={onEndClear}
-              >
-                <X size={20} aria-hidden />
-              </button>
-            )}
-          </div>
-        </section>
+          )}
+          <button
+            type="button"
+            data-testid="criteria-end-pick"
+            className={`${ICON_BUTTON} aria-pressed:text-accent`}
+            {...tip(t.chooseEnd, 'bottom-end')}
+            aria-pressed={finishing}
+            onClick={onFinishToggle}
+          >
+            <Crosshair size={20} aria-hidden />
+          </button>
+        </div>
       )}
       {criteriaShown ? (
         <CriteriaForm

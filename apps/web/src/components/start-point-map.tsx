@@ -65,6 +65,10 @@ import { NORTH_EPSILON, useRouteSnapshot } from './use-route-snapshot.ts';
 
 const LONG_PRESS_MS = 500;
 
+// The path of the flag icon (Lucide's `flag`): its pole stands on the point.
+const FLAG_PATH =
+  'M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528';
+
 // Pixels between a framed route and the edge of the visible map: a margin (`--spacing-6`).
 const FRAME_MARGIN = 24;
 // Without the stylesheet that sets the room of the desktop panels (`--column-inset`…), they take none.
@@ -787,10 +791,15 @@ export function StartPointMap({
   useEffect(() => {
     if (!end) return;
     const element = document.createElement('div');
-    // A dark square, where the start is a dot: the route ends here.
-    element.className = 'size-4 rounded-xs border-4 border-ink bg-white shadow-float';
+    // A flag, where the start is a dot: the route ends at the foot of its pole.
+    element.innerHTML =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="white" stroke="${MAP_INK}" ` +
+      `stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow-md" aria-hidden="true">` +
+      `<path d="${FLAG_PATH}"/></svg>`;
     element.dataset.testid = 'end-marker';
-    const marker = new Marker({ element }).setLngLat(end).addTo(mapRef.current!);
+    const marker = new Marker({ element, anchor: 'bottom-left', offset: [-5, 2] })
+      .setLngLat(end)
+      .addTo(mapRef.current!);
     return () => {
       marker.remove();
     };
