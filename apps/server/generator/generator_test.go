@@ -23,6 +23,11 @@ type fakeLooper struct {
 	directErr   error
 	directCalls int
 	loopCalls   int
+	// references holds the way found for a reference (the shortest, the fastest) when it is not the direct route.
+	references map[engine.Reference]*engine.Route
+	onDirect   func(engine.DirectLoopRequest)
+	// referenceErr is why there is no way for a reference.
+	referenceErr map[engine.Reference]error
 	// enoughAt is the number of loops after which Enough said to stop, when the loops are given to it one by one; 0 if never.
 	enoughAt  int
 	askEnough bool
@@ -34,6 +39,15 @@ type fakeLooper struct {
 func (f *fakeLooper) DirectLoop(_ context.Context, req engine.DirectLoopRequest) (*engine.Route, error) {
 	f.directCalls++
 	f.gotDirect = req
+	if f.onDirect != nil {
+		f.onDirect(req)
+	}
+	if err, ok := f.referenceErr[req.Reference]; ok {
+		return nil, err
+	}
+	if r, ok := f.references[req.Reference]; ok {
+		return r, f.directErr
+	}
 	return f.direct, f.directErr
 }
 

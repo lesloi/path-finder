@@ -534,6 +534,26 @@ describe('RouteSetView', () => {
     expect(marker).toHaveAccessibleName('3 laps of 4.1 km');
   });
 
+  it('marks the shortest and the fastest way with an icon each, named for those who cannot see it', () => {
+    render(<View list={[route({ references: ['shortest', 'fastest'] })]} />);
+
+    const marker = screen.getByTestId('routes-row-0-references');
+    expect(marker).toHaveAccessibleName(`${en.shortestWay}, ${en.fastestWay}`);
+    expect(marker.textContent).toBe('');
+  });
+
+  it('says in words which reference way the opened route is', () => {
+    render(<View open list={[route({ references: ['fastest'] })]} />);
+
+    expect(screen.getByTestId('route-references')).toHaveTextContent(en.fastestWay);
+  });
+
+  it('marks no reference on a route that is none', () => {
+    render(<View list={[route()]} />);
+
+    expect(screen.queryByTestId('routes-row-0-references')).not.toBeInTheDocument();
+  });
+
   it('says the laps in the language of the settings', () => {
     render(<View language="fr" list={[route({ laps: 3 })]} />);
 

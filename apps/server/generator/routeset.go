@@ -83,6 +83,8 @@ type candidate struct {
 	// direct marks the loop straight through the waypoints. Its length is set by them, not by the target, and it
 	// goes back over its steps where the graph offers no other way: it is not held to either.
 	direct bool
+	// references tells which reference ways to the end point this route is, when it is one: see contract.Route.
+	references []string
 	// lollipop marks a loop that reaches its high ground by a stem out and back: the stem's retrace is the shape,
 	// not a flaw, so the ranking does not penalise it.
 	lollipop bool
@@ -169,6 +171,11 @@ func repeatTechnical(list []contract.TechnicalStretch, lap float64, laps int) []
 		}
 	}
 	return out
+}
+
+// sameWay tells whether two candidates follow the same points: the engine finds one way by more than one cost.
+func (c *candidate) sameWay(other *candidate) bool {
+	return c.distance == other.distance && slices.EqualFunc(c.geometry, other.geometry, slices.Equal[[]float64])
 }
 
 // effortDistance is the distance weighted by the slope of each stretch, in kilometres.
@@ -258,6 +265,8 @@ func surfaceMismatch(surface string, unpavedShare float64) float64 {
 }
 
 type ranked struct {
+	// seq is the order the candidates were added in, to tell two entries apart.
+	seq    int
 	route  contract.Route
 	score  float64
 	tier   tier
@@ -321,7 +330,7 @@ func classify(c contract.Criteria, cand *candidate, radius float64) (ranked, boo
 		Geometry: cand.geometry, Distance: cand.distance, ElevationGain: cand.elevationGain,
 		ElevationLoss: cand.elevationLoss, EstimatedDuration: estimated, Kind: kind, Laps: cand.laps,
 		UnpavedShare: cand.unpavedShare, Surfaces: cand.surfaces, Technical: cand.technical,
-		TechnicalStretches: cand.technicalStretches,
+		TechnicalStretches: cand.technicalStretches, References: cand.references,
 	}, score: score, tier: worst, cells: cells, direct: cand.direct}, true
 }
 
@@ -331,6 +340,7 @@ type ranking struct {
 	criteria contract.Criteria
 	radius   float64
 	all      []ranked
+	added    int
 }
 
 func newRanking(c contract.Criteria, targetKm float64) *ranking {
@@ -342,16 +352,24 @@ func newRanking(c contract.Criteria, targetKm float64) *ranking {
 func (r *ranking) add(candidates ...*candidate) {
 	for _, cand := range candidates {
 		if entry, ok := classify(r.criteria, cand, r.radius); ok {
+			r.added++
+			entry.seq = r.added
 			r.all = append(r.all, entry)
 		}
 	}
 	sort.SliceStable(r.all, func(i, j int) bool { return r.all[i].score < r.all[j].score })
 }
 
-// holdsADirectSuggestion tells whether the direct loop is in the ranking without being a match: the matches then
-// fill the set one short.
-func (r *ranking) holdsADirectSuggestion() bool {
-	return slices.ContainsFunc(r.all, func(e ranked) bool { return e.direct && e.tier != tierMatch })
+// directSuggestions is how many direct routes are in the ranking without being matches: the matches then fill the
+// set that many short.
+func (r *ranking) directSuggestions() int {
+	n := 0
+	for _, e := range r.all {
+		if e.direct && e.tier != tierMatch {
+			n++
+		}
+	}
+	return n
 }
 
 // sharing is how much of a route another one covers, for the ranking to leave out a duplicate. The direct loop
@@ -366,8 +384,10 @@ func sharing(a, b ranked) float64 {
 
 // routes keeps the best up to limit matches, then suggestions only to fill the set up to minRoutes, then wide
 // suggestions for what is still missing, none sharing most of its geometry with a better one. Fewer is fine,
-// and none is possible. The direct loop through the waypoints, if it is no duplicate, always has a place, taken from
-// the worst route: matches that fill the set would leave it out, and it is what the user asked for.
+// and none is possible. The direct routes (the loop through the waypoints; the preferred, shortest and fastest ways to
+// an end point), if they are no duplicate of a detour, always have a place, taken from the worst routes: matches that
+// fill the set would leave them out, and they are what the user asked for. They are not compared to one another: the
+// shortest and the fastest way often share most of their ground, and each carries what it is.
 func (r *ranking) routes(limit int) []contract.Route {
 	var picked []ranked
 	shares := func(entry ranked) bool {
@@ -389,18 +409,31 @@ func (r *ranking) routes(limit int) []contract.Route {
 	pick(tierMatch, limit)
 	pick(tierSuggestion, minRoutes)
 	pick(tierWide, minRoutes)
-	// There is at most one direct loop. The sort restores the order the picks above give: by tier, then by score.
-	if i := slices.IndexFunc(r.all, func(e ranked) bool { return e.direct }); i >= 0 {
-		entry := r.all[i]
-		if !slices.ContainsFunc(picked, func(p ranked) bool { return p.direct }) && !shares(entry) {
-			if len(picked) >= limit {
-				picked = picked[:limit-1]
-			}
-			picked = append(picked, entry)
-			sort.SliceStable(picked, func(i, j int) bool {
-				return picked[i].tier < picked[j].tier || picked[i].tier == picked[j].tier && picked[i].score < picked[j].score
-			})
+	// The sort restores the order the picks above give: by tier, then by score.
+	for _, entry := range r.all {
+		if !entry.direct || slices.ContainsFunc(picked, func(p ranked) bool { return p.seq == entry.seq }) {
+			continue
 		}
+		if slices.ContainsFunc(picked, func(p ranked) bool { return !p.direct && sharing(p, entry) > maxShared }) {
+			continue
+		}
+		if len(picked) >= limit {
+			// The worst route that is no direct one gives its place.
+			worst := -1
+			for i := range picked {
+				if !picked[i].direct {
+					worst = i
+				}
+			}
+			if worst < 0 {
+				continue
+			}
+			picked = slices.Delete(picked, worst, worst+1)
+		}
+		picked = append(picked, entry)
+		sort.SliceStable(picked, func(i, j int) bool {
+			return picked[i].tier < picked[j].tier || picked[i].tier == picked[j].tier && picked[i].score < picked[j].score
+		})
 	}
 	routes := make([]contract.Route, len(picked))
 	for i, p := range picked {

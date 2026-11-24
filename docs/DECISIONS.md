@@ -272,13 +272,17 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   leg (picked by chance, longer legs more often), not on a circle through the start, since the way between the fixed
   points is already the direct path. The arc's first height makes up what the direct path lacks of the target, with the
   loop's 1.3 tortuosity, and the resizings of the loop search, its elevation-gain lift, its effort target and its
-  length band do the rest, so surface preference, gain and duration act as they do for a loop. The direct path is
-  always in the set, as the direct loop is with waypoints, and when it already overshoots what a suggestion allows no
-  detour is searched. It cannot repeat laps (a lap ends where it starts) and the summit and lollipop sources are left
-  out: both are shaped around the start. On the Annecy graph a 10 km target between two points 0.8 km apart gave
-  5 matches in 0.7 s, and +400 m took 4.7 s, as long as the same loop (5.0 s). An end beyond the longest route in a
-  straight line is refused. Revisit if routes to a far end bulge too little: the arc is symmetric, and a skewed
-  one would give the search more shapes.
+  length band do the rest, so surface preference, gain and duration act as they do for a loop. It cannot repeat laps
+  (a lap ends where it starts) and the summit and lollipop sources are left out: both are shaped around the start. An
+  end beyond the longest route in a straight line is refused.
+- **A route with an end point offers up to three direct ways, whatever the target, and labels two of them.** They are
+  the cheapest for the surface preference, the shortest (every way costs its length) and the fastest (its length plus
+  8 m per metre of ascent, which is the profile's climb cost and Naismith's rule); the same way found twice is one
+  route, and a way that is neither labelled is dropped. The route labelled `shortest` is the one of least distance and the one labelled `fastest` the one of least
+  effort distance, the figure the shown duration is read from, so no label contradicts the numbers beside it. The
+  preferred way is not the shortest (it detours from main roads), which is why the label is not left to it. The three
+  are not compared to one another for duplicates, since the shortest and the fastest often share most of their
+  ground, and each takes a place from the worst detour.
 
 ## Elevation
 

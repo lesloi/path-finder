@@ -549,8 +549,19 @@ func (e *Engine) measureAnchors(ctx context.Context, anchors []uint32, f *forbid
 // through them can be shorter, and it is the lower bound a loop search may rely on. It is zero when the chain cannot
 // be routed.
 func shortestLoop(ctx context.Context, e *Engine, anchors []uint32, f *forbidden) float64 {
-	if len(anchors) < 2 {
+	nodes, edges, ok := unitChain(ctx, e, anchors, f, 0)
+	if !ok {
 		return 0
+	}
+	dist, _, _ := measure(e.g, nodes, edges)
+	return dist
+}
+
+// unitChain routes the chain through the anchors with every way costing its length and each metre of ascent costing
+// climb more: the shortest chain for 0, and for the profile's climb cost the one that takes the least walking time.
+func unitChain(ctx context.Context, e *Engine, anchors []uint32, f *forbidden, climb float32) (nodes, edges []uint32, ok bool) {
+	if len(anchors) < 2 {
+		return nil, nil, false
 	}
 	// The profile's multipliers are not all 1: the cheapest chain for a preference can be longer than the shortest
 	// one, so the bound is searched with every way costing its length.
@@ -564,12 +575,8 @@ func shortestLoop(ctx context.Context, e *Engine, anchors []uint32, f *forbidden
 	unit.alt = nil
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
-	nodes, edges, cause := chainLegs(ctx, &unit, s, 0, searchLimits{loopLegMaxSettled, f}, false, anchors)
-	if cause != CauseNone {
-		return 0
-	}
-	dist, _, _ := measure(e.g, nodes, edges)
-	return dist
+	nodes, edges, cause := chainLegs(ctx, &unit, s, climb, searchLimits{loopLegMaxSettled, f}, false, anchors)
+	return nodes, edges, cause == CauseNone
 }
 
 // shortestLoopForLoops is the shortest length of a loop through the waypoints the loop search would take, moving them
@@ -587,14 +594,30 @@ func (e *Engine) shortestLoopForLoops(ctx context.Context, start Point, waypoint
 	return shortestLoop(ctx, e, anchors, f)
 }
 
+// Reference tells which way a point-to-point direct route is found by.
+type Reference uint8
+
+const (
+	// ReferencePreferred is the cheapest way for the surface preference, its climb cost included.
+	ReferencePreferred Reference = iota
+	// ReferenceShortest is the way of least length, whatever its surface or its climb.
+	ReferenceShortest
+	// ReferenceFastest is the way of least walking time: its length plus the climb cost of each metre of ascent
+	// (8 m, which is Naismith's rule), whatever its surface.
+	ReferenceFastest
+)
+
 // DirectLoopRequest asks for the cheapest loop from Start through the Waypoints in order, keeping out of the
 // Avoided areas.
 type DirectLoopRequest struct {
 	Start     Point
 	Waypoints []Point
 	// End makes the route finish there instead of coming back to Start: a point-to-point route, not a loop.
-	End     *Point
-	Avoided []Circle
+	End *Point
+	// Reference, with End, asks for the shortest or the fastest way to it instead of the cheapest for the surface
+	// preference.
+	Reference Reference
+	Avoided   []Circle
 	// IncludeTechnical is LoopRequest.IncludeTechnical for the direct loop.
 	IncludeTechnical bool
 }
@@ -629,7 +652,6 @@ func (e *Engine) directPath(ctx context.Context, src uint32, req DirectLoopReque
 		return nil, err
 	}
 	// The end is snapped as the detour search snaps it, so that both finish at the same node.
-	// The end is snapped as the detour search snaps it, so that both finish at the same node.
 	end, err := e.snapPathEnd(*req.End, f)
 	if err != nil {
 		return nil, err
@@ -640,9 +662,22 @@ func (e *Engine) directPath(ctx context.Context, src uint32, req DirectLoopReque
 		r.anchors, r.fingerprint, r.mode = anchors, e.g.fingerprint, e.mode
 		return r, nil
 	}
-	nodes, edges, err := e.routeChain(ctx, anchors, f)
-	if err != nil {
-		return nil, err
+	var nodes, edges []uint32
+	switch req.Reference {
+	case ReferenceShortest:
+		var ok bool
+		if nodes, edges, ok = unitChain(ctx, e, anchors, f, 0); !ok {
+			return nil, ErrNoRoute
+		}
+	case ReferenceFastest:
+		var ok bool
+		if nodes, edges, ok = unitChain(ctx, e, anchors, f, e.prof.UpPerMeter); !ok {
+			return nil, ErrNoRoute
+		}
+	default:
+		if nodes, edges, err = e.routeChain(ctx, anchors, f); err != nil {
+			return nil, err
+		}
 	}
 	r := e.describe(nodes, edges)
 	r.anchors, r.fingerprint, r.mode = anchors, e.g.fingerprint, e.mode

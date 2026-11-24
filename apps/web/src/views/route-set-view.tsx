@@ -28,6 +28,7 @@ import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
   ImportedMarker,
   LapsMarker,
+  ReferenceMarker,
   RouteFigures,
   routeTitle,
   SurfaceShare,
@@ -363,6 +364,7 @@ function RouteRow({
           </span>
           {route.technical && <TechnicalMarker text={t.technical} testId={`routes-row-${index}-technical`} />}
           <LapsMarker route={route} language={language} testId={`routes-row-${index}-laps`} compact />
+          <ReferenceMarker route={route} language={language} testId={`routes-row-${index}-references`} />
         </span>
         {/* The empty width of the row: where the route climbs, at a glance. */}
         <ProfileSparkline testId={`routes-row-${index}-profile`} geometry={route.geometry} index={colorIndex} />
@@ -474,6 +476,7 @@ function RouteDetail({
       </div>
       {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" />}
       <LapsMarker route={route} language={language} testId="route-laps" />
+      <ReferenceMarker route={route} language={language} testId="route-references" labelled />
       <ElevationProfile
         testId="route-profile"
         route={route}

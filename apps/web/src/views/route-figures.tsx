@@ -1,4 +1,4 @@
-import { ArrowDownRight, ArrowUpRight, FileUp, Mountain, Repeat2 } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, FileUp, Mountain, Repeat2, Ruler, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { SURFACE_CLASSES } from '../components/index.ts';
@@ -117,6 +117,49 @@ export function TechnicalMarker({
     <span data-testid={testId} className={`flex items-center gap-1 text-sm font-semibold text-ink ${className}`}>
       <Mountain size={14} aria-hidden className="text-technical" />
       {text}
+    </span>
+  );
+}
+
+const REFERENCE_ICONS = { shortest: Ruler, fastest: Zap } as const;
+
+/**
+ * Which reference ways to the end point a route is: the shortest, the fastest, or both. An icon each, named for those
+ * who cannot see it; with `labelled` the words come beside them, where there is room.
+ */
+export function ReferenceMarker({
+  route,
+  language,
+  testId,
+  labelled = false,
+  className = '',
+}: {
+  route: Route;
+  language: Language;
+  testId: string;
+  labelled?: boolean;
+  className?: string;
+}) {
+  if (!route.references?.length) return null;
+  const t = routesText[language];
+  const names = route.references.map((reference) => (reference === 'shortest' ? t.shortestWay : t.fastestWay));
+  return (
+    <span
+      data-testid={testId}
+      role="img"
+      aria-label={names.join(', ')}
+      title={names.join(', ')}
+      className={`flex items-center gap-2 text-sm font-semibold text-ink ${className}`}
+    >
+      {route.references.map((reference, i) => {
+        const Icon = REFERENCE_ICONS[reference];
+        return (
+          <span key={reference} aria-hidden className="flex items-center gap-1">
+            <Icon size={14} className="flex-none text-accent" />
+            {labelled && names[i]}
+          </span>
+        );
+      })}
     </span>
   );
 }

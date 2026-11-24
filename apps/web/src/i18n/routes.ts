@@ -46,6 +46,8 @@ export const routesText = {
     laps: (count: number) => `${count} laps`,
     lapOf: (count: number, distance: string) => `${count} laps of ${distance}`,
     technical: 'technical stretches',
+    shortestWay: 'Shortest route',
+    fastestWay: 'Fastest route',
     importedTrack: 'Imported track',
     finding: 'Finding routes…',
     gainMissed: 'No route matches the elevation gain you asked for.',
@@ -61,7 +63,7 @@ export const routesText = {
     startTooFar: 'The start point is too far from a path.',
     startTooFarHint: 'Choose a start point closer to a path.',
     waypointsUnreachable: 'No route goes through these waypoints.',
-    avoidedAreaRefused: (area: number) => `Area ${area} cannot hold the start point or a waypoint.`,
+    avoidedAreaRefused: (area: number) => `Area ${area} cannot hold the start point, a waypoint or the end point.`,
   },
   fr: {
     routes: 'Parcours',
@@ -104,6 +106,8 @@ export const routesText = {
     laps: (count: number) => `${count} tours`,
     lapOf: (count: number, distance: string) => `${count} tours de ${distance}`,
     technical: 'passages techniques',
+    shortestWay: 'Parcours le plus court',
+    fastestWay: 'Parcours le plus rapide',
     importedTrack: 'Trace importée',
     finding: 'Recherche de parcours…',
     gainMissed: 'Aucun parcours ne correspond au dénivelé demandé.',
@@ -119,6 +123,7 @@ export const routesText = {
     startTooFar: 'Le point de départ est trop loin d’un chemin.',
     startTooFarHint: 'Choisissez un point de départ plus près d’un chemin.',
     waypointsUnreachable: 'Aucun parcours ne passe par ces points.',
-    avoidedAreaRefused: (area: number) => `La zone ${area} ne peut pas contenir le départ ou un point de passage.`,
+    avoidedAreaRefused: (area: number) =>
+      `La zone ${area} ne peut pas contenir le départ, un point de passage ou l’arrivée.`,
   },
 } satisfies Record<Language, Record<string, unknown>>;

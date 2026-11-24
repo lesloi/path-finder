@@ -133,3 +133,128 @@ func TestGenerateRefusesAnEndPointOffTheWays(t *testing.T) {
 		t.Errorf("err = %v, want a CriteriaError on end", err)
 	}
 }
+
+// climbing is the route with a climb along it, which makes its effort distance longer than its length.
+func climbing(r *engine.Route, metres float64) *engine.Route {
+	for i := range r.Points {
+		r.Points[i].Elevation += metres * float64(i) / float64(len(r.Points)-1)
+	}
+	return r
+}
+
+func ofLength(r *engine.Route, metres float64) *engine.Route {
+	r.Distance = metres
+	return r
+}
+
+func referencesOf(routes []contract.Route) map[string]bool {
+	out := map[string]bool{}
+	for _, r := range routes {
+		for _, ref := range r.References {
+			out[ref] = true
+		}
+	}
+	return out
+}
+
+func TestGenerateLabelsTheShortestAndTheFastestWayToTheEndPoint(t *testing.T) {
+	// Arrange: the shortest way climbs, so a longer flat one is faster; the preferred one is neither
+	looper := &fakeLooper{
+		direct: ofLength(engineLoop(0), 4000),
+		references: map[engine.Reference]*engine.Route{
+			engine.ReferenceShortest: climbing(ofLength(engineLoop(10), 3000), 900),
+			engine.ReferenceFastest:  ofLength(engineLoop(20), 3500),
+		},
+	}
+
+	routes, err := generate(t, looper, context.Background(), withEnd)
+
+	byLabel := map[string]float64{}
+	for _, r := range routes {
+		for _, ref := range r.References {
+			byLabel[ref] = r.Distance
+		}
+	}
+	if err != nil || byLabel["shortest"] != 3 || byLabel["fastest"] != 3.5 || len(routes) < 3 {
+		t.Errorf("routes = %d, labels = %v, err = %v, want the 3 km route shortest and the 3.5 km one fastest", len(routes), byLabel, err)
+	}
+}
+
+func TestGenerateLabelsOneRouteBothWhenItIsTheShortestAndTheFastest(t *testing.T) {
+	looper := &fakeLooper{direct: shortRoute()}
+
+	routes, err := generate(t, looper, context.Background(), withEnd)
+
+	if err != nil || len(routes) != 1 || len(routes[0].References) != 2 {
+		t.Errorf("routes = %+v, err = %v, want one route that is both", routes, err)
+	}
+}
+
+func TestGenerateKeepsTheShortestAndTheFastestWaysThatShareTheirGround(t *testing.T) {
+	// Arrange: the two ways differ by one point, a metre away, and cover the same cells
+	fastest := ofLength(engineLoop(0), 3500)
+	shortest := ofLength(engineLoop(0), 3000)
+	shortest.Points[1].Lat += 0.00001
+	climbing(shortest, 900)
+	looper := &fakeLooper{
+		direct:     ofLength(engineLoop(0), 3500),
+		references: map[engine.Reference]*engine.Route{engine.ReferenceShortest: shortest, engine.ReferenceFastest: fastest},
+	}
+
+	routes, err := generate(t, looper, context.Background(), withEnd)
+
+	if got := referencesOf(routes); err != nil || !got["shortest"] || !got["fastest"] {
+		t.Errorf("labels = %v, err = %v, want both ways kept though they share their ground", got, err)
+	}
+}
+
+func TestGenerateAsksForTheShortestAndTheFastestWay(t *testing.T) {
+	seen := map[engine.Reference]bool{}
+	looper := &fakeLooper{direct: shortRoute(), onDirect: func(r engine.DirectLoopRequest) { seen[r.Reference] = true }}
+
+	if _, err := generate(t, looper, context.Background(), withEnd); err != nil {
+		t.Fatal(err)
+	}
+
+	if !seen[engine.ReferencePreferred] || !seen[engine.ReferenceShortest] || !seen[engine.ReferenceFastest] {
+		t.Errorf("references asked = %v, want all three", seen)
+	}
+}
+
+func TestGenerateDropsAWayThatIsNeitherTheShortestNorTheFastest(t *testing.T) {
+	// Arrange: the way found as the fastest is a metre off the shortest and a little longer, so it wins on nothing
+	fastest := ofLength(engineLoop(0), 3100)
+	fastest.Points[1].Lat += 0.00001
+	looper := &fakeLooper{
+		direct: ofLength(engineLoop(0), 4000),
+		references: map[engine.Reference]*engine.Route{
+			engine.ReferenceShortest: ofLength(engineLoop(0), 3000),
+			engine.ReferenceFastest:  fastest,
+		},
+	}
+
+	routes, err := generate(t, looper, context.Background(), withEnd)
+
+	for _, r := range routes {
+		if r.Distance == 3.1 {
+			t.Errorf("the 3.1 km way is in the set, which it has no label to be in: %+v", r.References)
+		}
+	}
+	if err != nil || len(routes) < 2 {
+		t.Errorf("routes = %d, err = %v, want the preferred and the shortest way", len(routes), err)
+	}
+}
+
+func TestGenerateNeverLabelsAWayShortestWhenTheSearchForTheShortestFailed(t *testing.T) {
+	looper := &fakeLooper{
+		direct:       ofLength(engineLoop(0), 4000),
+		references:   map[engine.Reference]*engine.Route{engine.ReferenceFastest: ofLength(engineLoop(10), 3500)},
+		referenceErr: map[engine.Reference]error{engine.ReferenceShortest: engine.ErrNoRoute},
+	}
+
+	routes, err := generate(t, looper, context.Background(), withEnd)
+
+	if got := referencesOf(routes); err != nil || got["shortest"] || !got["fastest"] {
+		t.Errorf("labels = %v, err = %v, want the fastest alone", got, err)
+	}
+}

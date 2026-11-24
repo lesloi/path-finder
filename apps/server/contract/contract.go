@@ -97,7 +97,10 @@ type Route struct {
 	EstimatedDuration float64     `json:"estimatedDuration"` // minutes
 	Kind              string      `json:"kind"`              // match or suggestion
 	// Laps is how many times the route runs its loop, from 2 up; absent for a loop run once.
-	Laps         int              `json:"laps,omitempty"`
+	Laps int `json:"laps,omitempty"`
+	// References tells which reference ways to the end point the route is: "shortest" and "fastest", both when one
+	// route is both; absent for any other route.
+	References   []string         `json:"references,omitempty"`
 	UnpavedShare float64          `json:"unpavedShare"`
 	Surfaces     []SurfaceStretch `json:"surfaces"`
 	Technical    bool             `json:"technical"` // holds a technical stretch
