@@ -79,6 +79,25 @@ func TestLoopsWithAnEndPointAreTheSameForTheSameSeed(t *testing.T) {
 	}
 }
 
+func TestDirectRouteToAnEndPointOnAnIslandFinishesOffTheIsland(t *testing.T) {
+	// Arrange: a valley of 1,771 nodes and a small island 250 m from the start, where the end point is
+	g := &testGraph{}
+	start := valleyBand(g)
+	island := g.addNode(250, 0, 900)
+	g.connect(island, g.addNode(300, 0, 900), KindPath)
+	e := openTest(t, g, false)
+	end := pointOf(g, island)
+	// Act
+	r, err := e.DirectLoop(context.Background(), DirectLoopRequest{Start: pointOf(g, start), End: &end})
+	// Assert
+	if err != nil {
+		t.Fatal(err)
+	}
+	if last := r.Points[len(r.Points)-1].Point; last == end {
+		t.Error("the route finishes on the island, where the detour search never goes")
+	}
+}
+
 func TestLoopsWithAnEndPointFailWhenTheEndIsOffTheWays(t *testing.T) {
 	g := &testGraph{}
 	at := g.grid(21, 21, flat)

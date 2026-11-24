@@ -96,7 +96,12 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		}
 	}
 	if criteria.End != nil {
-		return g.pointToPoint(ctx, looper, criteria, km, req)
+		routes, found, err := g.pointToPoint(ctx, looper, criteria, km, req)
+		if found || err != nil {
+			return routes, err
+		}
+		// The end is where the start is: the way between them has no length, and what is left to ask for is a loop.
+		criteria.End = nil
 	}
 	// The loop straight through the waypoints is a candidate of its own: run once, or as many times as best meets
 	// the criteria when the user allows repeats. It is one candidate, so the ranking still has one direct loop.
@@ -153,7 +158,7 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 
 // pointToPoint offers the cheapest route from the start through the waypoints to the end. There is no loop to search
 // for and none to repeat: the route is what the ways give, and the ranking says how far it is from the target.
-func (g *Generator) pointToPoint(ctx context.Context, looper Looper, c contract.Criteria, km float64, req engine.LoopRequest) (any, error) {
+func (g *Generator) pointToPoint(ctx context.Context, looper Looper, c contract.Criteria, km float64, req engine.LoopRequest) (any, bool, error) {
 	end := engine.Point{Lat: c.End[1], Lon: c.End[0]}
 	direct, err := looper.DirectLoop(ctx, engine.DirectLoopRequest{
 		Start:            req.Start,
@@ -165,30 +170,31 @@ func (g *Generator) pointToPoint(ctx context.Context, looper Looper, c contract.
 	var waypoint *engine.WaypointError
 	switch {
 	case errors.As(err, &waypoint):
-		return nil, &contract.CriteriaError{Field: "waypoints", Message: "waypoint is too far from a way", Waypoint: waypoint.Index}
+		return nil, false, &contract.CriteriaError{Field: "waypoints", Message: "waypoint is too far from a way", Waypoint: waypoint.Index}
 	case errors.Is(err, engine.ErrEndOffGraph):
-		return nil, &contract.CriteriaError{Field: "end", Message: "end point is too far from a way"}
+		return nil, false, &contract.CriteriaError{Field: "end", Message: "end point is too far from a way"}
 	case errors.Is(err, engine.ErrOffGraph):
-		return nil, &contract.CriteriaError{Field: "start", Message: "start point is too far from a way"}
+		return nil, false, &contract.CriteriaError{Field: "start", Message: "start point is too far from a way"}
 	case errors.Is(err, engine.ErrNoRoute):
-		return nil, &contract.CriteriaError{Field: "end", Message: "end point is not joined to the start by a way"}
+		return nil, false, &contract.CriteriaError{Field: "end", Message: "end point is not joined to the start by a way"}
 	case err != nil:
-		return nil, err
+		return nil, false, err
 	}
 	set := newRanking(c, km)
 	limit := cmpOr(g.MaxRoutes, maxRoutes)
 	cand := toCandidate(direct)
 	if cand == nil {
-		return routeSet(c, set.routes(limit)), nil
+		// Start and end are one node: nothing to offer here, and the caller asks for a loop instead.
+		return nil, false, nil
 	}
 	if cand.distance > contract.MaxDistanceKm() {
-		return nil, &contract.CriteriaError{Field: "end", Message: "end makes too long a route"}
+		return nil, false, &contract.CriteriaError{Field: "end", Message: "end makes too long a route"}
 	}
 	cand.direct = true
 	set.add(cand)
 	// Detours only add to the direct route: once it is beyond what a suggestion allows, none is nearer the target.
 	if overshoots(c, cand) {
-		return routeSet(c, set.routes(limit)), nil
+		return routeSet(c, set.routes(limit)), true, nil
 	}
 	req.End, req.Waypoints, req.Direct = &end, waypointPoints(c.Waypoints), direct
 	// The direct route keeps a place in the set (see ranking.routes), so one match fewer fills it.
@@ -201,13 +207,13 @@ func (g *Generator) pointToPoint(ctx context.Context, looper Looper, c contract.
 	case errors.Is(err, engine.ErrOffGraph), errors.Is(err, engine.ErrNoLoop), errors.Is(err, engine.ErrNoRoute):
 		// Nothing more to offer: the direct route stays.
 	case err != nil && ctx.Err() == nil:
-		return nil, err
+		return nil, false, err
 	}
 	routes := set.routes(limit)
 	if ctx.Err() != nil && len(routes) == 0 {
-		return nil, ctx.Err()
+		return nil, false, ctx.Err()
 	}
-	return routeSet(c, routes), nil
+	return routeSet(c, routes), true, nil
 }
 
 func waypointPoints(list [][2]float64) []engine.Point {

@@ -65,6 +65,20 @@ func TestGenerateAimsDetoursAtTheCriteriaOfTheRequest(t *testing.T) {
 	}
 }
 
+func TestGenerateSearchesLoopsWhenTheEndPointIsWhereTheStartIs(t *testing.T) {
+	// Arrange: both points snap to the same node, so the way between them has no length
+	looper := &fakeLooper{direct: &engine.Route{}, loops: []*engine.Route{engineLoop(120)}}
+
+	routes, err := generate(t, looper, context.Background(), withEnd)
+
+	if err != nil || looper.loopCalls != 1 || looper.got.End != nil {
+		t.Fatalf("searches = %d, end = %v, err = %v, want one loop search without an end", looper.loopCalls, looper.got.End, err)
+	}
+	if len(routes) != 1 || routes[0].Kind != "match" {
+		t.Errorf("routes = %+v, want the loop as a match", routes)
+	}
+}
+
 func TestGenerateSearchesNoDetourWhenTheDirectRouteIsAlreadyBeyondTheTarget(t *testing.T) {
 	long := engineLoop(0)
 	long.Distance = 25_000

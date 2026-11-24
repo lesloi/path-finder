@@ -628,9 +628,11 @@ func (e *Engine) directPath(ctx context.Context, src uint32, req DirectLoopReque
 	if err != nil {
 		return nil, err
 	}
-	end, err := e.snapStart(*req.End, f)
+	// The end is snapped as the detour search snaps it, so that both finish at the same node.
+	// The end is snapped as the detour search snaps it, so that both finish at the same node.
+	end, err := e.snapPathEnd(*req.End, f)
 	if err != nil {
-		return nil, ErrEndOffGraph
+		return nil, err
 	}
 	anchors := collapse(append(append([]uint32{src}, snapped...), end))
 	if len(anchors) < 2 {
