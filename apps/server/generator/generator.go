@@ -8,6 +8,7 @@ import (
 	"errors"
 	"math"
 	"math/rand/v2"
+	"slices"
 
 	"github.com/lesloi/path-finder/apps/server/contract"
 	"github.com/lesloi/path-finder/apps/server/engine"
@@ -95,6 +96,14 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 			},
 		}
 	}
+	if criteria.End != nil {
+		routes, found, err := g.pointToPoint(ctx, looper, criteria, km, req)
+		if found || err != nil {
+			return routes, err
+		}
+		// The end is where the start is: the way between them has no length, and what is left to ask for is a loop.
+		criteria.End = nil
+	}
 	// The loop straight through the waypoints is a candidate of its own: run once, or as many times as best meets
 	// the criteria when the user allows repeats. It is one candidate, so the ranking still has one direct loop.
 	set := newRanking(criteria, km)
@@ -113,10 +122,8 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		req.Direct = directRoute
 		if direct != nil {
 			set.add(g.bestDirect(criteria, direct, set))
-			if set.holdsADirectSuggestion() {
-				// It keeps a place in the set (see ranking.routes), so one match fewer fills it.
-				enough = limit - 1
-			}
+			// It keeps a place in the set (see ranking.routes), so one match fewer fills it.
+			enough = limit - set.directSuggestions()
 			if criteria.Target.Distance > 0 && (criteria.ElevationGain == nil || criteria.ElevationGain.Shortcut == "") &&
 				directRoute != nil && directRoute.Shortest > 0 {
 				targetM := criteria.Target.Distance * 1000
@@ -146,6 +153,115 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		return nil, ctx.Err()
 	}
 	return routeSet(criteria, routes), nil
+}
+
+// pointToPoint offers the cheapest route from the start through the waypoints to the end. There is no loop to search
+// for and none to repeat: the route is what the ways give, and the ranking says how far it is from the target.
+func (g *Generator) pointToPoint(ctx context.Context, looper Looper, c contract.Criteria, km float64, req engine.LoopRequest) (any, bool, error) {
+	end := engine.Point{Lat: c.End[1], Lon: c.End[0]}
+	wayTo := engine.DirectLoopRequest{
+		Start:            req.Start,
+		Waypoints:        waypointPoints(c.Waypoints),
+		End:              &end,
+		Avoided:          req.Avoided,
+		IncludeTechnical: c.IncludeTechnical,
+	}
+	direct, err := looper.DirectLoop(ctx, wayTo)
+	var waypoint *engine.WaypointError
+	switch {
+	case errors.As(err, &waypoint):
+		return nil, false, &contract.CriteriaError{Field: "waypoints", Message: "waypoint is too far from a way", Waypoint: waypoint.Index}
+	case errors.Is(err, engine.ErrEndOffGraph):
+		return nil, false, &contract.CriteriaError{Field: "end", Message: "end point is too far from a way"}
+	case errors.Is(err, engine.ErrOffGraph):
+		return nil, false, &contract.CriteriaError{Field: "start", Message: "start point is too far from a way"}
+	case errors.Is(err, engine.ErrNoRoute):
+		return nil, false, &contract.CriteriaError{Field: "end", Message: "end point is not joined to the start by a way"}
+	case err != nil:
+		return nil, false, err
+	}
+	set := newRanking(c, km)
+	limit := cmpOr(g.MaxRoutes, maxRoutes)
+	cand := toCandidate(direct)
+	if cand == nil {
+		// Start and end are one node: nothing to offer here, and the caller asks for a loop instead.
+		return nil, false, nil
+	}
+	if cand.distance > contract.MaxDistanceKm() {
+		return nil, false, &contract.CriteriaError{Field: "end", Message: "end makes too long a route"}
+	}
+	cand.direct = true
+	set.add(referenceWays(ctx, looper, wayTo, cand)...)
+	// Detours only add to the direct route: once it is beyond what a suggestion allows, none is nearer the target.
+	if overshoots(c, cand) {
+		return routeSet(c, set.routes(limit)), true, nil
+	}
+	req.End, req.Waypoints, req.Direct = &end, waypointPoints(c.Waypoints), direct
+	// The direct route keeps a place in the set (see ranking.routes), so one match fewer fills it.
+	enough := limit - set.directSuggestions()
+	_, err = g.search(ctx, looper, req, set, 1, cmpOr(g.Candidates, defaultCandidates), cmpOr(g.StopAfter, defaultStopAfter), enough, limit)
+	switch {
+	case errors.Is(err, engine.ErrOffGraph), errors.Is(err, engine.ErrNoLoop), errors.Is(err, engine.ErrNoRoute):
+		// Nothing more to offer: the direct route stays.
+	case err != nil && ctx.Err() == nil:
+		return nil, false, err
+	}
+	routes := set.routes(limit)
+	if ctx.Err() != nil && len(routes) == 0 {
+		return nil, false, ctx.Err()
+	}
+	return routeSet(c, routes), true, nil
+}
+
+// referenceWays are the preferred way to the end point, which is the cheapest for the surface preference, and the
+// shortest and the fastest ones, which ignore it. The same way found twice is one route, and a route that is the
+// shortest or the fastest of them says so, if the search for that reference found a way: a failed one gives its label
+// to no other route. The fastest is the one with the least effort distance, as the duration shown for each route is
+// read from it, so no label contradicts the figures beside it. The preferred way is always kept; another is only
+// when it carries a label.
+func referenceWays(ctx context.Context, looper Looper, wayTo engine.DirectLoopRequest, preferred *candidate) []*candidate {
+	ways := []*candidate{preferred}
+	found := map[engine.Reference]bool{}
+	for _, ref := range []engine.Reference{engine.ReferenceShortest, engine.ReferenceFastest} {
+		wayTo.Reference = ref
+		route, err := looper.DirectLoop(ctx, wayTo)
+		if err != nil || route == nil {
+			continue
+		}
+		cand := toCandidate(route)
+		if cand == nil || cand.distance > contract.MaxDistanceKm() {
+			continue
+		}
+		found[ref] = true
+		if !slices.ContainsFunc(ways, cand.sameWay) {
+			cand.direct = true
+			ways = append(ways, cand)
+		}
+	}
+	shortest, fastest := ways[0], ways[0]
+	for _, w := range ways {
+		if w.distance < shortest.distance {
+			shortest = w
+		}
+		if w.effortDistance() < fastest.effortDistance() {
+			fastest = w
+		}
+	}
+	if found[engine.ReferenceShortest] {
+		shortest.reference = true
+	}
+	if found[engine.ReferenceFastest] {
+		fastest.reference = true
+	}
+	return slices.DeleteFunc(ways, func(w *candidate) bool { return w != preferred && !w.reference })
+}
+
+func waypointPoints(list [][2]float64) []engine.Point {
+	var points []engine.Point
+	for _, w := range list {
+		points = append(points, engine.Point{Lat: w[1], Lon: w[0]})
+	}
+	return points
 }
 
 // search runs one loop request and adds its loops to the set, repeated laps times. It stops the engine once the set

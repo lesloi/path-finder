@@ -67,6 +67,16 @@ describe('parseRouteSet', () => {
     expect(parseRouteSet({ routes: [repeated] })).toEqual({ routes: [repeated] });
   });
 
+  it('reads a direct way', () => {
+    const direct = { ...route, direct: true };
+
+    expect(parseRouteSet({ routes: [direct] })).toEqual({ routes: [direct] });
+  });
+
+  it.each([[false], ['yes'], [1]])('refuses a route that is direct: %j', (direct) => {
+    expect(parseRouteSet({ routes: [{ ...route, direct }] })).toBeUndefined();
+  });
+
   it.each([[1], [2.5], ['5']])('refuses a route with %s laps', (laps) => {
     expect(parseRouteSet({ routes: [{ ...route, laps }] })).toBeUndefined();
   });

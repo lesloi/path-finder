@@ -39,7 +39,7 @@ exception, open an issue before implementing it.
   IP addresses (chi's `Logger` is for development only); it may hold a salted IP hash, rotated at
   least daily, in memory for rate limiting.
 - The only runtime third party is the IGN Géoplateforme, for map tiles and for the address or place
-  name typed in the start point field. Any other runtime network call needs the maintainer's
+  name typed in the start point or end point field. Any other runtime network call needs the maintainer's
   approval.
 - Self-host every script, stylesheet, and font; only the map style and its fonts and icons
   come from the IGN Géoplateforme. No analytics, tracking, or accounts.

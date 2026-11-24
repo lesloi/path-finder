@@ -1,7 +1,7 @@
-import { ArrowDownRight, ArrowUpRight, FileUp, Mountain, Repeat2 } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, FileUp, Mountain, Repeat2, Route as RouteIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { SURFACE_CLASSES } from '../components/index.ts';
+import { hint, SURFACE_CLASSES } from '../components/index.ts';
 import { formatDistance, formatDuration, formatHeight, type Route } from '../core/index.ts';
 import type { Language } from '../i18n/index.ts';
 import { criteriaText, routesText } from '../i18n/index.ts';
@@ -117,6 +117,39 @@ export function TechnicalMarker({
     <span data-testid={testId} className={`flex items-center gap-1 text-sm font-semibold text-ink ${className}`}>
       <Mountain size={14} aria-hidden className="text-technical" />
       {text}
+    </span>
+  );
+}
+
+/**
+ * The mark of a direct way to the end point, the shortest or the fastest of them: one icon, whichever it is. With
+ * `labelled` the word comes beside it, where there is room; without, the tip of the other figures says it.
+ */
+export function DirectMarker({
+  route,
+  language,
+  testId,
+  labelled = false,
+  className = '',
+}: {
+  route: Route;
+  language: Language;
+  testId: string;
+  labelled?: boolean;
+  className?: string;
+}) {
+  if (!route.direct) return null;
+  const label = routesText[language].directWay;
+  return (
+    <span
+      data-testid={testId}
+      {...(labelled ? {} : hint(label, 'top-start'))}
+      aria-label={label}
+      role="img"
+      className={`flex items-center gap-1 text-sm font-semibold text-ink ${className}`}
+    >
+      <RouteIcon size={14} aria-hidden className="flex-none text-accent" />
+      {labelled && label}
     </span>
   );
 }

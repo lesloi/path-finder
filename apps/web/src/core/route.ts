@@ -24,6 +24,8 @@ export type Route = {
   kind: 'match' | 'suggestion';
   /** How many times the route runs its loop, from 2 up; absent for a loop run once. */
   laps?: number;
+  /** The shortest or the fastest way to the end point; absent for any other route. */
+  direct?: true;
   unpavedShare: number;
   surfaces: SurfaceStretch[];
   /** Holds a technical stretch: a way where the hands, ropes or chains are needed. */
@@ -60,11 +62,13 @@ function parseRoute(value: unknown): Route | undefined {
     estimatedDuration,
     kind,
     laps,
+    direct,
     unpavedShare,
     surfaces,
     technical,
     technicalStretches,
   } = value;
+  if (direct !== undefined && direct !== true) return undefined;
   if (!Array.isArray(geometry) || !geometry.every(isPoint)) return undefined;
   if (!isNumber(distance) || !isNumber(estimatedDuration) || !isNumber(unpavedShare)) return undefined;
   if (elevationGain !== undefined && !isNumber(elevationGain)) return undefined;
@@ -98,6 +102,7 @@ function parseRoute(value: unknown): Route | undefined {
     estimatedDuration,
     kind,
     ...(lapsCount !== undefined && { laps: lapsCount }),
+    ...(direct && { direct }),
     unpavedShare,
     surfaces: (surfaces as SurfaceStretch[]).map(({ surface, from, to }) => ({ surface, from, to })),
     technical,

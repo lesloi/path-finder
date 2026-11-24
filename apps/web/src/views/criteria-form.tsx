@@ -72,6 +72,7 @@ export function criteriaRequest(
   {
     pace,
     start,
+    end,
     waypoints,
     avoidedAreas,
     repeats,
@@ -79,6 +80,8 @@ export function criteriaRequest(
   }: {
     pace: number;
     start?: Position | undefined;
+    /** Where the route finishes: without it, it is a loop back to the start. */
+    end?: Position | undefined;
     waypoints?: Position[] | undefined;
     avoidedAreas?: AvoidedArea[] | undefined;
     /** Whether the engine may repeat a loop; it picks the number of laps itself. */
@@ -93,11 +96,8 @@ export function criteriaRequest(
   // A route is no longer than its target, and no point of it is farther from the start than that: an area beyond
   // stays on the device, as a route cannot need it. Except with waypoints: the loop through them is offered whatever
   // its length, up to the longest route.
-  const reachKm = waypoints?.length
-    ? MAX_TARGET_DISTANCE
-    : draft.target === 'distance'
-      ? distance
-      : draft.duration / pace;
+  const reachKm =
+    waypoints?.length || end ? MAX_TARGET_DISTANCE : draft.target === 'distance' ? distance : draft.duration / pace;
   const reachable =
     start && avoidedAreas?.filter((area) => kmBetween(start, area.center) - area.radius / 1000 <= reachKm);
   return (
@@ -108,9 +108,11 @@ export function criteriaRequest(
       ...((level === 'flat' || level === 'hilly') && { elevationGain: level }),
       surface: draft.surface,
       pace,
+      ...(end && { end }),
       ...(waypoints?.length && { waypoints }),
       ...(reachable?.length && { avoidedAreas: reachable }),
-      ...(repeats === true && { repeats: true }),
+      // A lap starts where it ends: a route that finishes elsewhere has no loop to repeat.
+      ...(repeats === true && !end && { repeats: true }),
       ...(technical === true && { includeTechnical: true }),
     }
   );
@@ -142,6 +144,7 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
     sameTarget &&
     sameGain &&
     samePositions([request.start], [found.start]) &&
+    samePositions(request.end ? [request.end] : [], found.end ? [found.end] : []) &&
     request.surface === found.surface &&
     samePositions(request.waypoints ?? [], found.waypoints ?? []) &&
     sameAreas(request.avoidedAreas ?? [], found.avoidedAreas ?? []) &&
@@ -159,6 +162,7 @@ export function criteriaChanged(request: RouteSetRequest, found: RouteSetRequest
 export function CriteriaForm({
   language,
   start,
+  end,
   waypoints,
   avoidedAreas,
   startUncovered = false,
@@ -170,6 +174,8 @@ export function CriteriaForm({
 }: {
   language: Language;
   start?: Position;
+  /** Where the route finishes, when it is not a loop: set on the map, not in the form. */
+  end?: Position | undefined;
   /** The points the routes go through, in order: they are placed on the map, not in the form. */
   waypoints?: Position[] | undefined;
   /** The areas routes keep out of: placed on the map, not in the form. */
@@ -199,6 +205,7 @@ export function CriteriaForm({
   const request = criteriaRequest(draft, {
     pace: settings.pace,
     start,
+    end,
     waypoints,
     avoidedAreas,
     repeats: settings.repeats,
@@ -380,6 +387,7 @@ function message(
   const t = criteriaText[language];
   const messages: Record<CriteriaField, string> = {
     start: t.startError,
+    end: t.endError,
     target: target === 'distance' ? t.distanceError(distance.min, distance.max, 'km') : t.durationError,
     elevationGain: t.elevationGainError(gain.max, 'm'),
     surface: t.surfaceError,

@@ -28,6 +28,7 @@ import { criteriaText, routesText, type Language } from '../i18n/index.ts';
 import {
   ImportedMarker,
   LapsMarker,
+  DirectMarker,
   RouteFigures,
   routeTitle,
   SurfaceShare,
@@ -79,6 +80,7 @@ export function RouteSetView({
   onReverseSort,
   onClear,
   onReverse,
+  reversible = true,
   onHover,
   waypoints,
   waypointPois,
@@ -112,6 +114,8 @@ export function RouteSetView({
   onClear: () => void;
   /** The user asks to run the route at this index the other way. */
   onReverse: (index: number) => void;
+  /** False when the routes are no loops: see RouteDock. */
+  reversible?: boolean;
   onHover: (position: Position | undefined) => void;
   /** The points the routes were asked to go through, shown on the profile of a route and kept in its GPX file. */
   waypoints?: Position[] | undefined;
@@ -141,6 +145,7 @@ export function RouteSetView({
         onSelect={(index) => onSelect(order[index]!)}
         onBack={() => onDetailChange(false)}
         onReverse={() => onReverse(order[at]!)}
+        reversible={reversible}
         onHover={onHover}
         waypoints={waypoints}
         waypointPois={waypointPois}
@@ -342,9 +347,12 @@ function RouteRow({
       <span className="flex w-full items-center gap-3">
         <RouteThumbnail geometry={route.geometry} index={colorIndex} {...(snapshot && { snapshot })} />
         <span className="flex min-w-0 flex-none flex-col gap-1">
-          <strong data-testid={`routes-row-${index}-distance`} className="text-lg">
-            {distance}
-          </strong>
+          <span className="flex items-center gap-2">
+            <strong data-testid={`routes-row-${index}-distance`} className="text-lg">
+              {distance}
+            </strong>
+            <DirectMarker route={route} language={language} testId={`routes-row-${index}-direct`} />
+          </span>
           <span className="flex items-center gap-3 text-sm text-ink-2">
             {gain && (
               <span
@@ -386,6 +394,7 @@ function RouteDetail({
   onSelect,
   onBack,
   onReverse,
+  reversible,
   onHover,
   waypoints,
   waypointPois,
@@ -402,6 +411,7 @@ function RouteDetail({
   onSelect: (index: number) => void;
   onBack: () => void;
   onReverse: () => void;
+  reversible: boolean;
   onHover: (position: Position | undefined) => void;
   waypoints?: Position[] | undefined;
   waypointPois?: WaypointPois | undefined;
@@ -445,12 +455,16 @@ function RouteDetail({
           <ArrowLeft size={18} aria-hidden />
           {t.routes}
         </button>
-        <button type="button" data-testid="route-reverse" className={TEXT_BUTTON} onClick={onReverse}>
-          <span className={TEXT_BUTTON_HOVER}>
-            <ArrowLeftRight size={18} aria-hidden />
-            {t.reverseRoute}
-          </span>
-        </button>
+        {reversible ? (
+          <button type="button" data-testid="route-reverse" className={TEXT_BUTTON} onClick={onReverse}>
+            <span className={TEXT_BUTTON_HOVER}>
+              <ArrowLeftRight size={18} aria-hidden />
+              {t.reverseRoute}
+            </span>
+          </button>
+        ) : (
+          <span />
+        )}
         {!route.imported && (
           <strong data-testid="route-position" aria-label={routeTitle(route, language, selected, routes.length)}>
             {selected + 1}/{routes.length}
@@ -474,6 +488,7 @@ function RouteDetail({
       </div>
       {route.technical && <TechnicalMarker text={t.technical} testId="route-technical" />}
       <LapsMarker route={route} language={language} testId="route-laps" />
+      <DirectMarker route={route} language={language} testId="route-direct" labelled />
       <ElevationProfile
         testId="route-profile"
         route={route}

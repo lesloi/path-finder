@@ -1033,5 +1033,105 @@
     "expect": {
       "field": "includeTechnical"
     }
+  },
+  {
+    "name": "keeps an end point",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "end": [6.2, 45.95]
+    },
+    "expect": {
+      "criteria": {
+        "start": [6.1294, 45.8992],
+        "target": {
+          "distance": 10
+        },
+        "surface": "any",
+        "pace": 6,
+        "end": [6.2, 45.95]
+      }
+    }
+  },
+  {
+    "name": "an end point that is not a longitude and a latitude",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "end": "here"
+    },
+    "expect": {
+      "field": "end"
+    }
+  },
+  {
+    "name": "an end point out of range",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "end": [6.2, 95]
+    },
+    "expect": {
+      "field": "end"
+    }
+  },
+  {
+    "name": "refuses an end point inside an avoided area",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "end": [6.2, 45.95],
+      "avoidedAreas": [{ "center": [6.2, 45.95], "radius": 200 }]
+    },
+    "expect": {
+      "field": "avoidedAreas"
+    }
+  },
+  {
+    "name": "refuses an end point further than the longest route",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "end": [7.5, 45.95]
+    },
+    "expect": {
+      "field": "end"
+    }
+  },
+  {
+    "name": "refuses repeats with an end point",
+    "body": {
+      "start": [6.1294, 45.8992],
+      "target": {
+        "distance": 10
+      },
+      "surface": "any",
+      "pace": 6,
+      "end": [6.2, 45.95],
+      "repeats": true
+    },
+    "expect": {
+      "field": "repeats"
+    }
   }
 ]

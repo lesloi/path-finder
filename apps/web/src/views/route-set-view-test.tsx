@@ -58,6 +58,7 @@ function View({
   onPaceChange,
   onClear = () => {},
   onReverse = () => {},
+  reversible,
   onSortChange,
   pace = 6,
   open = false,
@@ -73,6 +74,7 @@ function View({
   onPaceChange?: (pace: number) => void;
   onClear?: () => void;
   onReverse?: (index: number) => void;
+  reversible?: boolean;
   onSortChange?: (sort: RouteSort) => void;
   pace?: number;
   open?: boolean;
@@ -104,6 +106,7 @@ function View({
       onPaceChange={onPaceChange}
       onClear={onClear}
       onReverse={onReverse}
+      {...(reversible !== undefined && { reversible })}
       onHover={onHover}
       {...(waypoints && { waypoints })}
       {...(closestElevationGain !== undefined && { closestElevationGain })}
@@ -532,6 +535,33 @@ describe('RouteSetView', () => {
     const marker = screen.getByTestId('routes-row-0-laps');
     expect(marker).toHaveTextContent('3 laps');
     expect(marker).toHaveAccessibleName('3 laps of 4.1 km');
+  });
+
+  it('marks a direct way with one icon, named for those who cannot see it', () => {
+    render(<View list={[route({ direct: true })]} />);
+
+    const marker = screen.getByTestId('routes-row-0-direct');
+    expect(marker).toHaveAccessibleName(en.directWay);
+    expect(marker).toHaveAttribute('data-tip', en.directWay);
+    expect(marker.textContent).toBe('');
+  });
+
+  it('says in words that the opened route is a direct way', () => {
+    render(<View open list={[route({ direct: true })]} />);
+
+    expect(screen.getByTestId('route-direct')).toHaveTextContent(en.directWay);
+  });
+
+  it('marks no reference on a route that is none', () => {
+    render(<View list={[route()]} />);
+
+    expect(screen.queryByTestId('routes-row-0-direct')).not.toBeInTheDocument();
+  });
+
+  it('takes the reverse button away for routes that are no loops', () => {
+    render(<View open reversible={false} list={[route()]} />);
+
+    expect(screen.queryByTestId('route-reverse')).not.toBeInTheDocument();
   });
 
   it('says the laps in the language of the settings', () => {

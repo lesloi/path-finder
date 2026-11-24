@@ -336,6 +336,17 @@ describe('criteriaRequest', () => {
     expect(criteriaRequest(draft, { pace: 6, start: START, repeats: false })).not.toHaveProperty('repeats');
   });
 
+  it('carries the end point, and drops the repeats it cannot have', () => {
+    const draft = { target: 'distance', distance: 10, duration: 60, level: 'any', gain: 0, surface: 'any' } as const;
+    const end: Position = [6.2, 45.95];
+
+    const request = criteriaRequest(draft, { pace: 6, start: START, end, repeats: true });
+
+    expect(request).toMatchObject({ end });
+    expect(request).not.toHaveProperty('repeats');
+    expect(criteriaRequest(draft, { pace: 6, start: START })).not.toHaveProperty('end');
+  });
+
   it('carries whether the routes may take technical ways', () => {
     const draft = { target: 'distance', distance: 10, duration: 60, level: 'any', gain: 0, surface: 'any' } as const;
 
@@ -419,6 +430,15 @@ describe('criteriaChanged', () => {
     ['the technical stretches setting', { includeTechnical: true }],
   ])('sees a change of %s', (_, changes) => {
     expect(changed(changes)).toBe(true);
+  });
+
+  it('sees an end point added, moved or removed', () => {
+    const withEnd = { ...found, end: [6.2, 45.95] as Position };
+
+    expect(criteriaChanged(withEnd, withEnd)).toBe(false);
+    expect(criteriaChanged(withEnd, found)).toBe(true);
+    expect(criteriaChanged(found, withEnd)).toBe(true);
+    expect(criteriaChanged({ ...found, end: [6.21, 45.95] }, withEnd)).toBe(true);
   });
 
   it('sees a waypoint added, moved, removed or reordered, but not an empty list for none', () => {

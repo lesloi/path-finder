@@ -21,6 +21,8 @@ const maxWaypointSnapMeters = 250
 var (
 	// ErrOffGraph means a point is too far from any way of the graph.
 	ErrOffGraph = errors.New("engine: point is off the graph")
+	// ErrEndOffGraph means the end point of a point-to-point route is too far from any way of the graph.
+	ErrEndOffGraph = errors.New("engine: end point is off the graph")
 	// ErrNoRoute means no route was found between two points.
 	ErrNoRoute = errors.New("engine: no route found")
 	// ErrNoLoop means no loop was found from the start point.
@@ -125,6 +127,9 @@ type LoopRequest struct {
 	// Waypoints every loop goes through, in this order, between leaving Start and coming back to it. A
 	// route may retrace its steps to reach one. At most as many as the caller allows.
 	Waypoints []Point
+	// End, when set, makes the routes finish there instead of coming back to Start: point-to-point routes, which
+	// detour to reach the target as loops do. The waypoints are then between Start and End.
+	End *Point
 	// Direct, when set, is the loop through Waypoints the caller already found with DirectLoop. The engine reuses
 	// its chain when the waypoints snap to the same nodes on the same graph, so that a loop request does not route
 	// them twice; otherwise it routes them again.
@@ -334,7 +339,13 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if err != nil {
 		return nil, err
 	}
-	anchors, baseM, baseEffort, err := e.anchorLoop(ctx, start, req.Waypoints, forbidden, req.Direct, req.Effort)
+	var anchors []uint32
+	var baseM, baseEffort float64
+	if req.End != nil {
+		anchors, baseM, baseEffort, err = e.anchorPath(ctx, start, req.Waypoints, *req.End, forbidden, req.Direct, req.Effort)
+	} else {
+		anchors, baseM, baseEffort, err = e.anchorLoop(ctx, start, req.Waypoints, forbidden, req.Direct, req.Effort)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -354,6 +365,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 		distM: req.Distance, ascentM: req.Ascent, ascentBand: req.AscentBand, distanceBand: req.DistanceBand,
 		effort: req.Effort, candidates: req.Candidates, seed: req.Seed,
 		anchors: anchors, baseM: baseM, baseEffort: baseEffort, stats: req.Stats, forbidden: forbidden,
+		pathEnd: req.End != nil,
 	}
 	// A loop with an elevation gain to make heads for the highest ground around the start, rather than a random way.
 	if req.Ascent > 0 {
@@ -503,32 +515,53 @@ func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point
 	if err != nil || len(anchors) < 2 {
 		return nil, 0, 0, err
 	}
+	length, baseEffort, err = e.measureAnchors(ctx, anchors, f, direct, effort)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return anchors, length, baseEffort, nil
+}
+
+// measureAnchors is the length of the cheapest chain through the anchors and its effort distance. When direct is
+// the direct route of the same anchors, its length is that one, and the chain is not routed again.
+func (e *Engine) measureAnchors(ctx context.Context, anchors []uint32, f *forbidden, direct *Route, effort *EffortTarget) (length, baseEffort float64, err error) {
 	if direct != nil && direct.Distance > 0 && direct.mode == e.mode && direct.fingerprint == e.g.fingerprint && slices.Equal(direct.anchors, anchors) {
 		length = direct.Distance
 		baseEffort = length
 		if effort != nil {
 			baseEffort = length * effortFactorOfPoints(direct.Points, effort.Slope)
 		}
-		return anchors, length, baseEffort, nil
+		return length, baseEffort, nil
 	}
 	nodes, edges, err := e.routeChain(ctx, anchors, f)
 	if err != nil {
-		return nil, 0, 0, err
+		return 0, 0, err
 	}
 	length, _, _ = measure(e.g, nodes, edges)
 	baseEffort = length
 	if effort != nil {
 		baseEffort = length * effortFactor(e.g, nodes, effort.Slope)
 	}
-	return anchors, length, baseEffort, nil
+	return length, baseEffort, nil
 }
 
 // shortestLoop is the shortest length of a loop through the anchors: unit costs and no climb penalty, so no loop
 // through them can be shorter, and it is the lower bound a loop search may rely on. It is zero when the chain cannot
 // be routed.
 func shortestLoop(ctx context.Context, e *Engine, anchors []uint32, f *forbidden) float64 {
-	if len(anchors) < 2 {
+	nodes, edges, ok := unitChain(ctx, e, anchors, f, 0)
+	if !ok {
 		return 0
+	}
+	dist, _, _ := measure(e.g, nodes, edges)
+	return dist
+}
+
+// unitChain routes the chain through the anchors with every way costing its length and each metre of ascent costing
+// climb more: the shortest chain for 0, and for the profile's climb cost the one that takes the least walking time.
+func unitChain(ctx context.Context, e *Engine, anchors []uint32, f *forbidden, climb float32) (nodes, edges []uint32, ok bool) {
+	if len(anchors) < 2 {
+		return nil, nil, false
 	}
 	// The profile's multipliers are not all 1: the cheapest chain for a preference can be longer than the shortest
 	// one, so the bound is searched with every way costing its length.
@@ -542,12 +575,8 @@ func shortestLoop(ctx context.Context, e *Engine, anchors []uint32, f *forbidden
 	unit.alt = nil
 	s := searcherPool.Get().(*searcher)
 	defer searcherPool.Put(s)
-	nodes, edges, cause := chainLegs(ctx, &unit, s, 0, searchLimits{loopLegMaxSettled, f}, false, anchors)
-	if cause != CauseNone {
-		return 0
-	}
-	dist, _, _ := measure(e.g, nodes, edges)
-	return dist
+	nodes, edges, cause := chainLegs(ctx, &unit, s, climb, searchLimits{loopLegMaxSettled, f}, false, anchors)
+	return nodes, edges, cause == CauseNone
 }
 
 // shortestLoopForLoops is the shortest length of a loop through the waypoints the loop search would take, moving them
@@ -565,11 +594,29 @@ func (e *Engine) shortestLoopForLoops(ctx context.Context, start Point, waypoint
 	return shortestLoop(ctx, e, anchors, f)
 }
 
+// Reference tells which way a point-to-point direct route is found by.
+type Reference uint8
+
+const (
+	// ReferencePreferred is the cheapest way for the surface preference, its climb cost included.
+	ReferencePreferred Reference = iota
+	// ReferenceShortest is the way of least length, whatever its surface or its climb.
+	ReferenceShortest
+	// ReferenceFastest is the way of least walking time: its length plus the climb cost of each metre of ascent
+	// (8 m, which is Naismith's rule), whatever its surface.
+	ReferenceFastest
+)
+
 // DirectLoopRequest asks for the cheapest loop from Start through the Waypoints in order, keeping out of the
 // Avoided areas.
 type DirectLoopRequest struct {
 	Start     Point
 	Waypoints []Point
+	// End makes the route finish there instead of coming back to Start: a point-to-point route, not a loop.
+	End *Point
+	// Reference, with End, asks for the shortest or the fastest way to it instead of the cheapest for the surface
+	// preference.
+	Reference Reference
 	Avoided   []Circle
 	// IncludeTechnical is LoopRequest.IncludeTechnical for the direct loop.
 	IncludeTechnical bool
@@ -584,6 +631,9 @@ func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route,
 	if err != nil {
 		return nil, err
 	}
+	if req.End != nil {
+		return e.directPath(ctx, src, req, forbidden)
+	}
 	anchors, nodes, edges, err := e.routeAnchors(ctx, src, req.Waypoints, false, forbidden)
 	if err != nil {
 		return nil, err
@@ -591,6 +641,47 @@ func (e *Engine) DirectLoop(ctx context.Context, req DirectLoopRequest) (*Route,
 	r := e.describe(nodes, edges)
 	r.anchors, r.fingerprint, r.mode = anchors, e.g.fingerprint, e.mode
 	r.Shortest = e.shortestLoopForLoops(ctx, req.Start, req.Waypoints, forbidden)
+	return r, nil
+}
+
+// directPath is DirectLoop for a request with an end point: the cheapest route from src through the waypoints to the
+// end. It fails with ErrEndOffGraph for an end off the ways. Its Shortest is the shortest length of such a route.
+func (e *Engine) directPath(ctx context.Context, src uint32, req DirectLoopRequest, f *forbidden) (*Route, error) {
+	snapped, err := e.snapWaypoints(req.Waypoints, false, f)
+	if err != nil {
+		return nil, err
+	}
+	// The end is snapped as the detour search snaps it, so that both finish at the same node.
+	end, err := e.snapPathEnd(*req.End, f)
+	if err != nil {
+		return nil, err
+	}
+	anchors := collapse(append(append([]uint32{src}, snapped...), end))
+	if len(anchors) < 2 {
+		r := e.describe([]uint32{src}, nil)
+		r.anchors, r.fingerprint, r.mode = anchors, e.g.fingerprint, e.mode
+		return r, nil
+	}
+	var nodes, edges []uint32
+	switch req.Reference {
+	case ReferenceShortest:
+		var ok bool
+		if nodes, edges, ok = unitChain(ctx, e, anchors, f, 0); !ok {
+			return nil, ErrNoRoute
+		}
+	case ReferenceFastest:
+		var ok bool
+		if nodes, edges, ok = unitChain(ctx, e, anchors, f, e.prof.UpPerMeter); !ok {
+			return nil, ErrNoRoute
+		}
+	default:
+		if nodes, edges, err = e.routeChain(ctx, anchors, f); err != nil {
+			return nil, err
+		}
+	}
+	r := e.describe(nodes, edges)
+	r.anchors, r.fingerprint, r.mode = anchors, e.g.fingerprint, e.mode
+	r.Shortest = shortestLoop(ctx, e, anchors, f)
 	return r, nil
 }
 

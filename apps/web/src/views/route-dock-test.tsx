@@ -85,6 +85,12 @@ describe('RouteDock', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('takes the reverse button away for a route that is no loop', () => {
+    dock('en', { reversible: false });
+
+    expect(screen.queryByTestId('route-reverse')).not.toBeInTheDocument();
+  });
+
   it('runs the route the other way from its button', () => {
     const onReverse = vi.fn();
     dock('en', { onReverse });

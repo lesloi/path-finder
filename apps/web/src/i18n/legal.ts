@@ -10,7 +10,7 @@ type Block = { paragraph: Paragraph } | { list: Paragraph[] };
 export type Section = { id: string; title?: string; blocks: Block[] };
 
 /** Where the privacy policy was last updated, as a UTC calendar day. */
-export const PRIVACY_POLICY_UPDATED = '2026-11-05';
+export const PRIVACY_POLICY_UPDATED = '2026-11-24';
 
 /** The "Last updated" line of the privacy policy, with the day written as the language does (28 September 2026). */
 export function privacyUpdatedLine(language: Language): string {
@@ -88,7 +88,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'The app asks for your location only when you tap “my location”. Otherwise, you pick the start point on the map, or type an address or a place name; what you type goes to the IGN (see Recipients).',
+              text: 'The app asks for your location only when you tap “my location”. Otherwise, you pick the start point or the end point on the map, or type an address or a place name; what you type goes to the IGN (see Recipients).',
             },
           },
         ],
@@ -99,7 +99,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'When you ask for routes, our server receives your criteria (start point coordinates, pace, target distance or duration, elevation gain, surface preference) and, as with any connection, your IP address. It uses them only to generate the routes and forgets them once the response is sent. It writes no log that contains a location or an IP address.',
+              text: 'When you ask for routes, our server receives your criteria (start point and end point coordinates, pace, target distance or duration, elevation gain, surface preference) and, as with any connection, your IP address. It uses them only to generate the routes and forgets them once the response is sent. It writes no log that contains a location or an IP address.',
             },
           },
           {
@@ -132,7 +132,7 @@ export const legalText = {
             list: [
               { text: 'OVHcloud, our host, runs our server in France and processes this data only on our behalf.' },
               {
-                text: 'IGN (the French national institute of geographic and forest information), a French public body: your browser loads the map, with its fonts and icons, straight from the IGN Géoplateforme, which therefore receives your IP address and the map area you view. When you search for a start point by address or place name, the IGN also receives the text you type, sent as you type it. Our pages do not send their address (no referrer) to IGN.',
+                text: 'IGN (the French national institute of geographic and forest information), a French public body: your browser loads the map, with its fonts and icons, straight from the IGN Géoplateforme, which therefore receives your IP address and the map area you view. When you search for a start point or an end point by address or place name, the IGN also receives the text you type, sent as you type it. Our pages do not send their address (no referrer) to IGN.',
               },
             ],
           },
@@ -250,7 +250,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'L’application ne demande votre position que lorsque vous touchez « ma position ». Sinon, vous choisissez le point de départ sur la carte, ou vous tapez une adresse ou un nom de lieu ; ce que vous tapez part à l’IGN (voir « Destinataires »).',
+              text: 'L’application ne demande votre position que lorsque vous touchez « ma position ». Sinon, vous choisissez le point de départ ou d’arrivée sur la carte, ou vous tapez une adresse ou un nom de lieu ; ce que vous tapez part à l’IGN (voir « Destinataires »).',
             },
           },
         ],
@@ -261,7 +261,7 @@ export const legalText = {
         blocks: [
           {
             paragraph: {
-              text: 'Quand vous demandez des parcours, notre serveur reçoit vos critères (coordonnées du point de départ, allure, distance ou durée visée, dénivelé, préférence de revêtement) et, comme pour toute connexion, votre adresse IP. Il s’en sert uniquement pour calculer les parcours et les oublie dès la réponse envoyée. Il n’écrit aucun journal contenant une position ou une adresse IP.',
+              text: 'Quand vous demandez des parcours, notre serveur reçoit vos critères (coordonnées des points de départ et d’arrivée, allure, distance ou durée visée, dénivelé, préférence de revêtement) et, comme pour toute connexion, votre adresse IP. Il s’en sert uniquement pour calculer les parcours et les oublie dès la réponse envoyée. Il n’écrit aucun journal contenant une position ou une adresse IP.',
             },
           },
           {
@@ -296,7 +296,7 @@ export const legalText = {
                 text: 'OVHcloud, notre hébergeur, fait tourner notre serveur en France et ne traite ces données que pour notre compte.',
               },
               {
-                text: 'L’IGN (Institut national de l’information géographique et forestière), organisme public français : votre navigateur charge la carte, avec ses polices et ses icônes, directement depuis la Géoplateforme de l’IGN, qui reçoit donc votre adresse IP et la zone de carte affichée. Quand vous cherchez un point de départ par une adresse ou un nom de lieu, l’IGN reçoit aussi le texte que vous tapez, au fil de la frappe. Nos pages n’envoient pas leur adresse (aucun « referrer ») à l’IGN.',
+                text: 'L’IGN (Institut national de l’information géographique et forestière), organisme public français : votre navigateur charge la carte, avec ses polices et ses icônes, directement depuis la Géoplateforme de l’IGN, qui reçoit donc votre adresse IP et la zone de carte affichée. Quand vous cherchez un point de départ ou d’arrivée par une adresse ou un nom de lieu, l’IGN reçoit aussi le texte que vous tapez, au fil de la frappe. Nos pages n’envoient pas leur adresse (aucun « referrer ») à l’IGN.',
               },
             ],
           },

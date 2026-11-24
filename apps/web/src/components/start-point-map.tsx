@@ -65,6 +65,10 @@ import { NORTH_EPSILON, useRouteSnapshot } from './use-route-snapshot.ts';
 
 const LONG_PRESS_MS = 500;
 
+// The path of the flag icon (Lucide's `flag`): its pole stands on the point.
+const FLAG_PATH =
+  'M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528';
+
 // Pixels between a framed route and the edge of the visible map: a margin (`--spacing-6`).
 const FRAME_MARGIN = 24;
 // Without the stylesheet that sets the room of the desktop panels (`--column-inset`…), they take none.
@@ -216,6 +220,8 @@ function boundsOf(geometries: Position[][]): [Position, Position] {
 export function StartPointMap({
   basemap = DEFAULT_BASEMAP,
   start,
+  end,
+  finishing = false,
   focus,
   pickOnClick = false,
   waypoints = NO_WAYPOINTS,
@@ -239,6 +245,7 @@ export function StartPointMap({
   onBackgroundClick,
   onSnapshot,
   onStartChange,
+  onEndChange,
   onWaypointAdd,
   onAvoidedAreaAdd,
   onWaypointRefused,
@@ -295,6 +302,11 @@ export function StartPointMap({
    */
   onSnapshot?: (snapshot: MapSnapshot | undefined) => void;
   start?: Position;
+  /** Where the route finishes, when it is not a loop. */
+  end?: Position;
+  /** A click or a tap sets the end point, and a long press no longer sets the start point. */
+  finishing?: boolean;
+  onEndChange?: (end: Position) => void;
   /** Where the map moves to: the device location, or coordinates the user typed. */
   focus?: Position;
   /** Desktops arm a click once the user asks to pick the start point. */
@@ -343,7 +355,8 @@ export function StartPointMap({
   // The route set the map has a snapshot of: it draws the routes once it has.
   const drawnFor = useRouteSnapshot({ map: mapRef, loaded, routes, desktop, onSnapshot });
   // Picking the start point on the map comes first: a click then is not on a route.
-  const interactive = Boolean(routes?.length) && routesInteractive && !pickOnClick && !(placing || avoiding);
+  const interactive =
+    Boolean(routes?.length) && routesInteractive && !pickOnClick && !(placing || avoiding || finishing);
   const view = useRef<MapView>({ bearing: 0, rotated: false, movedAway: false });
   // Tells the app what changed in the view, and only when something did: the map moves many times a second.
   const changeView = useEffectEvent((change: Partial<MapView>) => {
@@ -355,7 +368,7 @@ export function StartPointMap({
   // The veiled part of the map is where the server cannot route: a waypoint there would only be refused.
   const canPlace = useEffectEvent(([lng, lat]: Position) => !coverage || isCovered(coverage, [lng, lat]));
   // What the pointer looks like where nothing else sets it: a crosshair while placing, which says a tap places a waypoint.
-  const marking = placing || avoiding;
+  const marking = placing || avoiding || finishing;
   const isPlacing = useEffectEvent(() => marking);
   const idleCursor = useEffectEvent(() => (marking ? 'crosshair' : ''));
   const pick = useEffectEvent(
@@ -366,6 +379,13 @@ export function StartPointMap({
     ) => {
       if (avoiding) {
         if (how === 'click') onAvoidedAreaAdd?.([lng, lat]);
+        return;
+      }
+      if (finishing) {
+        if (how === 'click') {
+          if (!canPlace([lng, lat])) onWaypointRefused?.();
+          else onEndChange?.([lng, lat]);
+        }
         return;
       }
       if (placing) {
@@ -383,7 +403,7 @@ export function StartPointMap({
     },
   );
   const clickedBackground = useEffectEvent(() => {
-    if (!pickOnClick && !(placing || avoiding)) onBackgroundClick?.();
+    if (!pickOnClick && !(placing || avoiding || finishing)) onBackgroundClick?.();
   });
   const basemapFailed = useEffectEvent((previous: Basemap) => onBasemapFail?.(previous));
   const selectRoute = useEffectEvent((index: number) => {
@@ -768,18 +788,35 @@ export function StartPointMap({
     };
   }, [start]);
 
+  useEffect(() => {
+    if (!end) return;
+    const element = document.createElement('div');
+    // A flag, where the start is a dot: the route ends at the foot of its pole.
+    element.innerHTML =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="white" stroke="${MAP_INK}" ` +
+      `stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="drop-shadow-md" aria-hidden="true">` +
+      `<path d="${FLAG_PATH}"/></svg>`;
+    element.dataset.testid = 'end-marker';
+    const marker = new Marker({ element, anchor: 'bottom-left', offset: [-3, 1] })
+      .setLngLat(end)
+      .addTo(mapRef.current!);
+    return () => {
+      marker.remove();
+    };
+  }, [end]);
+
   // A forbidden sign over the veiled part of the map, while placing.
   useEffect(() => {
     const map = mapRef.current!;
     map.getCanvas().style.cursor = idleCursor();
-    if (!placing) return;
+    if (!placing && !finishing) return;
     const follow = ({ lngLat }: MapMouseEvent) => {
       const cursor = canPlace([lngLat.lng, lngLat.lat]) ? 'crosshair' : 'not-allowed';
       if (map.getCanvas().style.cursor !== cursor) map.getCanvas().style.cursor = cursor;
     };
     map.on('mousemove', follow);
     return () => void map.off('mousemove', follow);
-  }, [placing, avoiding]);
+  }, [placing, avoiding, finishing]);
 
   // The waypoints' markers: a button each, which the pins (`WaypointPin`) are drawn into. Tapping one opens a bubble with a
   // button to remove it. The marker's own events stop here, as MapLibre would hear them as the map's: a click that

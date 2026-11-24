@@ -809,6 +809,31 @@ describe('CriteriaView', () => {
       expect(map().easedTo).toMatchObject({ center: [6.869242, 45.924044] });
     });
 
+    it('sets the end point from a place found by its name, or from typed coordinates', async () => {
+      onDesktop();
+      stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+      setStartPoint();
+      fireEvent.click(screen.getByTestId('criteria-end-add'));
+      const endField = () => screen.getByTestId('criteria-end');
+
+      fireEvent.change(endField(), { target: { value: 'Chamonix' } });
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+      fireEvent.click(screen.getByTestId('criteria-end-place-0'));
+
+      expect(endField()).toHaveValue('45.9240° N · 6.8692° E');
+      expect(screen.getByTestId('criteria-end-place')).toHaveTextContent('Chamonix');
+      expect(markers.at(-1)).toMatchObject({ position: [6.869242, 45.924044], shown: true });
+
+      fireEvent.change(endField(), { target: { value: '45.85, 6.25' } });
+      fireEvent.keyDown(endField(), { key: 'Enter' });
+
+      expect(endField()).toHaveValue('45.8500° N · 6.2500° E');
+      expect(screen.queryByTestId('criteria-end-place')).not.toBeInTheDocument();
+    });
+
     it('picks the place under the arrows with Enter', async () => {
       onDesktop();
       stubGeocoder(() => Promise.resolve(Response.json(places(chamonix, chamonixSud))));
@@ -2499,6 +2524,54 @@ describe('CriteriaView', () => {
       expect(banner()).toBeInTheDocument();
     });
 
+    it('asks for a route to the end point tapped on the map, and for a loop once it is cleared', () => {
+      const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => new Promise(() => {}));
+      stubFetch(fetchMock);
+      render(<CriteriaView language="en" />);
+      setStart();
+
+      fireEvent.click(screen.getByTestId('criteria-end-add'));
+      fireEvent.click(screen.getByTestId('criteria-end-pick'));
+      place(6.25, 45.85);
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+      const toEnd = lastRequest(fetchMock);
+      fireEvent.click(screen.getByTestId('criteria-end-clear'));
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      expect(toEnd.end).toEqual([6.25, 45.85]);
+      expect(lastRequest(fetchMock)).not.toHaveProperty('end');
+    });
+
+    it('asks for the end point field, which takes the focus, and folds it back to a loop', () => {
+      render(<CriteriaView language="en" />);
+      setStart();
+      expect(screen.queryByTestId('criteria-end')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('criteria-end-add'));
+      expect(screen.getByTestId('criteria-end')).toHaveFocus();
+      expect(screen.queryByTestId('criteria-end-add')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('criteria-end-clear'));
+
+      expect(screen.queryByTestId('criteria-end')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-end-add')).toBeInTheDocument();
+    });
+
+    it('stops setting the end point when its banner is cancelled, and when the search starts', () => {
+      stubFetch(() => new Promise(() => {}));
+      render(<CriteriaView language="en" />);
+      setStart();
+      fireEvent.click(screen.getByTestId('criteria-end-add'));
+      fireEvent.click(screen.getByTestId('criteria-end-pick'));
+      expect(screen.getByTestId('criteria-end-bar')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('criteria-end-cancel'));
+      expect(screen.queryByTestId('criteria-end-bar')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('criteria-end-pick'));
+      fireEvent.click(screen.getByTestId('criteria-submit'));
+
+      expect(screen.queryByTestId('criteria-end-bar')).not.toBeInTheDocument();
+    });
+
     it('does not move the start point while placing', () => {
       render(<CriteriaView language="en" />);
       startPlacing();
@@ -2674,6 +2747,21 @@ describe('CriteriaView', () => {
       it('says the waypoints make too long a route, or that no way joins them', async () => {
         expect(await refuse({ field: 'waypoints' })).toHaveTextContent(t.waypointsUnreachable);
       });
+    });
+  });
+
+  describe('the end point on a phone', () => {
+    it('closes the criteria layer to tap the end point on the map, as for the start point', () => {
+      render(<CriteriaView language="en" />);
+      fireEvent.click(screen.getByTestId('criteria-bar'));
+      fireEvent.change(field(), { target: { value: '45.8, 6.2' } });
+      fireEvent.keyDown(field(), { key: 'Enter' });
+      fireEvent.click(screen.getByTestId('criteria-end-add'));
+
+      fireEvent.click(screen.getByTestId('criteria-end-pick'));
+
+      expect(screen.queryByTestId('sub-page')).not.toBeInTheDocument();
+      expect(screen.getByTestId('criteria-end-bar')).toBeInTheDocument();
     });
   });
 

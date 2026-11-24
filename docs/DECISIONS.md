@@ -267,6 +267,22 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   asks for, as a distance target already accepts the match tolerance. The cost of the search (climb penalty,
   landmarks) is a separate model and does not change. Revisit if a target duration still misses often on the hard
   starts (#324).
+- **A route with an end point detours over one leg of its chain, on an arc, and is ranked as a loop is.** The
+  chain is the start, the waypoints and the end; the 2–4 control points sit on an arc that bulges to one side of one
+  leg (picked by chance, longer legs more often), not on a circle through the start, since the way between the fixed
+  points is already the direct path. The arc's first height makes up what the direct path lacks of the target, with the
+  loop's 1.3 tortuosity, and the resizings of the loop search, its elevation-gain lift, its effort target and its
+  length band do the rest, so surface preference, gain and duration act as they do for a loop. It cannot repeat laps
+  (a lap ends where it starts) and the summit and lollipop sources are left out: both are shaped around the start. An
+  end beyond the longest route in a straight line is refused.
+- **A route with an end point offers up to three direct ways, whatever the target, and marks two of them as direct (`direct` in the route).** They are
+  the cheapest for the surface preference, the shortest (every way costs its length) and the fastest (its length plus
+  8 m per metre of ascent, which is the profile's climb cost and Naismith's rule); the same way found twice is one
+  route, and a way that is neither is dropped. The shortest is the one of least distance and the fastest the one of least
+  effort distance, the figure the shown duration is read from, so no label contradicts the numbers beside it. The
+  preferred way is not the shortest (it detours from main roads), which is why the label is not left to it. The three
+  are not compared to one another for duplicates, since the shortest and the fastest often share most of their
+  ground, and each takes a place from the worst detour.
 
 ## Elevation
 

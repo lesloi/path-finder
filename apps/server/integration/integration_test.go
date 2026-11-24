@@ -399,6 +399,39 @@ func TestRouteSetsThroughWaypoints(t *testing.T) {
 	}
 }
 
+func TestRouteSetsToAnEndPoint(t *testing.T) {
+	h := newServer(t)
+
+	code, routes, out := routeSets(t, h, criteria(`{"distance":10}`, `,"end":[6.1380,45.9030]`))
+
+	if code != 200 || len(routes) == 0 {
+		t.Fatalf("status %d, %d routes: %s", code, len(routes), out[:min(len(out), 200)])
+	}
+	for i, r := range routes {
+		first, last := r.Geometry[0], r.Geometry[len(r.Geometry)-1]
+		if first[0] == last[0] && first[1] == last[1] {
+			t.Errorf("route %d is a loop, want it to finish at the end point", i)
+		}
+	}
+}
+
+func TestEndPointRefusalsNameTheFieldNeverAPosition(t *testing.T) {
+	h := newServer(t)
+	cases := map[string]string{
+		"an end beyond the longest route": criteria(`{"distance":5}`, `,"end":[9.0,48.0]`),
+		"an end off the ways":             criteria(`{"distance":10}`, `,"end":[6.1916,45.8992]`),
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			code, _, out := routeSets(t, h, body)
+
+			if code != 400 || strings.TrimSpace(out) != `{"error":"invalid-criteria","field":"end"}` {
+				t.Errorf("status %d: %s", code, out)
+			}
+		})
+	}
+}
+
 func TestWaypointRefusalsNameAFieldOrANumberNeverAPosition(t *testing.T) {
 	h := newServer(t)
 	cases := map[string]struct{ criteria, want string }{

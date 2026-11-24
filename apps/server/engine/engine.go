@@ -898,6 +898,9 @@ type loopParams struct {
 	anchors    []uint32
 	baseM      float64
 	baseEffort float64
+	// pathEnd is set when the anchors end at an end point, not at the start: the detours are arcs over one leg of
+	// the chain (see pathloops.go), not a circle through the start.
+	pathEnd bool
 	// heading is the direction of the highest ground around the start when hasHeading is set: a loop with an
 	// elevation gain to make heads there rather than in a random direction.
 	heading    float64
@@ -1213,18 +1216,43 @@ func candidateLoop(ctx context.Context, cx *Engine, sp *spatial, s *searcher, lp
 	for j := range jitter {
 		jitter[j] = 0.85 + 0.3*rng.f64()
 	}
+	// A route to an end point detours over one leg of its chain, on the side it is given.
+	leg, sign := 0, 1.0
+	var legA, legB [2]float64
+	if lp.pathEnd {
+		leg = pathLeg(lp.anchors, xy, rng.f64())
+		if rng.f64() < 0.5 {
+			sign = -1
+		}
+		legA[0], legA[1] = xy(lp.anchors[leg])
+		legB[0], legB[1] = xy(lp.anchors[leg+1])
+		rc = pathHeight(math.Hypot(legB[0]-legA[0], legB[1]-legA[1]), extraM)
+	}
 	var best *loopResult
 	lift := 0.0
 	for iter := 0; iter < 4; iter++ {
 		if ctx.Err() != nil {
 			return best, CauseCanceled
 		}
-		circle, turned, ok := rotatedCircle(g, sp, slat, slon, rc, theta, jitter, lift, lp.forbidden, cx.mode)
-		if !ok {
-			return best, CauseNoSnap
+		var points []uint32
+		if lp.pathEnd {
+			control, ok := bulgePoints(g, sp, slat, slon, legA, legB, rc, sign, jitter, lift, lp.forbidden, cx.mode)
+			if !ok {
+				// The other side of the leg may fall on ways.
+				sign = -sign
+				if control, ok = bulgePoints(g, sp, slat, slon, legA, legB, rc, sign, jitter, lift, lp.forbidden, cx.mode); !ok {
+					return best, CauseNoSnap
+				}
+			}
+			points = pathPoints(lp.anchors, leg, control)
+		} else {
+			circle, turned, ok := rotatedCircle(g, sp, slat, slon, rc, theta, jitter, lift, lp.forbidden, cx.mode)
+			if !ok {
+				return best, CauseNoSnap
+			}
+			theta = turned
+			points = loopPoints(start, circle, lp.anchors, xy)
 		}
-		theta = turned
-		points := loopPoints(start, circle, lp.anchors, xy)
 		if len(points) < 3 {
 			// Every control point fell on the one before it: the chain is no loop.
 			return best, CauseSameNode

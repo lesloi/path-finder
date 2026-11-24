@@ -802,6 +802,46 @@ func TestDirectLoopErrors(t *testing.T) {
 	}
 }
 
+func TestDirectLoopWithAnEndPointFinishesThereWithoutComingBack(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	e := openTest(t, g, false)
+	start, end := pointOf(g, at(10, 10)), pointOf(g, at(14, 13))
+	via := pointOf(g, at(14, 10))
+
+	r, err := e.DirectLoop(context.Background(), DirectLoopRequest{Start: start, Waypoints: []Point{via}, End: &end})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	near(t, r.Distance, 400+300, 1, "distance") // 400 m up, then 300 m across, and no way back
+	if r.Points[len(r.Points)-1].Point != end || !visitOrder(r, via) {
+		t.Error("the route does not go from the start through the waypoint to the end")
+	}
+	near(t, r.Shortest, 700, 1, "shortest")
+}
+
+func TestDirectLoopWithAnEndPointFailsWhenTheEndIsOffTheWaysOrNotJoined(t *testing.T) {
+	g := &testGraph{}
+	at := g.grid(21, 21, flat)
+	islandEnd := g.addNode(2100, 2100, 100)
+	g.connect(islandEnd, g.addNode(2200, 2100, 100), KindPath)
+	e := openTest(t, g, false)
+	start := pointOf(g, at(10, 10))
+
+	off := Point{46, 7}
+	island := offset(2100, 2100)
+	_, errOff := e.DirectLoop(context.Background(), DirectLoopRequest{Start: start, End: &off})
+	_, errIsland := e.DirectLoop(context.Background(), DirectLoopRequest{Start: start, End: &island})
+
+	if !errors.Is(errOff, ErrEndOffGraph) {
+		t.Errorf("end off the graph: err = %v, want ErrEndOffGraph", errOff)
+	}
+	if !errors.Is(errIsland, ErrNoRoute) {
+		t.Errorf("end not joined: err = %v, want ErrNoRoute", errIsland)
+	}
+}
+
 func TestLoopsAreSteeredTowardsTheElevationGainWhenGivenABand(t *testing.T) {
 	// Arrange: a lattice that rises towards the east, and a target the first loops miss
 	g := &testGraph{}
