@@ -809,6 +809,30 @@ describe('CriteriaView', () => {
       expect(map().easedTo).toMatchObject({ center: [6.869242, 45.924044] });
     });
 
+    it('sets the end point from a place found by its name, or from typed coordinates', async () => {
+      onDesktop();
+      stubGeocoder(() => Promise.resolve(Response.json(places(chamonix))));
+      render(<CriteriaView language="en" />);
+      setStartPoint();
+      const endField = () => screen.getByTestId('criteria-end');
+
+      fireEvent.change(endField(), { target: { value: 'Chamonix' } });
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+      fireEvent.click(screen.getByTestId('criteria-end-place-0'));
+
+      expect(endField()).toHaveValue('45.9240° N · 6.8692° E');
+      expect(screen.getByTestId('criteria-end-place')).toHaveTextContent('Chamonix');
+      expect(markers.at(-1)).toMatchObject({ position: [6.869242, 45.924044], shown: true });
+
+      fireEvent.change(endField(), { target: { value: '45.85, 6.25' } });
+      fireEvent.keyDown(endField(), { key: 'Enter' });
+
+      expect(endField()).toHaveValue('45.8500° N · 6.2500° E');
+      expect(screen.queryByTestId('criteria-end-place')).not.toBeInTheDocument();
+    });
+
     it('picks the place under the arrows with Enter', async () => {
       onDesktop();
       stubGeocoder(() => Promise.resolve(Response.json(places(chamonix, chamonixSud))));

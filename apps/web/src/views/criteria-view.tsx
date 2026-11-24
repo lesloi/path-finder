@@ -261,6 +261,8 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
   const finishing = mode === 'finish';
   // Where the route finishes when it is not a loop back to the start: kept here for this visit, as the waypoints are.
   const [end, setEnd] = useState<Position>();
+  // The name of the place the end point was found from, as for the start point.
+  const [endPlace, setEndPlace] = useState<string>();
   // The points the routes go through, in the order placed: kept here with the start point, not in the criteria kept.
   const [waypoints, setWaypoints] = useState<Position[]>([]);
   // The circles routes keep out of: kept here too, for this visit only, as the waypoints are.
@@ -456,12 +458,28 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
     setRefused(undefined);
     deselect();
     setEnd(position);
+    setEndPlace(undefined);
     setMode(undefined);
+  }
+
+  // Typed, or found by its name: the form says when the end is inside an area to avoid, as it does for the start.
+  function moveEnd(position: Position, place?: string) {
+    deselect();
+    setRefused(undefined);
+    setEnd(position);
+    setEndPlace(place);
+    setMode((current) => (current === 'finish' ? undefined : current));
+  }
+
+  function moveEndToPlace(position: Position, place: string) {
+    setFocus(position);
+    moveEnd(position, place);
   }
 
   function clearEnd() {
     deselect();
     setEnd(undefined);
+    setEndPlace(undefined);
     setMode((current) => (current === 'finish' ? undefined : current));
   }
 
@@ -630,9 +648,15 @@ export function CriteriaView({ language, pageOpen = false }: { language: Languag
       language={language}
       picking={picking}
       end={end}
+      endPlace={endPlace}
       finishing={finishing}
       onFinishToggle={toggleFinishing}
       onEndClear={clearEnd}
+      onEndTyped={(position) => {
+        setFocus(position);
+        moveEnd(position);
+      }}
+      onEndPlace={moveEndToPlace}
       waypoints={waypoints}
       avoidedAreas={avoidedAreas}
       draft={draft}
@@ -1063,9 +1087,12 @@ function CriteriaFields({
   language,
   picking,
   end,
+  endPlace,
   finishing,
   onFinishToggle,
   onEndClear,
+  onEndTyped,
+  onEndPlace,
   waypoints,
   avoidedAreas,
   draft,
@@ -1089,9 +1116,12 @@ function CriteriaFields({
   language: Language;
   picking: boolean;
   end: Position | undefined;
+  endPlace: string | undefined;
   finishing: boolean;
   onFinishToggle: () => void;
   onEndClear: () => void;
+  onEndTyped: (end: Position) => void;
+  onEndPlace: (end: Position, place: string) => void;
   waypoints: Position[];
   avoidedAreas: AvoidedArea[];
   draft: ReturnType<typeof useCriteriaDraft>;
@@ -1143,19 +1173,18 @@ function CriteriaFields({
         </button>
       </StartPointField>
       {criteriaShown && start && (
-        <div
-          className={
-            'flex items-center gap-1 rounded-md bg-surface-2 pr-1 ' +
-            `${finishing ? 'ring-2 ring-accent ring-inset' : ''}`
-          }
+        <StartPointField
+          kind="end"
+          start={end}
+          place={endPlace}
+          desktop={desktop}
+          language={language}
+          picking={finishing}
+          mapCenter={mapCenter}
+          onStartChange={onEndTyped}
+          onPlaceChange={onEndPlace}
+          onUnreadable={onUnreadable}
         >
-          <Flag size={16} aria-hidden className="ml-3 flex-none text-ink" />
-          <div className="flex min-h-14 min-w-0 flex-1 flex-col justify-center px-3 py-2">
-            <span className="text-sm text-ink-2">{t.endPoint}</span>
-            <span data-testid="criteria-end" className={`truncate ${end ? '' : 'text-ink-2'}`}>
-              {end ? formatPosition(end, language) : t.endLoop}
-            </span>
-          </div>
           {end && (
             <button
               type="button"
@@ -1177,7 +1206,7 @@ function CriteriaFields({
           >
             <Crosshair size={20} aria-hidden />
           </button>
-        </div>
+        </StartPointField>
       )}
       {criteriaShown ? (
         <CriteriaForm
@@ -1210,6 +1239,7 @@ type SearchStatus = 'idle' | 'failed' | 'answered';
 // The start point as coordinates, to copy, or to type or paste to set it; or an address or place name, which the
 // Géoplateforme turns into coordinates. Coordinates are read here and never sent: they are not a search.
 function StartPointField({
+  kind = 'start',
   start,
   place,
   desktop,
@@ -1221,6 +1251,8 @@ function StartPointField({
   onUnreadable,
   children,
 }: {
+  /** The end point is a field of its own, with the same ways to set it. */
+  kind?: 'start' | 'end';
   start?: Position;
   place?: string;
   desktop: boolean;
@@ -1236,6 +1268,7 @@ function StartPointField({
   children?: ReactNode;
 }) {
   const t = criteriaText[language];
+  const id = `criteria-${kind}`;
   const coordinates = start ? formatPosition(start, language) : '';
   // A phone shows the name typed when the start point came from one, where a narrow field has room for either that or
   // the coordinates. A desktop keeps the coordinates, to copy, and names the place beside them.
@@ -1405,16 +1438,20 @@ function StartPointField({
           `focus-within:ring-inset ${picking ? 'ring-2 ring-accent ring-inset' : ''}`
         }
       >
-        <span className="ml-3 size-4 flex-none rounded-full border-4 border-start bg-white" />
+        {kind === 'end' ? (
+          <Flag size={16} aria-hidden className="ml-3 flex-none text-ink" />
+        ) : (
+          <span className="ml-3 size-4 flex-none rounded-full border-4 border-start bg-white" />
+        )}
         <div className="flex min-h-14 min-w-0 flex-1 flex-col justify-center px-3 py-2">
           <div className="flex min-w-0 items-baseline gap-1">
             <label className="flex-none text-sm text-ink-2" htmlFor={inputId}>
-              {t.startPoint}
+              {kind === 'end' ? t.endPoint : t.startPoint}
             </label>
             {place && desktop && (
               <span className="flex min-w-0 items-baseline gap-1 text-sm text-ink-2">
                 <span aria-hidden>·</span>
-                <span id={placeId} data-testid="criteria-start-place" className="truncate">
+                <span id={placeId} data-testid={`${id}-place`} className="truncate">
                   {place}
                 </span>
               </span>
@@ -1422,7 +1459,7 @@ function StartPointField({
           </div>
           <input
             id={inputId}
-            data-testid="criteria-start"
+            data-testid={id}
             role="combobox"
             aria-expanded={open}
             aria-controls={listId}
@@ -1431,7 +1468,7 @@ function StartPointField({
             aria-describedby={describedBy === '' ? undefined : describedBy}
             className="w-full bg-transparent outline-none placeholder:text-ink-2"
             value={draft}
-            placeholder={t.startPlaceholder}
+            placeholder={kind === 'end' ? t.endPlaceholder : t.startPlaceholder}
             autoComplete="off"
             spellCheck={false}
             aria-invalid={unreadable}
@@ -1455,7 +1492,7 @@ function StartPointField({
           }
         >
           {places.length === 0 ? (
-            <li role="presentation" data-testid="criteria-start-no-place" className="px-3 py-2 text-sm text-ink-2">
+            <li role="presentation" data-testid={`${id}-no-place`} className="px-3 py-2 text-sm text-ink-2">
               {status === 'failed' ? t.placeSearchFailed : t.noPlace}
             </li>
           ) : (
@@ -1465,7 +1502,7 @@ function StartPointField({
                 id={optionId(index)}
                 role="option"
                 aria-selected={index === active}
-                data-testid={`criteria-start-place-${index}`}
+                data-testid={`${id}-place-${index}`}
                 // The input keeps the focus: a click on an option must not blur it, which would close the list first.
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseMove={() => setActive(index)}
@@ -1482,7 +1519,7 @@ function StartPointField({
           )}
         </ul>
       )}
-      <p role="status" data-testid="criteria-start-status" className="sr-only">
+      <p role="status" data-testid={`${id}-status`} className="sr-only">
         {open &&
           (places.length > 0 ? t.placeCount(places.length) : status === 'failed' ? t.placeSearchFailed : t.noPlace)}
       </p>
