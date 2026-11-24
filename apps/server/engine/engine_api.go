@@ -127,6 +127,9 @@ type LoopRequest struct {
 	// Waypoints every loop goes through, in this order, between leaving Start and coming back to it. A
 	// route may retrace its steps to reach one. At most as many as the caller allows.
 	Waypoints []Point
+	// End, when set, makes the routes finish there instead of coming back to Start: point-to-point routes, which
+	// detour to reach the target as loops do. The waypoints are then between Start and End.
+	End *Point
 	// Direct, when set, is the loop through Waypoints the caller already found with DirectLoop. The engine reuses
 	// its chain when the waypoints snap to the same nodes on the same graph, so that a loop request does not route
 	// them twice; otherwise it routes them again.
@@ -336,7 +339,13 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 	if err != nil {
 		return nil, err
 	}
-	anchors, baseM, baseEffort, err := e.anchorLoop(ctx, start, req.Waypoints, forbidden, req.Direct, req.Effort)
+	var anchors []uint32
+	var baseM, baseEffort float64
+	if req.End != nil {
+		anchors, baseM, baseEffort, err = e.anchorPath(ctx, start, req.Waypoints, *req.End, forbidden, req.Direct, req.Effort)
+	} else {
+		anchors, baseM, baseEffort, err = e.anchorLoop(ctx, start, req.Waypoints, forbidden, req.Direct, req.Effort)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -356,6 +365,7 @@ func (e *Engine) Loops(ctx context.Context, req LoopRequest) ([]*Route, error) {
 		distM: req.Distance, ascentM: req.Ascent, ascentBand: req.AscentBand, distanceBand: req.DistanceBand,
 		effort: req.Effort, candidates: req.Candidates, seed: req.Seed,
 		anchors: anchors, baseM: baseM, baseEffort: baseEffort, stats: req.Stats, forbidden: forbidden,
+		pathEnd: req.End != nil,
 	}
 	// A loop with an elevation gain to make heads for the highest ground around the start, rather than a random way.
 	if req.Ascent > 0 {
@@ -505,24 +515,34 @@ func (e *Engine) anchorLoop(ctx context.Context, start uint32, waypoints []Point
 	if err != nil || len(anchors) < 2 {
 		return nil, 0, 0, err
 	}
+	length, baseEffort, err = e.measureAnchors(ctx, anchors, f, direct, effort)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return anchors, length, baseEffort, nil
+}
+
+// measureAnchors is the length of the cheapest chain through the anchors and its effort distance. When direct is
+// the direct route of the same anchors, its length is that one, and the chain is not routed again.
+func (e *Engine) measureAnchors(ctx context.Context, anchors []uint32, f *forbidden, direct *Route, effort *EffortTarget) (length, baseEffort float64, err error) {
 	if direct != nil && direct.Distance > 0 && direct.mode == e.mode && direct.fingerprint == e.g.fingerprint && slices.Equal(direct.anchors, anchors) {
 		length = direct.Distance
 		baseEffort = length
 		if effort != nil {
 			baseEffort = length * effortFactorOfPoints(direct.Points, effort.Slope)
 		}
-		return anchors, length, baseEffort, nil
+		return length, baseEffort, nil
 	}
 	nodes, edges, err := e.routeChain(ctx, anchors, f)
 	if err != nil {
-		return nil, 0, 0, err
+		return 0, 0, err
 	}
 	length, _, _ = measure(e.g, nodes, edges)
 	baseEffort = length
 	if effort != nil {
 		baseEffort = length * effortFactor(e.g, nodes, effort.Slope)
 	}
-	return anchors, length, baseEffort, nil
+	return length, baseEffort, nil
 }
 
 // shortestLoop is the shortest length of a loop through the anchors: unit costs and no climb penalty, so no loop

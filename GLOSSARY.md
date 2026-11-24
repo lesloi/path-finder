@@ -138,8 +138,9 @@ distance and the elevation gain are those of all the laps together.
 _Avoid_: Multi-loop, circuit repeat
 
 **Point-to-point route**:
-A route that ends at the **end point** instead of its start point. It is the cheapest way through the
-waypoints, with no detour to reach the target distance, so it is often a suggestion; it never repeats laps.
+A route that ends at the **end point** instead of its start point. It is generated like a loop: it detours to
+reach the target distance, elevation gain and duration, and the shortest way to the end point is always offered.
+It never repeats laps.
 _Avoid_: One-way, parcours, traversée
 
 **Route set**:

@@ -267,12 +267,18 @@ propose another with your arguments, then rewrite the entry. Git keeps the histo
   asks for, as a distance target already accepts the match tolerance. The cost of the search (climb penalty,
   landmarks) is a separate model and does not change. Revisit if a target duration still misses often on the hard
   starts (#324).
-- **A route with an end point is the cheapest way from the start through the waypoints to the end, and nothing
-  more.** The loop search has no point-to-point counterpart, so no detour brings the route nearer the target
-  distance: it is offered whatever its length, as a suggestion when it is out of the tolerances, and the
-  target only ranks it. It cannot repeat laps (a lap ends where it starts), and an end beyond the longest route
-  in a straight line is refused. Revisit once users ask for a longer way to the same finish: a detour search
-  would need its own control points, between the start and the end instead of on a circle.
+- **A route with an end point detours over one leg of its chain, on an arc, and is ranked as a loop is.** The
+  chain is the start, the waypoints and the end; the 2–4 control points sit on an arc that bulges to one side of one
+  leg (picked by chance, longer legs more often), not on a circle through the start, since the way between the fixed
+  points is already the direct path. The arc's first height makes up what the direct path lacks of the target, with the
+  loop's 1.3 tortuosity, and the resizings of the loop search, its elevation-gain lift, its effort target and its
+  length band do the rest, so surface preference, gain and duration act as they do for a loop. The direct path is
+  always in the set, as the direct loop is with waypoints, and when it already overshoots what a suggestion allows no
+  detour is searched. It cannot repeat laps (a lap ends where it starts) and the summit and lollipop sources are left
+  out: both are shaped around the start. On the Annecy graph a 10 km target between two points 0.8 km apart gave
+  5 matches in 0.7 s, and +400 m took 4.7 s, as long as the same loop (5.0 s). An end beyond the longest route in a
+  straight line is refused. Revisit if routes to a far end bulge too little: the arc is symmetric, and a skewed
+  one would give the search more shapes.
 
 ## Elevation
 

@@ -1185,7 +1185,7 @@ function CriteriaFields({
         <button
           type="button"
           data-testid="criteria-end-add"
-          className="flex min-h-touch items-center gap-2 rounded-md text-sm font-semibold text-ink-2 hover:text-ink"
+          className="-mt-1 flex items-center gap-2 self-start rounded-md py-1 text-sm font-semibold text-ink-2 hover:text-ink"
           onClick={onEndOpen}
         >
           <Flag size={16} aria-hidden />

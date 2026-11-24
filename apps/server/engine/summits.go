@@ -69,7 +69,7 @@ func routesMetGain(routes []*Route, ascent float64, band AscentBand) bool {
 // length-and-gain request. Waypoints and effort targets keep their own shape and ranking; the source would ignore
 // them, so it stays out of those requests.
 func summitWanted(req LoopRequest, found []*loopResult) bool {
-	return req.Ascent > 0 && len(req.Waypoints) == 0 && req.Effort == nil &&
+	return req.Ascent > 0 && len(req.Waypoints) == 0 && req.Effort == nil && req.End == nil &&
 		!circlesMetGain(found, req.Ascent, req.AscentBand)
 }
 

@@ -84,9 +84,6 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 		req.Ascent = criteria.ElevationGain.Metres
 		req.AscentBand = engine.AscentBand{Share: matchTolerance.elevationGain, FloorM: matchTolerance.elevationGainFloor}
 	}
-	if criteria.End != nil {
-		return g.pointToPoint(ctx, looper, criteria, km, req)
-	}
 	// A target duration is an effort distance: the search aims at it with the same curve the ranking estimates the
 	// duration with, so that a hilly loop is shorter than the flat prior rather than too slow.
 	if criteria.Target.Duration > 0 {
@@ -97,6 +94,9 @@ func (g *Generator) Generate(ctx context.Context, body json.RawMessage) (any, er
 				Decay: s.Decay, EasiestGrade: s.EasiestGrade, MaxGrade: s.MaxGrade, StretchMetres: s.StretchMetres,
 			},
 		}
+	}
+	if criteria.End != nil {
+		return g.pointToPoint(ctx, looper, criteria, km, req)
 	}
 	// The loop straight through the waypoints is a candidate of its own: run once, or as many times as best meets
 	// the criteria when the user allows repeats. It is one candidate, so the ranking still has one direct loop.
@@ -176,14 +176,38 @@ func (g *Generator) pointToPoint(ctx context.Context, looper Looper, c contract.
 		return nil, err
 	}
 	set := newRanking(c, km)
-	if cand := toCandidate(direct); cand != nil {
-		if cand.distance > contract.MaxDistanceKm() {
-			return nil, &contract.CriteriaError{Field: "end", Message: "end makes too long a route"}
-		}
-		cand.direct = true
-		set.add(g.bestDirect(c, cand, set))
+	limit := cmpOr(g.MaxRoutes, maxRoutes)
+	cand := toCandidate(direct)
+	if cand == nil {
+		return routeSet(c, set.routes(limit)), nil
 	}
-	return routeSet(c, set.routes(cmpOr(g.MaxRoutes, maxRoutes))), nil
+	if cand.distance > contract.MaxDistanceKm() {
+		return nil, &contract.CriteriaError{Field: "end", Message: "end makes too long a route"}
+	}
+	cand.direct = true
+	set.add(cand)
+	// Detours only add to the direct route: once it is beyond what a suggestion allows, none is nearer the target.
+	if overshoots(c, cand) {
+		return routeSet(c, set.routes(limit)), nil
+	}
+	req.End, req.Waypoints, req.Direct = &end, waypointPoints(c.Waypoints), direct
+	// The direct route keeps a place in the set (see ranking.routes), so one match fewer fills it.
+	enough := limit
+	if set.holdsADirectSuggestion() {
+		enough = limit - 1
+	}
+	_, err = g.search(ctx, looper, req, set, 1, cmpOr(g.Candidates, defaultCandidates), cmpOr(g.StopAfter, defaultStopAfter), enough, limit)
+	switch {
+	case errors.Is(err, engine.ErrOffGraph), errors.Is(err, engine.ErrNoLoop), errors.Is(err, engine.ErrNoRoute):
+		// Nothing more to offer: the direct route stays.
+	case err != nil && ctx.Err() == nil:
+		return nil, err
+	}
+	routes := set.routes(limit)
+	if ctx.Err() != nil && len(routes) == 0 {
+		return nil, ctx.Err()
+	}
+	return routeSet(c, routes), nil
 }
 
 func waypointPoints(list [][2]float64) []engine.Point {
