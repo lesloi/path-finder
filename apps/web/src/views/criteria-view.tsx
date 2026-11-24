@@ -1468,7 +1468,7 @@ function StartPointField({
             aria-describedby={describedBy === '' ? undefined : describedBy}
             className="w-full bg-transparent outline-none placeholder:text-ink-2"
             value={draft}
-            placeholder={kind === 'end' ? t.endPlaceholder : t.startPlaceholder}
+            placeholder={t.startPlaceholder}
             autoComplete="off"
             spellCheck={false}
             aria-invalid={unreadable}
